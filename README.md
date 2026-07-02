@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# countryatlas <img src="man/figures/logo.png" align="right" height="120" alt="" />
+# countryatlas <img src="man/figures/logo.png" align="right" height="120" alt="countryatlas hex logo: an orthographic globe choropleth with population spikes rising off the horizon" />
 
 <!-- badges: start -->
 
