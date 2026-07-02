@@ -217,6 +217,16 @@ see different maps or values.
 
 ### Housekeeping
 
+- New hex logo, drawn by the package itself (`data-raw/hex_logo.R`): an
+  orthographic globe —
+  [`globe_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/globe_map.md)’s
+  projection — carrying a viridis choropleth of `world_snapshot` GDP per
+  capita on Natural Earth geometry joined by
+  [`attach_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/attach_geometry.md),
+  with
+  [`spike_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/spike_map.md)-style
+  population spikes rising off the horizon and the binned-legend
+  swatches under the wordmark.
 - The `gdp_per_capita_2015` compatibility alias (a one-cycle deprecation
   shim from 1.0.0) is now opt-in: set
   `options(countryatlas.gdp_compat = TRUE)` to restore it. The default

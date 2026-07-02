@@ -121,6 +121,7 @@ world_data(2020)
 #> # ℹ 1 more variable: gdp_per_capita <dbl>
 world_data(2020, indicator = c(life_exp = "SP.DYN.LE00.IN"),
            geometry = "none")
+#> Warning: URL 'https://api.worldbank.org/v2/en/country/all/indicator/SP.DYN.LE00.IN?format=json&date=2020:2020&per_page=32500&page=2': Timeout of 60 seconds was reached
 #> # A tibble: 216 × 7
 #>    iso3c iso2c country             continent region              income life_exp
 #>    <chr> <chr> <chr>               <chr>     <chr>               <fct>     <dbl>

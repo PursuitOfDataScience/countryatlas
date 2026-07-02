@@ -132,7 +132,8 @@
 </ul></div>
 <div class="section level3">
 <h3 id="housekeeping-2-0-0">Housekeeping<a class="anchor" aria-label="anchor" href="#housekeeping-2-0-0"></a></h3>
-<ul><li>The <code>gdp_per_capita_2015</code> compatibility alias (a one-cycle deprecation shim from 1.0.0) is now opt-in: set <code>options(countryatlas.gdp_compat = TRUE)</code> to restore it. The default is <code>FALSE</code>, so <code><a href="../reference/world_data.html">world_data()</a></code> no longer emits a duplicate column.</li>
+<ul><li>New hex logo, drawn by the package itself (<code>data-raw/hex_logo.R</code>): an orthographic globe — <code><a href="../reference/globe_map.html">globe_map()</a></code>’s projection — carrying a viridis choropleth of <code>world_snapshot</code> GDP per capita on Natural Earth geometry joined by <code><a href="../reference/attach_geometry.html">attach_geometry()</a></code>, with <code><a href="../reference/spike_map.html">spike_map()</a></code>-style population spikes rising off the horizon and the binned-legend swatches under the wordmark.</li>
+<li>The <code>gdp_per_capita_2015</code> compatibility alias (a one-cycle deprecation shim from 1.0.0) is now opt-in: set <code>options(countryatlas.gdp_compat = TRUE)</code> to restore it. The default is <code>FALSE</code>, so <code><a href="../reference/world_data.html">world_data()</a></code> no longer emits a duplicate column.</li>
 <li>
 <code>world_snapshot</code> refreshed to year <strong>2024</strong> (was 2022) and rebuilt with the latest WDI data and curated overrides.</li>
 <li>
