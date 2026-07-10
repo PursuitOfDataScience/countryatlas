@@ -149,18 +149,19 @@ country_data <- function(year,
                          language = "en",
                          parallel = TRUE) {
   year <- validate_years(year)
+  latest_single <- isTRUE(latest) && length(year) == 1L
   panel <- isTRUE(panel) || length(year) > 1L
   classify <- intersect(classify, c("income", "continent", "region"))
 
   start <- min(year)
   end <- max(year)
 
-  wdi <- fetch_wdi(indicator, start = start, end = end, cache = cache,
-                   language = language, parallel = parallel)
+  wdi <- fetch_wdi(indicator, start = if (latest_single) 1960L else start, end = end,
+                   cache = cache, language = language, parallel = parallel)
 
   # Restrict to requested years and drop World Bank aggregates / non-countries.
   if (nrow(wdi)) {
-    wdi <- dplyr::filter(wdi, .data$year %in% !!year)
+    wdi <- if (latest_single) dplyr::filter(wdi, .data$year <= !!end) else dplyr::filter(wdi, .data$year %in% !!year)
     wdi <- dplyr::filter(wdi, !is.na(.data$iso3c))
     # Keep only true countries (valid iso3c in the codelist) -> removes
     # "World", "Euro area", regional aggregates.

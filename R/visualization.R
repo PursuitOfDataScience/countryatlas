@@ -32,6 +32,7 @@ is_sf <- function(x) inherits(x, "sf")
 # unavailable.
 compute_breaks <- function(x, style, n_bins) {
   x <- x[is.finite(x)]
+  if (length(unique(x)) < 2L) { if (!length(x)) return(c(0, 1)); v <- unique(x)[1]; return(c(v - 0.5, v + 0.5)) }
   if (has_pkg("classInt")) {
     cls <- switch(style, quantile = "quantile", jenks = "jenks", "quantile")
     # classInt is chatty when n equals the number of distinct values, or on
@@ -295,7 +296,7 @@ spike_map <- function(data, height, max_height = 20, width = 1.6,
   if (!nrow(pts)) {
     wdj_abort("No rows with a non-negative {.val {h_name}} joined to a centroid.")
   }
-  h <- pts[[h_name]] / max(pts[[h_name]]) * max_height
+  .mx <- max(pts[[h_name]]); h <- if (.mx > 0) pts[[h_name]] / .mx * max_height else rep(0, nrow(pts))
 
   # One triangle (3 vertices) per country: (x - w/2, y), (x, y + h), (x + w/2, y).
   spikes <- tibble::tibble(
@@ -531,6 +532,7 @@ flow_map <- function(data, from, to, weight = NULL, origin = "country.name",
       ggplot2::aes(.data$long, .data$lat, group = .data$group),
       fill = "grey92", color = "grey80", linewidth = 0.1
     )
+  if (is.null(arcs) || !nrow(arcs)) return(base + ggplot2::coord_quickmap() + theme_world_map())
   arc_aes <- if (!rlang::quo_is_null(weight_q)) {
     ggplot2::aes(.data$lon, .data$lat, group = .data$.id,
                  linewidth = .data$weight, alpha = .data$weight)

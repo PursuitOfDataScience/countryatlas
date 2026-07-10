@@ -5,8 +5,10 @@ detect_country_col <- function(data, call = rlang::caller_env()) {
   nms <- names(data)
   candidates <- c("country", "country_name", "countryname", "nation", "name",
                   "iso3c", "iso2c", "iso_a3", "iso", "region", "geo")
-  hit <- nms[tolower(nms) %in% candidates]
-  if (length(hit)) return(hit[1])
+  for (cand in candidates) {
+    m <- nms[tolower(nms) == cand]
+    if (length(m)) return(m[1])
+  }
   # Otherwise the first character/factor column that mostly matches ISO codes.
   for (nm in nms) {
     col <- data[[nm]]
@@ -127,7 +129,7 @@ country_join <- function(x, y, by_x, by_y,
                      left = dplyr::left_join,
                      inner = dplyr::inner_join,
                      full = dplyr::full_join)
-  join_fun(x, y, by = "iso3c", suffix = suffix)
+  join_fun(x, y, by = "iso3c", suffix = suffix, na_matches = "never")
 }
 
 #' Join many messy country tables on the ISO spine
@@ -160,6 +162,9 @@ country_join_all <- function(tables, by, origin = "country.name",
   n <- length(tables)
   by <- if (length(by) == 1L) rep(by, n) else by
   origin <- if (length(origin) == 1L) rep(origin, n) else origin
+  if (length(origin) != n) {
+    wdj_abort("{.arg origin} must be length 1 or length {n} (one scheme per table).")
+  }
   if (length(by) != n) {
     wdj_abort("{.arg by} must be length 1 or length {n} (one column per table).")
   }
@@ -174,5 +179,5 @@ country_join_all <- function(tables, by, origin = "country.name",
   })
   join_fun <- switch(type, left = dplyr::left_join,
                      inner = dplyr::inner_join, full = dplyr::full_join)
-  Reduce(function(x, y) join_fun(x, y, by = "iso3c"), prepped)
+  Reduce(function(x, y) join_fun(x, y, by = "iso3c", na_matches = "never"), prepped)
 }

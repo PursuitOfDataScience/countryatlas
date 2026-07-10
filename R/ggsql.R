@@ -53,8 +53,8 @@ world_query <- function(fill, source = "countryatlas_world",
   if (!is.null(projection)) {
     lines <- c(lines, sprintf("PROJECT TO %s", projection))
   }
-  if (!is.null(palette)) {
-    scale_line <- sprintf("SCALE fill TO %s", palette)
+  if (!is.null(palette) || !is.null(transform)) {
+    scale_line <- if (!is.null(palette)) sprintf("SCALE fill TO %s", palette) else "SCALE fill"
     if (!is.null(transform)) scale_line <- paste0(scale_line, " VIA ", transform)
     lines <- c(lines, scale_line)
   }

@@ -12,6 +12,9 @@ wdj_to_iso3c <- function(x, origin = "country.name", custom_match = wdj_override
       hit <- match(x, names(custom_match))
       out[!is.na(hit)] <- unname(custom_match[hit[!is.na(hit)]])
     }
+    valid <- unique(stats::na.omit(countrycode::codelist$iso3c))
+    valid <- c(valid, unname(custom_match), "XKX")
+    out[!is.na(out) & !(out %in% valid)] <- NA_character_
     return(out)
   }
   suppressWarnings(
@@ -43,8 +46,7 @@ wdj_derive_from_iso3c <- function(iso3c, add) {
   )
   for (a in add) {
     if (a == "iso3c") next
-    dest <- dest_map[[a]]
-    if (is.null(dest)) dest <- a # allow raw countrycode destinations
+    dest <- if (a %in% names(dest_map)) dest_map[[a]] else a # allow raw countrycode destinations
     out[[a]] <- suppressWarnings(
       countrycode::countrycode(iso3c, origin = "iso3c", destination = dest, warn = FALSE)
     )
