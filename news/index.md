@@ -151,6 +151,70 @@ see different maps or values.
 
 ### Bug fixes
 
+- [`country_join()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_join.md)
+  /
+  [`country_join_all()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_join_all.md)
+  no longer cross-join rows whose `iso3c` is `NA`: unmatched countries
+  used to collapse to a single `NA` key and fan out into a Cartesian
+  product. The joins now pass `na_matches = "never"`
+  ([\#4](https://github.com/PursuitOfDataScience/countryatlas/issues/4)).
+- [`country_join_all()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_join_all.md)
+  validates the length of `origin` (must be 1 or one per table) instead
+  of failing with a cryptic “missing value where TRUE/FALSE needed”
+  error
+  ([\#16](https://github.com/PursuitOfDataScience/countryatlas/issues/16)).
+- [`join_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/join_world.md)’s
+  auto-detection (`detect_country_col()`) honours the candidate priority
+  order instead of picking the first column by data-frame position, so a
+  `region` column no longer shadows a real `country` column
+  ([\#6](https://github.com/PursuitOfDataScience/countryatlas/issues/6)).
+- `standardize_country(add = ...)` accepts any raw `countrycode`
+  destination (e.g. `"iso3n"`) again instead of erroring with “subscript
+  out of bounds”
+  ([\#5](https://github.com/PursuitOfDataScience/countryatlas/issues/5)).
+- `standardize_country(origin = "iso3c")` now validates codes: strings
+  that are not real ISO 3166-1 alpha-3 codes become `NA` (and are
+  flagged by `warn`) rather than passing through uppercased and
+  unchecked
+  ([\#12](https://github.com/PursuitOfDataScience/countryatlas/issues/12)).
+- `country_data(latest = TRUE)` / `world_data(latest = TRUE)` for a
+  single year now returns each country’s most recent non-`NA` value: the
+  fetch window is widened so an earlier observation can actually be
+  found
+  ([\#7](https://github.com/PursuitOfDataScience/countryatlas/issues/7)).
+- `fetch_wdi()` keeps `iso2c` / `country` for a country that appears
+  only in a non-first indicator (they are coalesced across indicators)
+  instead of leaving them `NA`
+  ([\#8](https://github.com/PursuitOfDataScience/countryatlas/issues/8)).
+- [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
+  /
+  [`globe_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/globe_map.md)
+  with `style = "quantile"` / `"jenks"` no longer error on a constant,
+  single-country, or all-`NA` value column; degenerate breaks now fall
+  back to a single bin
+  ([\#9](https://github.com/PursuitOfDataScience/countryatlas/issues/9)).
+- [`flow_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/flow_map.md)
+  returns the base map (instead of erroring) when no origin-destination
+  pair resolves to a centroid
+  ([\#10](https://github.com/PursuitOfDataScience/countryatlas/issues/10)).
+- `aggregate_regions(fun = "min"/"max")` returns `NA` for an all-`NA`
+  group instead of `Inf` / `-Inf`
+  ([\#11](https://github.com/PursuitOfDataScience/countryatlas/issues/11)).
+- [`share_of_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/share_of_world.md)
+  returns `NA` (not `NaN`/`Inf`) when the (per-year) total is zero or
+  non-finite
+  ([\#13](https://github.com/PursuitOfDataScience/countryatlas/issues/13)).
+- [`gini()`](https://pursuitofdatascience.github.io/countryatlas/reference/gini.md)
+  returns `NA` with a warning for negative input rather than a value
+  outside the documented `[0, 1]` range
+  ([\#14](https://github.com/PursuitOfDataScience/countryatlas/issues/14)).
+- [`spike_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/spike_map.md)
+  no longer produces `NaN` spike coordinates when every height is zero
+  ([\#15](https://github.com/PursuitOfDataScience/countryatlas/issues/15)).
+- [`world_query()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_query.md)
+  honours `transform` even when `palette = NULL`, emitting a standalone
+  `SCALE fill VIA <transform>` clause
+  ([\#17](https://github.com/PursuitOfDataScience/countryatlas/issues/17)).
 - `world_map(style = "quantile"/"jenks")` computed breaks over polygon
   **vertices**, so a country’s geometric complexity biased the quantiles
   and the bins held unequal numbers of countries. Breaks are now

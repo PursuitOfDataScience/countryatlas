@@ -112,6 +112,34 @@
 <div class="section level3">
 <h3 id="bug-fixes-2-0-0">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-2-0-0"></a></h3>
 <ul><li>
+<code><a href="../reference/country_join.html">country_join()</a></code> / <code><a href="../reference/country_join_all.html">country_join_all()</a></code> no longer cross-join rows whose <code>iso3c</code> is <code>NA</code>: unmatched countries used to collapse to a single <code>NA</code> key and fan out into a Cartesian product. The joins now pass <code>na_matches = "never"</code> (<a href="https://github.com/PursuitOfDataScience/countryatlas/issues/4" class="external-link">#4</a>).</li>
+<li>
+<code><a href="../reference/country_join_all.html">country_join_all()</a></code> validates the length of <code>origin</code> (must be 1 or one per table) instead of failing with a cryptic “missing value where TRUE/FALSE needed” error (<a href="https://github.com/PursuitOfDataScience/countryatlas/issues/16" class="external-link">#16</a>).</li>
+<li>
+<code><a href="../reference/join_world.html">join_world()</a></code>’s auto-detection (<code>detect_country_col()</code>) honours the candidate priority order instead of picking the first column by data-frame position, so a <code>region</code> column no longer shadows a real <code>country</code> column (<a href="https://github.com/PursuitOfDataScience/countryatlas/issues/6" class="external-link">#6</a>).</li>
+<li>
+<code>standardize_country(add = ...)</code> accepts any raw <code>countrycode</code> destination (e.g. <code>"iso3n"</code>) again instead of erroring with “subscript out of bounds” (<a href="https://github.com/PursuitOfDataScience/countryatlas/issues/5" class="external-link">#5</a>).</li>
+<li>
+<code>standardize_country(origin = "iso3c")</code> now validates codes: strings that are not real ISO 3166-1 alpha-3 codes become <code>NA</code> (and are flagged by <code>warn</code>) rather than passing through uppercased and unchecked (<a href="https://github.com/PursuitOfDataScience/countryatlas/issues/12" class="external-link">#12</a>).</li>
+<li>
+<code>country_data(latest = TRUE)</code> / <code>world_data(latest = TRUE)</code> for a single year now returns each country’s most recent non-<code>NA</code> value: the fetch window is widened so an earlier observation can actually be found (<a href="https://github.com/PursuitOfDataScience/countryatlas/issues/7" class="external-link">#7</a>).</li>
+<li>
+<code>fetch_wdi()</code> keeps <code>iso2c</code> / <code>country</code> for a country that appears only in a non-first indicator (they are coalesced across indicators) instead of leaving them <code>NA</code> (<a href="https://github.com/PursuitOfDataScience/countryatlas/issues/8" class="external-link">#8</a>).</li>
+<li>
+<code><a href="../reference/world_map.html">world_map()</a></code> / <code><a href="../reference/globe_map.html">globe_map()</a></code> with <code>style = "quantile"</code> / <code>"jenks"</code> no longer error on a constant, single-country, or all-<code>NA</code> value column; degenerate breaks now fall back to a single bin (<a href="https://github.com/PursuitOfDataScience/countryatlas/issues/9" class="external-link">#9</a>).</li>
+<li>
+<code><a href="../reference/flow_map.html">flow_map()</a></code> returns the base map (instead of erroring) when no origin-destination pair resolves to a centroid (<a href="https://github.com/PursuitOfDataScience/countryatlas/issues/10" class="external-link">#10</a>).</li>
+<li>
+<code>aggregate_regions(fun = "min"/"max")</code> returns <code>NA</code> for an all-<code>NA</code> group instead of <code>Inf</code> / <code>-Inf</code> (<a href="https://github.com/PursuitOfDataScience/countryatlas/issues/11" class="external-link">#11</a>).</li>
+<li>
+<code><a href="../reference/share_of_world.html">share_of_world()</a></code> returns <code>NA</code> (not <code>NaN</code>/<code>Inf</code>) when the (per-year) total is zero or non-finite (<a href="https://github.com/PursuitOfDataScience/countryatlas/issues/13" class="external-link">#13</a>).</li>
+<li>
+<code><a href="../reference/gini.html">gini()</a></code> returns <code>NA</code> with a warning for negative input rather than a value outside the documented <code>[0, 1]</code> range (<a href="https://github.com/PursuitOfDataScience/countryatlas/issues/14" class="external-link">#14</a>).</li>
+<li>
+<code><a href="../reference/spike_map.html">spike_map()</a></code> no longer produces <code>NaN</code> spike coordinates when every height is zero (<a href="https://github.com/PursuitOfDataScience/countryatlas/issues/15" class="external-link">#15</a>).</li>
+<li>
+<code><a href="../reference/world_query.html">world_query()</a></code> honours <code>transform</code> even when <code>palette = NULL</code>, emitting a standalone <code>SCALE fill VIA &lt;transform&gt;</code> clause (<a href="https://github.com/PursuitOfDataScience/countryatlas/issues/17" class="external-link">#17</a>).</li>
+<li>
 <code>world_map(style = "quantile"/"jenks")</code> computed breaks over polygon <strong>vertices</strong>, so a country’s geometric complexity biased the quantiles and the bins held unequal numbers of countries. Breaks are now computed on one value per country.</li>
 <li>
 <code>bubble_map(backend = "sf")</code> placed bubbles in projected metres on a degrees base map (off the map). The base map and bubbles now share one projected CRS via <code><a href="https://ggplot2.tidyverse.org/reference/ggsf.html" class="external-link">coord_sf()</a></code>.</li>
@@ -217,7 +245,7 @@
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>
