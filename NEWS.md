@@ -88,6 +88,43 @@ behaviour may see different maps or values.
 
 ## Bug fixes
 
+* `country_join()` / `country_join_all()` no longer cross-join rows whose
+  `iso3c` is `NA`: unmatched countries used to collapse to a single `NA` key and
+  fan out into a Cartesian product. The joins now pass `na_matches = "never"`
+  (#4).
+* `country_join_all()` validates the length of `origin` (must be 1 or one per
+  table) instead of failing with a cryptic "missing value where TRUE/FALSE
+  needed" error (#16).
+* `join_world()`'s auto-detection (`detect_country_col()`) honours the candidate
+  priority order instead of picking the first column by data-frame position, so
+  a `region` column no longer shadows a real `country` column (#6).
+* `standardize_country(add = ...)` accepts any raw `countrycode` destination
+  (e.g. `"iso3n"`) again instead of erroring with "subscript out of bounds"
+  (#5).
+* `standardize_country(origin = "iso3c")` now validates codes: strings that are
+  not real ISO 3166-1 alpha-3 codes become `NA` (and are flagged by `warn`)
+  rather than passing through uppercased and unchecked (#12).
+* `country_data(latest = TRUE)` / `world_data(latest = TRUE)` for a single year
+  now returns each country's most recent non-`NA` value: the fetch window is
+  widened so an earlier observation can actually be found (#7).
+* `fetch_wdi()` keeps `iso2c` / `country` for a country that appears only in a
+  non-first indicator (they are coalesced across indicators) instead of leaving
+  them `NA` (#8).
+* `world_map()` / `globe_map()` with `style = "quantile"` / `"jenks"` no longer
+  error on a constant, single-country, or all-`NA` value column; degenerate
+  breaks now fall back to a single bin (#9).
+* `flow_map()` returns the base map (instead of erroring) when no
+  origin-destination pair resolves to a centroid (#10).
+* `aggregate_regions(fun = "min"/"max")` returns `NA` for an all-`NA` group
+  instead of `Inf` / `-Inf` (#11).
+* `share_of_world()` returns `NA` (not `NaN`/`Inf`) when the (per-year) total is
+  zero or non-finite (#13).
+* `gini()` returns `NA` with a warning for negative input rather than a value
+  outside the documented `[0, 1]` range (#14).
+* `spike_map()` no longer produces `NaN` spike coordinates when every height is
+  zero (#15).
+* `world_query()` honours `transform` even when `palette = NULL`, emitting a
+  standalone `SCALE fill VIA <transform>` clause (#17).
 * `world_map(style = "quantile"/"jenks")` computed breaks over polygon
   **vertices**, so a country's geometric complexity biased the quantiles and the
   bins held unequal numbers of countries. Breaks are now computed on one value

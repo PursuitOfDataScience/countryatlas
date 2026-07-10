@@ -98,8 +98,10 @@ aggregate_regions <- function(data, value, by = "region", fun = "sum",
       .groups = "drop"
     )
   } else {
+    .safe_min <- function(v, na.rm = TRUE) { u <- if (isTRUE(na.rm)) v[!is.na(v)] else v; if (!length(u)) NA_real_ else min(u) }
+    .safe_max <- function(v, na.rm = TRUE) { u <- if (isTRUE(na.rm)) v[!is.na(v)] else v; if (!length(u)) NA_real_ else max(u) }
     f <- switch(fun, sum = sum, mean = mean, median = stats::median,
-                min = min, max = max)
+                min = .safe_min, max = .safe_max)
     dplyr::summarise(
       grouped,
       "{val_name}" := f(.data[[val_name]], na.rm = TRUE),
@@ -564,9 +566,10 @@ gini <- function(x, weights = NULL, na.rm = TRUE) {
   }
   if (length(x) == 0L || anyNA(x) || anyNA(w)) return(NA_real_)
   if (any(w < 0)) wdj_abort("{.arg weights} must be non-negative.")
+  if (any(x < 0)) { wdj_warn("{.arg x} has negative values; Gini needs x >= 0. Returning {.val NA}."); return(NA_real_) }
   sw <- sum(w)
   mu <- sum(w * x) / sw
-  if (sw == 0 || mu == 0) return(NA_real_)
+  if (sw == 0 || mu <= 0) return(NA_real_)
   # Mean absolute difference over all weighted pairs; O(n^2) is trivial at
   # country scale (~200 values) and immune to ties/ordering subtleties.
   sum(outer(w, w) * abs(outer(x, x, "-"))) / (2 * sw^2 * mu)
@@ -662,7 +665,7 @@ share_of_world <- function(data, value, suffix = "_share") {
   }
   out <- dplyr::mutate(
     out,
-    "{new_col}" := .data[[val_name]] / sum(.data[[val_name]], na.rm = TRUE)
+    "{new_col}" := { .wdj_tot <- sum(.data[[val_name]], na.rm = TRUE); if (!is.finite(.wdj_tot) || .wdj_tot == 0) NA_real_ else .data[[val_name]] / .wdj_tot }
   )
   dplyr::ungroup(tibble::as_tibble(out))
 }
