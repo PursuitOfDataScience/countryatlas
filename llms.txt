@@ -88,8 +88,8 @@ devtools::install_github("PursuitOfDataScience/countryatlas")
 ```
 
 The base install is light. Heavy spatial extras (`sf`, `rnaturalearth`,
-`cartogram`, `biscale`, `geofacet`, `gganimate`, `leaflet`, …) live in
-`Suggests` and are only needed for the features that use them.
+`cartogram`, `biscale`, `gganimate`, `leaflet`, …) live in `Suggests`
+and are only needed for the features that use them.
 
 ### Optional features at a glance
 
@@ -107,7 +107,6 @@ The base install is light. Heavy spatial extras (`sf`, `rnaturalearth`,
 | `interactive_map(engine = "ggiraph")` | `ggiraph` |
 | `interactive_map(engine = "leaflet")` | `leaflet`, `sf` |
 | `interactive_map(engine = "ggsql")`, [`as_ggsql_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/as_ggsql_source.md) | `ggsql`, `duckdb`, `DBI`, `nanoarrow`, `sf` |
-| [`tile_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/tile_map.md) with `geofacet`-style small multiples | `geofacet` |
 | [`simplify_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/simplify_geometry.md) with `rmapshaper` | `rmapshaper` |
 | [`repair_country_names()`](https://pursuitofdatascience.github.io/countryatlas/reference/repair_country_names.md) / [`check_country_match()`](https://pursuitofdatascience.github.io/countryatlas/reference/check_country_match.md) with `stringdist` | `stringdist` |
 
@@ -276,6 +275,8 @@ in_group(c("France", "United States", "Japan"), "EU")
 
 Beyond the choropleth: proportional-symbol
 ([`bubble_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/bubble_map.md)),
+spikes
+([`spike_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/spike_map.md)),
 bivariate
 ([`bivariate_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/bivariate_map.md)),
 area-honest cartograms
@@ -355,6 +356,16 @@ Get point data onto the spine, repair messy names, reduce-join many
 tables, and run panel analysis — all keyed on `iso3c`:
 
 ``` r
+
+# normalise a total by population, so the map isn't just a population map
+# (omit `pop` and SP.POP.TOTL is fetched for the relevant countries/years)
+per_capita(data.frame(iso3c = c("USA", "CHN"), co2 = c(4.7e6, 1.1e7),
+                      pop = c(331e6, 1412e6)), co2, pop)
+#> # A tibble: 2 × 4
+#>   iso3c      co2        pop co2_per_capita
+#>   <chr>    <dbl>      <dbl>          <dbl>
+#> 1 USA    4700000  331000000        0.0142 
+#> 2 CHN   11000000 1412000000        0.00779
 
 # each country's share of a world total (within year, for a panel)
 share_of_world(data.frame(iso3c = c("USA", "CHN", "IND"), co2 = c(5, 15, 3)), co2)

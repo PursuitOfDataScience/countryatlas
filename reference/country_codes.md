@@ -1,7 +1,7 @@
 # The countrycode codelist as a tidy tibble
 
 The whole
-[countrycode::codelist](https://vincentarelbundock.github.io/countrycode/man/codelist.html)
+[countrycode::codelist](https://rdrr.io/pkg/countrycode/man/codelist.html)
 reshaped into a tidy, pipeable lookup you can
 [`filter()`](https://dplyr.tidyverse.org/reference/filter.html) /
 `join()` directly – one row per country.

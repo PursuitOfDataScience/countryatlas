@@ -114,7 +114,7 @@
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># install.packages("devtools")</span></span>
 <span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"PursuitOfDataScience/countryatlas"</span><span class="op">)</span></span></code></pre></div>
-<p>The base install is light. Heavy spatial extras (<code>sf</code>, <code>rnaturalearth</code>, <code>cartogram</code>, <code>biscale</code>, <code>geofacet</code>, <code>gganimate</code>, <code>leaflet</code>, …) live in <code>Suggests</code> and are only needed for the features that use them.</p>
+<p>The base install is light. Heavy spatial extras (<code>sf</code>, <code>rnaturalearth</code>, <code>cartogram</code>, <code>biscale</code>, <code>gganimate</code>, <code>leaflet</code>, …) live in <code>Suggests</code> and are only needed for the features that use them.</p>
 <div class="section level3">
 <h3 id="optional-features-at-a-glance">Optional features at a glance<a class="anchor" aria-label="anchor" href="#optional-features-at-a-glance"></a>
 </h3>
@@ -200,11 +200,6 @@
 <td>
 <code>ggsql</code>, <code>duckdb</code>, <code>DBI</code>, <code>nanoarrow</code>, <code>sf</code>
 </td>
-</tr>
-<tr>
-<td>
-<code><a href="reference/tile_map.html">tile_map()</a></code> with <code>geofacet</code>-style small multiples</td>
-<td><code>geofacet</code></td>
 </tr>
 <tr>
 <td>
@@ -344,7 +339,7 @@
 <div class="section level2">
 <h2 id="a-whole-vocabulary-of-honest-maps">A whole vocabulary of honest maps<a class="anchor" aria-label="anchor" href="#a-whole-vocabulary-of-honest-maps"></a>
 </h2>
-<p>Beyond the choropleth: proportional-symbol (<code><a href="reference/bubble_map.html">bubble_map()</a></code>), bivariate (<code><a href="reference/bivariate_map.html">bivariate_map()</a></code>), area-honest cartograms (<code><a href="reference/cartogram_map.html">cartogram_map()</a></code>, including a first-class <code><a href="reference/dorling_map.html">dorling_map()</a></code>), equal-area tile grids (<code><a href="reference/tile_map.html">tile_map()</a></code>), great-circle flows (<code><a href="reference/flow_map.html">flow_map()</a></code>), an orthographic globe (<code><a href="reference/globe_map.html">globe_map()</a></code>), small multiples (<code><a href="reference/facet_map.html">facet_map()</a></code>), animation (<code><a href="reference/animate_world.html">animate_world()</a></code>) and interactivity (<code><a href="reference/interactive_map.html">interactive_map()</a></code>).</p>
+<p>Beyond the choropleth: proportional-symbol (<code><a href="reference/bubble_map.html">bubble_map()</a></code>), spikes (<code><a href="reference/spike_map.html">spike_map()</a></code>), bivariate (<code><a href="reference/bivariate_map.html">bivariate_map()</a></code>), area-honest cartograms (<code><a href="reference/cartogram_map.html">cartogram_map()</a></code>, including a first-class <code><a href="reference/dorling_map.html">dorling_map()</a></code>), equal-area tile grids (<code><a href="reference/tile_map.html">tile_map()</a></code>), great-circle flows (<code><a href="reference/flow_map.html">flow_map()</a></code>), an orthographic globe (<code><a href="reference/globe_map.html">globe_map()</a></code>), small multiples (<code><a href="reference/facet_map.html">facet_map()</a></code>), animation (<code><a href="reference/animate_world.html">animate_world()</a></code>) and interactivity (<code><a href="reference/interactive_map.html">interactive_map()</a></code>).</p>
 <p>The world as a globe, not a rectangle — with the <code>"polygon"</code> backend (only <code>maps</code> + <code>mapproj</code>, no <code>sf</code>) you can draw it and even <strong>spin</strong> it:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/globe_map.html">globe_map</a></span><span class="op">(</span><span class="va">world_snapshot</span><span class="op">$</span><span class="va">countries</span>, <span class="va">continent</span>, backend <span class="op">=</span> <span class="st">"polygon"</span>,</span>
@@ -379,7 +374,17 @@
 </h2>
 <p>Get point data onto the spine, repair messy names, reduce-join many tables, and run panel analysis — all keyed on <code>iso3c</code>:</p>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># each country's share of a world total (within year, for a panel)</span></span>
+<code class="sourceCode R"><span><span class="co"># normalise a total by population, so the map isn't just a population map</span></span>
+<span><span class="co"># (omit `pop` and SP.POP.TOTL is fetched for the relevant countries/years)</span></span>
+<span><span class="fu"><a href="reference/per_capita.html">per_capita</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>iso3c <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"USA"</span>, <span class="st">"CHN"</span><span class="op">)</span>, co2 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4.7e6</span>, <span class="fl">1.1e7</span><span class="op">)</span>,</span>
+<span>                      pop <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">331e6</span>, <span class="fl">1412e6</span><span class="op">)</span><span class="op">)</span>, <span class="va">co2</span>, <span class="va">pop</span><span class="op">)</span></span>
+<span><span class="co">#&gt; # A tibble: 2 × 4</span></span>
+<span><span class="co">#&gt;   iso3c      co2        pop co2_per_capita</span></span>
+<span><span class="co">#&gt;   &lt;chr&gt;    &lt;dbl&gt;      &lt;dbl&gt;          &lt;dbl&gt;</span></span>
+<span><span class="co">#&gt; 1 USA    4700000  331000000        0.0142 </span></span>
+<span><span class="co">#&gt; 2 CHN   11000000 1412000000        0.00779</span></span>
+<span></span>
+<span><span class="co"># each country's share of a world total (within year, for a panel)</span></span>
 <span><span class="fu"><a href="reference/share_of_world.html">share_of_world</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>iso3c <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"USA"</span>, <span class="st">"CHN"</span>, <span class="st">"IND"</span><span class="op">)</span>, co2 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">15</span>, <span class="fl">3</span><span class="op">)</span><span class="op">)</span>, <span class="va">co2</span><span class="op">)</span></span>
 <span><span class="co">#&gt; # A tibble: 3 × 3</span></span>
 <span><span class="co">#&gt;   iso3c   co2 co2_share</span></span>

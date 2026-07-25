@@ -73,7 +73,9 @@ world_map(
 
 - na_label:
 
-  Legend label for missing data.
+  Legend key label for missing data, used by the styles with a discrete
+  legend (`"quantile"`, `"jenks"`, `"categorical"`); the continuous and
+  binned colourbars have no `NA` key to name.
 
 - recenter:
 

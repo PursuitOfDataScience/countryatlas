@@ -7,7 +7,7 @@ together map geometry
 ([`ggplot2::map_data()`](https://ggplot2.tidyverse.org/reference/map_data.html)
 or Natural Earth `sf`), World Bank indicators
 ([`WDI::WDI()`](https://rdrr.io/pkg/WDI/man/WDI.html)) and the
-[`countrycode::countrycode()`](https://vincentarelbundock.github.io/countrycode/man/countrycode.html)
+[`countrycode::countrycode()`](https://rdrr.io/pkg/countrycode/man/countrycode.html)
 crosswalk.
 
 ## Details

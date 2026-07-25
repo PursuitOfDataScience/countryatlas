@@ -10,10 +10,12 @@ ISO 3166 codes as a universal join key and by stitching together three
 otherwise disjoint resources — map geometry, World Bank development
 indicators, and a comprehensive country-code crosswalk — into a single,
 map-ready table. This vignette presents the package’s design philosophy,
-its complete functional vocabulary, and worked examples spanning data
+its core functional vocabulary, and worked examples spanning data
 assembly, the join engine, diagnostics, reference data, analysis helpers
-and a full grammar of honest cartographic displays. All examples run
-offline against a bundled data snapshot.
+and the grammar of honest cartographic displays — the companion
+vignettes take up the remaining map types, projections and query
+interface in detail. All examples run offline against a bundled data
+snapshot.
 
 ## Introduction
 
@@ -368,12 +370,34 @@ head(wdi_search("renewable energy"), 3)
 
 The package also bundles `country_meta` (static per-country attributes),
 `common_indicators` (a friendly indicator catalogue),
-`country_groups_tbl` and `world_tiles`.
+`country_groups_tbl`, `world_tiles` and `historical_codes` (the
+dissolved-entity crosswalk used above).
 
 ## Analysis helpers
 
 Small, in-spirit transforms that keep an analysis from leaving the
-package mid-pipeline:
+package mid-pipeline.
+[`per_capita()`](https://pursuitofdatascience.github.io/countryatlas/reference/per_capita.md)
+disarms the commonest footgun in this data — *is this map just a
+population map?* — by normalising a total before it is plotted. Supply
+the denominator, or omit it and the relevant years of `SP.POP.TOTL` are
+fetched for you:
+
+``` r
+
+emissions <- data.frame(
+  iso3c = c("USA", "CHN", "IND"),
+  co2   = c(4.7e6, 1.1e7, 2.7e6),      # total kt
+  pop   = c(331e6, 1412e6, 1408e6)
+)
+per_capita(emissions, co2, pop)
+#> # A tibble: 3 × 4
+#>   iso3c      co2        pop co2_per_capita
+#>   <chr>    <dbl>      <dbl>          <dbl>
+#> 1 USA    4700000  331000000        0.0142 
+#> 2 CHN   11000000 1412000000        0.00779
+#> 3 IND    2700000 1408000000        0.00192
+```
 
 ``` r
 

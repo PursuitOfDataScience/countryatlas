@@ -37,7 +37,8 @@ theil(x, weights = NULL, groups = NULL, na.rm = TRUE)
 Without `groups`: a single non-negative number (`0` = perfect equality).
 With `groups`: a tibble with components `"total"`, `"between"` and
 `"within"` (`total = between + within`) and each component's `share` of
-the total.
+the total (`NA` when the total is `0`, i.e. perfect equality, and the
+shares are undefined).
 
 ## Examples
 

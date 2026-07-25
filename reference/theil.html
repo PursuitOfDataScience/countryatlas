@@ -90,7 +90,8 @@ decomposition is returned instead of the scalar.</p></dd>
     <p>Without <code>groups</code>: a single non-negative number (<code>0</code> = perfect
 equality). With <code>groups</code>: a tibble with components <code>"total"</code>,
 <code>"between"</code> and <code>"within"</code> (<code>total = between + within</code>) and each
-component's <code>share</code> of the total.</p>
+component's <code>share</code> of the total (<code>NA</code> when the total is <code>0</code>, i.e.
+perfect equality, and the shares are undefined).</p>
     </div>
 
     <div class="section level2">

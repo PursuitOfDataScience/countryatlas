@@ -152,6 +152,16 @@ projecting, so nothing streaks across the frame:</p>
 <code>projection</code> suited to the subset
 (e.g. <code>"azimuthal_equal_area"</code> for a single continent, the
 polar projections for the Arctic) so the crop stays area-honest.</p>
+<p>A box is the one form that clips the polygons themselves, which is
+what you want for a region that is neither a continent nor a group — the
+Mediterranean basin, say:</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">med</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/world_geometry.html">world_geometry</a></span><span class="op">(</span><span class="st">"countries"</span>, geometry <span class="op">=</span> <span class="st">"sf"</span>,</span>
+<span>                      region <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">10</span>, <span class="fl">30</span>, <span class="fl">40</span>, <span class="fl">48</span><span class="op">)</span>, projection <span class="op">=</span> <span class="st">"equal_earth"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">med</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggsf.html" class="external-link">geom_sf</a></span><span class="op">(</span>fill <span class="op">=</span> <span class="st">"grey85"</span>, colour <span class="op">=</span> <span class="st">"grey40"</span>, linewidth <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="../reference/theme_world_map.html">theme_world_map</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<p><img src="sf-and-projections_files/figure-html/unnamed-chunk-9-1.png" class="r-plt" alt="" width="672" style="display: block; margin: auto;"></p>
 </div>
 <div class="section level2">
 <h2 id="simplifying-for-the-web">Simplifying for the web<a class="anchor" aria-label="anchor" href="#simplifying-for-the-web"></a>
@@ -159,7 +169,7 @@ polar projections for the Arctic) so the crop stays area-honest.</p>
 <p>High-resolution geometry can be thinned for fast plotting with
 <code><a href="../reference/simplify_geometry.html">simplify_geometry()</a></code> (which uses <code>rmapshaper</code>
 when available).</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/world_geometry.html">world_geometry</a></span><span class="op">(</span>geometry <span class="op">=</span> <span class="st">"sf"</span>, scale <span class="op">=</span> <span class="st">"large"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/simplify_geometry.html">simplify_geometry</a></span><span class="op">(</span>keep <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span></span></code></pre></div>
 </div>

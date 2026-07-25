@@ -138,20 +138,21 @@ also drive yourself for full control over the query:</p>
 source once, then chart it in a <code>```{ggsql}</code> block,
 referencing the registered table by name:</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode default"><code class="sourceCode default"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>```{r}</span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>library(ggsql)</span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>reader &lt;- duckdb_reader()</span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>ggsql_register(reader, countryatlas:::ggsql_wkb_frame(world_data(2020, geometry = "sf")),</span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>               "countryatlas_world")</span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>```</span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a></span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>```{ggsql connection=reader}</span>
-<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>VISUALISE gdp_per_capita AS fill</span>
-<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>FROM countryatlas_world</span>
-<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>DRAW spatial</span>
-<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>PROJECT TO equal_earth</span>
-<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>SCALE fill TO magma VIA log10</span>
-<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>LABEL title =&gt; 'GDP per capita, 2020'</span>
-<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a>```</span></code></pre></div>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>library(countryatlas)</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>library(ggsql)</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>src &lt;- world_data(2020, geometry = "sf") |&gt;</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  as_ggsql_source(format = "duckdb")          # registers countryatlas_world</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>```</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>```{ggsql connection=src}</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>VISUALISE gdp_per_capita AS fill</span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>FROM countryatlas_world</span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>DRAW spatial</span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>PROJECT TO equal_earth</span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>SCALE fill TO magma VIA log10</span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a>LABEL title =&gt; 'GDP per capita, 2020'</span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a>```</span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="why-bother">Why bother?<a class="anchor" aria-label="anchor" href="#why-bother"></a>

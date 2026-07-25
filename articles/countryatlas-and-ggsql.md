@@ -77,13 +77,14 @@ table by name:
 
 ```` default
 ```{r}
+library(countryatlas)
 library(ggsql)
-reader <- duckdb_reader()
-ggsql_register(reader, countryatlas:::ggsql_wkb_frame(world_data(2020, geometry = "sf")),
-               "countryatlas_world")
+
+src <- world_data(2020, geometry = "sf") |>
+  as_ggsql_source(format = "duckdb")          # registers countryatlas_world
 ```
 
-```{ggsql connection=reader}
+```{ggsql connection=src}
 VISUALISE gdp_per_capita AS fill
 FROM countryatlas_world
 DRAW spatial

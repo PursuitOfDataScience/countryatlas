@@ -3,7 +3,7 @@
 The package's mission, exposed for *your* data: take a data frame keyed
 on messy country names (or codes) and attach standardised ISO codes plus
 useful classifications, reconciling spellings via
-[`countrycode::countrycode()`](https://vincentarelbundock.github.io/countrycode/man/countrycode.html)
+[`countrycode::countrycode()`](https://rdrr.io/pkg/countrycode/man/countrycode.html)
 and the curated
 [`wdj_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)
 table. The result joins cleanly to anything else keyed on `iso3c`.
@@ -34,7 +34,7 @@ standardize_country(
 - origin:
 
   How to read `country_col`; any
-  [`countrycode::countrycode()`](https://vincentarelbundock.github.io/countrycode/man/countrycode.html)
+  [`countrycode::countrycode()`](https://rdrr.io/pkg/countrycode/man/countrycode.html)
   origin scheme such as `"country.name"` (default), `"iso2c"`,
   `"iso3c"`, `"wb"`, `"un"`.
 

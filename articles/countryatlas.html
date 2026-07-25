@@ -85,10 +85,12 @@ by adopting ISO 3166 codes as a universal join key and by stitching
 together three otherwise disjoint resources — map geometry, World Bank
 development indicators, and a comprehensive country-code crosswalk —
 into a single, map-ready table. This vignette presents the package’s
-design philosophy, its complete functional vocabulary, and worked
-examples spanning data assembly, the join engine, diagnostics, reference
-data, analysis helpers and a full grammar of honest cartographic
-displays. All examples run offline against a bundled data snapshot.</p>
+design philosophy, its core functional vocabulary, and worked examples
+spanning data assembly, the join engine, diagnostics, reference data,
+analysis helpers and the grammar of honest cartographic displays — the
+companion vignettes take up the remaining map types, projections and
+query interface in detail. All examples run offline against a bundled
+data snapshot.</p>
 </div>
 <div class="section level2">
 <h2 id="introduction">Introduction<a class="anchor" aria-label="anchor" href="#introduction"></a>
@@ -391,15 +393,33 @@ indicator catalogue is searchable offline with
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> 4.1.2_REN.ELECTRICITY.OUTPUT Renewable energy electricity output (GWh)</span></span></code></pre></div>
 <p>The package also bundles <code>country_meta</code> (static
 per-country attributes), <code>common_indicators</code> (a friendly
-indicator catalogue), <code>country_groups_tbl</code> and
-<code>world_tiles</code>.</p>
+indicator catalogue), <code>country_groups_tbl</code>,
+<code>world_tiles</code> and <code>historical_codes</code> (the
+dissolved-entity crosswalk used above).</p>
 </div>
 <div class="section level2">
 <h2 id="analysis-helpers">Analysis helpers<a class="anchor" aria-label="anchor" href="#analysis-helpers"></a>
 </h2>
 <p>Small, in-spirit transforms that keep an analysis from leaving the
-package mid-pipeline:</p>
+package mid-pipeline. <code><a href="../reference/per_capita.html">per_capita()</a></code> disarms the commonest
+footgun in this data — <em>is this map just a population map?</em> — by
+normalising a total before it is plotted. Supply the denominator, or
+omit it and the relevant years of <code>SP.POP.TOTL</code> are fetched
+for you:</p>
 <div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">emissions</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  iso3c <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"USA"</span>, <span class="st">"CHN"</span>, <span class="st">"IND"</span><span class="op">)</span>,</span>
+<span>  co2   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4.7e6</span>, <span class="fl">1.1e7</span>, <span class="fl">2.7e6</span><span class="op">)</span>,      <span class="co"># total kt</span></span>
+<span>  pop   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">331e6</span>, <span class="fl">1412e6</span>, <span class="fl">1408e6</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/per_capita.html">per_capita</a></span><span class="op">(</span><span class="va">emissions</span>, <span class="va">co2</span>, <span class="va">pop</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 3 × 4</span></span></span>
+<span><span class="co">#&gt;   iso3c      co2        pop co2_per_capita</span></span>
+<span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> USA    4<span style="text-decoration: underline;">700</span>000  331<span style="text-decoration: underline;">000</span>000        0.014<span style="text-decoration: underline;">2</span> </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> CHN   11<span style="text-decoration: underline;">000</span>000 <span style="text-decoration: underline;">1</span>412<span style="text-decoration: underline;">000</span>000        0.007<span style="text-decoration: underline;">79</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> IND    2<span style="text-decoration: underline;">700</span>000 <span style="text-decoration: underline;">1</span>408<span style="text-decoration: underline;">000</span>000        0.001<span style="text-decoration: underline;">92</span></span></span></code></pre></div>
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">snapshot</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/rank_countries.html">rank_countries</a></span><span class="op">(</span><span class="va">gdp_per_capita</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">rank</span> <span class="op">&lt;=</span> <span class="fl">5</span><span class="op">)</span> <span class="op">|&gt;</span></span>
@@ -412,7 +432,7 @@ package mid-pipeline:</p>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> Luxembourg         <span style="text-decoration: underline;">104</span>147.     3      0.989</span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> Monaco             <span style="text-decoration: underline;">247</span>170.     1      1    </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> Switzerland         <span style="text-decoration: underline;">90</span>067.     5      0.979</span></span></code></pre></div>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">snapshot</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/aggregate_regions.html">aggregate_regions</a></span><span class="op">(</span><span class="va">population</span>, by <span class="op">=</span> <span class="st">"region"</span>, fun <span class="op">=</span> <span class="st">"sum"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 8 × 2</span></span></span>
@@ -430,7 +450,7 @@ package mid-pipeline:</p>
 <code><a href="../reference/index_to.html">index_to()</a></code> (rebase a series so the base year = 100) and
 <code><a href="../reference/share_of_world.html">share_of_world()</a></code> (share of the year’s world total) cover
 the standard comparative moves, each computed per country:</p>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">panel</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  iso3c <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"USA"</span>, <span class="st">"CHN"</span><span class="op">)</span>, each <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>,</span>
 <span>  year  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">2019</span><span class="op">:</span><span class="fl">2021</span>, <span class="fl">2</span><span class="op">)</span>,</span>
@@ -453,7 +473,7 @@ otherwise make an animation flicker or a join silently drop years — by
 grid completion, carry-forward or linear interpolation
 (<code><a href="../reference/lag_by_country.html">lag_by_country()</a></code> and <code><a href="../reference/lag_by_country.html">diff_by_country()</a></code> round
 out the panel toolkit):</p>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">patchy</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>iso3c <span class="op">=</span> <span class="st">"USA"</span>, year <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2019L</span>, <span class="fl">2021L</span><span class="op">)</span>, gdp <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">100</span>, <span class="fl">110</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/complete_years.html">complete_years</a></span><span class="op">(</span><span class="va">patchy</span>, <span class="fl">2019</span><span class="op">:</span><span class="fl">2021</span>, method <span class="op">=</span> <span class="st">"linear"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 3 × 3</span></span></span>
@@ -471,7 +491,7 @@ catching up?</em> <code><a href="../reference/gini.html">gini()</a></code> and <
 inequality across countries — weight by population and they describe
 inequality between people; <code><a href="../reference/theil.html">theil()</a></code> decomposes exactly into
 between/within components:</p>
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/gini.html">gini</a></span><span class="op">(</span><span class="va">snapshot</span><span class="op">$</span><span class="va">gdp_per_capita</span>, weights <span class="op">=</span> <span class="va">snapshot</span><span class="op">$</span><span class="va">population</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 0.6094909</span></span>
 <span><span class="fu"><a href="../reference/theil.html">theil</a></span><span class="op">(</span><span class="va">snapshot</span><span class="op">$</span><span class="va">gdp_per_capita</span>, weights <span class="op">=</span> <span class="va">snapshot</span><span class="op">$</span><span class="va">population</span>,</span>
@@ -486,7 +506,7 @@ between/within components:</p>
 (pairwise-complete, with the per-pair <code>n</code> reported so a
 correlation computed on 12 countries cannot masquerade as a world
 fact):</p>
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/correlate_indicators.html">correlate_indicators</a></span><span class="op">(</span><span class="va">snapshot</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 6 × 4</span></span></span>
 <span><span class="co">#&gt;   var_x           var_y                  r     n</span></span>
@@ -528,7 +548,7 @@ vocabulary of projected, area-honest maps.</p>
 <div class="section level2">
 <h2 class="unnumbered" id="session-information">Session information<a class="anchor" aria-label="anchor" href="#session-information"></a>
 </h2>
-<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/sessionInfo.html" class="external-link">sessionInfo</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt; R version 4.6.1 (2026-06-24)</span></span>
 <span><span class="co">#&gt; Platform: x86_64-pc-linux-gnu</span></span>

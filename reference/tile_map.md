@@ -3,7 +3,10 @@
 A statebins-style equal-area tile grid of the world (one square per
 country) so tiny states are actually visible. Uses the bundled
 [world_tiles](https://pursuitofdatascience.github.io/countryatlas/reference/world_tiles.md)
-layout (and `geofacet` when available for small multiples).
+layout. For small multiples of a tile grid, facet the result as you
+would any other `ggplot` (or see
+[`facet_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/facet_map.md)
+for the choropleth equivalent).
 
 ## Usage
 

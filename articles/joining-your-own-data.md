@@ -129,6 +129,14 @@ dissolve_country(c("Czechoslovakia", "France"))
 #> 3 France         NA                    NA FRA   France
 ```
 
+`"West Germany"` is the instructive case: it resolves to `DEU` and is
+*not* flagged — correctly so, because the Federal Republic never
+dissolved. It absorbed the GDR in 1990 and simply continued, so `DEU`
+really is the right answer. The crosswalk is curated rather than a
+blanket rule that anything old-sounding gets flagged, so only the entity
+that actually ceased to exist is listed: `historical_codes` maps East
+Germany (`DDR`) to `DEU`.
+
 ## Repair what can be repaired
 
 [`repair_country_names()`](https://pursuitofdatascience.github.io/countryatlas/reference/repair_country_names.md)

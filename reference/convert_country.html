@@ -49,7 +49,7 @@ emoji, currency, top-level domain, continent/region and research codes
     </div>
 
     <div class="ref-description section level2">
-    <p>A discoverable wrapper around <code><a href="https://vincentarelbundock.github.io/countrycode/man/countrycode.html" class="external-link">countrycode::countrycode()</a></code> exposing the full
+    <p>A discoverable wrapper around <code><a href="https://rdrr.io/pkg/countrycode/man/countrycode.html" class="external-link">countrycode::countrycode()</a></code> exposing the full
 set of schemes with first-class shortcuts for the high-value ones: flag
 emoji, currency, top-level domain, continent/region and research codes
 (Correlates of War, Polity, Gleditsch-Ward, V-Dem, IMF, FAO, FIPS, GAUL).</p>
@@ -91,7 +91,10 @@ destination.</p></dd>
 
 
 <dt id="arg-warn">warn<a class="anchor" aria-label="anchor" href="#arg-warn"></a></dt>
-<dd><p>Whether to warn about unmatched inputs.</p></dd>
+<dd><p>Whether to warn about inputs that match no country (default
+<code>TRUE</code>). A recognised country whose destination value is genuinely
+missing – countrycode has no currency for Kosovo – returns <code>NA</code>
+without warning.</p></dd>
 
 </dl></div>
     <div class="section level2">

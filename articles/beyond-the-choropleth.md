@@ -123,7 +123,7 @@ world_data(2020) |>
 
 Two lightweight spatial helpers that aren’t choropleths at all.
 [`distance_between()`](https://pursuitofdatascience.github.io/countryatlas/reference/distance_between.md)
-answers “how far apart” from the bundled \[country_meta\] centroids – no
+answers “how far apart” from the bundled `country_meta` centroids — no
 `sf` or network required:
 
 ``` r

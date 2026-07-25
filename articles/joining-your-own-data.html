@@ -182,6 +182,14 @@ successor, dated):</p>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> Czechoslovakia Czechoslovakia      <span style="text-decoration: underline;">1</span>993 CZE   Czechia </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> Czechoslovakia Czechoslovakia      <span style="text-decoration: underline;">1</span>993 SVK   Slovakia</span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> France         <span style="color: #BB0000;">NA</span>                    <span style="color: #BB0000;">NA</span> FRA   France</span></span></code></pre></div>
+<p><code>"West Germany"</code> is the instructive case: it resolves to
+<code>DEU</code> and is <em>not</em> flagged — correctly so, because the
+Federal Republic never dissolved. It absorbed the GDR in 1990 and simply
+continued, so <code>DEU</code> really is the right answer. The crosswalk
+is curated rather than a blanket rule that anything old-sounding gets
+flagged, so only the entity that actually ceased to exist is listed:
+<code>historical_codes</code> maps East Germany (<code>DDR</code>) to
+<code>DEU</code>.</p>
 </div>
 <div class="section level2">
 <h2 id="repair-what-can-be-repaired">Repair what can be repaired<a class="anchor" aria-label="anchor" href="#repair-what-can-be-repaired"></a>

@@ -1,7 +1,7 @@
 # Friendly country-code conversion
 
 A discoverable wrapper around
-[`countrycode::countrycode()`](https://vincentarelbundock.github.io/countrycode/man/countrycode.html)
+[`countrycode::countrycode()`](https://rdrr.io/pkg/countrycode/man/countrycode.html)
 exposing the full set of schemes with first-class shortcuts for the
 high-value ones: flag emoji, currency, top-level domain,
 continent/region and research codes (Correlates of War, Polity,
@@ -44,7 +44,9 @@ convert_country(
 
 - warn:
 
-  Whether to warn about unmatched inputs.
+  Whether to warn about inputs that match no country (default `TRUE`). A
+  recognised country whose destination value is genuinely missing –
+  countrycode has no currency for Kosovo – returns `NA` without warning.
 
 ## Value
 

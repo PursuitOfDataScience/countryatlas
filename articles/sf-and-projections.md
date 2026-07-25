@@ -100,6 +100,21 @@ Pair it with a `projection` suited to the subset
 (e.g. `"azimuthal_equal_area"` for a single continent, the polar
 projections for the Arctic) so the crop stays area-honest.
 
+A box is the one form that clips the polygons themselves, which is what
+you want for a region that is neither a continent nor a group — the
+Mediterranean basin, say:
+
+``` r
+
+med <- world_geometry("countries", geometry = "sf",
+                      region = c(-10, 30, 40, 48), projection = "equal_earth")
+ggplot(med) +
+  geom_sf(fill = "grey85", colour = "grey40", linewidth = 0.1) +
+  theme_world_map()
+```
+
+![](sf-and-projections_files/figure-html/unnamed-chunk-9-1.png)
+
 ## Simplifying for the web
 
 High-resolution geometry can be thinned for fast plotting with
