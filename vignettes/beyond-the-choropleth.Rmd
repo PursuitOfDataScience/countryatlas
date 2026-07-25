@@ -118,8 +118,8 @@ world_data(2020) |>
 ## Country adjacency and distance
 
 Two lightweight spatial helpers that aren't choropleths at all.
-`distance_between()` answers "how far apart" from the bundled [country_meta]
-centroids -- no `sf` or network required:
+`distance_between()` answers "how far apart" from the bundled `country_meta`
+centroids — no `sf` or network required:
 
 ```{r}
 distance_between("France", "Germany")

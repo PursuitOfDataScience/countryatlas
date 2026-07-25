@@ -33,6 +33,24 @@ wdj_crs <- function(projection = "equal_earth", recenter = NULL, lat0 = NULL) {
   paste0(proj4, " +lon_0=", lon0, " +datum=WGS84 +units=m +no_defs")
 }
 
+# coord_sf() for one of our projections.
+#
+# ggplot2's coord_sf() builds a graticule for the target CRS. Under PROJ's
+# Winkel Tripel some graticule segments collapse to a single point, and GEOS
+# rejects those outright ("IllegalArgumentException: point array must contain
+# 0 or >1 elements") -- so every winkel_tripel map failed at build time even
+# though the geometry itself projects fine. theme_world_map() blanks
+# panel.grid, so the graticule is invisible in these maps anyway and skipping
+# it costs nothing. Every other projection keeps the default graticule.
+wdj_coord_sf <- function(projection = "equal_earth", recenter = NULL,
+                         lat0 = NULL) {
+  crs <- wdj_crs(projection, recenter, lat0)
+  if (identical(projection, "winkel_tripel")) {
+    return(ggplot2::coord_sf(crs = crs, datum = NA))
+  }
+  ggplot2::coord_sf(crs = crs)
+}
+
 # Map a Natural Earth scale word to the package code understood by rnaturalearth.
 ne_scale <- function(scale = c("small", "medium", "large")) {
   scale <- match.arg(scale)
@@ -149,7 +167,16 @@ get_world_sf <- function(scale = "small", region = NULL,
       bb <- unclass(iso)
       bbox <- sf::st_bbox(c(xmin = bb[1], ymin = bb[2], xmax = bb[3], ymax = bb[4]),
                           crs = sf::st_crs(4326))
-      ne <- suppressWarnings(sf::st_crop(ne, bbox))
+      # Natural Earth has a couple of self-intersecting rings that the strict
+      # S2 engine (the default on unprojected geometry) rejects outright, so
+      # cropping to a bounding box used to error. Use GEOS's planar clip
+      # instead -- exactly as country_borders() / locate_country() do.
+      use_s2 <- sf::sf_use_s2()
+      on.exit(quietly_sf(sf::sf_use_s2(use_s2)), add = TRUE)
+      ne <- quietly_sf(suppressWarnings({
+        sf::sf_use_s2(FALSE)
+        sf::st_crop(ne, bbox)
+      }))
     } else {
       ne <- ne[!is.na(ne$iso3c) & ne$iso3c %in% iso, ]
     }
@@ -222,7 +249,14 @@ world_geometry <- function(what = c("countries", "centroids", "coastline",
     what,
     countries = countries,
     centroids = sf_centroids(countries),
-    coastline = sf::st_cast(sf::st_union(countries), "MULTILINESTRING"),
+    # A couple of Natural Earth rings are invalid (self-intersecting), and
+    # st_union() -- unlike the predicates -- refuses to work with them
+    # ("TopologyException: side location conflict"). Repair first so the
+    # coastline is available in every projection, not just the lucky ones.
+    coastline = sf::st_cast(
+      sf::st_union(quietly_sf(suppressWarnings(sf::st_make_valid(countries)))),
+      "MULTILINESTRING"
+    ),
     borders   = sf::st_cast(countries, "MULTILINESTRING", warn = FALSE),
     graticule = sf::st_transform(
       sf::st_graticule(),

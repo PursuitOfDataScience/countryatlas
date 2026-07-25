@@ -88,6 +88,61 @@ behaviour may see different maps or values.
 
 ## Bug fixes
 
+* `bivariate_map()` errored on every call ("the condition has length > 1",
+  pre-dating 2.0.0). The two fill columns were injected into
+  `biscale::bi_class()` with `!!rlang::sym()`, but `bi_class()` reads them
+  with `as.character(substitute(...))` rather than tidy eval, so the
+  injection deparsed into a multi-element vector inside `biscale`. The
+  happy path is now covered by a test (the old one only checked that the
+  function errors cleanly when `sf` is *absent*).
+* `as_ggsql_source()` and `interactive_map(engine = "ggsql")` errored on any
+  `sf` input -- the whole point of the ggsql bridge. `sf::st_as_binary()`
+  returns a classed `WKB` object, which `tibble` rejects ("all columns must
+  be vectors"); the geometry column is now the plain list of raw vectors
+  that `nanoarrow` encodes as binary and `DBI` writes as a `BLOB`.
+* `projection = "winkel_tripel"` errored on every render -- one of the eight
+  projections this release adds. The CRS built fine and the geometry
+  projected fine, but `ggplot2::coord_sf()`'s graticule collapses to a
+  degenerate single-point segment under PROJ's Winkel Tripel, which GEOS
+  rejects ("point array must contain 0 or >1 elements"). The graticule is now
+  skipped for that projection only; [theme_world_map()] blanks `panel.grid`
+  anyway, so nothing visible changes. All 13 projections are now covered by a
+  full-render test.
+* `world_geometry("coastline", geometry = "sf")` errored with a GEOS
+  `TopologyException` in every projection except `"plate_carree"`: a couple
+  of Natural Earth rings are self-intersecting and `sf::st_union()` (unlike
+  the spatial predicates) refuses them. The geometry is repaired before the
+  union.
+* `world_geometry(region = c(xmin, ymin, xmax, ymax))` -- and `world_data()`
+  / `attach_geometry()` with a bounding-box `region` -- errored on the `sf`
+  backend ("Loop 0 is not valid"), because `sf::st_crop()` runs under the
+  strict S2 engine on unprojected geometry. It now clips with the GEOS
+  planar predicate, as `country_borders()` / `locate_country()` already did.
+* `convert_country()`'s `warn` argument was documented but silently ignored
+  (every internal `countrycode()` call is wrapped in `suppressWarnings()`,
+  because countrycode also warns on intermediate hops that
+  `convert_country()` goes on to recover). It now reports inputs that match
+  no country, like `standardize_country()` does. A recognised country whose
+  destination value is genuinely missing still returns `NA` quietly.
+* `world_map()` / `globe_map()`'s `na_label` was accepted and silently
+  ignored. The `"quantile"`, `"jenks"` and `"categorical"` legends now label
+  their missing-data key with it (the continuous and binned colourbars have
+  no `NA` key to name, which the documentation now says).
+* Kosovo's `XKX` resolves for `country` and `flag` from `from = "iso3c"`,
+  not just from its name. It has no row at all in `countrycode::codelist`,
+  so everything derived from the code was `NA` -- which surfaced as
+  `country_borders()` / `neighbors()` returning `NA` names for Kosovo's four
+  land borders, `locate_country(add = "country")` returning `NA` for points
+  inside it, and `standardize_country(add = c("country", "flag"))` doing the
+  same. The curated fallback table now carries the name and flag too.
+* `per_capita()` without an explicit `pop` column died with an opaque
+  `vctrs` error ("Can't subset columns that don't exist: `.wdj_pop`") when
+  the World Bank population fetch failed or timed out -- `fetch_wdi()`
+  deliberately degrades to a keys-only tibble in that case. It now reports
+  the failed fetch and points at the `pop` argument.
+* `theil()` returns `NA` shares (not `NaN`) for a perfectly equal
+  distribution, where the total is `0` and the shares are undefined --
+  matching how `gini()` and `share_of_world()` treat a zero denominator.
 * `country_join()` / `country_join_all()` no longer cross-join rows whose
   `iso3c` is `NA`: unmatched countries used to collapse to a single `NA` key and
   fan out into a Cartesian product. The joins now pass `na_matches = "never"`
@@ -196,6 +251,18 @@ behaviour may see different maps or values.
   `wdj_overrides()`. The README's rendered output and figures were stale
   (pre-dating the quantile-breaks fix and the `gdp_per_capita_2015` opt-in)
   and have been re-rendered from the 2.0.0 code.
+* `geofacet` is dropped from `Suggests`: no code ever used it, and
+  `?tile_map` / the README claimed a `geofacet`-backed small-multiples
+  feature that did not exist. Facet a `tile_map()` like any other `ggplot`,
+  or use `facet_map()` for choropleth small multiples.
+* The README's figures are shipped in the tarball again, so the images on the
+  CRAN package page resolve. `.Rbuildignore` excluded the generated `.png`s
+  but not the (much larger) `.gif`, which left six of the seven images
+  broken.
+* `?world_snapshot`'s `@format` said "two elements" while listing three, and
+  advertised an `sf` element that is `NULL` in the released package. It now
+  documents what actually ships and points at `attach_geometry()` for
+  geometry.
 
 # countryatlas 1.0.0
 

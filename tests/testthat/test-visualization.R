@@ -11,6 +11,43 @@ test_that("world_map builds a ggplot for several styles", {
   }
 })
 
+test_that("world_map renders in every documented projection", {
+  # Regression: winkel_tripel built a CRS fine and st_transform()ed fine, but
+  # coord_sf()'s graticule collapsed to a degenerate point under it and GEOS
+  # threw "point array must contain 0 or >1 elements" -- so one of the eight
+  # projections 2.0.0 advertises errored on every render. Only a full
+  # ggplot_build() over every projection catches this class of bug.
+  skip_if_not_installed("sf")
+  skip_if_not_installed("rnaturalearth")
+  sfdata <- attach_geometry(snap, geometry = "sf")
+  for (proj in countryatlas:::wdj_projections()) {
+    expect_no_error(
+      ggplot2::ggplot_build(world_map(sfdata, gdp_per_capita, projection = proj))
+    )
+  }
+})
+
+test_that("na_label renames the discrete legend's NA key", {
+  skip_if_not_installed("maps")
+  mapdf <- attach_geometry(snap, geometry = "polygon")
+  labels_of <- function(p) {
+    ggplot2::ggplot_build(p)$plot$scales$scales[[1]]$get_labels()
+  }
+  # Default.
+  expect_true("No data" %in% labels_of(world_map(mapdf, continent,
+                                                 style = "categorical")))
+  # Custom, for both the categorical and the binned-into-a-factor styles.
+  expect_true("Not reported" %in%
+    labels_of(world_map(mapdf, continent, style = "categorical",
+                        na_label = "Not reported")))
+  expect_true("Not reported" %in%
+    labels_of(world_map(mapdf, gdp_per_capita, style = "quantile",
+                        na_label = "Not reported")))
+  # Real levels are untouched.
+  expect_true("Europe" %in% labels_of(world_map(mapdf, continent,
+                                                style = "categorical")))
+})
+
 test_that("bubble_map, tile_map and flow_map build", {
   skip_if_not_installed("maps")
   expect_s3_class(bubble_map(snap, population), "ggplot")
@@ -34,6 +71,26 @@ test_that("theme_world_map is a theme", {
 test_that("sf-only plots error cleanly without sf", {
   skip_if(requireNamespace("sf", quietly = TRUE))
   expect_error(bivariate_map(snap, gdp_per_capita, life_expectancy))
+})
+
+test_that("bivariate_map builds a ggplot (needs sf + biscale)", {
+  # Regression: the fill columns were injected into biscale::bi_class() with
+  # `!!sym()`, but bi_class() reads them with as.character(substitute(...)),
+  # so every call failed with "the condition has length > 1".
+  skip_if_not_installed("sf")
+  skip_if_not_installed("biscale")
+  skip_if_not_installed("rnaturalearth")
+  sfdata <- attach_geometry(snap, geometry = "sf")
+  p <- suppressWarnings(bivariate_map(sfdata, gdp_per_capita, life_expectancy))
+  expect_s3_class(p, "ggplot")
+  expect_no_error(suppressWarnings(ggplot2::ggplot_build(p)))
+  expect_s3_class(
+    suppressWarnings(bivariate_map(sfdata, gdp_per_capita, life_expectancy,
+                                   dim = 2)),
+    "ggplot"
+  )
+  expect_error(bivariate_map(sfdata, not_a_column, life_expectancy),
+               class = "countryatlas_error")
 })
 
 test_that("interactive_map(engine='ggiraph') accepts a custom tooltip", {

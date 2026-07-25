@@ -49,7 +49,6 @@ Suggests:
     DBI,
     duckdb,
     gganimate,
-    geofacet,
     ggiraph,
     ggrepel,
     ggsql,

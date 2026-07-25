@@ -14,4 +14,3 @@
 ^CRAN-SUBMISSION$
 ^cran-comments\.md$
 ^\.git$
-^man/figures/README-.*\.png$

@@ -38,6 +38,15 @@ per_capita <- function(data, value, pop = NULL, suffix = "_per_capita",
     }
     popdf <- fetch_wdi(c(.wdj_pop = "SP.POP.TOTL"),
                        start = min(years), end = max(years), cache = cache)
+    # A failed or empty World Bank fetch comes back as a keys-only tibble
+    # (fetch_wdi() degrades rather than erroring), so say so instead of
+    # dying on a "column `.wdj_pop` doesn't exist" subscript error.
+    if (!".wdj_pop" %in% names(popdf) || !nrow(popdf)) {
+      wdj_abort(c(
+        "Could not fetch population ({.val SP.POP.TOTL}) from the World Bank.",
+        "i" = "Pass a population column with {.arg pop} to compute per-capita values offline."
+      ))
+    }
     if ("year" %in% names(data)) {
       data <- dplyr::left_join(data, popdf[, c("iso3c", "year", ".wdj_pop")],
                                by = c("iso3c", "year"))
@@ -593,7 +602,8 @@ gini <- function(x, weights = NULL, na.rm = TRUE) {
 #' @return Without `groups`: a single non-negative number (`0` = perfect
 #'   equality). With `groups`: a tibble with components `"total"`,
 #'   `"between"` and `"within"` (`total = between + within`) and each
-#'   component's `share` of the total.
+#'   component's `share` of the total (`NA` when the total is `0`, i.e.
+#'   perfect equality, and the shares are undefined).
 #' @export
 #' @examples
 #' snap <- countryatlas::world_snapshot$countries
@@ -630,10 +640,13 @@ theil <- function(x, weights = NULL, groups = NULL, na.rm = TRUE) {
   parts <- dplyr::bind_rows(parts)
   between <- sum(parts$between)
   within <- sum(parts$within)
+  # Perfect equality gives total == 0, and 0/0 shares are undefined, not NaN.
+  share <- if (total == 0) c(NA_real_, NA_real_, NA_real_) else
+    c(1, between / total, within / total)
   tibble::tibble(
     component = c("total", "between", "within"),
     value = c(total, between, within),
-    share = c(1, between / total, within / total)
+    share = share
   )
 }
 

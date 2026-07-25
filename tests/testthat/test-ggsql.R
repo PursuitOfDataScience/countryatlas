@@ -67,6 +67,36 @@ test_that("ggsql_wkb_frame passes a plain data frame through unchanged", {
   expect_true(all(c("iso3c", "value") %in% names(out)))
 })
 
+test_that("ggsql_wkb_frame WKB-encodes real sf geometry", {
+  # Regression: st_as_binary() returns a classed "WKB" object that tibble
+  # rejects ("all columns must be vectors"), so every sf input to
+  # as_ggsql_source() / interactive_map(engine = "ggsql") used to error.
+  skip_if_not_installed("sf")
+  skip_if_not_installed("rnaturalearth")
+  sfd <- world_geometry("countries", geometry = "sf", region = "Europe")
+  out <- countryatlas:::ggsql_wkb_frame(sfd)
+  expect_s3_class(out, "tbl_df")
+  expect_equal(nrow(out), nrow(sfd))
+  expect_true("geometry" %in% names(out))
+  expect_type(out$geometry, "list")
+  expect_true(is.raw(out$geometry[[1]]))
+  # The WKB round-trips back to the geometry it came from.
+  expect_s3_class(sf::st_as_sfc(structure(out$geometry, class = "WKB"),
+                                EWKB = FALSE), "sfc")
+})
+
+test_that("as_ggsql_source(format = 'arrow') streams an sf frame", {
+  skip_if_not_installed("nanoarrow")
+  skip_if_not_installed("sf")
+  skip_if_not_installed("rnaturalearth")
+  sfd <- world_geometry("countries", geometry = "sf", region = "Europe")
+  stream <- as_ggsql_source(sfd, format = "arrow")
+  expect_s3_class(stream, "nanoarrow_array_stream")
+  # Geometry lands as an Arrow binary column ("z"), which is what ggsql reads.
+  schema <- nanoarrow::infer_nanoarrow_schema(countryatlas:::ggsql_wkb_frame(sfd))
+  expect_equal(schema$children$geometry$format, "z")
+})
+
 test_that("as_ggsql_source errors cleanly without duckdb/DBI", {
   skip_if(requireNamespace("duckdb", quietly = TRUE) &&
           requireNamespace("DBI", quietly = TRUE))

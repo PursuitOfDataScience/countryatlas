@@ -25,7 +25,10 @@ destination.}
 
 \item{custom_match}{Optional overrides (default \code{\link[=wdj_overrides]{wdj_overrides()}}).}
 
-\item{warn}{Whether to warn about unmatched inputs.}
+\item{warn}{Whether to warn about inputs that match no country (default
+\code{TRUE}). A recognised country whose destination value is genuinely
+missing -- countrycode has no currency for Kosovo -- returns \code{NA}
+without warning.}
 }
 \value{
 A vector of converted codes.

@@ -21,7 +21,8 @@ decomposition is returned instead of the scalar.}
 Without \code{groups}: a single non-negative number (\code{0} = perfect
 equality). With \code{groups}: a tibble with components \code{"total"},
 \code{"between"} and \code{"within"} (\code{total = between + within}) and each
-component's \code{share} of the total.
+component's \code{share} of the total (\code{NA} when the total is \code{0}, i.e.
+perfect equality, and the shares are undefined).
 }
 \description{
 The Theil T inequality index -- less famous than Gini, but it decomposes

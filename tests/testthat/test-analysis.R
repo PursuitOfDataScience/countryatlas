@@ -6,6 +6,26 @@ test_that("per_capita divides by a supplied population column", {
   expect_equal(out$co2_per_capita, df$co2 / df$pop)
 })
 
+test_that("per_capita reports a failed population fetch clearly", {
+  # Regression: fetch_wdi() degrades to a keys-only tibble when the World Bank
+  # fetch fails (a timeout, say), and per_capita() then died on an opaque
+  # vctrs error -- "Can't subset columns that don't exist: `.wdj_pop`".
+  local_mocked_bindings(
+    fetch_wdi = function(...) {
+      tibble::tibble(iso3c = character(), iso2c = character(),
+                     country = character(), year = integer())
+    }
+  )
+  df <- data.frame(iso3c = c("USA", "CHN"), year = 2020L, co2 = c(5e6, 1e7))
+  expect_error(per_capita(df, co2), class = "countryatlas_error")
+  expect_error(per_capita(df, co2), "Could not fetch population")
+  # A panel-free frame takes the other join branch; same clean error.
+  expect_error(per_capita(df[, c("iso3c", "co2")], co2),
+               "Could not fetch population")
+  # An explicit pop column never touches the network.
+  expect_no_error(per_capita(cbind(df, pop = c(331e6, 1402e6)), co2, pop))
+})
+
 test_that("aggregate_regions rolls up with sum and weighted mean", {
   df <- data.frame(
     iso3c = c("USA", "CAN", "BRA"),

@@ -75,7 +75,7 @@ devtools::install_github("PursuitOfDataScience/countryatlas")
 ```
 
 The base install is light. Heavy spatial extras (`sf`, `rnaturalearth`,
-`cartogram`, `biscale`, `geofacet`, `gganimate`, `leaflet`, …) live in
+`cartogram`, `biscale`, `gganimate`, `leaflet`, …) live in
 `Suggests` and are only needed for the features that use them.
 
 ### Optional features at a glance
@@ -94,7 +94,6 @@ The base install is light. Heavy spatial extras (`sf`, `rnaturalearth`,
 | `interactive_map(engine = "ggiraph")` | `ggiraph` |
 | `interactive_map(engine = "leaflet")` | `leaflet`, `sf` |
 | `interactive_map(engine = "ggsql")`, `as_ggsql_source()` | `ggsql`, `duckdb`, `DBI`, `nanoarrow`, `sf` |
-| `tile_map()` with `geofacet`-style small multiples | `geofacet` |
 | `simplify_geometry()` with `rmapshaper` | `rmapshaper` |
 | `repair_country_names()` / `check_country_match()` with `stringdist` | `stringdist` |
 
@@ -183,12 +182,12 @@ in_group(c("France", "United States", "Japan"), "EU")
 
 ## A whole vocabulary of honest maps
 
-Beyond the choropleth: proportional-symbol (`bubble_map()`), bivariate
-(`bivariate_map()`), area-honest cartograms (`cartogram_map()`, including a
-first-class `dorling_map()`), equal-area tile grids (`tile_map()`),
-great-circle flows (`flow_map()`), an orthographic globe (`globe_map()`),
-small multiples (`facet_map()`), animation (`animate_world()`) and
-interactivity (`interactive_map()`).
+Beyond the choropleth: proportional-symbol (`bubble_map()`), spikes
+(`spike_map()`), bivariate (`bivariate_map()`), area-honest cartograms
+(`cartogram_map()`, including a first-class `dorling_map()`), equal-area tile
+grids (`tile_map()`), great-circle flows (`flow_map()`), an orthographic globe
+(`globe_map()`), small multiples (`facet_map()`), animation
+(`animate_world()`) and interactivity (`interactive_map()`).
 
 The world as a globe, not a rectangle — with the `"polygon"` backend (only
 `maps` + `mapproj`, no `sf`) you can draw it and even **spin** it:
@@ -233,6 +232,11 @@ Get point data onto the spine, repair messy names, reduce-join many tables, and
 run panel analysis — all keyed on `iso3c`:
 
 ```{r}
+# normalise a total by population, so the map isn't just a population map
+# (omit `pop` and SP.POP.TOTL is fetched for the relevant countries/years)
+per_capita(data.frame(iso3c = c("USA", "CHN"), co2 = c(4.7e6, 1.1e7),
+                      pop = c(331e6, 1412e6)), co2, pop)
+
 # each country's share of a world total (within year, for a panel)
 share_of_world(data.frame(iso3c = c("USA", "CHN", "IND"), co2 = c(5, 15, 3)), co2)
 

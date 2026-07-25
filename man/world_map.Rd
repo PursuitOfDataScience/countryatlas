@@ -41,7 +41,9 @@ or \code{"categorical"}.}
 
 \item{title, legend}{Optional plot title and legend title.}
 
-\item{na_label}{Legend label for missing data.}
+\item{na_label}{Legend key label for missing data, used by the styles with
+a discrete legend (\code{"quantile"}, \code{"jenks"}, \code{"categorical"}); the
+continuous and binned colourbars have no \code{NA} key to name.}
 
 \item{recenter}{Optional central meridian for the \code{sf} backend.}
 }

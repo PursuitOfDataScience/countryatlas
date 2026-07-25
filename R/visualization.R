@@ -72,7 +72,9 @@ compute_breaks <- function(x, style, n_bins) {
 #' @param n_bins Number of bins for binned/quantile/jenks styles.
 #' @param borders Draw country borders (default `TRUE`).
 #' @param title,legend Optional plot title and legend title.
-#' @param na_label Legend label for missing data.
+#' @param na_label Legend key label for missing data, used by the styles with
+#'   a discrete legend (`"quantile"`, `"jenks"`, `"categorical"`); the
+#'   continuous and binned colourbars have no `NA` key to name.
 #' @param recenter Optional central meridian for the `sf` backend.
 #'
 #' @return A `ggplot` object.
@@ -124,7 +126,7 @@ world_map <- function(data, fill,
       ggplot2::geom_sf(ggplot2::aes(fill = !!fill_mapped),
                        color = if (borders) "grey30" else NA,
                        linewidth = 0.1) +
-      ggplot2::coord_sf(crs = wdj_crs(projection, recenter))
+      wdj_coord_sf(projection, recenter)
   } else {
     p <- ggplot2::ggplot(
       data,
@@ -158,12 +160,29 @@ add_fill_scale <- function(style, palette, n_bins, na_label, legend) {
     ),
     quantile = ,
     jenks = ggplot2::scale_fill_viridis_d(
-      name = legend, na.value = na_val, option = palette %||% "viridis"
+      name = legend, na.value = na_val, option = palette %||% "viridis",
+      labels = discrete_na_labels(na_label)
     ),
     categorical = ggplot2::scale_fill_viridis_d(
-      name = legend, na.value = na_val, option = palette %||% "turbo"
+      name = legend, na.value = na_val, option = palette %||% "turbo",
+      labels = discrete_na_labels(na_label)
     )
   )
+}
+
+# Label the discrete scales' NA key with `na_label` instead of a bare "NA".
+# (Continuous / binned colourbars have no NA key to name, so they are left
+# to the default formatter.)
+discrete_na_labels <- function(na_label) {
+  if (is.null(na_label) || !length(na_label) || is.na(na_label)) {
+    return(ggplot2::waiver())
+  }
+  force(na_label)
+  function(x) {
+    x <- as.character(x)
+    x[is.na(x)] <- as.character(na_label)
+    x
+  }
 }
 
 # Use scales::label_number if available, else identity labels. SI-style
@@ -229,7 +248,7 @@ bubble_map <- function(data, size, color = NULL, projection = "equal_earth",
                          linewidth = 0.1) +
         ggplot2::geom_sf(data = pts_sf, mapping = aes_pt, alpha = alpha) +
         ggplot2::scale_size_area(max_size = max_size) +
-        ggplot2::coord_sf(crs = wdj_crs(projection)) +
+        wdj_coord_sf(projection) +
         theme_world_map()
     )
   }
@@ -351,14 +370,25 @@ bivariate_map <- function(data, fill_x, fill_y, palette = "GrPink", dim = 3,
   x_name <- rlang::as_name(rlang::enquo(fill_x))
   y_name <- rlang::as_name(rlang::enquo(fill_y))
 
-  bidata <- biscale::bi_class(data, x = !!rlang::sym(x_name),
-                              y = !!rlang::sym(y_name),
-                              style = "quantile", dim = dim)
+  for (nm in c(x_name, y_name)) {
+    if (!nm %in% names(data)) {
+      wdj_abort("Column {.val {nm}} not found in {.arg data}.")
+    }
+  }
+  # bi_class() reads its x/y arguments with as.character(substitute(...)), not
+  # tidy eval: a `!!sym()` injection deparses into a multi-element vector and
+  # blows up inside biscale ("the condition has length > 1"), and a variable
+  # holding the name deparses to the variable's own name. Build the call so
+  # the column names are inlined as literals.
+  bidata <- do.call(
+    biscale::bi_class,
+    list(.data = data, x = x_name, y = y_name, style = "quantile", dim = dim)
+  )
   ggplot2::ggplot() +
     ggplot2::geom_sf(data = bidata, ggplot2::aes(fill = .data$bi_class),
                      color = "grey30", linewidth = 0.1, show.legend = FALSE) +
     biscale::bi_scale_fill(pal = palette, dim = dim) +
-    ggplot2::coord_sf(crs = wdj_crs(projection)) +
+    wdj_coord_sf(projection) +
     biscale::bi_theme()
 }
 
@@ -443,8 +473,9 @@ dorling_map <- function(data, weight, fill = NULL, k = 5, itermax = 1000,
 #' Equal-area world tile grid
 #'
 #' A statebins-style equal-area tile grid of the world (one square per country)
-#' so tiny states are actually visible. Uses the bundled [world_tiles] layout
-#' (and `geofacet` when available for small multiples).
+#' so tiny states are actually visible. Uses the bundled [world_tiles] layout.
+#' For small multiples of a tile grid, facet the result as you would any other
+#' `ggplot` (or see [facet_map()] for the choropleth equivalent).
 #'
 #' @param data A country-level frame with `iso3c` and the `fill` column.
 #' @param fill The fill column (unquoted).
@@ -639,7 +670,14 @@ interactive_map <- function(data, fill, tooltip = NULL,
   need_pkg(engine, sprintf("for interactive_map(engine = \"%s\")", engine))
 
   if (engine == "ggsql") {
-    need_pkg("sf", "engine = \"ggsql\" needs an sf frame (geometry = \"sf\")")
+    need_pkg(c("sf", "DBI", "duckdb"),
+             "for interactive_map(engine = \"ggsql\")")
+    if (!is_sf(data)) {
+      wdj_abort(c(
+        '{.code engine = "ggsql"} needs an sf frame so {.code DRAW spatial} has geometry.',
+        "i" = 'Build one with {.code world_data(..., geometry = "sf")} or {.fn attach_geometry}.'
+      ))
+    }
     reader <- ggsql::duckdb_reader()
     ggsql::ggsql_register(reader, ggsql_wkb_frame(data), "countryatlas_world")
     q <- world_query(!!fill_q, source = "countryatlas_world", ...)
@@ -732,7 +770,8 @@ geom_country_labels <- function(mapping = NULL, repel = TRUE, flag = FALSE,
     }
     names(out)[names(out) == "centroid_lon"] <- "long"
     names(out)[names(out) == "centroid_lat"] <- "lat"
-    out$flag <- convert_country(out$iso3c, to = "flag", from = "iso3c")
+    out$flag <- convert_country(out$iso3c, to = "flag", from = "iso3c",
+                                warn = FALSE)
     out
   }
   # Build a self-contained mapping (don't inherit the plot's group/fill aes).
@@ -865,7 +904,7 @@ globe_map <- function(data, fill, lon = 0, lat = 20,
   p <- ggplot2::ggplot(data) +
     ggplot2::geom_sf(ggplot2::aes(fill = !!fill_mapped),
                      color = if (borders) "grey30" else NA, linewidth = 0.1) +
-    ggplot2::coord_sf(crs = wdj_crs("orthographic", recenter = lon, lat0 = lat)) +
+    wdj_coord_sf("orthographic", recenter = lon, lat0 = lat) +
     add_fill_scale(style, palette, n_bins, na_label, legend %||% fill_name) +
     theme_world_map()
   if (!is.null(title)) p <- p + ggplot2::labs(title = title)

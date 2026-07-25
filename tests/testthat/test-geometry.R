@@ -108,6 +108,53 @@ test_that("neighbors returns zero rows for islands", {
   expect_equal(nrow(nbr), 0)
 })
 
+test_that("locate_country names Kosovo (XKX has no countrycode row)", {
+  skip_if_not_installed("sf")
+  skip_if_not_installed("rnaturalearth")
+  out <- locate_country(lon = 20.9, lat = 42.6, add = c("country", "continent"))
+  expect_equal(out$iso3c, "XKX")
+  expect_equal(out$country, "Kosovo")
+  expect_equal(out$continent, "Europe")
+})
+
+test_that("country_borders names every endpoint, Kosovo included", {
+  skip_if_not_installed("sf")
+  skip_if_not_installed("rnaturalearth")
+  edges <- country_borders()
+  expect_false(anyNA(edges$country_a))
+  expect_false(anyNA(edges$country_b))
+  xkx <- edges[edges$iso3c_a == "XKX" | edges$iso3c_b == "XKX", ]
+  expect_gt(nrow(xkx), 0)
+})
+
+test_that("world_geometry('coastline') works in every projection", {
+  # Two Natural Earth rings are invalid once projected, and st_union() (unlike
+  # the predicates) refuses them outright: the coastline used to error with
+  # "TopologyException: side location conflict" in all but plate_carree.
+  skip_if_not_installed("sf")
+  skip_if_not_installed("rnaturalearth")
+  for (proj in c("equal_earth", "robinson", "mollweide", "mercator",
+                 "plate_carree", "orthographic")) {
+    cl <- world_geometry("coastline", geometry = "sf", projection = proj)
+    expect_s3_class(cl, "sfc_MULTILINESTRING")
+    expect_length(cl, 1)
+  }
+})
+
+test_that("world_geometry accepts a bounding-box region on the sf backend", {
+  # Regression: st_crop() under the strict S2 engine rejected Natural Earth's
+  # self-intersecting rings, so region = c(xmin, ymin, xmax, ymax) errored.
+  skip_if_not_installed("sf")
+  skip_if_not_installed("rnaturalearth")
+  eur <- world_geometry("countries", geometry = "sf",
+                        region = c(-10, 35, 30, 60))
+  expect_s3_class(eur, "sf")
+  expect_gt(nrow(eur), 10)
+  expect_lt(nrow(eur), 100)
+  expect_true("FRA" %in% eur$iso3c)
+  expect_false("AUS" %in% eur$iso3c)
+})
+
 test_that("polygon_centroids returns one centroid per iso3c", {
   # Bug 3.3: PRT / ESP / BES must each produce ONE row, not multiple.
   skip_if_not_installed("maps")

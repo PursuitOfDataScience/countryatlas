@@ -47,7 +47,10 @@ convert_dest_map <- function() {
 #'   destination.
 #' @param from Origin scheme (default `"country.name"`).
 #' @param custom_match Optional overrides (default [wdj_overrides()]).
-#' @param warn Whether to warn about unmatched inputs.
+#' @param warn Whether to warn about inputs that match no country (default
+#'   `TRUE`). A recognised country whose destination value is genuinely
+#'   missing -- countrycode has no currency for Kosovo -- returns `NA`
+#'   without warning.
 #'
 #' @return A vector of converted codes.
 #' @export
@@ -72,9 +75,14 @@ convert_country <- function(x, to = "iso3c", from = "country.name",
   # Islands, ...) resolve for EVERY destination, not just iso3c.
   if (from %in% c("country.name", "iso3c")) {
     iso <- wdj_to_iso3c(x, origin = from, custom_match = custom_match)
+    # Report inputs that resolve to no country at all. A recognised country
+    # whose *destination* value is genuinely missing (countrycode has no
+    # currency for Kosovo) is a data gap, not a matching failure, so it does
+    # not warn -- otherwise sparse destinations like `cown` would cry wolf.
+    warn_unmatched_input(x, iso, warn)
     if (identical(dest, "iso3c")) return(iso)
     out <- suppressWarnings(
-      countrycode::countrycode(iso, origin = "iso3c", destination = dest, warn = warn)
+      countrycode::countrycode(iso, origin = "iso3c", destination = dest, warn = FALSE)
     )
     # A handful of user-assigned codes (Kosovo's XKX) have NO row at all in
     # countrycode::codelist, so the iso3c round-trip above is NA for every
@@ -90,17 +98,51 @@ convert_country <- function(x, to = "iso3c", from = "country.name",
         )
       }
     }
-    # Even direct name matching doesn't classify iso2c/continent/region for
-    # XKX; apply the same fallback standardize_country() uses, so
-    # convert_country() and locate_country() agree with it.
-    if (dest %in% c("iso2c", "continent", "region")) {
-      out <- apply_code_fallback(tibble::tibble(iso3c = iso, "{dest}" := out))[[dest]]
-    }
+    # Codes with no codelist row at all (XKX) are still NA here -- and from
+    # `iso3c` there is no name to recover from. Apply the same curated
+    # fallback standardize_country() uses, so convert_country(),
+    # locate_country() and country_borders() all agree with it.
+    out <- apply_fallback_dest(iso, out, dest)
     return(out)
   }
-  suppressWarnings(
-    countrycode::countrycode(x, origin = from, destination = dest, warn = warn)
+  out <- suppressWarnings(
+    countrycode::countrycode(x, origin = from, destination = dest, warn = FALSE)
   )
+  # No intermediate iso3c here, so the single hop is the match.
+  warn_unmatched_input(x, out, warn)
+  out
+}
+
+# countrycode destination -> the column of wdj_code_fallback() that fills it.
+fallback_dest_col <- function(dest) {
+  switch(dest,
+         iso2c = "iso2c", continent = "continent", region = "region",
+         country.name.en = "country", unicode.symbol = "flag",
+         NULL)
+}
+
+# Fill a converted vector from the curated fallback table where the iso3c
+# round-trip left it NA.
+apply_fallback_dest <- function(iso, out, dest) {
+  col <- fallback_dest_col(dest)
+  if (is.null(col)) return(out)
+  apply_code_fallback(tibble::tibble(iso3c = iso, "{col}" := out))[[col]]
+}
+
+# `warn = TRUE` has to warn from here: countrycode's own warning is suppressed
+# throughout, because it also fires on intermediate hops that
+# convert_country() goes on to recover.
+warn_unmatched_input <- function(x, matched, warn) {
+  if (!isTRUE(warn)) return(invisible(NULL))
+  x <- as.character(x)
+  miss <- unique(x[!is.na(x) & nzchar(x) & is.na(matched)])
+  if (!length(miss)) return(invisible(NULL))
+  wdj_warn(c(
+    "{length(miss)} value{?s} could not be matched to a country:",
+    "*" = "{.val {miss}}",
+    "i" = "Use {.fn check_country_match} to inspect, or pass {.arg custom_match}."
+  ))
+  invisible(NULL)
 }
 
 #' The countrycode codelist as a tidy tibble

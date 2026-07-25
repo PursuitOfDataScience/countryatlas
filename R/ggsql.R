@@ -10,7 +10,11 @@ ggsql_wkb_frame <- function(data, geometry_col = "geometry") {
   need_pkg("sf", "to WKB-encode geometry for ggsql")
   geom <- sf::st_geometry(data)
   df <- sf::st_drop_geometry(data)
-  df[[geometry_col]] <- sf::st_as_binary(geom, EWKB = FALSE)
+  # st_as_binary() returns a classed "WKB" object, which tibble rejects ("all
+  # columns must be vectors"). Strip the class: the payload is already a list
+  # of raw vectors, which is what nanoarrow encodes as binary and DBI writes
+  # as a BLOB.
+  df[[geometry_col]] <- unclass(sf::st_as_binary(geom, EWKB = FALSE))
   tibble::as_tibble(df)
 }
 

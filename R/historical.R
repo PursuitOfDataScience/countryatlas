@@ -78,6 +78,10 @@ normalize_historical <- function(x) {
 #' dissolve_country("Yugoslavia")
 dissolve_country <- function(x, warn = TRUE) {
   x <- as.character(x)
+  empty <- tibble::tibble(input = character(), historical = character(),
+                          dissolved = integer(), iso3c = character(),
+                          country = character())
+  if (!length(x)) return(empty)
   aliases <- historical_aliases()
   canon <- unname(aliases[normalize_historical(x)])
 

@@ -88,22 +88,26 @@ country_overrides <- function(extra = NULL) {
 }
 
 # Small fallback table for ISO3c codes that `countrycode` does not classify
-# into a continent / region (notably Kosovo's user-assigned XKX).
+# (notably Kosovo's user-assigned XKX, which has no row at all in
+# countrycode::codelist, so every destination derived from the code is NA).
 wdj_code_fallback <- function() {
   tibble::tribble(
-    ~iso3c,  ~iso2c, ~continent, ~region,
-    "XKX",   "XK",   "Europe",   "Europe & Central Asia"
+    ~iso3c,  ~iso2c, ~continent, ~region,                 ~country,  ~flag,
+    "XKX",   "XK",   "Europe",   "Europe & Central Asia", "Kosovo",  "\U0001F1FD\U0001F1F0"
   )
 }
 
-# Fill continent / region / iso2c for codes countrycode leaves NA.
+# Columns apply_code_fallback() knows how to fill.
+wdj_fallback_cols <- function() c("iso2c", "continent", "region", "country", "flag")
+
+# Fill the fallback columns for codes countrycode leaves NA.
 apply_code_fallback <- function(df) {
   fb <- wdj_code_fallback()
   if (!"iso3c" %in% names(df)) return(df)
   for (i in seq_len(nrow(fb))) {
     hit <- !is.na(df$iso3c) & df$iso3c == fb$iso3c[i]
     if (!any(hit)) next
-    for (col in c("iso2c", "continent", "region")) {
+    for (col in wdj_fallback_cols()) {
       if (col %in% names(df)) {
         miss <- hit & is.na(df[[col]])
         df[[col]][miss] <- fb[[col]][i]

@@ -50,6 +50,9 @@ wdj_workers <- function(n_tasks = Inf) {
   opt <- getOption("countryatlas.workers", NULL)
   if (!is.null(opt)) {
     workers <- max(1L, as.integer(opt))
+  } else if (identical(Sys.getenv("_R_CHECK_LIMIT_CORES_"), "TRUE")) {
+    # CRAN policy: never use more than two cores under R CMD check.
+    workers <- 2L
   } else {
     cores <- tryCatch(parallel::detectCores(), error = function(e) 1L)
     if (is.na(cores) || cores < 1L) cores <- 1L

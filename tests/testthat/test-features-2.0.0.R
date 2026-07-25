@@ -59,11 +59,37 @@ test_that("convert_country routes overrides through iso3c for all destinations",
   # Genuinely missing data (countrycode has no currency for Kosovo) stays NA,
   # not silently invented -- both before and after this fix.
   expect_true(is.na(convert_country("Kosovo", to = "currency")))
-  # from = "iso3c" has no name to recover from, so it only gets the curated
-  # iso2c/continent/region fallback (the locate_country()/standardize_country()
-  # path), not the name-matching recovery -- a narrower but honest boundary.
+  # from = "iso3c" has no name to recover from, so everything it resolves for
+  # XKX comes from the curated fallback table -- which covers name and flag
+  # too, so country_borders() / locate_country(add = "country") don't hand
+  # back NA for Kosovo.
   expect_equal(convert_country("XKX", to = "continent", from = "iso3c"), "Europe")
-  expect_true(is.na(convert_country("XKX", to = "flag", from = "iso3c")))
+  expect_equal(convert_country("XKX", to = "region", from = "iso3c"),
+               "Europe & Central Asia")
+  expect_equal(convert_country("XKX", to = "iso2c", from = "iso3c"), "XK")
+  expect_equal(convert_country("XKX", to = "country", from = "iso3c"), "Kosovo")
+  expect_equal(convert_country("XKX", to = "flag", from = "iso3c"),
+               "\U0001F1FD\U0001F1F0")
+  # Genuinely missing data still stays NA rather than being invented.
+  expect_true(is.na(convert_country("XKX", to = "currency", from = "iso3c",
+                                    warn = FALSE)))
+})
+
+test_that("convert_country(warn = TRUE) actually warns about misses", {
+  # It used to be a no-op: every internal countrycode() call is wrapped in
+  # suppressWarnings(), so `warn` never reached the user.
+  expect_warning(convert_country("Wakanda", to = "continent"),
+                 "could not be matched")
+  expect_warning(convert_country("Wakanda"), "could not be matched")
+  expect_warning(convert_country("ZZ", to = "country", from = "iso2c"),
+                 "could not be matched")
+  expect_silent(convert_country("Wakanda", to = "continent", warn = FALSE))
+  expect_silent(convert_country(c("France", "Japan"), to = "continent"))
+  # NA in, NA out is not a matching failure.
+  expect_silent(convert_country(c(NA, "France"), to = "continent"))
+  # Neither is a recognised country with no value for that destination:
+  # countrycode simply has no currency for Kosovo.
+  expect_silent(convert_country("Kosovo", to = "currency"))
 })
 
 test_that("new country groups are present and correctly sized", {

@@ -23,7 +23,7 @@
   is unreachable; the bundled `world_snapshot` dataset keeps the remaining tests
   offline and deterministic.
 * Heavy spatial dependencies (`sf`, `rnaturalearth`, `cartogram`, `biscale`,
-  `geofacet`, `gganimate`, `leaflet`, `ggiraph`, `plotly`, `rmapshaper`,
+  `gganimate`, `leaflet`, `ggiraph`, `plotly`, `rmapshaper`,
   `ggsql`, `duckdb`) are in `Suggests` and gated with
   `rlang::check_installed()`; tests and vignette chunks that use them skip
   cleanly when they are absent.

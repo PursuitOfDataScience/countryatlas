@@ -212,6 +212,13 @@ test_that("theil is zero at equality and decomposes exactly", {
   expect_warning(theil(c(0, 1, 2)), class = "countryatlas_warning")
 })
 
+test_that("theil shares are NA (not NaN) at perfect equality", {
+  dec <- theil(c(5, 5, 5, 5), groups = c("a", "a", "b", "b"))
+  expect_equal(dec$value, c(0, 0, 0))
+  expect_true(all(is.na(dec$share)))
+  expect_false(any(is.nan(dec$share)))
+})
+
 # --- Moran's I ------------------------------------------------------------------
 
 test_that("morans_i finds spatial autocorrelation in GDP (needs sf)", {

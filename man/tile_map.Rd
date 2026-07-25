@@ -18,8 +18,9 @@ A \code{ggplot} object.
 }
 \description{
 A statebins-style equal-area tile grid of the world (one square per country)
-so tiny states are actually visible. Uses the bundled \link{world_tiles} layout
-(and \code{geofacet} when available for small multiples).
+so tiny states are actually visible. Uses the bundled \link{world_tiles} layout.
+For small multiples of a tile grid, facet the result as you would any other
+\code{ggplot} (or see \code{\link[=facet_map]{facet_map()}} for the choropleth equivalent).
 }
 \examples{
 \donttest{
