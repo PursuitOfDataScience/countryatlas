@@ -126,7 +126,11 @@ test_that("a parquet export defaults into the session temp dir, not getwd()", {
   # helper because the surrounding code needs duckdb, which is not installed
   # everywhere this runs.
   d <- countryatlas:::ggsql_parquet_path("countryatlas_world")
-  expect_identical(dirname(d), tempdir())
+  # Compare normalised paths: on Windows tempdir() comes back with backslashes
+  # while dirname() hands back forward slashes, so the raw strings differ even
+  # when they name the same directory.
+  norm <- function(x) normalizePath(x, winslash = "/", mustWork = FALSE)
+  expect_identical(norm(dirname(d)), norm(tempdir()))
   expect_identical(basename(d), "countryatlas_world.parquet")
   expect_false(basename(d) == d)                 # i.e. not a bare relative path
   expect_true(startsWith(d, tempdir()))

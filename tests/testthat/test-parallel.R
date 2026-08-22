@@ -63,6 +63,9 @@ test_that("wdj_lapply gives the same answer forked as serial", {
 test_that("an error inside a fork is surfaced, not swallowed", {
   # mclapply returns a try-error object per failed element rather than raising,
   # so without the check the failure would pass silently downstream.
+  # Windows never forks: wdj_lapply() takes the plain lapply() branch there and
+  # the error propagates unwrapped, which is correct but not what this pins.
+  skip_on_os("windows")
   wl <- countryatlas:::wdj_lapply
   err <- tryCatch(
     suppressWarnings(wl(1:4, function(i) if (i == 3) stop("boom-3") else i,
@@ -153,9 +156,14 @@ test_that("a bad workers option names the option instead of failing later", {
                  "countryatlas.workers")
     expect_error(suppressWarnings(countryatlas:::wdj_workers(10)),
                  class = "countryatlas_error")
-    # And the parallel helper surfaces it rather than dying in mclapply.
-    expect_error(suppressWarnings(
-      countryatlas:::wdj_lapply(1:3, function(i) i * 2)), "countryatlas.workers")
+    # And the parallel helper surfaces it rather than dying in mclapply. Only
+    # where forking happens: on Windows wdj_lapply() returns from the plain
+    # lapply() branch before it ever asks for a worker count, so there is no
+    # error to catch and nothing about the option to report.
+    if (.Platform$OS.type != "windows") {
+      expect_error(suppressWarnings(
+        countryatlas:::wdj_lapply(1:3, function(i) i * 2)), "countryatlas.workers")
+    }
     options(old)
   }
 })

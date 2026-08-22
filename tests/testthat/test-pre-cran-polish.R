@@ -645,7 +645,7 @@ test_that("every option the package reads is documented on the package page", {
   # reference documentation -- so a reader of ?countryatlas had no way to find
   # them. wdj_workers()'s own comment even said "the option is advertised in
   # NEWS", which is how a bad value became reachable in the first place.
-  skip_if_not(dir.exists("../../R"), "source tree not available")
+  skip_if_no_source_tree()
   src <- unlist(lapply(list.files("../../R", pattern = "[.]R$", full.names = TRUE),
                        readLines, warn = FALSE))
   # Read only from getOption() calls: a bare mention in a comment or a filename
@@ -843,7 +843,7 @@ test_that("globalVariables() declares nothing it does not need", {
   # `.data$x` idiom, which needs no declaration. A stale entry silences the "no
   # visible binding" NOTE for a *new* bare use of the same name -- the warning
   # that would otherwise catch a typo -- so keep the list minimal.
-  skip_if_not(dir.exists("../../R"), "source tree not available")
+  skip_if_no_source_tree()
   files <- list.files("../../R", pattern = "[.]R$", full.names = TRUE)
 
   # Read the declared names by parsing R, not by regexing text.
@@ -893,7 +893,7 @@ test_that("bundled datasets are never referenced bare inside the package", {
   # package, so nothing caught it. Declaring the names in globalVariables()
   # silenced the check NOTE without fixing the runtime lookup, which is why the
   # NOTE existed. They must be `countryatlas::`-qualified.
-  skip_if_not(dir.exists("../../R"), "source tree not available")
+  skip_if_no_source_tree()
   datasets <- c("world_snapshot", "country_meta", "world_tiles",
                 "country_groups_tbl", "historical_codes", "common_indicators")
   files <- setdiff(list.files("../../R", pattern = "[.]R$", full.names = TRUE),

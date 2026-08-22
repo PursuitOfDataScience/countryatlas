@@ -1,17 +1,20 @@
 # Case folding under a locale where "i" and "I" are not a case pair.
 #
 # toupper()/tolower() follow LC_CTYPE. Turkish, Azeri and Crimean Tatar have a
-# dotted and a dotless i, so toupper("idn") is "İDN" and tolower("ISO3C")
-# is "ıso3c" -- neither of which matches the ASCII identifier it is being
-# compared against. Every ISO code containing an "i" (IDN, IND, IRL, IRN, ISL,
-# ISR, ITA, BIH, CIV, FIN, ...) silently resolved to NA for those users.
+# dotted and a dotless i, so toupper("idn") gives a dotted capital I and
+# tolower("ISO3C") a dotless i -- neither of which matches the ASCII
+# identifier it is compared against. Every ISO code containing an "i"
+# (IDN, IND, IRL, IRN, ISL, ISR, ITA, BIH, CIV, FIN, ...) silently
+# resolved to NA for those users.
 
 test_that("ascii_upper / ascii_lower fold only ASCII", {
   expect_identical(ascii_upper("idn"), "IDN")
   expect_identical(ascii_lower("ISO3C"), "iso3c")
   expect_identical(ascii_upper(c("irl", "CHN", NA)), c("IRL", "CHN", NA))
   # Non-ASCII is deliberately left alone: these fold identifiers, not prose.
-  expect_identical(ascii_upper("côte"), "CôTE")
+  # Written as escapes so this file stays pure ASCII: a literal here would
+  # depend on how the source is decoded on a non-UTF-8 platform.
+  expect_identical(ascii_upper("c\u00f4te"), "C\u00f4TE")
   expect_identical(ascii_lower(""), "")
   expect_identical(ascii_upper(character()), character())
 })

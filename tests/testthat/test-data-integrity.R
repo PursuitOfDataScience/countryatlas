@@ -426,7 +426,7 @@ test_that("no documented indicator code has been retired upstream", {
   # column. R CMD check reports examples "OK" without failing on warnings, so
   # nothing surfaced it. This is a static check -- every indicator code quoted
   # anywhere in the package must be one the bundled table vouches for.
-  skip_if_not(dir.exists("../../R"), "source tree not available")
+  skip_if_no_source_tree()
   where <- c(list.files("../../R", pattern = "[.]R$", full.names = TRUE),
              list.files("../../man", pattern = "[.]Rd$", full.names = TRUE),
              list.files("../../vignettes", pattern = "[.]Rmd$", full.names = TRUE))
