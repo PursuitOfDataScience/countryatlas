@@ -118,3 +118,28 @@ test_that("ggsql helpers error cleanly without the optional stack", {
     interactive_map(world_snapshot$countries, gdp_per_capita, engine = "ggsql")
   )
 })
+
+test_that("a parquet export defaults into the session temp dir, not getwd()", {
+  # CRAN policy: a package writes nowhere but the session temp directory unless
+  # the caller says otherwise. The default was the bare relative path
+  # "<name>.parquet", which lands in the working directory. Tested through the
+  # helper because the surrounding code needs duckdb, which is not installed
+  # everywhere this runs.
+  d <- countryatlas:::ggsql_parquet_path("countryatlas_world")
+  expect_identical(dirname(d), tempdir())
+  expect_identical(basename(d), "countryatlas_world.parquet")
+  expect_false(basename(d) == d)                 # i.e. not a bare relative path
+  expect_true(startsWith(d, tempdir()))
+
+  # The table name is honoured, and an explicit path always wins.
+  expect_identical(basename(countryatlas:::ggsql_parquet_path("mine")),
+                   "mine.parquet")
+  expect_identical(countryatlas:::ggsql_parquet_path("x", "/somewhere/else.parquet"),
+                   "/somewhere/else.parquet")
+
+  # No other export writes outside the temp dir by default: spin_globe() and
+  # its frames both go through tempfile().
+  body_txt <- paste(deparse(body(spin_globe)), collapse = " ")
+  expect_true(grepl("tempfile", body_txt, fixed = TRUE))
+  expect_false(grepl("getwd", body_txt, fixed = TRUE))
+})

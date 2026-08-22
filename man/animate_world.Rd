@@ -13,7 +13,8 @@ animate_world(data, fill, time = year, projection = "equal_earth", ...)
 
 \item{time}{The time column (unquoted; default \code{year}).}
 
-\item{projection}{Projection for the sf backend.}
+\item{projection}{Projection for the sf backend. See \code{\link[=world_map]{world_map()}} for the
+projections available.}
 
 \item{...}{Passed to \code{\link[=world_map]{world_map()}}.}
 }

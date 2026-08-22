@@ -33,3 +33,6 @@ df <- data.frame(
 )
 sigma_convergence(df, gdp)
 }
+\seealso{
+\code{\link[=beta_convergence]{beta_convergence()}} for the growth-regression counterpart.
+}

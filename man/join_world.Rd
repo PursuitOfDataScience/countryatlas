@@ -26,11 +26,13 @@ auto-detected.}
 
 \item{geometry}{\code{"polygon"} (default), \code{"sf"} or \code{"none"}.}
 
-\item{scale}{Natural Earth resolution for the \code{sf} backend.}
+\item{scale}{Natural Earth resolution for the \code{sf} backend. \code{"large"} needs the
+non-CRAN \code{rnaturalearthhires} package; see \code{\link[=world_geometry]{world_geometry()}}.}
 
 \item{region}{Optional region subset (see \code{\link[=world_geometry]{world_geometry()}}).}
 
-\item{projection, recenter}{Projection options for the \code{sf} backend.}
+\item{projection, recenter}{Projection, and optional central meridian, for
+the \code{sf} backend (see \code{\link[=world_map]{world_map()}} for the projections available).}
 
 \item{warn}{Whether to report unmatched countries (default \code{TRUE}); also
 surfaces a \code{\link[=check_country_match]{check_country_match()}} summary.}

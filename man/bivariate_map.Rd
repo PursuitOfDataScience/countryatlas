@@ -22,7 +22,7 @@ bivariate_map(
 
 \item{dim}{Bivariate dimension (2 or 3, default 3).}
 
-\item{projection}{Projection.}
+\item{projection}{Projection; see \code{\link[=world_map]{world_map()}} for the ones available.}
 }
 \value{
 A \code{ggplot} object (the map; combine with \code{biscale::bi_legend()} for a
@@ -33,9 +33,12 @@ A 2-D bivariate choropleth with a built-in 2-D legend (via the optional
 \code{biscale} package), e.g. GDP per capita x life expectancy in one map.
 }
 \examples{
-\dontrun{
-world_data(2020, c(gdp = "NY.GDP.PCAP.KD", life = "SP.DYN.LE00.IN"),
-           geometry = "sf") |>
-  bivariate_map(gdp, life)
+\donttest{
+if (requireNamespace("sf", quietly = TRUE) &&
+    requireNamespace("rnaturalearth", quietly = TRUE) &&
+    requireNamespace("biscale", quietly = TRUE)) {
+  attach_geometry(countryatlas::world_snapshot$countries, geometry = "sf") |>
+    bivariate_map(gdp_per_capita, life_expectancy)
+}
 }
 }

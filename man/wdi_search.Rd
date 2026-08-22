@@ -23,6 +23,7 @@ codes.
 }
 \examples{
 \donttest{
+# Searches WDI's bundled indicator list, so this needs no connection.
 wdi_search("CO2 emissions")
 }
 }

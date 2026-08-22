@@ -15,21 +15,25 @@
 #' @param x A vector of country names or codes.
 #' @param origin How to read `x` (any countrycode origin scheme).
 #' @param custom_match Overrides applied before matching (default
-#'   [wdj_overrides()]).
+#'   [country_overrides()]).
 #' @param suggest Whether to compute closest-name suggestions for misses
 #'   (requires the optional `stringdist` package; default `TRUE`).
 #'
 #' @return A tibble with columns `input`, `iso3c`, `matched`, `historical`,
 #'   `suggestion`.
 #' @export
+#' @seealso [dissolve_country()] for resolving the entities this flags as
+#'   `historical` to their successor states, and [repair_country_names()] for
+#'   applying the `suggestion` column automatically.
 #' @examples
 #' check_country_match(c("USA", "Cote d'Ivoire", "Yugoslavia", "Wakanda"))
 #' # "USSR" matches (to RUS!) but is flagged historical:
 #' check_country_match("USSR")
 check_country_match <- function(x,
                                 origin = "country.name",
-                                custom_match = wdj_overrides(),
+                                custom_match = country_overrides(),
                                 suggest = TRUE) {
+  check_bool(suggest, "suggest")
   x <- as.character(x)
   iso3c <- wdj_to_iso3c(x, origin = origin, custom_match = custom_match)
   matched <- !is.na(iso3c)
@@ -77,7 +81,10 @@ check_country_match <- function(x,
 #' @param by Grouping for the coverage breakdown: `"region"` (default),
 #'   `"income"` or `"continent"`.
 #'
-#' @return A list with elements `unmatched`, `na_rates` and `by_group`.
+#' @return A list of class `countryatlas_coverage`, with elements `unmatched`,
+#'   `na_rates` and `by_group`. It has a `print()` method, so at the console you
+#'   see a formatted report rather than the raw list; reach into the elements by
+#'   name to use the numbers programmatically.
 #' @export
 #' @examples
 #' audit_coverage(countryatlas::world_snapshot$countries)
@@ -86,8 +93,10 @@ audit_coverage <- function(data,
                            by = c("region", "income", "continent")) {
   by <- match.arg(by)
   data <- tibble::as_tibble(data)
-  # Reduce to one row per country if a polygon frame was passed in.
-  if (all(c("iso3c", "group") %in% names(data))) {
+  # Reduce to one row per country. Gating on `group` only caught polygon
+  # frames; an sf frame has no `group` column yet still repeats divided
+  # countries, which skewed both `n` and every NA rate.
+  if ("iso3c" %in% names(data)) {
     data <- dplyr::distinct(data, .data$iso3c, .keep_all = TRUE)
   }
 
@@ -103,6 +112,8 @@ audit_coverage <- function(data,
     num <- names(data)[vapply(data, is.numeric, logical(1))]
     indicator <- setdiff(num, c("year", "long", "lat", "group", "order",
                                 "centroid_lon", "centroid_lat"))
+  } else {
+    check_cols(data, indicator)
   }
   na_rates <- tibble::tibble(
     indicator = indicator,
@@ -141,6 +152,10 @@ audit_coverage <- function(data,
 #' @param threshold Maximum string distance to accept a repair (0 = identical,
 #'   1 = unrelated). Lower is stricter; default `0.2`. Uses Jaro-Winkler when
 #'   `stringdist` is installed, otherwise a length-normalised edit distance.
+#'   The fallback is the more conservative of the two -- it repairs a subset of
+#'   what Jaro-Winkler would, mainly missing transposed letters ("Frnace"), and
+#'   never picks a different country -- so results can differ between machines
+#'   depending on whether `stringdist` is available.
 #' @param origin countrycode origin scheme (default `"country.name"`).
 #' @param verbose Whether to message the substitutions made (default `TRUE`).
 #'
@@ -148,10 +163,15 @@ audit_coverage <- function(data,
 #'   replaced by the closest known country name (others left unchanged). The
 #'   applied substitutions are attached as the attribute `"repairs"`.
 #' @export
+#' @seealso [check_country_match()] for the report this acts on, and
+#'   [dissolve_country()] for dissolved entities, which are deliberately not
+#'   repaired.
 #' @examples
 #' repair_country_names(c("United States", "Brzil", "Germny"))
 repair_country_names <- function(x, threshold = 0.2, origin = "country.name",
                                  verbose = TRUE) {
+  check_bool(verbose, "verbose")
+  check_number(threshold, "threshold", lo = 0, hi = 1)
   x <- as.character(x)
   report <- check_country_match(x, origin = origin, suggest = TRUE)
   out <- x

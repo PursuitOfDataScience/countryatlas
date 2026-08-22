@@ -44,6 +44,17 @@ Vega-Lite widget, so the geometry never has to come back into R. Pure string
 builder with no dependencies; pair it with \code{\link[=as_ggsql_source]{as_ggsql_source()}} +
 \code{ggsql::ggsql_execute()}, or drop the string into a \code{{ggsql}} chunk.
 }
+\section{Executing the query}{
+
+Building the string needs nothing installed. \emph{Running} it needs
+\code{ggsql} >= 0.4.1, the version that added the \verb{DRAW spatial} clause; older
+\code{ggsql} releases parse the query and reject that clause. As of August 2026
+that clause has shipped in the ggsql \emph{engine} but not yet in the ggsql R
+package (still 0.3.3), so \code{\link[=interactive_map]{interactive_map()}}\code{(engine = "ggsql")} will refuse
+until the bindings catch up. \verb{PROJECT TO} additionally needs a spatial
+backend -- for DuckDB, its \code{spatial} extension.
+}
+
 \examples{
 world_query(gdp_per_capita, projection = "equal_earth",
             palette = "magma", transform = "log10",

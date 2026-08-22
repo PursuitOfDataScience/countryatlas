@@ -9,6 +9,20 @@ A tibble with one row per country and columns including \code{iso3c},
 \code{iso2c}, \code{country}, \code{continent}, \code{region}, \code{un_region}, \code{capital},
 \code{capital_lat}, \code{capital_lon}, \code{centroid_lat}, \code{centroid_lon}, \code{area_km2},
 \code{currency}, \code{tld}, \code{landlocked}, \code{flag}.
+
+Assembled from \link[countrycode:codelist]{countrycode::codelist}, so Kosovo (\code{XKX}) has no row --
+\code{countrycode} has none either. The geometry backends and
+\code{\link[=convert_country]{convert_country()}} do handle it; \code{\link[=distance_between]{distance_between()}}, which reads its
+centroids from here, does not. Ten further territories have a row but no
+centroid or area.
+
+\code{country} therefore carries the English names from \code{countrycode}
+("South Korea", "Congo - Kinshasa"), which differ from the World Bank's for
+38 of the 215 countries in \link{world_snapshot} ("Korea, Rep.",
+"Congo, Dem. Rep."). Each
+table is faithful to its own source, so join on \code{iso3c} and keep whichever
+label you want to display -- reconciling the two is what \code{\link[=country_join]{country_join()}}
+is for.
 }
 \source{
 Assembled from \pkg{countrycode}, \pkg{WDI} metadata and Natural

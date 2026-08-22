@@ -10,7 +10,7 @@
 #'
 #' @section Core data assembly:
 #' [world_data()], [country_data()], [world_geometry()], [locate_country()],
-#' [country_borders()], [neighbors()], [distance_between()], [morans_i()].
+#' [country_borders()], [neighbors()], [distance_between()].
 #'
 #' @section The join engine:
 #' [standardize_country()], [join_world()], [attach_geometry()], [country_join()],
@@ -29,16 +29,35 @@
 #' [per_capita()], [aggregate_regions()], [rank_countries()], [complete_years()],
 #' [growth_rate()], [index_to()], [share_of_world()], [lag_by_country()],
 #' [diff_by_country()], [correlate_indicators()], [beta_convergence()],
-#' [sigma_convergence()], [gini()], [theil()].
+#' [sigma_convergence()], [gini()], [theil()], [morans_i()].
 #'
 #' @section Visualization:
 #' [world_map()], [globe_map()], [spin_globe()], [facet_map()], [bubble_map()],
 #' [spike_map()], [bivariate_map()], [cartogram_map()], [dorling_map()],
 #' [tile_map()], [flow_map()], [animate_world()], [interactive_map()],
-#' [geom_country_labels()], [theme_world_map()].
+#' [geom_country_labels()], [theme_world_map()], [simplify_geometry()].
 #'
 #' @section Database rendering (ggsql):
 #' [as_ggsql_source()], [world_query()].
+#'
+#' @section Performance & caching:
+#' [clear_wdi_cache()].
+#'
+#' @section Options:
+#' Three options change the package's behaviour. All are unset by default.
+#' \describe{
+#'   \item{`countryatlas.cache_dir`}{Where the persistent World Bank cache
+#'     lives. Defaults to `tools::R_user_dir("countryatlas", "cache")`; set it to
+#'     `""` for session-only caching. See [clear_wdi_cache()].}
+#'   \item{`countryatlas.workers`}{How many processes fetch indicators in
+#'     parallel (only when the cache is on disk -- a memory-only memo cannot
+#'     survive a fork). Defaults to one fewer than the available cores, and
+#'     to 2 under `R CMD check`, per CRAN policy. Must be a single finite
+#'     number; values below one are clamped to one.}
+#'   \item{`countryatlas.gdp_compat`}{Set to `TRUE` to restore the
+#'     `gdp_per_capita_2015` column that [world_data()] emitted in 1.0.0. It is
+#'     a one-cycle deprecation shim and off by default.}
+#' }
 #'
 #' @keywords internal
 "_PACKAGE"
@@ -51,10 +70,17 @@ NULL
 
 # Quiet R CMD check for tidy-eval column references and bundled datasets
 # referenced by name inside the package.
-utils::globalVariables(c(
-  ".", ".data", "region", "long", "lat", "group", "order", "subregion",
-  "country", "iso2c", "iso3c", "income", "continent", "year",
-  "NY.GDP.PCAP.KD", "gdp_per_capita_2015", "value", "name", "indicator",
-  "rank", "percentile", "z_score", "geometry", "centroid_lon", "centroid_lat",
-  "country_groups_tbl", "world_tiles", "country_meta", "historical_codes"
-))
+# Exactly the names R CMD check reports as unbound, and no more. The list had
+# grown to 29; emptying it entirely showed only a handful were load-bearing --
+# the rest were covered by the `.data$x` / `.data[[x]]` idiom the code uses
+# throughout, which needs no declaration at all. A stale entry is not merely
+# dead weight: it silences the "no visible binding" NOTE for a *new* bare use of
+# the same name, which is the warning that would otherwise catch a typo.
+#
+# The four bundled datasets used to be declared here too. They are now referred
+# to as `countryatlas::country_meta` and so on, because a *bare* reference only
+# resolves while the package is attached: under `countryatlas::fn()` alone the
+# lazy-data objects are not on the search path, and six exported functions failed
+# with "object 'world_tiles' not found". Declaring them here silenced the NOTE
+# without fixing that, which is exactly the trap described above.
+utils::globalVariables(c("long", "lat", "year"))

@@ -14,12 +14,13 @@ locate_country(
 )
 }
 \arguments{
-\item{lon, lat}{Numeric vectors of longitude / latitude (recycled together;
-ignored if \code{points} is supplied).}
+\item{lon, lat}{Equal-length numeric vectors of longitude / latitude, giving
+one point per element (ignored if \code{points} is supplied).}
 
 \item{points}{Optional \code{sf} POINT object to use instead of \code{lon}/\code{lat}.}
 
-\item{scale}{Natural Earth resolution for the lookup geometry.}
+\item{scale}{Natural Earth resolution for the lookup geometry. \code{"large"} needs the
+non-CRAN \code{rnaturalearthhires} package; see \code{\link[=world_geometry]{world_geometry()}}.}
 
 \item{add}{Extra attributes to return alongside \code{iso3c} (any
 \code{\link[=convert_country]{convert_country()}} destination, e.g. \code{"country"}, \code{"continent"}).}
@@ -42,7 +43,10 @@ for getting point data (events, stations, observations) onto the country
 spine so it can be joined, aggregated and mapped like everything else.
 }
 \examples{
-\dontrun{
-locate_country(lon = c(2.35, -74.0), lat = c(48.85, 40.7))  # Paris, NYC
+\donttest{
+if (requireNamespace("sf", quietly = TRUE) &&
+    requireNamespace("rnaturalearth", quietly = TRUE)) {
+  locate_country(lon = c(2.35, -74.0), lat = c(48.85, 40.7))  # Paris, NYC
+}
 }
 }

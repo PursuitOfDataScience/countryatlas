@@ -18,7 +18,7 @@ The happy path stays one call: \code{\link[=world_data]{world_data()}}. Everythi
 \section{Core data assembly}{
 
 \code{\link[=world_data]{world_data()}}, \code{\link[=country_data]{country_data()}}, \code{\link[=world_geometry]{world_geometry()}}, \code{\link[=locate_country]{locate_country()}},
-\code{\link[=country_borders]{country_borders()}}, \code{\link[=neighbors]{neighbors()}}, \code{\link[=distance_between]{distance_between()}}, \code{\link[=morans_i]{morans_i()}}.
+\code{\link[=country_borders]{country_borders()}}, \code{\link[=neighbors]{neighbors()}}, \code{\link[=distance_between]{distance_between()}}.
 }
 
 \section{The join engine}{
@@ -45,7 +45,7 @@ The happy path stays one call: \code{\link[=world_data]{world_data()}}. Everythi
 \code{\link[=per_capita]{per_capita()}}, \code{\link[=aggregate_regions]{aggregate_regions()}}, \code{\link[=rank_countries]{rank_countries()}}, \code{\link[=complete_years]{complete_years()}},
 \code{\link[=growth_rate]{growth_rate()}}, \code{\link[=index_to]{index_to()}}, \code{\link[=share_of_world]{share_of_world()}}, \code{\link[=lag_by_country]{lag_by_country()}},
 \code{\link[=diff_by_country]{diff_by_country()}}, \code{\link[=correlate_indicators]{correlate_indicators()}}, \code{\link[=beta_convergence]{beta_convergence()}},
-\code{\link[=sigma_convergence]{sigma_convergence()}}, \code{\link[=gini]{gini()}}, \code{\link[=theil]{theil()}}.
+\code{\link[=sigma_convergence]{sigma_convergence()}}, \code{\link[=gini]{gini()}}, \code{\link[=theil]{theil()}}, \code{\link[=morans_i]{morans_i()}}.
 }
 
 \section{Visualization}{
@@ -53,12 +53,35 @@ The happy path stays one call: \code{\link[=world_data]{world_data()}}. Everythi
 \code{\link[=world_map]{world_map()}}, \code{\link[=globe_map]{globe_map()}}, \code{\link[=spin_globe]{spin_globe()}}, \code{\link[=facet_map]{facet_map()}}, \code{\link[=bubble_map]{bubble_map()}},
 \code{\link[=spike_map]{spike_map()}}, \code{\link[=bivariate_map]{bivariate_map()}}, \code{\link[=cartogram_map]{cartogram_map()}}, \code{\link[=dorling_map]{dorling_map()}},
 \code{\link[=tile_map]{tile_map()}}, \code{\link[=flow_map]{flow_map()}}, \code{\link[=animate_world]{animate_world()}}, \code{\link[=interactive_map]{interactive_map()}},
-\code{\link[=geom_country_labels]{geom_country_labels()}}, \code{\link[=theme_world_map]{theme_world_map()}}.
+\code{\link[=geom_country_labels]{geom_country_labels()}}, \code{\link[=theme_world_map]{theme_world_map()}}, \code{\link[=simplify_geometry]{simplify_geometry()}}.
 }
 
 \section{Database rendering (ggsql)}{
 
 \code{\link[=as_ggsql_source]{as_ggsql_source()}}, \code{\link[=world_query]{world_query()}}.
+}
+
+\section{Performance & caching}{
+
+\code{\link[=clear_wdi_cache]{clear_wdi_cache()}}.
+}
+
+\section{Options}{
+
+Three options change the package's behaviour. All are unset by default.
+\describe{
+\item{\code{countryatlas.cache_dir}}{Where the persistent World Bank cache
+lives. Defaults to \code{tools::R_user_dir("countryatlas", "cache")}; set it to
+\code{""} for session-only caching. See \code{\link[=clear_wdi_cache]{clear_wdi_cache()}}.}
+\item{\code{countryatlas.workers}}{How many processes fetch indicators in
+parallel (only when the cache is on disk -- a memory-only memo cannot
+survive a fork). Defaults to one fewer than the available cores, and
+to 2 under \verb{R CMD check}, per CRAN policy. Must be a single finite
+number; values below one are clamped to one.}
+\item{\code{countryatlas.gdp_compat}}{Set to \code{TRUE} to restore the
+\code{gdp_per_capita_2015} column that \code{\link[=world_data]{world_data()}} emitted in 1.0.0. It is
+a one-cycle deprecation shim and off by default.}
+}
 }
 
 \seealso{
@@ -72,11 +95,6 @@ Useful links:
 }
 \author{
 \strong{Maintainer}: Youzhi Yu \email{yuyouzhi666@icloud.com}
-
-Authors:
-\itemize{
-  \item Youzhi Yu \email{yuyouzhi666@icloud.com}
-}
 
 }
 \keyword{internal}

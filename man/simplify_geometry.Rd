@@ -9,7 +9,12 @@ simplify_geometry(x, keep = 0.05, ...)
 \arguments{
 \item{x}{An \code{sf} object.}
 
-\item{keep}{Proportion of vertices to keep (0-1) for \code{rmapshaper}.}
+\item{keep}{Proportion of vertices to keep: greater than 0 and at most 1
+(\code{keep = 0} would leave nothing to draw and errors). Honoured as a proportion
+only by \code{rmapshaper}; without it the \code{sf::st_simplify()} fallback can work
+only from a distance tolerance, so \code{keep} is approximated (scaled to the
+object's extent) and simplifies less aggressively. Install \code{rmapshaper}
+for proportional control.}
 
 \item{...}{Passed to the underlying simplifier.}
 }
@@ -21,7 +26,10 @@ Reduce the vertex count of an \code{sf} object via the optional \code{rmapshaper
 package (falling back to \code{\link[sf:geos_unary]{sf::st_simplify()}}), for fast web/plotting.
 }
 \examples{
-\dontrun{
-world_geometry(geometry = "sf") |> simplify_geometry(keep = 0.1)
+\donttest{
+if (requireNamespace("sf", quietly = TRUE) &&
+    requireNamespace("rnaturalearth", quietly = TRUE)) {
+  world_geometry(geometry = "sf") |> simplify_geometry(keep = 0.1)
+}
 }
 }

@@ -3,17 +3,17 @@
 # Convert raw country identifiers to iso3c, applying overrides and (optionally)
 # warning about misses. `origin` is any countrycode origin scheme
 # ("country.name", "iso2c", "iso3c", "wb", ...).
-wdj_to_iso3c <- function(x, origin = "country.name", custom_match = wdj_overrides()) {
+wdj_to_iso3c <- function(x, origin = "country.name", custom_match = country_overrides()) {
+  check_string(origin, "origin")
   x <- as.character(x)
   if (identical(origin, "iso3c")) {
-    out <- toupper(trimws(x))
+    out <- ascii_upper(trimws(x))
     # Still let overrides repair known-bad spellings.
     if (length(custom_match)) {
       hit <- match(x, names(custom_match))
       out[!is.na(hit)] <- unname(custom_match[hit[!is.na(hit)]])
     }
-    valid <- unique(stats::na.omit(countrycode::codelist$iso3c))
-    valid <- c(valid, unname(custom_match), "XKX")
+    valid <- c(wdj_known_iso3c(), unname(custom_match))
     out[!is.na(out) & !(out %in% valid)] <- NA_character_
     return(out)
   }
@@ -60,7 +60,7 @@ wdj_derive_from_iso3c <- function(iso3c, add) {
 #' The package's mission, exposed for *your* data: take a data frame keyed on
 #' messy country names (or codes) and attach standardised ISO codes plus useful
 #' classifications, reconciling spellings via [countrycode::countrycode()] and
-#' the curated [wdj_overrides()] table. The result joins cleanly to anything
+#' the curated [country_overrides()] table. The result joins cleanly to anything
 #' else keyed on `iso3c`.
 #'
 #' @param data A data frame / tibble.
@@ -73,7 +73,7 @@ wdj_derive_from_iso3c <- function(iso3c, add) {
 #'   `c("iso3c", "iso2c", "continent", "region")`. Any countrycode destination
 #'   is accepted, plus the shortcuts `"flag"`, `"currency"`, `"tld"`.
 #' @param custom_match A named character vector of name -> iso3c overrides;
-#'   defaults to [wdj_overrides()]. Merged on top of the built-in matching.
+#'   defaults to [country_overrides()]. Merged on top of the built-in matching.
 #' @param warn Whether to warn about unmatched countries (default `TRUE`).
 #'
 #' @return `data` with the requested columns added (and existing same-named
@@ -86,8 +86,9 @@ standardize_country <- function(data,
                                 country_col,
                                 origin = "country.name",
                                 add = c("iso3c", "iso2c", "continent", "region"),
-                                custom_match = wdj_overrides(),
+                                custom_match = country_overrides(),
                                 warn = TRUE) {
+  check_bool(warn, "warn")
   if (!is.data.frame(data)) {
     wdj_abort("{.arg data} must be a data frame.")
   }
@@ -117,7 +118,10 @@ standardize_country <- function(data,
   }
 
   derived <- wdj_derive_from_iso3c(iso3c, add)
-  # Drop any columns we are about to (re)create, then bind.
+  # Drop any columns we are about to (re)create, then bind. No warn_overwrite()
+  # here: `add` names the columns literally, so replacing an existing `continent`
+  # is precisely what the caller asked for. The warning belongs where the package
+  # invents the name (rank_countries) or composes it from a suffix (per_capita).
   data[intersect(names(derived), names(data))] <- NULL
   dplyr::bind_cols(tibble::as_tibble(data), derived)
 }

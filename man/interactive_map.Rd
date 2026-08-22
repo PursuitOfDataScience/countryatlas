@@ -13,14 +13,17 @@ interactive_map(
 )
 }
 \arguments{
-\item{data}{A map-ready frame.}
+\item{data}{A map-ready frame (polygon or sf). The \code{"leaflet"} engine will
+attach geometry itself if given a country-level table; the others require
+it already attached.}
 
 \item{fill}{The fill column (unquoted).}
 
 \item{tooltip}{Optional tooltip column (unquoted).}
 
 \item{engine}{\code{"plotly"} (default), \code{"ggiraph"}, \code{"leaflet"} or \code{"ggsql"}
-(database-side rendering to a Vega-Lite widget; needs an \code{sf} frame).
+(database-side rendering to a Vega-Lite widget; needs an \code{sf} frame and
+\code{ggsql} >= 0.4.1, the version that added the \verb{DRAW spatial} clause).
 \code{tooltip} is honoured by the \code{"ggiraph"} and \code{"leaflet"} engines (defaults
 to \code{fill} when omitted); \code{"plotly"}'s hover is controlled by \code{world_map()}
 aesthetics instead, and \code{"ggsql"} has no hover concept.}

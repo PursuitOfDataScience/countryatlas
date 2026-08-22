@@ -15,8 +15,19 @@ Invisibly \code{TRUE}.
 \description{
 Forget memoised World Bank fetches, both in-session and (optionally) on disk.
 }
+\section{Where the cache lives}{
+
+The persistent cache goes in the standard per-user cache location,
+\code{tools::R_user_dir("countryatlas", "cache")}. Point it elsewhere with
+\code{options(countryatlas.cache_dir = )}, or skip the disk entirely by passing
+\code{cache = FALSE} to \code{\link[=world_data]{world_data()}} / \code{\link[=country_data]{country_data()}}. Nothing is written
+until a World Bank fetch actually succeeds, so a purely offline session
+(examples, tests, the bundled \link{world_snapshot}) never creates it.
+}
+
 \examples{
+clear_wdi_cache()              # forget the in-session memo
 \dontrun{
-clear_wdi_cache()
+clear_wdi_cache(disk = TRUE)   # also delete the persistent cache
 }
 }

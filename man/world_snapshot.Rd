@@ -11,11 +11,13 @@ A list with three elements:
 \code{country}, classifications and curated indicators
 (\code{gdp_per_capita}, \code{population}, \code{life_expectancy}, \code{co2_per_capita}).}
 \item{sf}{\code{NULL} in the released package -- geometry is not bundled twice.
-Attach it on demand with \code{\link[=attach_geometry]{attach_geometry()}}\verb{(world_snapshot$countries,}
-\code{geometry = "sf")}, which pulls the same Natural Earth 110m polygons
-from \code{rnaturalearth}.}
+Attach it on demand with \code{\link[=attach_geometry]{attach_geometry()}}:
+\code{attach_geometry(world_snapshot$countries, geometry = "sf")} pulls the
+same Natural Earth 110m polygons from \code{rnaturalearth}.}
 \item{year}{The reference year.}
 }
+\code{country} carries the World Bank's own names, which differ from the
+\code{countrycode} names used by \link{country_meta} for 38 countries.
 }
 \source{
 World Bank via \pkg{WDI}; geometry from Natural Earth via

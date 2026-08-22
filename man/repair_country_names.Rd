@@ -16,7 +16,11 @@ repair_country_names(
 
 \item{threshold}{Maximum string distance to accept a repair (0 = identical,
 1 = unrelated). Lower is stricter; default \code{0.2}. Uses Jaro-Winkler when
-\code{stringdist} is installed, otherwise a length-normalised edit distance.}
+\code{stringdist} is installed, otherwise a length-normalised edit distance.
+The fallback is the more conservative of the two -- it repairs a subset of
+what Jaro-Winkler would, mainly missing transposed letters ("Frnace"), and
+never picks a different country -- so results can differ between machines
+depending on whether \code{stringdist} is available.}
 
 \item{origin}{countrycode origin scheme (default \code{"country.name"}).}
 
@@ -35,4 +39,9 @@ result into \code{\link[=standardize_country]{standardize_country()}} / \code{\l
 }
 \examples{
 repair_country_names(c("United States", "Brzil", "Germny"))
+}
+\seealso{
+\code{\link[=check_country_match]{check_country_match()}} for the report this acts on, and
+\code{\link[=dissolve_country]{dissolve_country()}} for dissolved entities, which are deliberately not
+repaired.
 }

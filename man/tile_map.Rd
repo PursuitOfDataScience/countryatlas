@@ -22,6 +22,12 @@ so tiny states are actually visible. Uses the bundled \link{world_tiles} layout.
 For small multiples of a tile grid, facet the result as you would any other
 \code{ggplot} (or see \code{\link[=facet_map]{facet_map()}} for the choropleth equivalent).
 }
+\details{
+Every tile in the layout is drawn, taking the scale's \code{na.value} fill where
+\code{data} has no row for it. The converse also holds and is quieter: \code{data} rows
+keyed on one of the 10 countries with no tile are dropped without a warning
+(see \link{world_tiles} for which).
+}
 \examples{
 \donttest{
 tile_map(countryatlas::world_snapshot$countries, gdp_per_capita)

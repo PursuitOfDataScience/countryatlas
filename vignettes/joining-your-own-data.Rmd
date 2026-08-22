@@ -16,7 +16,8 @@ library(countryatlas)
 library(ggplot2)
 library(dplyr)
 has_sf <- requireNamespace("sf", quietly = TRUE) &&
-  requireNamespace("rnaturalearth", quietly = TRUE)
+  requireNamespace("rnaturalearth", quietly = TRUE) &&
+  requireNamespace("rnaturalearthdata", quietly = TRUE)
 ```
 
 The headline use case: *I have a frame keyed on messy country names — get it on

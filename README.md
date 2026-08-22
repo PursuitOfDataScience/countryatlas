@@ -80,19 +80,19 @@ and are only needed for the features that use them.
 
 | Feature / verb | Optional packages required |
 |----|----|
-| `world_map()` polygon backend | `maps` |
-| `world_map()` sf backend, `world_geometry(sf)` | `sf`, `rnaturalearth`, `rnaturalearthdata` |
-| `globe_map(backend = "polygon")`, `spin_globe()` | `maps`, `mapproj` |
+| `world_map()` polygon backend, `spike_map()`, `flow_map()`, `bubble_map()` | `maps` |
+| sf geometry: `world_map(sf)`, `world_geometry(sf)`, `locate_country()`, `country_borders()`, `neighbors()`, `morans_i()` | `sf`, `rnaturalearth`, `rnaturalearthdata` |
+| `globe_map(backend = "polygon")` | `maps`, `mapproj` |
+| `spin_globe()` (animated GIF) | its backend's packages, plus `gifski` or `magick` |
 | `bivariate_map()` | `biscale`, `sf` |
 | `cartogram_map()`, `dorling_map()` | `cartogram`, `sf` |
-| `spike_map()` | `maps` |
-| `country_borders()`, `neighbors()`, `morans_i()` | `sf` |
 | `animate_world()` (animated GIF) | `gganimate` (+ `gifski` or `magick`) |
 | `interactive_map(engine = "plotly")` | `plotly` |
 | `interactive_map(engine = "ggiraph")` | `ggiraph` |
 | `interactive_map(engine = "leaflet")` | `leaflet`, `sf` |
-| `interactive_map(engine = "ggsql")`, `as_ggsql_source()` | `ggsql`, `duckdb`, `DBI`, `nanoarrow`, `sf` |
-| `simplify_geometry()` with `rmapshaper` | `rmapshaper` |
+| `interactive_map(engine = "ggsql")` | `ggsql` (>= 0.4.1), `duckdb`, `DBI`, `sf` |
+| `as_ggsql_source()` | `duckdb` + `DBI`, or `nanoarrow` for `format = "arrow"` |
+| `simplify_geometry()` | `sf`; `rmapshaper` for the better simplifier |
 | `repair_country_names()` / `check_country_match()` with `stringdist` | `stringdist` |
 
 ``` r

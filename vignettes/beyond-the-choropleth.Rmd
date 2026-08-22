@@ -15,7 +15,12 @@ knitr::opts_chunk$set(
 library(countryatlas)
 library(ggplot2)
 snap <- world_snapshot$countries
-has_sf <- requireNamespace("sf", quietly = TRUE)
+# The sf geometry backend needs all three, which is what need_pkg() gates
+# on in geometry.R: sf alone is not enough, and a chunk guarded on sf
+# alone fails the vignette build wherever the data packages are absent.
+has_sf <- requireNamespace("sf", quietly = TRUE) &&
+  requireNamespace("rnaturalearth", quietly = TRUE) &&
+  requireNamespace("rnaturalearthdata", quietly = TRUE)
 ```
 
 "World data on a map" has many honest forms. A choropleth is only the first. The
@@ -43,7 +48,9 @@ spike_map(snap, population)
 
 ## Equal-area tile grids
 
-Give every country the same visual weight so micro-states are visible.
+Give every country the same visual weight so micro-states are visible. The
+bundled grid covers 239 countries -- see `?world_tiles` for the ten it
+omits.
 
 ```{r fig.height = 5}
 tile_map(snap, gdp_per_capita)

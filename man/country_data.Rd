@@ -31,10 +31,19 @@ spans multiple years).}
 
 \item{language}{WDI language code.}
 
-\item{parallel}{Whether to fetch indicators in parallel.}
+\item{parallel}{Whether to fetch indicators in parallel. Ignored when the
+cache is memory-only; see \code{\link[=world_data]{world_data()}}.}
 }
 \value{
 A tibble, one row per country (or per country-year for a panel).
+
+\code{iso3c} is the stable key; \code{country} is a \emph{label} and its spelling depends on
+where the row came from. A successful fetch carries the World Bank's names
+("Korea, Rep.", "Congo, Dem. Rep."), while the country spine used when the
+fetch returns nothing carries the \code{countrycode} names ("South Korea",
+"Congo - Kinshasa") -- as do \code{\link[=convert_country]{convert_country()}}, \code{\link[=standardize_country]{standardize_country()}}
+and the rest of the package. Match on \code{iso3c}, and relabel with
+\code{convert_country(iso3c, to = "country")} if you need one consistent set.
 }
 \description{
 The analysis counterpart to \code{\link[=world_data]{world_data()}}: no polygons, one tidy row per
@@ -44,6 +53,6 @@ indicators). This is what you actually \code{join()} / \code{mutate()} / \code{s
 }
 \examples{
 \donttest{
-country_data(2020, c(co2 = "EN.ATM.CO2E.KT"))
+country_data(2020, c(co2 = "EN.GHG.CO2.MT.CE.AR5"))
 }
 }

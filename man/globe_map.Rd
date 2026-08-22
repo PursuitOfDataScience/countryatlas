@@ -45,11 +45,17 @@ gives the cleanest limb; the \code{"polygon"} backend draws the globe with
 \code{\link[ggplot2:coord_map]{ggplot2::coord_map()}} and needs only \code{maps} + \code{mapproj} (no \code{sf}).
 }
 \examples{
+\donttest{
+# No sf required -- the polygon backend needs only maps + mapproj:
+if (requireNamespace("maps", quietly = TRUE) &&
+    requireNamespace("mapproj", quietly = TRUE)) {
+  globe_map(countryatlas::world_snapshot$countries, continent,
+            backend = "polygon", style = "categorical")
+}
+}
 \dontrun{
+# The sf backend gives the cleanest limb (needs a World Bank fetch):
 world_data(2020, geometry = "sf") |>
   globe_map(gdp_per_capita, lon = 10, lat = 30)
-# No sf required:
-globe_map(world_snapshot$countries, continent, backend = "polygon",
-          style = "categorical")
 }
 }

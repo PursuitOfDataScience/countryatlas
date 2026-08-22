@@ -19,7 +19,8 @@ share_of_world(data, value, suffix = "_share")
 \description{
 Adds a column giving each country's value as a share of the (year's) world
 total -- e.g. share of global emissions or GDP. Operates within \code{year} when a
-panel is supplied.
+panel is supplied. A \code{dplyr} grouping on \code{data} is ignored -- the denominator
+is always the world (or the year's) total, never the group's.
 }
 \examples{
 df <- data.frame(iso3c = c("USA", "CHN"), co2 = c(5, 10))

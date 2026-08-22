@@ -33,3 +33,44 @@ test_that("standardize_country warns on unmatched", {
   df <- data.frame(x = c("United States", "Wakanda"))
   expect_warning(standardize_country(df, x), class = "countryatlas_warning")
 })
+
+# ?country_overrides used to offer de-accenting as an alternative to running in
+# a UTF-8 locale. It is not one: iconv's //TRANSLIT is itself locale-dependent,
+# so in the C locale -- exactly where the advice was needed -- it yields NA, or
+# "Cura?ao" when given an explicit from=, and nothing resolves. The ASCII
+# spellings in the override table are what actually work everywhere.
+
+test_that("ASCII spellings resolve regardless of locale", {
+  # The property the override table exists for. Run in whatever locale the
+  # session has; ASCII must work in all of them.
+  expect_equal(suppressWarnings(convert_country("Curacao", to = "iso3c")), "CUW")
+  expect_equal(suppressWarnings(convert_country("Aland Islands", to = "iso3c")),
+               "ALA")
+  expect_equal(suppressWarnings(convert_country("Cote d'Ivoire", to = "iso3c")),
+               "CIV")
+  # And every key in the table is ASCII, which is what makes that true.
+  expect_false(any(grepl("[^ -~]", names(country_overrides()))))
+})
+
+test_that("de-accenting only helps inside a UTF-8 locale", {
+  # The behaviour the corrected documentation describes. Asserted against the
+  # session's own locale rather than against the Rd text: reading Rd from a test
+  # needs the source tree, which is not there under R CMD check.
+  skip_on_os("windows")                       # iconv //TRANSLIT differs there
+  accented <- "Cura\u00e7ao"
+  de <- iconv(accented, to = "ASCII//TRANSLIT")
+  if (grepl("UTF-8", Sys.getlocale("LC_CTYPE"), fixed = TRUE)) {
+    # In UTF-8 the recipe works, and so does the accented spelling directly.
+    expect_false(is.na(de))
+    expect_equal(de, "Curacao")
+    expect_equal(suppressWarnings(convert_country(de, to = "iso3c")), "CUW")
+    expect_equal(suppressWarnings(convert_country(accented, to = "iso3c")), "CUW")
+  } else {
+    # Outside UTF-8, //TRANSLIT cannot produce a resolvable spelling -- which is
+    # why the documentation no longer offers it as an alternative.
+    expect_true(is.na(de) || is.na(
+      suppressWarnings(convert_country(de, to = "iso3c"))))
+  }
+  # Either way, the ASCII spelling in the override table resolves.
+  expect_equal(suppressWarnings(convert_country("Curacao", to = "iso3c")), "CUW")
+})

@@ -44,7 +44,7 @@ historical_aliases <- function() {
 
 # Normalise free-text names for alias lookup.
 normalize_historical <- function(x) {
-  tolower(gsub("\\s+", " ", trimws(as.character(x))))
+  ascii_lower(gsub("\\s+", " ", trimws(as.character(x))))
 }
 
 #' Resolve dissolved entities to their successor states
@@ -71,12 +71,14 @@ normalize_historical <- function(x) {
 #' @export
 #' @seealso [historical_codes] for the crosswalk itself and the successor
 #'   policy (e.g. Kosovo's inclusion in the Yugoslavia list);
-#'   [check_country_match()], whose `historical` column flags these entities.
+#'   [check_country_match()], whose `historical` column flags these entities;
+#'   [repair_country_names()], which deliberately leaves them alone.
 #' @examples
 #' dissolve_country(c("USSR", "Czechoslovakia", "France"))
 #' # One-to-many: Yugoslavia expands to its successor territories
 #' dissolve_country("Yugoslavia")
 dissolve_country <- function(x, warn = TRUE) {
+  check_bool(warn, "warn")
   x <- as.character(x)
   empty <- tibble::tibble(input = character(), historical = character(),
                           dissolved = integer(), iso3c = character(),
@@ -87,7 +89,8 @@ dissolve_country <- function(x, warn = TRUE) {
 
   out <- lapply(seq_along(x), function(i) {
     if (!is.na(canon[i])) {
-      rows <- historical_codes[historical_codes$historical == canon[i], ]
+      rows <- countryatlas::historical_codes[
+        countryatlas::historical_codes$historical == canon[i], ]
       return(tibble::tibble(
         input = x[i],
         historical = rows$historical,

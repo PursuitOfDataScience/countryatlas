@@ -7,7 +7,8 @@
 distance_between(a, b, origin = "country.name")
 }
 \arguments{
-\item{a, b}{Vectors of country names or codes (recycled against each other).}
+\item{a, b}{Vectors of country names or codes. Either the same length, or one
+of them length 1 to compare one country against many.}
 
 \item{origin}{How to read \code{a}/\code{b} (default \code{"country.name"}).}
 }
@@ -21,6 +22,17 @@ companion to \code{\link[=country_borders]{country_borders()}} for "how far apar
 touch". Works from the bundled \link{country_meta} centroids, so unlike most of
 the spatial toolkit it needs neither \code{sf} nor the network.
 }
+\section{Countries without a bundled centroid}{
+
+\link{country_meta} carries no centroid for a handful of small or dependent
+territories (Bouvet Island, the British Virgin Islands, Gibraltar, Hong Kong,
+Macao, Svalbard and Jan Mayen, Tokelau, Tuvalu, the U.S. Minor Outlying
+Islands and the Aland Islands), and no row at all for Kosovo, because
+\link[countrycode:codelist]{countrycode::codelist} has none. Those inputs return \code{NA} here even though
+the geometry backends do map them -- so \code{\link[=neighbors]{neighbors()}} and \code{\link[=country_borders]{country_borders()}}
+know about Kosovo while this function does not.
+}
+
 \examples{
 distance_between("France", "Germany")
 distance_between("USA", c("Canada", "Mexico"))

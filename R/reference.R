@@ -16,7 +16,7 @@ convert_dest_map <- function() {
     flag         = "unicode.symbol",
     currency     = "iso4217c",
     tld          = "cctld",
-    calling_code = "genc3c",   # not ideal; documented as best-effort
+    calling_code = "telephone",
     cown         = "cown",
     cowc         = "cowc",
     p4n          = "p4n",
@@ -41,12 +41,13 @@ convert_dest_map <- function() {
 #'
 #' @param x A vector of country names or codes.
 #' @param to Destination scheme. A shortcut (`"iso3c"`, `"flag"`, `"currency"`,
-#'   `"tld"`, `"continent"`, `"region"`, `"cown"`, ...), a localized name
+#'   `"tld"`, `"continent"`, `"region"`, `"calling_code"`, `"cown"`, ...), a
+#'   localized name
 #'   `"name_<lang>"` (`"name_fr"`, `"name_es"`, `"name_zh"`, ... -- any
 #'   language in countrycode's CLDR tables), or any raw countrycode
 #'   destination.
 #' @param from Origin scheme (default `"country.name"`).
-#' @param custom_match Optional overrides (default [wdj_overrides()]).
+#' @param custom_match Optional overrides (default [country_overrides()]).
 #' @param warn Whether to warn about inputs that match no country (default
 #'   `TRUE`). A recognised country whose destination value is genuinely
 #'   missing -- countrycode has no currency for Kosovo -- returns `NA`
@@ -60,7 +61,10 @@ convert_dest_map <- function() {
 #' convert_country(c("USA", "France"), to = "continent")
 #' convert_country(c("Germany", "United States"), to = "name_fr")
 convert_country <- function(x, to = "iso3c", from = "country.name",
-                            custom_match = wdj_overrides(), warn = TRUE) {
+                            custom_match = country_overrides(), warn = TRUE) {
+  check_bool(warn, "warn")
+  check_string(to, "to")
+  check_string(from, "from")
   m <- convert_dest_map()
   dest <- if (to %in% names(m)) {
     m[[to]]
@@ -173,7 +177,17 @@ country_codes <- function(codes = NULL) {
     if (f %in% names(raw_of)) raw_of[[f]] else f
   }, character(1))
   inv <- stats::setNames(names(raw_of), raw_of)
-  keep <- raw[raw %in% names(cl)]
+  # A name that is neither a friendly shortcut nor a real codelist column used
+  # to be dropped in silence, so a typo ("curency") returned a table quietly
+  # missing that column.
+  unknown <- names(raw)[!raw %in% names(cl)]
+  if (length(unknown)) {
+    wdj_abort(c(
+      "Unknown column{?s}: {.val {unknown}}.",
+      "i" = "Use a shortcut ({.val {names(raw_of)}}) or a {.code countrycode::codelist} column name."
+    ))
+  }
+  keep <- raw
   out <- cl[, unname(keep), drop = FALSE]
   # Rename raw columns back to friendly names where we know them.
   names(out) <- vapply(names(out), function(nm) {
@@ -200,7 +214,7 @@ country_codes <- function(codes = NULL) {
 #' country_groups("EU")
 #' country_groups(c("G7", "BRICS"))
 country_groups <- function(group = NULL) {
-  tbl <- country_groups_tbl
+  tbl <- countryatlas::country_groups_tbl
   if (is.null(group)) return(tbl)
   valid <- unique(tbl$group)
   bad <- setdiff(group, valid)
@@ -222,7 +236,10 @@ country_groups <- function(group = NULL) {
 #' @param group A single group name (see [country_groups()]).
 #' @param origin How to read `x` (default `"country.name"`).
 #'
-#' @return A logical vector the same length as `x`.
+#' @return A logical vector the same length as `x`. A value `origin` cannot
+#'   resolve to an ISO code answers `FALSE` -- the same as a country that is
+#'   genuinely outside the group -- so run [check_country_match()] first if you
+#'   need to tell "not a member" from "not recognised".
 #' @export
 #' @examples
 #' in_group(c("France", "United States", "Japan"), "EU")
@@ -247,6 +264,7 @@ in_group <- function(x, group, origin = "country.name") {
 #' @export
 #' @examples
 #' \donttest{
+#' # Searches WDI's bundled indicator list, so this needs no connection.
 #' wdi_search("CO2 emissions")
 #' }
 wdi_search <- function(pattern, field = c("name", "indicator"), cache = NULL) {

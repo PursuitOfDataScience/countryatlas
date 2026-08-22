@@ -9,7 +9,7 @@ standardize_country(
   country_col,
   origin = "country.name",
   add = c("iso3c", "iso2c", "continent", "region"),
-  custom_match = wdj_overrides(),
+  custom_match = country_overrides(),
   warn = TRUE
 )
 }
@@ -28,7 +28,7 @@ origin scheme such as \code{"country.name"} (default), \code{"iso2c"}, \code{"is
 is accepted, plus the shortcuts \code{"flag"}, \code{"currency"}, \code{"tld"}.}
 
 \item{custom_match}{A named character vector of name -> iso3c overrides;
-defaults to \code{\link[=wdj_overrides]{wdj_overrides()}}. Merged on top of the built-in matching.}
+defaults to \code{\link[=country_overrides]{country_overrides()}}. Merged on top of the built-in matching.}
 
 \item{warn}{Whether to warn about unmatched countries (default \code{TRUE}).}
 }
@@ -40,7 +40,7 @@ columns overwritten).
 The package's mission, exposed for \emph{your} data: take a data frame keyed on
 messy country names (or codes) and attach standardised ISO codes plus useful
 classifications, reconciling spellings via \code{\link[countrycode:countrycode]{countrycode::countrycode()}} and
-the curated \code{\link[=wdj_overrides]{wdj_overrides()}} table. The result joins cleanly to anything
+the curated \code{\link[=country_overrides]{country_overrides()}} table. The result joins cleanly to anything
 else keyed on \code{iso3c}.
 }
 \examples{

@@ -5,7 +5,8 @@
 \alias{world_tiles}
 \title{Equal-area world tile-grid layout}
 \format{
-A tibble with columns \code{iso3c}, \code{country}, \code{row}, \code{col}.
+A tibble with columns \code{iso3c}, \code{country}, \code{row}, \code{col}; one row per
+country, with \code{row}/\code{col} unique across the grid.
 }
 \source{
 Derived from Natural Earth country centroids.
@@ -16,5 +17,11 @@ world_tiles
 \description{
 A statebins-style equal-area tile layout: one square per country, positioned
 on a \code{row}/\code{col} grid derived from country centroids. Used by \code{\link[=tile_map]{tile_map()}}.
+}
+\details{
+The grid holds one row for each of the 239 countries in \link{country_meta} that
+has a bundled centroid; the 10 without one (\code{ALA}, \code{BVT}, \code{GIB}, \code{HKG},
+\code{MAC}, \code{SJM}, \code{TKL}, \code{TUV}, \code{UMI}, \code{VGB} -- see \link{country_meta}) have no tile
+and so cannot be drawn by \code{\link[=tile_map]{tile_map()}}.
 }
 \keyword{datasets}

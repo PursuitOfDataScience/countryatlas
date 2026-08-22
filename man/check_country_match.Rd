@@ -7,7 +7,7 @@
 check_country_match(
   x,
   origin = "country.name",
-  custom_match = wdj_overrides(),
+  custom_match = country_overrides(),
   suggest = TRUE
 )
 }
@@ -17,7 +17,7 @@ check_country_match(
 \item{origin}{How to read \code{x} (any countrycode origin scheme).}
 
 \item{custom_match}{Overrides applied before matching (default
-\code{\link[=wdj_overrides]{wdj_overrides()}}).}
+\code{\link[=country_overrides]{country_overrides()}}).}
 
 \item{suggest}{Whether to compute closest-name suggestions for misses
 (requires the optional \code{stringdist} package; default \code{TRUE}).}
@@ -42,4 +42,9 @@ routed through \code{\link[=dissolve_country]{dissolve_country()}} instead.
 check_country_match(c("USA", "Cote d'Ivoire", "Yugoslavia", "Wakanda"))
 # "USSR" matches (to RUS!) but is flagged historical:
 check_country_match("USSR")
+}
+\seealso{
+\code{\link[=dissolve_country]{dissolve_country()}} for resolving the entities this flags as
+\code{historical} to their successor states, and \code{\link[=repair_country_names]{repair_country_names()}} for
+applying the \code{suggestion} column automatically.
 }

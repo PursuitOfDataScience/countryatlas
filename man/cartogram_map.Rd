@@ -22,7 +22,8 @@ cartogram_map(
 
 \item{fill}{Optional fill column (unquoted); defaults to \code{weight}.}
 
-\item{projection}{Projection (an equal-area CRS is recommended).}
+\item{projection}{Projection; an equal-area CRS is recommended. See
+\code{\link[=world_map]{world_map()}} for the projections available.}
 
 \item{...}{Passed to the underlying \verb{cartogram::cartogram_*()} function
 (e.g. \code{itermax}, or \code{k} for \code{type = "dorling"} -- see \code{\link[=dorling_map]{dorling_map()}}).}
@@ -36,8 +37,12 @@ Resizes countries by \code{weight} (population, GDP, ...) via the optional
 bias of world choropleths.
 }
 \examples{
-\dontrun{
-world_data(2020, c(pop = "SP.POP.TOTL"), geometry = "sf") |>
-  cartogram_map(pop, type = "dorling")
+\donttest{
+if (requireNamespace("sf", quietly = TRUE) &&
+    requireNamespace("rnaturalearth", quietly = TRUE) &&
+    requireNamespace("cartogram", quietly = TRUE)) {
+  attach_geometry(countryatlas::world_snapshot$countries, geometry = "sf") |>
+    cartogram_map(population, type = "dorling")
+}
 }
 }

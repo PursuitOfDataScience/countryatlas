@@ -9,7 +9,8 @@ geom_country_labels(mapping = NULL, repel = TRUE, flag = FALSE, size = 3, ...)
 \arguments{
 \item{mapping}{Aesthetic mapping; defaults to \code{aes(label = iso3c)}.}
 
-\item{repel}{Use \code{ggrepel} to avoid overlaps (default \code{TRUE}).}
+\item{repel}{Use \code{ggrepel} to avoid overlaps (default \code{TRUE}). Falls back to
+plain labels, with a one-time note, when \code{ggrepel} is not installed.}
 
 \item{flag}{If \code{TRUE}, label with flag emoji instead of the mapped label.}
 
@@ -23,7 +24,11 @@ A \code{ggplot2} layer.
 \description{
 A \code{ggplot2} layer that places labels (names, ISO codes or flag emoji) at
 country centroids, with optional \code{ggrepel} collision avoidance. Designed for
-the polygon backend produced by \code{\link[=world_data]{world_data()}} / \code{\link[=join_world]{join_world()}}.
+the polygon backend produced by \code{\link[=world_data]{world_data()}} / \code{\link[=join_world]{join_world()}}: it reads the
+\code{long}, \code{lat} and \code{group} columns, so it errors on an \code{sf} frame and points at
+\code{\link[ggplot2:ggsf]{ggplot2::geom_sf_text()}} instead. Placement is exact only while \code{group} is
+present -- that is what identifies each country's separate pieces, and the
+label goes on the largest one.
 }
 \examples{
 \donttest{

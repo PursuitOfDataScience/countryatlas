@@ -10,10 +10,16 @@ theil(x, weights = NULL, groups = NULL, na.rm = TRUE)
 \item{x}{A positive numeric vector (log scale; zero/negative values are
 dropped with a warning).}
 
-\item{weights}{Optional non-negative weights (e.g. population).}
+\item{weights}{Optional non-negative weights (e.g. population), either the
+same length as \code{x} or length 1.}
 
-\item{groups}{Optional grouping vector (e.g. continent). When supplied, the
-decomposition is returned instead of the scalar.}
+\item{groups}{Optional grouping vector (e.g. continent), the same length as
+\code{x} (or length 1). When supplied, the decomposition is returned instead of
+the scalar. A row whose group is missing is dropped along with the rows
+whose value is missing, so the decomposition's \code{total} is computed over the
+grouped subset and can differ from the ungrouped \code{theil(x)}. For
+\code{world_snapshot}, Puerto Rico has no \code{region}, which is the whole of the
+difference there.}
 
 \item{na.rm}{Whether to drop \code{NA} values (default \code{TRUE}).}
 }
@@ -23,6 +29,11 @@ equality). With \code{groups}: a tibble with components \code{"total"},
 \code{"between"} and \code{"within"} (\code{total = between + within}) and each
 component's \code{share} of the total (\code{NA} when the total is \code{0}, i.e.
 perfect equality, and the shares are undefined).
+
+When there is nothing to compute -- no values left after \code{na.rm}, a zero
+total weight, or an infinity in \code{x} or \code{weights} -- the result is a single
+\code{NA} whatever \code{groups} says, so reach for the components only after checking
+\code{is.data.frame()}.
 }
 \description{
 The Theil T inequality index -- less famous than Gini, but it decomposes
@@ -35,4 +46,8 @@ than between country units.
 snap <- countryatlas::world_snapshot$countries
 theil(snap$gdp_per_capita, weights = snap$population)
 theil(snap$gdp_per_capita, weights = snap$population, groups = snap$continent)
+}
+\seealso{
+\code{\link[=gini]{gini()}} for the more familiar single-number summary, which does not
+decompose.
 }

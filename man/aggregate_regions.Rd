@@ -26,6 +26,16 @@ A tibble of \code{by} plus the aggregated value.
 Aggregate a country-level value to a coarser grouping, optionally with
 population-weighted means.
 }
+\section{Groups with no data}{
+
+Missing values are dropped before aggregating, so a group is summarised from
+whatever it does have. A group with \emph{no} non-missing value returns \code{NA}
+rather than a figure: \code{sum()} would otherwise report \code{0}, \code{mean()} \code{NaN} and
+\code{min()}/\code{max()} \code{-Inf}/\code{Inf}, each of which reads as a real total for a
+region we simply have no data for. Use \code{\link[=audit_coverage]{audit_coverage()}} to see where those
+gaps are.
+}
+
 \examples{
 df <- data.frame(iso3c = c("USA", "CAN", "BRA"),
                  region = c("North America", "North America", "Latin America"),

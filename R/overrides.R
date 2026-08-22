@@ -18,22 +18,44 @@
 #'   of the built-in table, so you can extend or override it, e.g.
 #'   `wdj_overrides(c(Somaliland = "SOM"))`.
 #'
+#' @section Accented names and locales:
+#' Every name in this table is plain ASCII, and that is deliberate: ASCII
+#' spellings match in any locale. Accented spellings (`"Curacao"` with a
+#' cedilla, `"Saint Barthelemy"` with an acute) are matched natively by
+#' [countrycode::countrycode()] *in a UTF-8 locale*, which is why they are not
+#' listed here -- but in a non-UTF-8 locale (`LC_CTYPE=C`) they cannot be
+#' compared reliably and resolve to `NA`.
+#'
+#' If your input may contain accented country names, run in a UTF-8 locale.
+#' De-accenting with `iconv(x, to = "ASCII//TRANSLIT")` gives ASCII spellings
+#' that resolve everywhere, but it is not an escape from the locale problem:
+#' `//TRANSLIT` is itself locale-dependent, so under `LC_CTYPE=C` it returns
+#' `NA` (or, given an explicit `from = "UTF-8"`, replaces each accent with `?`)
+#' and nothing resolves. De-accent while still in a UTF-8 locale, or supply the
+#' ASCII spellings directly.
+#'
 #' @return A named character vector suitable for `countrycode(custom_match=)`.
 #' @export
 #' @examples
 #' wdj_overrides()
 #' wdj_overrides(c(Somaliland = "SOM"))
 wdj_overrides <- function(extra = NULL) {
-  # Soft-deprecated in 2.0.0; prefer country_overrides().
-  # Only message in interactive sessions — this function is called as a default
-  # argument by most of the public API (world_data, standardize_country, …) so
-  # firing in non-interactive runs contaminates CI/test/pkgdown output.
+  # Soft-deprecated in 2.0.0; prefer country_overrides(). The note belongs to
+  # *this* name only. It used to live in the shared body, so it fired for
+  # country_overrides() -- the replacement it recommends -- and for every public
+  # function that takes `overrides = country_overrides()` as a default, telling
+  # interactive callers to stop using a function they had never written.
   if (interactive()) {
     cli::cli_inform(
       c("i" = "{.fn wdj_overrides} is soft-deprecated; use {.fn country_overrides} instead."),
       .frequency = "once", .frequency_id = "wdj_overrides-deprecated"
     )
   }
+  build_overrides(extra)
+}
+
+# The override table itself, with no deprecation notice attached.
+build_overrides <- function(extra = NULL) {
   base <- c(
     # map_data("world") spellings the legacy code used to drop.
     "Ascension Island" = "SHN",
@@ -84,7 +106,7 @@ wdj_overrides <- function(extra = NULL) {
 #' @examples
 #' country_overrides()
 country_overrides <- function(extra = NULL) {
-  wdj_overrides(extra)
+  build_overrides(extra)
 }
 
 # Small fallback table for ISO3c codes that `countrycode` does not classify

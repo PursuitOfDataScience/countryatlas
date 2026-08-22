@@ -14,7 +14,10 @@ in_group(x, group, origin = "country.name")
 \item{origin}{How to read \code{x} (default \code{"country.name"}).}
 }
 \value{
-A logical vector the same length as \code{x}.
+A logical vector the same length as \code{x}. A value \code{origin} cannot
+resolve to an ISO code answers \code{FALSE} -- the same as a country that is
+genuinely outside the group -- so run \code{\link[=check_country_match]{check_country_match()}} first if you
+need to tell "not a member" from "not recognised".
 }
 \description{
 A vectorised membership predicate built on \code{\link[=country_groups]{country_groups()}}.

@@ -38,5 +38,6 @@ dissolve_country("Yugoslavia")
 \seealso{
 \link{historical_codes} for the crosswalk itself and the successor
 policy (e.g. Kosovo's inclusion in the Yugoslavia list);
-\code{\link[=check_country_match]{check_country_match()}}, whose \code{historical} column flags these entities.
+\code{\link[=check_country_match]{check_country_match()}}, whose \code{historical} column flags these entities;
+\code{\link[=repair_country_names]{repair_country_names()}}, which deliberately leaves them alone.
 }

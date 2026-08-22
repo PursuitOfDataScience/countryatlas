@@ -12,7 +12,7 @@ attach_geometry(
   region = NULL,
   projection = "equal_earth",
   recenter = NULL,
-  overrides = wdj_overrides()
+  overrides = country_overrides()
 )
 }
 \arguments{
@@ -22,15 +22,18 @@ attach_geometry(
 
 \item{geometry}{\code{"polygon"} (default) or \code{"sf"}.}
 
-\item{scale}{Natural Earth resolution for the \code{sf} backend.}
+\item{scale}{Natural Earth resolution for the \code{sf} backend. \code{"large"} needs the
+non-CRAN \code{rnaturalearthhires} package; see \code{\link[=world_geometry]{world_geometry()}}. It also
+affects which countries are covered at all -- see below.}
 
 \item{region}{Optional region subset (see \code{\link[=world_geometry]{world_geometry()}}).}
 
-\item{projection, recenter}{Projection options for the \code{sf} backend.}
+\item{projection, recenter}{Projection, and optional central meridian, for
+the \code{sf} backend (see \code{\link[=world_map]{world_map()}} for the projections available).}
 
 \item{overrides}{Name -> iso3c overrides applied when matching the geometry
-backend's country names (default \code{\link[=wdj_overrides]{wdj_overrides()}}). Pass a custom set
-built with \code{\link[=wdj_overrides]{wdj_overrides()}} to add your own.}
+backend's country names (default \code{\link[=country_overrides]{country_overrides()}}). Pass a custom set
+built with \code{\link[=country_overrides]{country_overrides()}} to add your own.}
 }
 \value{
 For \code{"polygon"}, a tibble with \code{long}/\code{lat}/\code{group} plus your
@@ -41,6 +44,30 @@ The bridge between a one-row-per-country table (e.g. from \code{\link[=country_d
 and plotting: bolts polygon or \code{sf} geometry onto your data, keyed on
 \code{iso3c}.
 }
+\section{One row in, one row out}{
+
+Geometry is attached once \strong{per row}, not once per country. That is what a
+panel wants -- one row per country-year, each carrying the shape -- but it
+means a frame that repeats a country by accident draws that country more than
+once, and only the last one painted is visible. The package cannot tell the
+two apart (a panel's time column may be called anything), so reduce to one row
+per country yourself when that is what you meant.
+}
+
+\section{Which countries have geometry}{
+
+The join keeps only countries the chosen backend actually carries, so rows of
+\code{data} with no matching geometry are dropped silently -- worth checking first
+when a country you expected is missing from the map. Coverage differs by
+backend and, for \code{"sf"}, by \code{scale}, which changes \emph{which} countries are
+present and not merely how detailed they look. Of the 215 countries in
+\link{world_snapshot}, \code{"polygon"} carries 210, \code{"sf"} with \code{scale = "small"} (the
+default, 110m) carries 169, and \code{"sf"} with \code{scale = "medium"} carries 214:
+the 110m coastlines omit most small states, so \code{scale = "medium"} is the fix
+when microstates matter -- Hong Kong, Macao, Tuvalu and the British Virgin
+Islands are each in no other backend. Gibraltar alone is in none of them.
+}
+
 \examples{
 \donttest{
 df <- data.frame(iso3c = c("USA", "CAN"), value = c(1, 2))

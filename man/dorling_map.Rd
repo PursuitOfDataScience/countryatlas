@@ -26,7 +26,8 @@ dorling_map(
 \item{itermax}{Maximum iterations of the circle-repulsion algorithm
 (default \code{1000}; raise it if circles still overlap in the result).}
 
-\item{projection}{Projection (an equal-area CRS is recommended).}
+\item{projection}{Projection; an equal-area CRS is recommended. See
+\code{\link[=world_map]{world_map()}} for the projections available.}
 }
 \value{
 A \code{ggplot} object.
@@ -40,8 +41,12 @@ visible as a giant country's. A first-class verb for
 tuning knobs.
 }
 \examples{
-\dontrun{
-world_data(2020, c(pop = "SP.POP.TOTL"), geometry = "sf") |>
-  dorling_map(pop)
+\donttest{
+if (requireNamespace("sf", quietly = TRUE) &&
+    requireNamespace("rnaturalearth", quietly = TRUE) &&
+    requireNamespace("cartogram", quietly = TRUE)) {
+  attach_geometry(countryatlas::world_snapshot$countries, geometry = "sf") |>
+    dorling_map(population)
+}
 }
 }

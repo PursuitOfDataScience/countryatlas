@@ -8,7 +8,7 @@ convert_country(
   x,
   to = "iso3c",
   from = "country.name",
-  custom_match = wdj_overrides(),
+  custom_match = country_overrides(),
   warn = TRUE
 )
 }
@@ -16,14 +16,15 @@ convert_country(
 \item{x}{A vector of country names or codes.}
 
 \item{to}{Destination scheme. A shortcut (\code{"iso3c"}, \code{"flag"}, \code{"currency"},
-\code{"tld"}, \code{"continent"}, \code{"region"}, \code{"cown"}, ...), a localized name
+\code{"tld"}, \code{"continent"}, \code{"region"}, \code{"calling_code"}, \code{"cown"}, ...), a
+localized name
 \code{"name_<lang>"} (\code{"name_fr"}, \code{"name_es"}, \code{"name_zh"}, ... -- any
 language in countrycode's CLDR tables), or any raw countrycode
 destination.}
 
 \item{from}{Origin scheme (default \code{"country.name"}).}
 
-\item{custom_match}{Optional overrides (default \code{\link[=wdj_overrides]{wdj_overrides()}}).}
+\item{custom_match}{Optional overrides (default \code{\link[=country_overrides]{country_overrides()}}).}
 
 \item{warn}{Whether to warn about inputs that match no country (default
 \code{TRUE}). A recognised country whose destination value is genuinely

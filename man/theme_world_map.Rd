@@ -15,8 +15,10 @@ theme_world_map(base_size = 12, base_family = "")
 A \code{ggplot2} theme object.
 }
 \description{
-Strips axes, panel grid and background so the map is the focus. Used by all
-the package's plotting functions and exported for reuse.
+Strips axes, panel grid and background so the map is the focus. Applied by
+every plotting function in the package except \code{\link[=bivariate_map]{bivariate_map()}}, which uses
+\code{biscale::bi_theme()} so the map matches its own legend, and exported here for
+reuse on plots you build yourself.
 }
 \examples{
 library(ggplot2)

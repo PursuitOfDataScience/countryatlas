@@ -24,7 +24,11 @@ a nanoarrow array stream ggsql can read directly).}
 
 \item{con}{An existing DuckDB \code{DBIConnection} to write into (\code{format = "duckdb"}); a fresh in-memory one is created if \code{NULL}.}
 
-\item{path}{Output path for \code{format = "parquet"} (default \code{"<name>.parquet"}).}
+\item{path}{Output path for \code{format = "parquet"}. Defaults to a file named
+after \code{name} in the session's temporary directory, whose path is returned;
+pass one explicitly to write somewhere you choose. A package must not write
+to the working directory uninvited, which is what the bare \code{"<name>.parquet"}
+this used to default to did.}
 
 \item{geometry_col}{Name for the WKB geometry column (default \code{"geometry"}).}
 }

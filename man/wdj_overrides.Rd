@@ -34,6 +34,24 @@ an ISO 3166-1 alpha-3 code. Pass the result as the \code{custom_match} argument 
 (\code{iso2c}, continent, region, flag, ...) is derived from this \code{iso3c}, so a
 single override is enough.
 }
+\section{Accented names and locales}{
+
+Every name in this table is plain ASCII, and that is deliberate: ASCII
+spellings match in any locale. Accented spellings (\code{"Curacao"} with a
+cedilla, \code{"Saint Barthelemy"} with an acute) are matched natively by
+\code{\link[countrycode:countrycode]{countrycode::countrycode()}} \emph{in a UTF-8 locale}, which is why they are not
+listed here -- but in a non-UTF-8 locale (\code{LC_CTYPE=C}) they cannot be
+compared reliably and resolve to \code{NA}.
+
+If your input may contain accented country names, run in a UTF-8 locale.
+De-accenting with \code{iconv(x, to = "ASCII//TRANSLIT")} gives ASCII spellings
+that resolve everywhere, but it is not an escape from the locale problem:
+\verb{//TRANSLIT} is itself locale-dependent, so under \code{LC_CTYPE=C} it returns
+\code{NA} (or, given an explicit \code{from = "UTF-8"}, replaces each accent with \verb{?})
+and nothing resolves. De-accent while still in a UTF-8 locale, or supply the
+ASCII spellings directly.
+}
+
 \examples{
 wdj_overrides()
 wdj_overrides(c(Somaliland = "SOM"))

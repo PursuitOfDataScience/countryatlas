@@ -16,8 +16,11 @@ library(countryatlas)
 
 [ggsql](https://ggsql.org) is a grammar of graphics for SQL: you describe a plot
 *inside a SQL query* and it renders in the database (DuckDB), returning a
-web-ready Vega-Lite widget — no ggplot2 or `sf` runtime required. Version 0.4.1
-added a spatial layer (`DRAW spatial`) that reads WKB geometry.
+web-ready Vega-Lite widget — no ggplot2 or `sf` runtime required. The spatial
+layer this vignette targets (`DRAW spatial`, which reads WKB geometry) arrived in
+the ggsql *engine* at 0.4.0. As of August 2026 the ggsql R package is still at
+0.3.3, so the bridge below is forward-looking: `world_query()` builds the query
+today, and the chunks that would execute one are shown but not evaluated.
 
 countryatlas and ggsql fit together cleanly:
 

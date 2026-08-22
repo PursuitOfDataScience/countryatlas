@@ -12,11 +12,13 @@
 #'     `country`, classifications and curated indicators
 #'     (`gdp_per_capita`, `population`, `life_expectancy`, `co2_per_capita`).}
 #'   \item{sf}{`NULL` in the released package -- geometry is not bundled twice.
-#'     Attach it on demand with [attach_geometry()]`(world_snapshot$countries,`
-#'     `geometry = "sf")`, which pulls the same Natural Earth 110m polygons
-#'     from `rnaturalearth`.}
+#'     Attach it on demand with [attach_geometry()]:
+#'     `attach_geometry(world_snapshot$countries, geometry = "sf")` pulls the
+#'     same Natural Earth 110m polygons from `rnaturalearth`.}
 #'   \item{year}{The reference year.}
 #' }
+#'   `country` carries the World Bank's own names, which differ from the
+#'   `countrycode` names used by [country_meta] for 38 countries.
 #' @source World Bank via \pkg{WDI}; geometry from Natural Earth via
 #'   \pkg{rnaturalearth}. Snapshot year: 2024.
 "world_snapshot"
@@ -30,6 +32,20 @@
 #'   `iso2c`, `country`, `continent`, `region`, `un_region`, `capital`,
 #'   `capital_lat`, `capital_lon`, `centroid_lat`, `centroid_lon`, `area_km2`,
 #'   `currency`, `tld`, `landlocked`, `flag`.
+#'
+#'   Assembled from [countrycode::codelist], so Kosovo (`XKX`) has no row --
+#'   `countrycode` has none either. The geometry backends and
+#'   [convert_country()] do handle it; [distance_between()], which reads its
+#'   centroids from here, does not. Ten further territories have a row but no
+#'   centroid or area.
+#'
+#'   `country` therefore carries the English names from `countrycode`
+#'   ("South Korea", "Congo - Kinshasa"), which differ from the World Bank's for
+#'   38 of the 215 countries in [world_snapshot] ("Korea, Rep.",
+#'   "Congo, Dem. Rep."). Each
+#'   table is faithful to its own source, so join on `iso3c` and keep whichever
+#'   label you want to display -- reconciling the two is what [country_join()]
+#'   is for.
 #' @source Assembled from \pkg{countrycode}, \pkg{WDI} metadata and Natural
 #'   Earth geometry.
 "country_meta"
@@ -58,7 +74,13 @@
 #' A statebins-style equal-area tile layout: one square per country, positioned
 #' on a `row`/`col` grid derived from country centroids. Used by [tile_map()].
 #'
-#' @format A tibble with columns `iso3c`, `country`, `row`, `col`.
+#' The grid holds one row for each of the 239 countries in [country_meta] that
+#' has a bundled centroid; the 10 without one (`ALA`, `BVT`, `GIB`, `HKG`,
+#' `MAC`, `SJM`, `TKL`, `TUV`, `UMI`, `VGB` -- see [country_meta]) have no tile
+#' and so cannot be drawn by [tile_map()].
+#'
+#' @format A tibble with columns `iso3c`, `country`, `row`, `col`; one row per
+#'   country, with `row`/`col` unique across the grid.
 #' @source Derived from Natural Earth country centroids.
 "world_tiles"
 

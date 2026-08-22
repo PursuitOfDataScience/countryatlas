@@ -17,7 +17,7 @@ world_data(
   cache = TRUE,
   language = "en",
   parallel = TRUE,
-  overrides = wdj_overrides()
+  overrides = country_overrides()
 )
 }
 \arguments{
@@ -31,15 +31,19 @@ names, e.g. \code{c(gdp = "NY.GDP.PCAP.KD", pop = "SP.POP.TOTL")}. Defaults to
 \item{geometry}{\code{"polygon"} (default; reproduces the classic output), \code{"sf"}
 (Natural Earth, for \code{geom_sf()} and real projections) or \code{"none"}.}
 
-\item{scale}{Natural Earth resolution for the \code{sf} backend.}
+\item{scale}{Natural Earth resolution for the \code{sf} backend. \code{"large"} needs the
+non-CRAN \code{rnaturalearthhires} package; see \code{\link[=world_geometry]{world_geometry()}}.}
 
 \item{region}{Optional subset: a continent, group name, \code{iso3c} vector or
-bounding box.}
+bounding box. A bounding box clips the shapes rather than selecting whole
+countries, and only the \code{sf} backend can do that properly -- see
+\code{\link[=world_geometry]{world_geometry()}}.}
 
 \item{classify}{Which classifications to add (any of \code{"income"},
 \code{"continent"}, \code{"region"}).}
 
-\item{projection, recenter}{Projection options for the \code{sf} backend.}
+\item{projection, recenter}{Projection, and optional central meridian, for
+the \code{sf} backend (see \code{\link[=world_map]{world_map()}} for the projections available).}
 
 \item{latest}{If \code{TRUE}, use the most recent non-\code{NA} value per country for a
 single-year request.}
@@ -48,14 +52,24 @@ single-year request.}
 
 \item{language}{WDI language code (default \code{"en"}).}
 
-\item{parallel}{Whether to fetch multiple indicators in parallel.}
+\item{parallel}{Whether to fetch multiple indicators in parallel. Ignored
+when the cache is memory-only (an unwritable \code{countryatlas.cache_dir}),
+because a forked worker's memo dies with it and nothing would be cached.}
 
 \item{overrides}{Name -> iso3c overrides for geometry matching (default
-\code{\link[=wdj_overrides]{wdj_overrides()}}).}
+\code{\link[=country_overrides]{country_overrides()}}).}
 }
 \value{
 A tibble (polygon backend), \code{sf} object (sf backend) or country-level
 tibble (\code{geometry = "none"}).
+
+\code{iso3c} is the stable key; \code{country} is a \emph{label} and its spelling depends on
+where the row came from. A successful fetch carries the World Bank's names
+("Korea, Rep.", "Congo, Dem. Rep."), while the country spine used when the
+fetch returns nothing carries the \code{countrycode} names ("South Korea",
+"Congo - Kinshasa") -- as do \code{\link[=convert_country]{convert_country()}}, \code{\link[=standardize_country]{standardize_country()}}
+and the rest of the package. Match on \code{iso3c}, and relabel with
+\code{convert_country(iso3c, to = "country")} if you need one consistent set.
 }
 \description{
 The package's headline function, generalised but backward-compatible. Returns
@@ -70,7 +84,15 @@ panel), an \code{sf} backend with real projections, and region subsetting.
 }
 \examples{
 \donttest{
-world_data(2020)
+# geometry = "polygon", the default, comes from the suggested `maps`
+# package, so guard the call: an example may not assume a Suggests is
+# installed (R CMD check runs \donttest{} blocks, and CRAN has a
+# check flavour with no suggested packages at all).
+if (requireNamespace("maps", quietly = TRUE)) {
+  world_data(2020)
+}
+
+# geometry = "none" needs nothing beyond the hard dependencies.
 world_data(2020, indicator = c(life_exp = "SP.DYN.LE00.IN"),
            geometry = "none")
 }

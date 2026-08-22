@@ -8,7 +8,9 @@ country_borders(scale = "small", region = NULL)
 }
 \arguments{
 \item{scale}{Natural Earth resolution to compute adjacency from. Coarser
-scales simplify small slivers and may miss a handful of short borders.}
+scales simplify small slivers and may miss a handful of short borders.
+\code{"large"} needs the non-CRAN \code{rnaturalearthhires} package; see
+\code{\link[=world_geometry]{world_geometry()}}.}
 
 \item{region}{Optional region subset (see \code{\link[=world_geometry]{world_geometry()}}); a pair is
 only reported when both countries remain in the subset.}
@@ -21,12 +23,29 @@ A tibble, one row per bordering pair: \code{iso3c_a}, \code{country_a},
 \description{
 Which countries share a land border with which, as a tidy edge list --
 built from polygon topology (\code{\link[sf:geos_binary_pred]{sf::st_touches()}}), so it reflects the same
-curated geometry as the rest of the package. Powers \code{\link[=neighbors]{neighbors()}}. Convert
-to a graph with e.g. \code{igraph::graph_from_data_frame(country_borders(), directed = FALSE)} if you need one.
+curated geometry as the rest of the package. Powers \code{\link[=neighbors]{neighbors()}}.
 }
+\section{Turning it into a graph}{
+
+\code{igraph::graph_from_data_frame()} takes the \emph{first two} columns as the edge
+endpoints, so pass only the two code columns -- handing it the whole tibble
+would build edges from each country's code to its own name:
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{igraph::graph_from_data_frame(
+  country_borders()[, c("iso3c_a", "iso3c_b")], directed = FALSE)
+}\if{html}{\out{</div>}}
+
+Attaching \code{igraph} also masks \code{\link[=neighbors]{neighbors()}}, which it exports too, so call
+that one as \code{countryatlas::neighbors()} from then on.
+}
+
 \examples{
-\dontrun{
-country_borders()
-country_borders(region = "Europe")
+\donttest{
+if (requireNamespace("sf", quietly = TRUE) &&
+    requireNamespace("rnaturalearth", quietly = TRUE)) {
+  head(country_borders(region = "Europe"))
+  # The whole world is only a little dearer: a fraction of a second.
+  nrow(country_borders())
+}
 }
 }

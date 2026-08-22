@@ -9,8 +9,9 @@ gini(x, weights = NULL, na.rm = TRUE)
 \arguments{
 \item{x}{A numeric vector (e.g. GDP per capita by country).}
 
-\item{weights}{Optional non-negative weights (e.g. population), recycled
-against \code{x} the usual R way. \code{NULL} (default) weights all values equally.}
+\item{weights}{Optional non-negative weights (e.g. population), either the
+same length as \code{x} or length 1. \code{NULL} (default) weights all values
+equally.}
 
 \item{na.rm}{Whether to drop \code{NA} values (pairwise with their weight;
 default \code{TRUE}).}

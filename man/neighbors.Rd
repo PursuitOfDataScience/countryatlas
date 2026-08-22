@@ -11,7 +11,8 @@ neighbors(x, origin = "country.name", scale = "small")
 
 \item{origin}{How to read \code{x} (default \code{"country.name"}).}
 
-\item{scale}{Natural Earth resolution to compute adjacency from.}
+\item{scale}{Natural Earth resolution to compute adjacency from. \code{"large"} needs the
+non-CRAN \code{rnaturalearthhires} package; see \code{\link[=world_geometry]{world_geometry()}}.}
 }
 \value{
 A tibble with one row per (\code{iso3c}, \code{neighbor}) pair: the queried
@@ -23,9 +24,34 @@ name (\code{neighbor}, \code{neighbor_country}). Countries with no land border
 Which countries border a given country (or countries) -- a vectorised
 lookup built on \code{\link[=country_borders]{country_borders()}}.
 }
+\section{Pass a vector, don't loop}{
+
+Every call rebuilds the whole world's adjacency from polygon topology, so
+asking about one country costs the same as asking about all of them. \code{x} is
+vectorised, and adding countries to a single call only adds the filtering:
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{countryatlas::neighbors(c("FRA", "DEU", "ESP"), origin = "iso3c")
+}\if{html}{\out{</div>}}
+
+Looping instead pays that rebuild once per country -- for every bordering
+country in the world, roughly two orders of magnitude more work than one
+vectorised call. The same applies to \code{\link[=country_borders]{country_borders()}}, which does the work.
+}
+
+\section{Name clash with igraph}{
+
+\code{igraph} also exports a \code{neighbors()}, and it takes a graph and a vertex
+rather than country names. Whichever package is attached later wins, so if
+you use both -- which \code{\link[=country_borders]{country_borders()}} suggests, for building a graph of
+the adjacency -- qualify this one as \code{countryatlas::neighbors()}.
+}
+
 \examples{
-\dontrun{
-neighbors("France")
-neighbors(c("FRA", "JPN"), origin = "iso3c")
+\donttest{
+if (requireNamespace("sf", quietly = TRUE) &&
+    requireNamespace("rnaturalearth", quietly = TRUE)) {
+  neighbors("France")
+  neighbors(c("FRA", "JPN"), origin = "iso3c")   # Japan has no land border
+}
 }
 }

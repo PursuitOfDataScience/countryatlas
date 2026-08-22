@@ -16,7 +16,10 @@ rates for. If \code{NULL}, all numeric columns are used.}
 \code{"income"} or \code{"continent"}.}
 }
 \value{
-A list with elements \code{unmatched}, \code{na_rates} and \code{by_group}.
+A list of class \code{countryatlas_coverage}, with elements \code{unmatched},
+\code{na_rates} and \code{by_group}. It has a \code{print()} method, so at the console you
+see a formatted report rather than the raw list; reach into the elements by
+name to use the numbers programmatically.
 }
 \description{
 What is missing, before you trust the map: which countries are unmatched,

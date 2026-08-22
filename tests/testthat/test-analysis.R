@@ -169,3 +169,199 @@ test_that("share_of_world errors on missing column", {
   expect_error(share_of_world(data.frame(x = 1), y),
                class = "countryatlas_error")
 })
+
+# Users pipe out of group_by(), so a grouped frame arrives routinely. Functions
+# here impose their own grouping (usually by iso3c) and so are unaffected --
+# except rank_countries(), whose mutate() honoured the caller's groups. That
+# silently converted the documented global ranking into a within-group one: the
+# same data ranked 4,1,3,2 ungrouped and 2,1,2,1 grouped, with `within = NULL`
+# in both cases.
+
+test_that("rank_countries ranks globally unless `within` says otherwise", {
+  d <- tibble::tibble(iso3c = c("AAA", "BBB", "CCC", "DDD"),
+                      region = c("X", "X", "Y", "Y"), g = c(1, 4, 2, 3))
+  global <- rank_countries(d, g)$rank
+  expect_equal(global, rank_countries(dplyr::group_by(d, region), g)$rank)
+  expect_equal(rank_countries(d, g)$percentile,
+               rank_countries(dplyr::group_by(d, region), g)$percentile)
+  expect_equal(rank_countries(d, g)$z_score,
+               rank_countries(dplyr::group_by(d, region), g)$z_score)
+  # `within` still works, from either input.
+  wi <- rank_countries(d, g, within = region)$rank
+  expect_equal(rank_countries(dplyr::group_by(d, region), g, within = region)$rank,
+               wi)
+  expect_false(identical(global, wi))          # the two really do differ
+  # And the global ranking is the right one: rank 1 is the largest value.
+  expect_equal(d$g[which(global == 1L)], max(d$g))
+})
+
+test_that("an incidental group_by() never changes an answer", {
+  panel <- tibble::tibble(
+    iso3c = rep(c("USA", "FRA", "CHN"), each = 4),
+    year = rep(2000:2003, 3), region = rep(c("A", "B", "A"), each = 4),
+    g = c(1, 2, 3, 4, 10, 11, 12, 13, 100, 110, 120, 130), population = 1e6)
+  grp <- dplyr::group_by(panel, region)
+  flat <- function(x) dplyr::ungroup(tibble::as_tibble(x))
+  expect_equal(flat(growth_rate(grp, g)), flat(growth_rate(panel, g)))
+  expect_equal(flat(index_to(grp, g, base_year = 2000)),
+               flat(index_to(panel, g, base_year = 2000)))
+  expect_equal(flat(lag_by_country(grp, g)), flat(lag_by_country(panel, g)))
+  expect_equal(flat(diff_by_country(grp, g)), flat(diff_by_country(panel, g)))
+  expect_equal(flat(share_of_world(grp, g)), flat(share_of_world(panel, g)))
+  expect_equal(flat(per_capita(grp, g, pop = population)),
+               flat(per_capita(panel, g, pop = population)))
+  expect_equal(flat(complete_years(grp, value = "g")),
+               flat(complete_years(panel, value = "g")))
+  expect_equal(flat(aggregate_regions(grp, g, by = "region")),
+               flat(aggregate_regions(panel, g, by = "region")))
+  expect_equal(flat(rank_countries(grp, g)), flat(rank_countries(panel, g)))
+
+  # The panel branch was safe by accident: share_of_world() regroups by `year`,
+  # which replaces the caller's groups. Without a `year` column nothing replaced
+  # them, so sum() ran per group and the "share of the world" became a share of
+  # the group -- grouped by region the column summed to 2, not 1. Cover that
+  # branch explicitly.
+  flat_panel <- dplyr::select(dplyr::ungroup(panel), -"year")
+  flat_panel <- dplyr::summarise(dplyr::group_by(flat_panel, .data$iso3c),
+                                 region = dplyr::first(.data$region),
+                                 g = sum(.data$g), .groups = "drop")
+  fg <- dplyr::group_by(flat_panel, region)
+  expect_warning(shares <- share_of_world(fg, g), "grouping is ignored")
+  expect_equal(flat(shares), flat(share_of_world(flat_panel, g)))
+  expect_equal(sum(shares$g_share), 1)
+})
+
+test_that("no function leaks grouping into its return value", {
+  panel <- tibble::tibble(iso3c = rep(c("USA", "FRA"), each = 3),
+                          year = rep(2000:2002, 2), g = c(1, 2, 3, 4, 5, 6),
+                          population = 1e6)
+  grp <- dplyr::group_by(panel, iso3c)
+  for (out in list(growth_rate(grp, g), lag_by_country(grp, g),
+                   diff_by_country(grp, g), share_of_world(grp, g),
+                   index_to(grp, g, base_year = 2000), rank_countries(grp, g),
+                   per_capita(grp, g, pop = population),
+                   complete_years(grp, value = "g"))) {
+    expect_false(dplyr::is_grouped_df(out))
+  }
+})
+
+# A group with no non-missing value has nothing to aggregate, and every base
+# function got that wrong differently: sum() returned 0, mean() NaN,
+# min()/max() -Inf/Inf with a warning, weighted.mean() NaN. "This region's
+# total is 0" is a claim, not an absence -- and this package exists to handle
+# missing country data honestly. .safe_min/.safe_max already returned NA; now
+# every `fun` does.
+
+test_that("a group with no data aggregates to NA, not 0", {
+  mix <- tibble::tibble(iso3c = c("A", "B", "C", "D"),
+                        region = c("X", "X", "Y", "Y"),
+                        g = c(1, 3, NA, NA), w = c(1, 1, 1, 1))
+  for (fn in c("sum", "mean", "median", "min", "max")) {
+    out <- aggregate_regions(mix, g, by = "region", fun = fn)
+    expect_identical(out$g[out$region == "Y"], NA_real_, info = fn)
+    expect_false(is.na(out$g[out$region == "X"]))          # X still aggregates
+  }
+  wm <- aggregate_regions(mix, g, by = "region", fun = "weighted_mean",
+                          weight = w)
+  expect_identical(wm$g[wm$region == "Y"], NA_real_)
+  # No warning either: min()/max() used to emit one on an empty group.
+  expect_no_warning(aggregate_regions(mix, g, by = "region", fun = "min"))
+  expect_no_warning(aggregate_regions(mix, g, by = "region", fun = "max"))
+})
+
+test_that("aggregating groups that do have data is unchanged", {
+  full <- tibble::tibble(iso3c = c("A", "B", "C", "D"),
+                         region = c("X", "X", "Y", "Y"),
+                         g = c(1, 3, 10, 20), w = c(1, 3, 1, 1))
+  val <- function(fn, ...) {
+    o <- aggregate_regions(full, g, by = "region", fun = fn, ...)
+    o$g[o$region == "X"]
+  }
+  expect_equal(val("sum"), 4)
+  expect_equal(val("mean"), 2)
+  expect_equal(val("median"), 2)
+  expect_equal(val("min"), 1)
+  expect_equal(val("max"), 3)
+  expect_equal(val("weighted_mean", weight = w), 2.5)   # (1*1 + 3*3) / 4
+  # A partially-missing group still aggregates the values it has.
+  part <- tibble::tibble(iso3c = c("A", "B", "C"), region = "X",
+                         g = c(2, NA, 4), w = c(1, 1, 1))
+  expect_equal(aggregate_regions(part, g, by = "region", fun = "sum")$g, 6)
+  expect_equal(aggregate_regions(part, g, by = "region", fun = "mean")$g, 3)
+  expect_equal(aggregate_regions(part, g, by = "region",
+                                 fun = "weighted_mean", weight = w)$g, 3)
+})
+
+test_that("aggregate_regions warns when handed map geometry", {
+  # The polygon backend expands each country into ~400 vertex rows, so a
+  # row-wise sum counts it that many times: for the bundled snapshot a regional
+  # total of 497,265 became 280,951,373, silently. It cannot de-duplicate on
+  # iso3c, because `by = c("region", "year")` roll-ups legitimately repeat a
+  # country, so it says what looks wrong instead. Reachable straight off the
+  # package's headline call, world_data(geometry = "polygon").
+  skip_if_not_installed("maps")
+  snap <- countryatlas::world_snapshot$countries
+  poly <- suppressWarnings(attach_geometry(snap, geometry = "polygon"))
+  expect_warning(aggregate_regions(poly, gdp_per_capita, by = "region"),
+                 "map geometry")
+  expect_warning(aggregate_regions(poly, gdp_per_capita, by = "region"),
+                 class = "countryatlas_warning")
+  # Country-level input is silent, and is the answer to trust.
+  expect_no_warning(aggregate_regions(snap, gdp_per_capita, by = "region"))
+  # A panel with many rows per country is legitimate and must stay silent.
+  panel <- tibble::tibble(iso3c = rep(c("USA", "FRA"), each = 2),
+                          year = rep(2000:2001, 2), region = rep("X", 4),
+                          g = c(1, 2, 3, 4))
+  expect_no_warning(aggregate_regions(panel, g, by = c("region", "year")))
+  expect_no_warning(aggregate_regions(panel, g, by = "region"))
+  expect_equal(aggregate_regions(panel, g, by = "region")$g, 10)
+})
+
+test_that("complete_years(value=) does not fill the columns it was not given", {
+  # `static <- setdiff(names(data), c("year", value))` counted an unlisted
+  # numeric column as a static attribute, so it got carry-filled -- naming
+  # *fewer* columns in `value` fabricated *more* data, and even method = "none"
+  # ("just complete the grid") invented a figure for the missing year.
+  pan <- tibble::tibble(iso3c = "USA", year = c(2000, 2001, 2003),
+                        v = c(1, 2, 4), w = c(10, 20, 40),
+                        name = "United States")
+  for (m in c("none", "locf", "linear")) {
+    out <- complete_years(pan, value = "v", method = m)
+    expect_identical(out$w, c(10, 20, NA, 40), info = m)
+    # The genuinely static attribute is still carried into the invented row.
+    expect_identical(unique(out$name), "United States", info = m)
+  }
+  # The requested column is still filled as asked.
+  expect_identical(complete_years(pan, value = "v", method = "none")$v,
+                   c(1, 2, NA, 4))
+  expect_identical(complete_years(pan, value = "v", method = "locf")$v,
+                   c(1, 2, 2, 4))
+  expect_identical(complete_years(pan, value = "v", method = "linear")$v,
+                   c(1, 2, 3, 4))
+  # value = NULL treats every measure as a value, and is unchanged by the fix.
+  both <- complete_years(pan, method = "locf")
+  expect_identical(both$v, c(1, 2, 2, 4))
+  expect_identical(both$w, c(10, 20, 20, 40))
+})
+
+test_that("aggregate_regions refuses a weight it would ignore", {
+  # `weight` is read only by fun = "weighted_mean". Any other fun silently
+  # returned the *unweighted* figure -- on European GDP per capita that is
+  # 38,323 against a population-weighted 29,896, a 22% error with nothing to
+  # say so. The mirror-image mistake (weighted_mean with no weight) already
+  # aborted; this makes the pair symmetric.
+  df <- tibble::tibble(iso3c = c("USA", "CAN", "BRA"),
+                       region = c("NA", "NA", "LatAm"),
+                       gdp = c(21, 1.7, 1.4), pop = c(330, 38, 213))
+  for (f in c("sum", "mean", "median", "min", "max")) {
+    expect_error(aggregate_regions(df, gdp, by = "region", fun = f, weight = pop),
+                 "only used when", info = f)
+    expect_error(aggregate_regions(df, gdp, by = "region", fun = f, weight = pop),
+                 class = "countryatlas_error", info = f)
+  }
+  # Without a weight every fun still works, and weighting really does differ.
+  expect_s3_class(aggregate_regions(df, gdp, by = "region", fun = "mean"), "tbl_df")
+  unw <- aggregate_regions(df, gdp, by = "region", fun = "mean")
+  wtd <- aggregate_regions(df, gdp, by = "region", fun = "weighted_mean", weight = pop)
+  expect_false(isTRUE(all.equal(unw$gdp, wtd$gdp)))
+})

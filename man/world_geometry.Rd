@@ -20,17 +20,59 @@ world_geometry(
 \item{geometry}{\code{"polygon"} (a tibble of \code{long}/\code{lat}/\code{group}) or \code{"sf"}.}
 
 \item{scale}{Natural Earth resolution for the \code{sf} backend:
-\code{"small"} (110m), \code{"medium"} (50m) or \code{"large"} (10m).}
+\code{"small"} (110m), \code{"medium"} (50m) or \code{"large"} (10m). \code{"large"}
+additionally needs the \code{rnaturalearthhires} package, which is not on CRAN
+(\verb{install.packages("rnaturalearthhires", repos =}
+\verb{"https://ropensci.r-universe.dev")}); \code{"small"} and \code{"medium"} need
+nothing beyond \code{rnaturalearthdata}. Coarser scales carry fewer
+countries as well as less detail -- see \code{\link[=attach_geometry]{attach_geometry()}}.}
 
 \item{region}{Optional subset: a continent, a group name, a vector of \code{iso3c}
-codes, or a bounding box \code{c(xmin, ymin, xmax, ymax)}.}
+codes, or a bounding box \code{c(xmin, ymin, xmax, ymax)}. A box is the one form
+that clips the shapes themselves rather than selecting whole countries --
+properly, via \code{sf::st_crop()}, on the \code{sf} backend. The polygon backend can
+only drop the vertices outside the box, which leaves a country straddling
+the edge with an approximate outline, so it warns.}
 
 \item{projection}{Projection for the \code{sf} backend (see \code{\link[=world_map]{world_map()}}).}
 
 \item{recenter}{Optional central meridian for a recentred map (e.g. \code{150}).}
 }
 \value{
-A tibble (polygon backend) or \code{sf} object (sf backend).
+A tibble (polygon backend) or \code{sf} object (sf backend), with columns
+depending on \code{what}:
+\describe{
+\item{\code{"countries"}}{polygon: \code{long}, \code{lat}, \code{group}, \code{order}, \code{region},
+\code{subregion}, \code{iso3c}, \code{iso2c}. sf: \code{iso3c}, \code{iso2c}, \code{name_long}.}
+\item{\code{"centroids"}}{the same identifier columns plus \code{centroid_lon} and
+\code{centroid_lat}.}
+\item{\code{"coastline"}, \code{"borders"}, \code{"ocean"}, \code{"graticule"}}{sf only.}
+}
+\strong{The centroid columns are in the coordinate system of the object
+returned}, so on the sf backend they are projected metres, not degrees --
+\code{centroid_lon} for France is \code{174097}, not \code{2.1}. For centroids in degrees
+use \link{country_meta}\verb{$centroid_lon} / \verb{$centroid_lat}, which is also what the
+polygon backend returns.
+
+A few Natural Earth features have no ISO code and so come back with \code{iso3c}
+\code{NA} -- Somaliland at every scale, plus the Indian Ocean Territories and
+Ashmore and Cartier Islands from \code{"medium"} on. They are kept so the land is
+still drawn; drop or \code{\link[=country_overrides]{country_overrides()}} them if you group by \code{iso3c}.
+
+\code{"orthographic"} is the one genuinely hemispheric projection: the countries
+on the far side have no image and come back as empty geometries (correctly,
+but \code{sf::st_coordinates()} cannot read a column that mixes empty and
+non-empty -- drop them first). The other three azimuthal projections
+(\code{"azimuthal_equal_area"}, \code{"north_polar"}, \code{"south_polar"}) are Lambert
+equal-area and draw the \emph{whole} globe, the far side stretched around the
+rim rather than dropped, so pass \code{region} if you want a polar view of the
+northern countries alone.
+
+\code{"ocean"} is a whole-globe background rectangle. It is unavailable in all
+four azimuthal projections -- \code{"orthographic"} has no image for it, and the
+Lambert three cut the globe at the antipode, which collapses the rectangle's
+outline -- and it cannot be recentred; both cases error rather than
+returning an invisible layer.
 }
 \description{
 Sometimes you just want the canvas: country polygons, label-ready centroids,

@@ -8,12 +8,13 @@ morans_i(data, value, scale = "small", n_perm = 999)
 }
 \arguments{
 \item{data}{A country-level data frame with \code{iso3c} (map-ready frames are
-reduced to one row per country).}
+reduced to one row per country first).}
 
 \item{value}{The value column (unquoted).}
 
 \item{scale}{Natural Earth resolution for the adjacency (see
-\code{\link[=country_borders]{country_borders()}}).}
+\code{\link[=country_borders]{country_borders()}}). \code{"large"} needs the non-CRAN \code{rnaturalearthhires}
+package; see \code{\link[=world_geometry]{world_geometry()}}.}
 
 \item{n_perm}{Number of permutations for the pseudo-p-value (default \code{999};
 use \code{0} to skip the test).}
@@ -35,9 +36,12 @@ maps. Countries with no land border in the data (islands) carry no weight
 and are excluded.
 }
 \examples{
-\dontrun{
-snap <- countryatlas::world_snapshot$countries
-set.seed(42)
-morans_i(snap, gdp_per_capita)   # GDP clusters strongly in space
+\donttest{
+if (requireNamespace("sf", quietly = TRUE) &&
+    requireNamespace("rnaturalearth", quietly = TRUE)) {
+  snap <- countryatlas::world_snapshot$countries
+  set.seed(42)
+  morans_i(snap, gdp_per_capita, n_perm = 99)  # GDP clusters in space
+}
 }
 }

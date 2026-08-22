@@ -7,8 +7,9 @@
 correlate_indicators(data, ..., method = c("pearson", "spearman"), min_n = 3)
 }
 \arguments{
-\item{data}{A country-level (or map-ready) data frame; polygon frames are
-reduced to one row per country first.}
+\item{data}{A country-level (or map-ready) data frame; map-ready frames are
+reduced to one row per country first, so the reported \code{n} counts countries
+rather than geometry rows.}
 
 \item{...}{<\code{\link[dplyr:dplyr_tidy_select]{tidy-select}}> Indicator columns to
 correlate. If empty, all numeric columns except coordinates, \code{year} and

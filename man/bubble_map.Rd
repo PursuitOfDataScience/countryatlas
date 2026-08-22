@@ -21,7 +21,8 @@ bubble_map(
 
 \item{color}{Optional column controlling bubble colour (unquoted).}
 
-\item{projection}{Projection for the base map (sf path).}
+\item{projection}{Projection for the base map (sf path). See \code{\link[=world_map]{world_map()}} for the
+projections available.}
 
 \item{backend}{\code{"polygon"} (default) or \code{"sf"} for the base map.}
 

@@ -184,3 +184,95 @@ test_that("neighbors looks up a country's borders (needs sf)", {
   # Japan is an island nation with no land border.
   expect_equal(nrow(neighbors("Japan")), 0L)
 })
+
+# country_borders() keeps one direction of each pair and asserts in a comment
+# that "a country never borders itself". neighbors() then rebuilds both
+# directions. Those are invariants a geometry or Natural Earth change could
+# quietly break, so pin them rather than trusting the comment.
+
+test_that("the border adjacency is irreflexive and de-duplicated", {
+  skip_if_not_installed("sf")
+  skip_if_not_installed("rnaturalearth")
+  b <- country_borders()
+  expect_gt(nrow(b), 100L)
+  expect_equal(sum(b$iso3c_a == b$iso3c_b), 0L)        # no country borders itself
+  # One direction per pair, not both.
+  key <- paste(pmin(b$iso3c_a, b$iso3c_b), pmax(b$iso3c_a, b$iso3c_b))
+  expect_equal(sum(duplicated(key)), 0L)
+  expect_false(anyNA(c(b$iso3c_a, b$iso3c_b)))
+})
+
+test_that("neighbors() builds the adjacency once, however many countries", {
+  # ?neighbors tells the reader to pass a vector rather than loop, because every
+  # call rebuilds the whole world's st_touches() adjacency. Pin the fact that
+  # claim rests on -- one country_borders() call per neighbors() call, not one
+  # per country -- rather than a wall-clock assertion, which would be flaky.
+  # Measured cost of getting this wrong: 0.43s for one country, 0.37s for 153,
+  # so looping over them would be ~66s, about 177x a single vectorised call.
+  skip_if_not_installed("sf")
+  skip_if_not_installed("rnaturalearth")
+  calls <- 0L
+  fake <- function(scale = "small", region = NULL) {
+    calls <<- calls + 1L
+    tibble::tibble(iso3c_a = c("FRA", "FRA", "DEU"),
+                   country_a = c("France", "France", "Germany"),
+                   iso3c_b = c("DEU", "ESP", "POL"),
+                   country_b = c("Germany", "Spain", "Poland"))
+  }
+  testthat::local_mocked_bindings(country_borders = fake)
+
+  calls <- 0L
+  one <- neighbors("FRA", origin = "iso3c")
+  expect_identical(calls, 1L)
+
+  calls <- 0L
+  many <- neighbors(c("FRA", "DEU", "ESP", "POL"), origin = "iso3c")
+  expect_identical(calls, 1L)
+
+  # And the vectorised answer really is the union of the individual ones.
+  expect_setequal(one$neighbor, c("DEU", "ESP"))
+  expect_setequal(many$neighbor[many$iso3c == "FRA"], c("DEU", "ESP"))
+  expect_gt(nrow(many), nrow(one))
+})
+
+test_that("neighbors() is symmetric even though country_borders() is not", {
+  skip_if_not_installed("sf")
+  skip_if_not_installed("rnaturalearth")
+  # neighbors() returns a tibble (iso3c, neighbor, neighbor_country) -- pin the
+  # shape too, since the symmetry check depends on reading the right column.
+  nb <- neighbors("France")
+  expect_s3_class(nb, "tbl_df")
+  expect_named(nb, c("iso3c", "neighbor", "neighbor_country"))
+
+  b <- country_borders()
+  codes <- sort(unique(c(b$iso3c_a, b$iso3c_b)))
+  # One vectorised call, not one per country. neighbors() recomputes the whole
+  # world's st_touches() adjacency on every call, and asking per country -- then
+  # again per neighbour, to check the reverse edge -- meant ~465 rebuilds and 292
+  # seconds, four fifths of the entire test suite. The function is vectorised, so
+  # a single call does exactly the same work and exercises the same code.
+  all_nb <- neighbors(codes, origin = "iso3c")
+  expect_setequal(unique(all_nb$iso3c), codes)
+
+  # No self-border, no repeated pair -- reported as the offending rows, so a
+  # failure still names the country rather than just a count.
+  expect_equal(all_nb$iso3c[all_nb$iso3c == all_nb$neighbor], character(0))
+  dup <- all_nb[duplicated(all_nb[, c("iso3c", "neighbor")]), ]
+  expect_equal(nrow(dup), 0L)
+
+  # Symmetry: every (a, b) edge has its (b, a) twin.
+  fwd <- paste(all_nb$iso3c, all_nb$neighbor)
+  rev <- paste(all_nb$neighbor, all_nb$iso3c)
+  expect_equal(setdiff(fwd, rev), character(0))
+
+  nbr <- function(a) all_nb$neighbor[all_nb$iso3c == a]
+  # A land border across an overseas territory is real, not a bug: French
+  # Guiana borders Brazil and Suriname.
+  expect_true(all(c("BRA", "SUR") %in% nbr("FRA")))
+  # Vectorised input returns the union, keyed by the country asked for, and
+  # agrees with the same lookup by name.
+  v <- neighbors(c("France", "Germany"), origin = "country.name")
+  expect_equal(nrow(v), length(nbr("FRA")) + length(nbr("DEU")))
+  expect_setequal(unique(v$iso3c), c("FRA", "DEU"))
+  expect_setequal(v$neighbor[v$iso3c == "FRA"], nbr("FRA"))
+})

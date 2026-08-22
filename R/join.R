@@ -5,16 +5,43 @@ detect_country_col <- function(data, call = rlang::caller_env()) {
   nms <- names(data)
   candidates <- c("country", "country_name", "countryname", "nation", "name",
                   "iso3c", "iso2c", "iso_a3", "iso", "region", "geo")
-  for (cand in candidates) {
-    m <- nms[tolower(nms) == cand]
-    if (length(m)) return(m[1])
+  # Some names say which scheme the column holds. Without this, a column named
+  # `iso3c` was found by name and then read as a country *name*, so
+  # join_world(tibble(iso3c = c("FRA", "JPN"))) -- the most natural call there
+  # is -- warned and returned all NA. The guess is verified before it is used,
+  # so a misnamed column still falls back to the default scheme.
+  scheme_for <- c(iso3c = "iso3c", iso_a3 = "iso3c", iso = "iso3c",
+                  iso2c = "iso2c")
+  resolves <- function(col, org) {
+    hits <- wdj_to_iso3c(as.character(col), origin = org)
+    length(hits) && mean(!is.na(hits)) > 0.5
   }
-  # Otherwise the first character/factor column that mostly matches ISO codes.
+  for (cand in candidates) {
+    m <- nms[ascii_lower(nms) == cand]
+    if (length(m)) {
+      org <- unname(scheme_for[cand])
+      if (!is.na(org) && resolves(data[[m[1]]], org)) {
+        return(structure(m[1], origin = org))
+      }
+      return(m[1])
+    }
+  }
+  # Otherwise the first character/factor column that mostly resolves to a
+  # country. Both schemes have to be tried: countrycode's country.name regex
+  # does not match most alpha-3 codes ("FRA" and "JPN" fail, "USA" happens to
+  # match), so testing names alone rejected a column of the very codes this
+  # function converts *to* -- unless it happened to be named `iso3c`.
   for (nm in nms) {
     col <- data[[nm]]
     if (is.character(col) || is.factor(col)) {
-      iso <- wdj_to_iso3c(as.character(col))
-      if (mean(!is.na(iso)) > 0.5) return(nm)
+      col <- as.character(col)
+      for (org in c("country.name", "iso3c")) {
+        iso <- wdj_to_iso3c(col, origin = org)
+        # Carry the scheme that worked back to the caller: detecting an alpha-3
+        # column and then reading it as a country *name* matched nothing, which
+        # is a worse outcome than not detecting it at all.
+        if (mean(!is.na(iso)) > 0.5) return(structure(nm, origin = org))
+      }
     }
   }
   wdj_abort(c(
@@ -35,9 +62,11 @@ detect_country_col <- function(data, call = rlang::caller_env()) {
 #'   auto-detected.
 #' @param origin How to read `country_col` (any countrycode origin scheme).
 #' @param geometry `"polygon"` (default), `"sf"` or `"none"`.
-#' @param scale Natural Earth resolution for the `sf` backend.
+#' @param scale Natural Earth resolution for the `sf` backend. `"large"` needs the
+#'   non-CRAN `rnaturalearthhires` package; see [world_geometry()].
 #' @param region Optional region subset (see [world_geometry()]).
-#' @param projection,recenter Projection options for the `sf` backend.
+#' @param projection,recenter Projection, and optional central meridian, for
+#'   the `sf` backend (see [world_map()] for the projections available).
 #' @param warn Whether to report unmatched countries (default `TRUE`); also
 #'   surfaces a [check_country_match()] summary.
 #'
@@ -61,10 +90,16 @@ join_world <- function(data,
                        projection = "equal_earth",
                        recenter = NULL,
                        warn = TRUE) {
+  check_bool(warn, "warn")
   geometry <- match.arg(geometry)
   col_q <- rlang::enquo(country_col)
   if (rlang::quo_is_null(col_q) || rlang::quo_is_missing(col_q)) {
     col_name <- detect_country_col(data)
+    # Only when the caller left `origin` at its default: an explicit origin is
+    # an instruction, not a hint.
+    detected <- attr(col_name, "origin")
+    if (missing(origin) && !is.null(detected)) origin <- detected
+    col_name <- as.character(col_name)
   } else {
     col_name <- rlang::as_name(col_q)
   }
@@ -115,8 +150,8 @@ country_join <- function(x, y, by_x, by_y,
                          type = c("left", "inner", "full"),
                          suffix = c(".x", ".y")) {
   type <- match.arg(type)
-  bx <- rlang::as_name(rlang::enquo(by_x))
-  by_ <- rlang::as_name(rlang::enquo(by_y))
+  bx <- quo_arg_name(rlang::enquo(by_x), "by_x")
+  by_ <- quo_arg_name(rlang::enquo(by_y), "by_y")
   if (!bx %in% names(x)) wdj_abort("Column {.val {bx}} not found in {.arg x}.")
   if (!by_ %in% names(y)) wdj_abort("Column {.val {by_}} not found in {.arg y}.")
 
