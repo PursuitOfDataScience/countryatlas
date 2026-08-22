@@ -32,6 +32,15 @@ tile_map(data, fill, label = TRUE)
 
 A `ggplot` object.
 
+## Details
+
+Every tile in the layout is drawn, taking the scale's `na.value` fill
+where `data` has no row for it. The converse also holds and is quieter:
+`data` rows keyed on one of the 10 countries with no tile are dropped
+without a warning (see
+[world_tiles](https://pursuitofdatascience.github.io/countryatlas/reference/world_tiles.md)
+for which).
+
 ## Examples
 
 ``` r

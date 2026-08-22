@@ -31,7 +31,11 @@ repair_country_names(
   Maximum string distance to accept a repair (0 = identical, 1 =
   unrelated). Lower is stricter; default `0.2`. Uses Jaro-Winkler when
   `stringdist` is installed, otherwise a length-normalised edit
-  distance.
+  distance. The fallback is the more conservative of the two – it
+  repairs a subset of what Jaro-Winkler would, mainly missing transposed
+  letters ("Frnace"), and never picks a different country – so results
+  can differ between machines depending on whether `stringdist` is
+  available.
 
 - origin:
 
@@ -46,6 +50,13 @@ repair_country_names(
 A character vector the same length as `x`, with confident misses
 replaced by the closest known country name (others left unchanged). The
 applied substitutions are attached as the attribute `"repairs"`.
+
+## See also
+
+[`check_country_match()`](https://pursuitofdatascience.github.io/countryatlas/reference/check_country_match.md)
+for the report this acts on, and
+[`dissolve_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/dissolve_country.md)
+for dissolved entities, which are deliberately not repaired.
 
 ## Examples
 

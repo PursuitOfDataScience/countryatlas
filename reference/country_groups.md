@@ -44,19 +44,24 @@ country_groups("EU")
 #> 10 EU    FRA   France  
 #> # ℹ 17 more rows
 country_groups(c("G7", "BRICS"))
-#> # A tibble: 12 × 3
-#>    group iso3c country       
-#>    <chr> <chr> <chr>         
-#>  1 BRICS BRA   Brazil        
-#>  2 BRICS CHN   China         
-#>  3 BRICS IND   India         
-#>  4 BRICS RUS   Russia        
-#>  5 BRICS ZAF   South Africa  
-#>  6 G7    CAN   Canada        
-#>  7 G7    FRA   France        
-#>  8 G7    DEU   Germany       
-#>  9 G7    ITA   Italy         
-#> 10 G7    JPN   Japan         
-#> 11 G7    GBR   United Kingdom
-#> 12 G7    USA   United States 
+#> # A tibble: 17 × 3
+#>    group iso3c country             
+#>    <chr> <chr> <chr>               
+#>  1 BRICS BRA   Brazil              
+#>  2 BRICS CHN   China               
+#>  3 BRICS EGY   Egypt               
+#>  4 BRICS ETH   Ethiopia            
+#>  5 BRICS IND   India               
+#>  6 BRICS IDN   Indonesia           
+#>  7 BRICS IRN   Iran                
+#>  8 BRICS RUS   Russia              
+#>  9 BRICS ZAF   South Africa        
+#> 10 BRICS ARE   United Arab Emirates
+#> 11 G7    CAN   Canada              
+#> 12 G7    FRA   France              
+#> 13 G7    DEU   Germany             
+#> 14 G7    ITA   Italy               
+#> 15 G7    JPN   Japan               
+#> 16 G7    GBR   United Kingdom      
+#> 17 G7    USA   United States       
 ```

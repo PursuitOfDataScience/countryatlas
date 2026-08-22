@@ -32,6 +32,9 @@ spike_map(snap, population)
 ## Equal-area tile grids
 
 Give every country the same visual weight so micro-states are visible.
+The bundled grid covers 239 countries – see
+[`?world_tiles`](https://pursuitofdatascience.github.io/countryatlas/reference/world_tiles.md)
+for the ten it omits.
 
 ``` r
 

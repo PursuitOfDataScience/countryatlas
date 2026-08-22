@@ -26,7 +26,11 @@ in_group(x, group, origin = "country.name")
 
 ## Value
 
-A logical vector the same length as `x`.
+A logical vector the same length as `x`. A value `origin` cannot resolve
+to an ISO code answers `FALSE` – the same as a country that is genuinely
+outside the group – so run
+[`check_country_match()`](https://pursuitofdatascience.github.io/countryatlas/reference/check_country_match.md)
+first if you need to tell "not a member" from "not recognised".
 
 ## Examples
 

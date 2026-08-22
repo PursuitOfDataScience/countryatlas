@@ -36,7 +36,9 @@ bivariate_map(
 
 - projection:
 
-  Projection.
+  Projection; see
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
+  for the ones available.
 
 ## Value
 
@@ -47,9 +49,13 @@ for a standalone legend).
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
-world_data(2020, c(gdp = "NY.GDP.PCAP.KD", life = "SP.DYN.LE00.IN"),
-           geometry = "sf") |>
-  bivariate_map(gdp, life)
-} # }
+# \donttest{
+if (requireNamespace("sf", quietly = TRUE) &&
+    requireNamespace("rnaturalearth", quietly = TRUE) &&
+    requireNamespace("biscale", quietly = TRUE)) {
+  attach_geometry(countryatlas::world_snapshot$countries, geometry = "sf") |>
+    bivariate_map(gdp_per_capita, life_expectancy)
+}
+
+# }
 ```

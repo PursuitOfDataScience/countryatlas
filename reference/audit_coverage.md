@@ -29,7 +29,11 @@ audit_coverage(data, indicator = NULL, by = c("region", "income", "continent"))
 
 ## Value
 
-A list with elements `unmatched`, `na_rates` and `by_group`.
+A list of class `countryatlas_coverage`, with elements `unmatched`,
+`na_rates` and `by_group`. It has a
+[`print()`](https://rdrr.io/r/base/print.html) method, so at the console
+you see a formatted report rather than the raw list; reach into the
+elements by name to use the numbers programmatically.
 
 ## Examples
 

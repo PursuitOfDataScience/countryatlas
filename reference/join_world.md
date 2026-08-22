@@ -43,7 +43,9 @@ join_world(
 
 - scale:
 
-  Natural Earth resolution for the `sf` backend.
+  Natural Earth resolution for the `sf` backend. `"large"` needs the
+  non-CRAN `rnaturalearthhires` package; see
+  [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md).
 
 - region:
 
@@ -52,7 +54,9 @@ join_world(
 
 - projection, recenter:
 
-  Projection options for the `sf` backend.
+  Projection, and optional central meridian, for the `sf` backend (see
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
+  for the projections available).
 
 - warn:
 

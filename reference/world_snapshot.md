@@ -24,13 +24,18 @@ A list with three elements:
 
   `NULL` in the released package – geometry is not bundled twice. Attach
   it on demand with
-  [`attach_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/attach_geometry.md)`(world_snapshot$countries,`
-  `geometry = "sf")`, which pulls the same Natural Earth 110m polygons
-  from `rnaturalearth`.
+  [`attach_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/attach_geometry.md):
+  `attach_geometry(world_snapshot$countries, geometry = "sf")` pulls the
+  same Natural Earth 110m polygons from `rnaturalearth`.
 
 - year:
 
   The reference year.
+
+`country` carries the World Bank's own names, which differ from the
+`countrycode` names used by
+[country_meta](https://pursuitofdatascience.github.io/countryatlas/reference/country_meta.md)
+for 38 countries.
 
 ## Source
 

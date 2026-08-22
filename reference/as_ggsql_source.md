@@ -42,7 +42,11 @@ as_ggsql_source(
 
 - path:
 
-  Output path for `format = "parquet"` (default `"<name>.parquet"`).
+  Output path for `format = "parquet"`. Defaults to a file named after
+  `name` in the session's temporary directory, whose path is returned;
+  pass one explicitly to write somewhere you choose. A package must not
+  write to the working directory uninvited, which is what the bare
+  `"<name>.parquet"` this used to default to did.
 
 - geometry_col:
 

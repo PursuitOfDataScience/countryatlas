@@ -65,11 +65,18 @@ A `ggplot` object.
 ## Examples
 
 ``` r
+# \donttest{
+# No sf required -- the polygon backend needs only maps + mapproj:
+if (requireNamespace("maps", quietly = TRUE) &&
+    requireNamespace("mapproj", quietly = TRUE)) {
+  globe_map(countryatlas::world_snapshot$countries, continent,
+            backend = "polygon", style = "categorical")
+}
+
+# }
 if (FALSE) { # \dontrun{
+# The sf backend gives the cleanest limb (needs a World Bank fetch):
 world_data(2020, geometry = "sf") |>
   globe_map(gdp_per_capita, lon = 10, lat = 30)
-# No sf required:
-globe_map(world_snapshot$countries, continent, backend = "polygon",
-          style = "categorical")
 } # }
 ```

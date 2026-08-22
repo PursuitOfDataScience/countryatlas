@@ -61,6 +61,17 @@ world_query(
 
 A `ggsql_query` string (prints as the formatted query).
 
+## Executing the query
+
+Building the string needs nothing installed. *Running* it needs `ggsql`
+\>= 0.4.1, the version that added the `DRAW spatial` clause; older
+`ggsql` releases parse the query and reject that clause. As of August
+2026 that clause has shipped in the ggsql *engine* but not yet in the
+ggsql R package (still 0.3.3), so
+[`interactive_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/interactive_map.md)`(engine = "ggsql")`
+will refuse until the bindings catch up. `PROJECT TO` additionally needs
+a spatial backend – for DuckDB, its `spatial` extension.
+
 ## Examples
 
 ``` r

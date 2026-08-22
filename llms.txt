@@ -95,19 +95,19 @@ and are only needed for the features that use them.
 
 | Feature / verb | Optional packages required |
 |----|----|
-| [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md) polygon backend | `maps` |
-| [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md) sf backend, `world_geometry(sf)` | `sf`, `rnaturalearth`, `rnaturalearthdata` |
-| `globe_map(backend = "polygon")`, [`spin_globe()`](https://pursuitofdatascience.github.io/countryatlas/reference/spin_globe.md) | `maps`, `mapproj` |
+| [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md) polygon backend, [`spike_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/spike_map.md), [`flow_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/flow_map.md), [`bubble_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/bubble_map.md) | `maps` |
+| sf geometry: `world_map(sf)`, `world_geometry(sf)`, [`locate_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/locate_country.md), [`country_borders()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_borders.md), [`neighbors()`](https://pursuitofdatascience.github.io/countryatlas/reference/neighbors.md), [`morans_i()`](https://pursuitofdatascience.github.io/countryatlas/reference/morans_i.md) | `sf`, `rnaturalearth`, `rnaturalearthdata` |
+| `globe_map(backend = "polygon")` | `maps`, `mapproj` |
+| [`spin_globe()`](https://pursuitofdatascience.github.io/countryatlas/reference/spin_globe.md) (animated GIF) | its backend’s packages, plus `gifski` or `magick` |
 | [`bivariate_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/bivariate_map.md) | `biscale`, `sf` |
 | [`cartogram_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/cartogram_map.md), [`dorling_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/dorling_map.md) | `cartogram`, `sf` |
-| [`spike_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/spike_map.md) | `maps` |
-| [`country_borders()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_borders.md), [`neighbors()`](https://pursuitofdatascience.github.io/countryatlas/reference/neighbors.md), [`morans_i()`](https://pursuitofdatascience.github.io/countryatlas/reference/morans_i.md) | `sf` |
 | [`animate_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/animate_world.md) (animated GIF) | `gganimate` (+ `gifski` or `magick`) |
 | `interactive_map(engine = "plotly")` | `plotly` |
 | `interactive_map(engine = "ggiraph")` | `ggiraph` |
 | `interactive_map(engine = "leaflet")` | `leaflet`, `sf` |
-| `interactive_map(engine = "ggsql")`, [`as_ggsql_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/as_ggsql_source.md) | `ggsql`, `duckdb`, `DBI`, `nanoarrow`, `sf` |
-| [`simplify_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/simplify_geometry.md) with `rmapshaper` | `rmapshaper` |
+| `interactive_map(engine = "ggsql")` | `ggsql` (\>= 0.4.1), `duckdb`, `DBI`, `sf` |
+| [`as_ggsql_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/as_ggsql_source.md) | `duckdb` + `DBI`, or `nanoarrow` for `format = "arrow"` |
+| [`simplify_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/simplify_geometry.md) | `sf`; `rmapshaper` for the better simplifier |
 | [`repair_country_names()`](https://pursuitofdatascience.github.io/countryatlas/reference/repair_country_names.md) / [`check_country_match()`](https://pursuitofdatascience.github.io/countryatlas/reference/check_country_match.md) with `stringdist` | `stringdist` |
 
 ``` r

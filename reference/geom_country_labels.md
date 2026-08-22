@@ -5,7 +5,13 @@ country centroids, with optional `ggrepel` collision avoidance. Designed
 for the polygon backend produced by
 [`world_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_data.md)
 /
-[`join_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/join_world.md).
+[`join_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/join_world.md):
+it reads the `long`, `lat` and `group` columns, so it errors on an `sf`
+frame and points at
+[`ggplot2::geom_sf_text()`](https://ggplot2.tidyverse.org/reference/ggsf.html)
+instead. Placement is exact only while `group` is present – that is what
+identifies each country's separate pieces, and the label goes on the
+largest one.
 
 ## Usage
 
@@ -21,7 +27,8 @@ geom_country_labels(mapping = NULL, repel = TRUE, flag = FALSE, size = 3, ...)
 
 - repel:
 
-  Use `ggrepel` to avoid overlaps (default `TRUE`).
+  Use `ggrepel` to avoid overlaps (default `TRUE`). Falls back to plain
+  labels, with a one-time note, when `ggrepel` is not installed.
 
 - flag:
 

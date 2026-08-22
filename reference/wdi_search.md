@@ -33,6 +33,7 @@ A tibble of matching `indicator` codes and `name`s.
 
 ``` r
 # \donttest{
+# Searches WDI's bundled indicator list, so this needs no connection.
 wdi_search("CO2 emissions")
 #> # A tibble: 42 × 2
 #>    indicator      name                                                          

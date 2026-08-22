@@ -14,7 +14,7 @@ convert_country(
   x,
   to = "iso3c",
   from = "country.name",
-  custom_match = wdj_overrides(),
+  custom_match = country_overrides(),
   warn = TRUE
 )
 ```
@@ -28,10 +28,10 @@ convert_country(
 - to:
 
   Destination scheme. A shortcut (`"iso3c"`, `"flag"`, `"currency"`,
-  `"tld"`, `"continent"`, `"region"`, `"cown"`, ...), a localized name
-  `"name_<lang>"` (`"name_fr"`, `"name_es"`, `"name_zh"`, ... – any
-  language in countrycode's CLDR tables), or any raw countrycode
-  destination.
+  `"tld"`, `"continent"`, `"region"`, `"calling_code"`, `"cown"`, ...),
+  a localized name `"name_<lang>"` (`"name_fr"`, `"name_es"`,
+  `"name_zh"`, ... – any language in countrycode's CLDR tables), or any
+  raw countrycode destination.
 
 - from:
 
@@ -40,7 +40,7 @@ convert_country(
 - custom_match:
 
   Optional overrides (default
-  [`wdj_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)).
+  [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)).
 
 - warn:
 

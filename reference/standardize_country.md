@@ -5,7 +5,7 @@ on messy country names (or codes) and attach standardised ISO codes plus
 useful classifications, reconciling spellings via
 [`countrycode::countrycode()`](https://rdrr.io/pkg/countrycode/man/countrycode.html)
 and the curated
-[`wdj_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)
+[`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)
 table. The result joins cleanly to anything else keyed on `iso3c`.
 
 ## Usage
@@ -16,7 +16,7 @@ standardize_country(
   country_col,
   origin = "country.name",
   add = c("iso3c", "iso2c", "continent", "region"),
-  custom_match = wdj_overrides(),
+  custom_match = country_overrides(),
   warn = TRUE
 )
 ```
@@ -48,7 +48,7 @@ standardize_country(
 - custom_match:
 
   A named character vector of name -\> iso3c overrides; defaults to
-  [`wdj_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md).
+  [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md).
   Merged on top of the built-in matching.
 
 - warn:

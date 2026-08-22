@@ -20,7 +20,7 @@ morans_i(data, value, scale = "small", n_perm = 999)
 - data:
 
   A country-level data frame with `iso3c` (map-ready frames are reduced
-  to one row per country).
+  to one row per country first).
 
 - value:
 
@@ -30,6 +30,8 @@ morans_i(data, value, scale = "small", n_perm = 999)
 
   Natural Earth resolution for the adjacency (see
   [`country_borders()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_borders.md)).
+  `"large"` needs the non-CRAN `rnaturalearthhires` package; see
+  [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md).
 
 - n_perm:
 
@@ -47,9 +49,16 @@ beforehand for a reproducible `p_value`.
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
-snap <- countryatlas::world_snapshot$countries
-set.seed(42)
-morans_i(snap, gdp_per_capita)   # GDP clusters strongly in space
-} # }
+# \donttest{
+if (requireNamespace("sf", quietly = TRUE) &&
+    requireNamespace("rnaturalearth", quietly = TRUE)) {
+  snap <- countryatlas::world_snapshot$countries
+  set.seed(42)
+  morans_i(snap, gdp_per_capita, n_perm = 99)  # GDP clusters in space
+}
+#> # A tibble: 1 × 5
+#>       i expected     n n_links p_value
+#>   <dbl>    <dbl> <int>   <int>   <dbl>
+#> 1 0.607 -0.00709   142     275    0.01
+# }
 ```

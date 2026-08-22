@@ -42,7 +42,9 @@ yield one row with `iso3c = NA`.
 for the crosswalk itself and the successor policy (e.g. Kosovo's
 inclusion in the Yugoslavia list);
 [`check_country_match()`](https://pursuitofdatascience.github.io/countryatlas/reference/check_country_match.md),
-whose `historical` column flags these entities.
+whose `historical` column flags these entities;
+[`repair_country_names()`](https://pursuitofdatascience.github.io/countryatlas/reference/repair_country_names.md),
+which deliberately leaves them alone.
 
 ## Examples
 

@@ -2,7 +2,9 @@
 
 Adds a column giving each country's value as a share of the (year's)
 world total – e.g. share of global emissions or GDP. Operates within
-`year` when a panel is supplied.
+`year` when a panel is supplied. A `dplyr` grouping on `data` is ignored
+– the denominator is always the world (or the year's) total, never the
+group's.
 
 ## Usage
 

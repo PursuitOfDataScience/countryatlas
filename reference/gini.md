@@ -18,8 +18,9 @@ gini(x, weights = NULL, na.rm = TRUE)
 
 - weights:
 
-  Optional non-negative weights (e.g. population), recycled against `x`
-  the usual R way. `NULL` (default) weights all values equally.
+  Optional non-negative weights (e.g. population), either the same
+  length as `x` or length 1. `NULL` (default) weights all values
+  equally.
 
 - na.rm:
 

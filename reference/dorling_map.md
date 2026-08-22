@@ -47,7 +47,9 @@ dorling_map(
 
 - projection:
 
-  Projection (an equal-area CRS is recommended).
+  Projection; an equal-area CRS is recommended. See
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
+  for the projections available.
 
 ## Value
 
@@ -56,8 +58,13 @@ A `ggplot` object.
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
-world_data(2020, c(pop = "SP.POP.TOTL"), geometry = "sf") |>
-  dorling_map(pop)
-} # }
+# \donttest{
+if (requireNamespace("sf", quietly = TRUE) &&
+    requireNamespace("rnaturalearth", quietly = TRUE) &&
+    requireNamespace("cartogram", quietly = TRUE)) {
+  attach_geometry(countryatlas::world_snapshot$countries, geometry = "sf") |>
+    dorling_map(population)
+}
+
+# }
 ```

@@ -41,6 +41,24 @@ backends) to an ISO 3166-1 alpha-3 code. Pass the result as the
 and friends. Every downstream code (`iso2c`, continent, region, flag,
 ...) is derived from this `iso3c`, so a single override is enough.
 
+## Accented names and locales
+
+Every name in this table is plain ASCII, and that is deliberate: ASCII
+spellings match in any locale. Accented spellings (`"Curacao"` with a
+cedilla, `"Saint Barthelemy"` with an acute) are matched natively by
+[`countrycode::countrycode()`](https://rdrr.io/pkg/countrycode/man/countrycode.html)
+*in a UTF-8 locale*, which is why they are not listed here – but in a
+non-UTF-8 locale (`LC_CTYPE=C`) they cannot be compared reliably and
+resolve to `NA`.
+
+If your input may contain accented country names, run in a UTF-8 locale.
+De-accenting with `iconv(x, to = "ASCII//TRANSLIT")` gives ASCII
+spellings that resolve everywhere, but it is not an escape from the
+locale problem: `//TRANSLIT` is itself locale-dependent, so under
+`LC_CTYPE=C` it returns `NA` (or, given an explicit `from = "UTF-8"`,
+replaces each accent with `?`) and nothing resolves. De-accent while
+still in a UTF-8 locale, or supply the ASCII spellings directly.
+
 ## Examples
 
 ``` r

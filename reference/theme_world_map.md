@@ -1,7 +1,12 @@
 # A clean theme for world maps
 
-Strips axes, panel grid and background so the map is the focus. Used by
-all the package's plotting functions and exported for reuse.
+Strips axes, panel grid and background so the map is the focus. Applied
+by every plotting function in the package except
+[`bivariate_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/bivariate_map.md),
+which uses
+[`biscale::bi_theme()`](https://chris-prener.github.io/biscale/reference/bi_theme.html)
+so the map matches its own legend, and exported here for reuse on plots
+you build yourself.
 
 ## Usage
 

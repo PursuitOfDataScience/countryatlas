@@ -59,45 +59,42 @@ country_data(
 
 - parallel:
 
-  Whether to fetch indicators in parallel.
+  Whether to fetch indicators in parallel. Ignored when the cache is
+  memory-only; see
+  [`world_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_data.md).
 
 ## Value
 
 A tibble, one row per country (or per country-year for a panel).
 
+`iso3c` is the stable key; `country` is a *label* and its spelling
+depends on where the row came from. A successful fetch carries the World
+Bank's names ("Korea, Rep.", "Congo, Dem. Rep."), while the country
+spine used when the fetch returns nothing carries the `countrycode`
+names ("South Korea", "Congo - Kinshasa") – as do
+[`convert_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/convert_country.md),
+[`standardize_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/standardize_country.md)
+and the rest of the package. Match on `iso3c`, and relabel with
+`convert_country(iso3c, to = "country")` if you need one consistent set.
+
 ## Examples
 
 ``` r
 # \donttest{
-country_data(2020, c(co2 = "EN.ATM.CO2E.KT"))
-#> Warning: Could not fetch indicator "EN.ATM.CO2E.KT" from the World Bank API.
-#> ✖ The following indicators could not be downloaded: EN.ATM.CO2E.KT.
-#> 
-#> Please make sure that you are running the latest version of the `WDI` package,
-#>   and that the arguments you are using in the `WDI()` function are valid.
-#> 
-#> Sometimes, downloads will suddenly stop working, even if nothing has changed in
-#>   the R code of the WDI package. ("The same WDI package version worked
-#>   yesterday!") In those cases, the problem is almost certainly related to the
-#>   World Bank servers or to your internet connection.
-#> 
-#> You can check if the World Bank web API is currently serving the indicator(s)
-#>   of interest by typing a URL of this form in your web browser:
-#> 
-#> https://api.worldbank.org/v2/en/country/all/indicator/EN.ATM.CO2E.KT?format=json&date=:&per_page=32500&page=1
-#> # A tibble: 249 × 6
-#>    iso3c iso2c country           continent  region                        income
-#>    <chr> <chr> <chr>             <chr>      <chr>                         <fct> 
-#>  1 AFG   AF    Afghanistan       Asia       Middle East, North Africa, A… Low i…
-#>  2 ALB   AL    Albania           Europe     Europe & Central Asia         Upper…
-#>  3 DZA   DZ    Algeria           Africa     Middle East, North Africa, A… Upper…
-#>  4 ASM   AS    American Samoa    Oceania    East Asia & Pacific           High …
-#>  5 AND   AD    Andorra           Europe     Europe & Central Asia         High …
-#>  6 AGO   AO    Angola            Africa     Sub-Saharan Africa            Lower…
-#>  7 AIA   AI    Anguilla          Americas   NA                            NA    
-#>  8 ATA   AQ    Antarctica        Antarctica NA                            NA    
-#>  9 ATG   AG    Antigua & Barbuda Americas   Latin America & Caribbean     High …
-#> 10 ARG   AR    Argentina         Americas   Latin America & Caribbean     Upper…
-#> # ℹ 239 more rows
+country_data(2020, c(co2 = "EN.GHG.CO2.MT.CE.AR5"))
+#> # A tibble: 216 × 7
+#>    iso3c iso2c country             continent region              income      co2
+#>    <chr> <chr> <chr>               <chr>     <chr>               <fct>     <dbl>
+#>  1 AFG   AF    Afghanistan         Asia      Middle East, North… Low i…  12.1   
+#>  2 ALB   AL    Albania             Europe    Europe & Central A… Upper…   4.57  
+#>  3 DZA   DZ    Algeria             Africa    Middle East, North… Upper… 172.    
+#>  4 ASM   AS    American Samoa      Oceania   East Asia & Pacific High …   0.0001
+#>  5 AND   AD    Andorra             Europe    Europe & Central A… High …  NA     
+#>  6 AGO   AO    Angola              Africa    Sub-Saharan Africa  Lower…  20.5   
+#>  7 ATG   AG    Antigua and Barbuda Americas  Latin America & Ca… High …   0.326 
+#>  8 ARG   AR    Argentina           Americas  Latin America & Ca… Upper… 168.    
+#>  9 ARM   AM    Armenia             Asia      Europe & Central A… Upper…   6.91  
+#> 10 ABW   AW    Aruba               Americas  Latin America & Ca… High …   0.489 
+#> # ℹ 206 more rows
 # }
 ```

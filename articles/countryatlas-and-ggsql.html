@@ -6,6 +6,11 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <title>countryatlas and ggsql • countryatlas</title>
+<!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
+<link rel="icon" type="”image/svg+xml”" href="../favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+<link rel="icon" sizes="any" href="../favicon.ico">
+<link rel="manifest" href="../site.webmanifest">
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
@@ -73,8 +78,12 @@
 <p><a href="https://ggsql.org" class="external-link">ggsql</a> is a grammar of graphics for
 SQL: you describe a plot <em>inside a SQL query</em> and it renders in
 the database (DuckDB), returning a web-ready Vega-Lite widget — no
-ggplot2 or <code>sf</code> runtime required. Version 0.4.1 added a
-spatial layer (<code>DRAW spatial</code>) that reads WKB geometry.</p>
+ggplot2 or <code>sf</code> runtime required. The spatial layer this
+vignette targets (<code>DRAW spatial</code>, which reads WKB geometry)
+arrived in the ggsql <em>engine</em> at 0.4.0. As of August 2026 the
+ggsql R package is still at 0.3.3, so the bridge below is
+forward-looking: <code><a href="../reference/world_query.html">world_query()</a></code> builds the query today, and
+the chunks that would execute one are shown but not evaluated.</p>
 <p>countryatlas and ggsql fit together cleanly:</p>
 <ul>
 <li>

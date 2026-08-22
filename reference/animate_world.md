@@ -26,7 +26,9 @@ animate_world(data, fill, time = year, projection = "equal_earth", ...)
 
 - projection:
 
-  Projection for the sf backend.
+  Projection for the sf backend. See
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
+  for the projections available.
 
 - ...:
 

@@ -6,6 +6,11 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <title>Modern maps with sf &amp; projections • countryatlas</title>
+<!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
+<link rel="icon" type="”image/svg+xml”" href="../favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+<link rel="icon" sizes="any" href="../favicon.ico">
+<link rel="manifest" href="../site.webmanifest">
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
@@ -152,9 +157,12 @@ projecting, so nothing streaks across the frame:</p>
 <code>projection</code> suited to the subset
 (e.g. <code>"azimuthal_equal_area"</code> for a single continent, the
 polar projections for the Arctic) so the crop stays area-honest.</p>
-<p>A box is the one form that clips the polygons themselves, which is
-what you want for a region that is neither a continent nor a group — the
-Mediterranean basin, say:</p>
+<p>A box is the one form that clips the shapes themselves, which is what
+you want for a region that is neither a continent nor a group — the
+Mediterranean basin, say. Use the <code>sf</code> backend for it: that
+clip is a real <code><a href="https://r-spatial.github.io/sf/reference/st_crop.html" class="external-link">sf::st_crop()</a></code>, whereas the polygon backend
+can only drop the vertices outside the box and warns that a country
+crossing the edge comes back with an approximate outline.</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">med</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/world_geometry.html">world_geometry</a></span><span class="op">(</span><span class="st">"countries"</span>, geometry <span class="op">=</span> <span class="st">"sf"</span>,</span>
 <span>                      region <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">10</span>, <span class="fl">30</span>, <span class="fl">40</span>, <span class="fl">48</span><span class="op">)</span>, projection <span class="op">=</span> <span class="st">"equal_earth"</span><span class="op">)</span></span>
@@ -168,9 +176,11 @@ Mediterranean basin, say:</p>
 </h2>
 <p>High-resolution geometry can be thinned for fast plotting with
 <code><a href="../reference/simplify_geometry.html">simplify_geometry()</a></code> (which uses <code>rmapshaper</code>
-when available).</p>
+when available). <code>scale = "medium"</code> is the 50m Natural Earth
+data; <code>"large"</code> is 10m and additionally needs the
+<code>rnaturalearthhires</code> package, which is not on CRAN.</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/world_geometry.html">world_geometry</a></span><span class="op">(</span>geometry <span class="op">=</span> <span class="st">"sf"</span>, scale <span class="op">=</span> <span class="st">"large"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/world_geometry.html">world_geometry</a></span><span class="op">(</span>geometry <span class="op">=</span> <span class="st">"sf"</span>, scale <span class="op">=</span> <span class="st">"medium"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/simplify_geometry.html">simplify_geometry</a></span><span class="op">(</span>keep <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span></span></code></pre></div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

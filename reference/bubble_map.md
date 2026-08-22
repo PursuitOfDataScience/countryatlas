@@ -34,7 +34,9 @@ bubble_map(
 
 - projection:
 
-  Projection for the base map (sf path).
+  Projection for the base map (sf path). See
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
+  for the projections available.
 
 - backend:
 

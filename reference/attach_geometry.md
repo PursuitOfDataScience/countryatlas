@@ -16,7 +16,7 @@ attach_geometry(
   region = NULL,
   projection = "equal_earth",
   recenter = NULL,
-  overrides = wdj_overrides()
+  overrides = country_overrides()
 )
 ```
 
@@ -36,7 +36,10 @@ attach_geometry(
 
 - scale:
 
-  Natural Earth resolution for the `sf` backend.
+  Natural Earth resolution for the `sf` backend. `"large"` needs the
+  non-CRAN `rnaturalearthhires` package; see
+  [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md).
+  It also affects which countries are covered at all – see below.
 
 - region:
 
@@ -45,21 +48,49 @@ attach_geometry(
 
 - projection, recenter:
 
-  Projection options for the `sf` backend.
+  Projection, and optional central meridian, for the `sf` backend (see
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
+  for the projections available).
 
 - overrides:
 
   Name -\> iso3c overrides applied when matching the geometry backend's
   country names (default
-  [`wdj_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)).
+  [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)).
   Pass a custom set built with
-  [`wdj_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)
+  [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)
   to add your own.
 
 ## Value
 
 For `"polygon"`, a tibble with `long`/`lat`/`group` plus your columns.
 For `"sf"`, an `sf` object.
+
+## One row in, one row out
+
+Geometry is attached once **per row**, not once per country. That is
+what a panel wants – one row per country-year, each carrying the shape –
+but it means a frame that repeats a country by accident draws that
+country more than once, and only the last one painted is visible. The
+package cannot tell the two apart (a panel's time column may be called
+anything), so reduce to one row per country yourself when that is what
+you meant.
+
+## Which countries have geometry
+
+The join keeps only countries the chosen backend actually carries, so
+rows of `data` with no matching geometry are dropped silently – worth
+checking first when a country you expected is missing from the map.
+Coverage differs by backend and, for `"sf"`, by `scale`, which changes
+*which* countries are present and not merely how detailed they look. Of
+the 215 countries in
+[world_snapshot](https://pursuitofdatascience.github.io/countryatlas/reference/world_snapshot.md),
+`"polygon"` carries 210, `"sf"` with `scale = "small"` (the default,
+110m) carries 169, and `"sf"` with `scale = "medium"` carries 214: the
+110m coastlines omit most small states, so `scale = "medium"` is the fix
+when microstates matter – Hong Kong, Macao, Tuvalu and the British
+Virgin Islands are each in no other backend. Gibraltar alone is in none
+of them.
 
 ## Examples
 

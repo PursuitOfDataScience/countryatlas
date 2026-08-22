@@ -16,8 +16,9 @@ correlate_indicators(data, ..., method = c("pearson", "spearman"), min_n = 3)
 
 - data:
 
-  A country-level (or map-ready) data frame; polygon frames are reduced
-  to one row per country first.
+  A country-level (or map-ready) data frame; map-ready frames are
+  reduced to one row per country first, so the reported `n` counts
+  countries rather than geometry rows.
 
 - ...:
 

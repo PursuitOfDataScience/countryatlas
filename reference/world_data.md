@@ -23,7 +23,7 @@ world_data(
   cache = TRUE,
   language = "en",
   parallel = TRUE,
-  overrides = wdj_overrides()
+  overrides = country_overrides()
 )
 ```
 
@@ -49,12 +49,16 @@ world_data(
 
 - scale:
 
-  Natural Earth resolution for the `sf` backend.
+  Natural Earth resolution for the `sf` backend. `"large"` needs the
+  non-CRAN `rnaturalearthhires` package; see
+  [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md).
 
 - region:
 
   Optional subset: a continent, group name, `iso3c` vector or bounding
-  box.
+  box. A bounding box clips the shapes rather than selecting whole
+  countries, and only the `sf` backend can do that properly – see
+  [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md).
 
 - classify:
 
@@ -63,7 +67,9 @@ world_data(
 
 - projection, recenter:
 
-  Projection options for the `sf` backend.
+  Projection, and optional central meridian, for the `sf` backend (see
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
+  for the projections available).
 
 - latest:
 
@@ -80,17 +86,29 @@ world_data(
 
 - parallel:
 
-  Whether to fetch multiple indicators in parallel.
+  Whether to fetch multiple indicators in parallel. Ignored when the
+  cache is memory-only (an unwritable `countryatlas.cache_dir`), because
+  a forked worker's memo dies with it and nothing would be cached.
 
 - overrides:
 
   Name -\> iso3c overrides for geometry matching (default
-  [`wdj_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)).
+  [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)).
 
 ## Value
 
 A tibble (polygon backend), `sf` object (sf backend) or country-level
 tibble (`geometry = "none"`).
+
+`iso3c` is the stable key; `country` is a *label* and its spelling
+depends on where the row came from. A successful fetch carries the World
+Bank's names ("Korea, Rep.", "Congo, Dem. Rep."), while the country
+spine used when the fetch returns nothing carries the `countrycode`
+names ("South Korea", "Congo - Kinshasa") – as do
+[`convert_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/convert_country.md),
+[`standardize_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/standardize_country.md)
+and the rest of the package. Match on `iso3c`, and relabel with
+`convert_country(iso3c, to = "country")` if you need one consistent set.
 
 ## Details
 
@@ -103,7 +121,13 @@ subsetting.
 
 ``` r
 # \donttest{
-world_data(2020)
+# geometry = "polygon", the default, comes from the suggested `maps`
+# package, so guard the call: an example may not assume a Suggests is
+# installed (R CMD check runs \donttest{} blocks, and CRAN has a
+# check flavour with no suggested packages at all).
+if (requireNamespace("maps", quietly = TRUE)) {
+  world_data(2020)
+}
 #> # A tibble: 99,338 × 12
 #>     long   lat group order subregion iso3c iso2c country continent region income
 #>    <dbl> <dbl> <dbl> <int> <chr>     <chr> <chr> <chr>   <chr>     <chr>  <fct> 
@@ -119,6 +143,8 @@ world_data(2020)
 #> 10 -69.9  12.5     1    10 NA        ABW   AW    Aruba   Americas  Latin… High …
 #> # ℹ 99,328 more rows
 #> # ℹ 1 more variable: gdp_per_capita <dbl>
+
+# geometry = "none" needs nothing beyond the hard dependencies.
 world_data(2020, indicator = c(life_exp = "SP.DYN.LE00.IN"),
            geometry = "none")
 #> # A tibble: 216 × 7

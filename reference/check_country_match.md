@@ -12,7 +12,7 @@ by string distance) for misses. Surfaced automatically by
 check_country_match(
   x,
   origin = "country.name",
-  custom_match = wdj_overrides(),
+  custom_match = country_overrides(),
   suggest = TRUE
 )
 ```
@@ -30,7 +30,7 @@ check_country_match(
 - custom_match:
 
   Overrides applied before matching (default
-  [`wdj_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)).
+  [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)).
 
 - suggest:
 
@@ -50,6 +50,14 @@ Russian data without a warning. Rows flagged `historical` should usually
 be routed through
 [`dissolve_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/dissolve_country.md)
 instead.
+
+## See also
+
+[`dissolve_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/dissolve_country.md)
+for resolving the entities this flags as `historical` to their successor
+states, and
+[`repair_country_names()`](https://pursuitofdatascience.github.io/countryatlas/reference/repair_country_names.md)
+for applying the `suggestion` column automatically.
 
 ## Examples
 

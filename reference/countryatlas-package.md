@@ -24,8 +24,7 @@ Everything else is opt-in.
 [`locate_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/locate_country.md),
 [`country_borders()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_borders.md),
 [`neighbors()`](https://pursuitofdatascience.github.io/countryatlas/reference/neighbors.md),
-[`distance_between()`](https://pursuitofdatascience.github.io/countryatlas/reference/distance_between.md),
-[`morans_i()`](https://pursuitofdatascience.github.io/countryatlas/reference/morans_i.md).
+[`distance_between()`](https://pursuitofdatascience.github.io/countryatlas/reference/distance_between.md).
 
 ## The join engine
 
@@ -73,7 +72,8 @@ and the datasets
 [`beta_convergence()`](https://pursuitofdatascience.github.io/countryatlas/reference/beta_convergence.md),
 [`sigma_convergence()`](https://pursuitofdatascience.github.io/countryatlas/reference/sigma_convergence.md),
 [`gini()`](https://pursuitofdatascience.github.io/countryatlas/reference/gini.md),
-[`theil()`](https://pursuitofdatascience.github.io/countryatlas/reference/theil.md).
+[`theil()`](https://pursuitofdatascience.github.io/countryatlas/reference/theil.md),
+[`morans_i()`](https://pursuitofdatascience.github.io/countryatlas/reference/morans_i.md).
 
 ## Visualization
 
@@ -91,12 +91,43 @@ and the datasets
 [`animate_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/animate_world.md),
 [`interactive_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/interactive_map.md),
 [`geom_country_labels()`](https://pursuitofdatascience.github.io/countryatlas/reference/geom_country_labels.md),
-[`theme_world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/theme_world_map.md).
+[`theme_world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/theme_world_map.md),
+[`simplify_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/simplify_geometry.md).
 
 ## Database rendering (ggsql)
 
 [`as_ggsql_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/as_ggsql_source.md),
 [`world_query()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_query.md).
+
+## Performance & caching
+
+[`clear_wdi_cache()`](https://pursuitofdatascience.github.io/countryatlas/reference/clear_wdi_cache.md).
+
+## Options
+
+Three options change the package's behaviour. All are unset by default.
+
+- `countryatlas.cache_dir`:
+
+  Where the persistent World Bank cache lives. Defaults to
+  `tools::R_user_dir("countryatlas", "cache")`; set it to `""` for
+  session-only caching. See
+  [`clear_wdi_cache()`](https://pursuitofdatascience.github.io/countryatlas/reference/clear_wdi_cache.md).
+
+- `countryatlas.workers`:
+
+  How many processes fetch indicators in parallel (only when the cache
+  is on disk – a memory-only memo cannot survive a fork). Defaults to
+  one fewer than the available cores, and to 2 under `R CMD check`, per
+  CRAN policy. Must be a single finite number; values below one are
+  clamped to one.
+
+- `countryatlas.gdp_compat`:
+
+  Set to `TRUE` to restore the `gdp_per_capita_2015` column that
+  [`world_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_data.md)
+  emitted in 1.0.0. It is a one-cycle deprecation shim and off by
+  default.
 
 ## See also
 
@@ -112,7 +143,3 @@ Useful links:
 ## Author
 
 **Maintainer**: Youzhi Yu <yuyouzhi666@icloud.com>
-
-Authors:
-
-- Youzhi Yu <yuyouzhi666@icloud.com>

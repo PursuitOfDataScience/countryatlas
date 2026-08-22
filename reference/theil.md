@@ -21,12 +21,18 @@ theil(x, weights = NULL, groups = NULL, na.rm = TRUE)
 
 - weights:
 
-  Optional non-negative weights (e.g. population).
+  Optional non-negative weights (e.g. population), either the same
+  length as `x` or length 1.
 
 - groups:
 
-  Optional grouping vector (e.g. continent). When supplied, the
-  decomposition is returned instead of the scalar.
+  Optional grouping vector (e.g. continent), the same length as `x` (or
+  length 1). When supplied, the decomposition is returned instead of the
+  scalar. A row whose group is missing is dropped along with the rows
+  whose value is missing, so the decomposition's `total` is computed
+  over the grouped subset and can differ from the ungrouped `theil(x)`.
+  For `world_snapshot`, Puerto Rico has no `region`, which is the whole
+  of the difference there.
 
 - na.rm:
 
@@ -39,6 +45,17 @@ With `groups`: a tibble with components `"total"`, `"between"` and
 `"within"` (`total = between + within`) and each component's `share` of
 the total (`NA` when the total is `0`, i.e. perfect equality, and the
 shares are undefined).
+
+When there is nothing to compute – no values left after `na.rm`, a zero
+total weight, or an infinity in `x` or `weights` – the result is a
+single `NA` whatever `groups` says, so reach for the components only
+after checking
+[`is.data.frame()`](https://rdrr.io/r/base/as.data.frame.html).
+
+## See also
+
+[`gini()`](https://pursuitofdatascience.github.io/countryatlas/reference/gini.md)
+for the more familiar single-number summary, which does not decompose.
 
 ## Examples
 

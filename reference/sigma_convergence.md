@@ -33,6 +33,11 @@ sigma_convergence(data, value, measure = c("sd_log", "cv"))
 A tibble with one row per year: `year`, `n` (countries with positive
 values) and `sigma`.
 
+## See also
+
+[`beta_convergence()`](https://pursuitofdatascience.github.io/countryatlas/reference/beta_convergence.md)
+for the growth-regression counterpart.
+
 ## Examples
 
 ``` r

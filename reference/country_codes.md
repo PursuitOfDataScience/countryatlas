@@ -30,7 +30,7 @@ country_codes()
 #> # A tibble: 249 × 10
 #>    country      iso3c iso2c iso3n continent region region23 currency tld   flag 
 #>    <chr>        <chr> <chr> <dbl> <chr>     <chr>  <chr>    <chr>    <chr> <chr>
-#>  1 Afghanistan  AFG   AF        4 Asia      South… Souther… AFN      .af   🇦🇫   
+#>  1 Afghanistan  AFG   AF        4 Asia      Middl… Souther… AFN      .af   🇦🇫   
 #>  2 Albania      ALB   AL        8 Europe    Europ… Souther… ALL      .al   🇦🇱   
 #>  3 Algeria      DZA   DZ       12 Africa    Middl… Norther… DZD      .dz   🇩🇿   
 #>  4 American Sa… ASM   AS       16 Oceania   East … Polynes… USD      .as   🇦🇸   

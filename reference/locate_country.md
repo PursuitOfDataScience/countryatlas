@@ -23,8 +23,8 @@ locate_country(
 
 - lon, lat:
 
-  Numeric vectors of longitude / latitude (recycled together; ignored if
-  `points` is supplied).
+  Equal-length numeric vectors of longitude / latitude, giving one point
+  per element (ignored if `points` is supplied).
 
 - points:
 
@@ -32,7 +32,9 @@ locate_country(
 
 - scale:
 
-  Natural Earth resolution for the lookup geometry.
+  Natural Earth resolution for the lookup geometry. `"large"` needs the
+  non-CRAN `rnaturalearthhires` package; see
+  [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md).
 
 - add:
 
@@ -57,7 +59,15 @@ for points that fall in no country, e.g. open ocean).
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
-locate_country(lon = c(2.35, -74.0), lat = c(48.85, 40.7))  # Paris, NYC
-} # }
+# \donttest{
+if (requireNamespace("sf", quietly = TRUE) &&
+    requireNamespace("rnaturalearth", quietly = TRUE)) {
+  locate_country(lon = c(2.35, -74.0), lat = c(48.85, 40.7))  # Paris, NYC
+}
+#> # A tibble: 2 × 2
+#>   iso3c country      
+#>   <chr> <chr>        
+#> 1 FRA   France       
+#> 2 USA   United States
+# }
 ```

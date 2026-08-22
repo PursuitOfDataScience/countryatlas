@@ -19,7 +19,9 @@ interactive_map(
 
 - data:
 
-  A map-ready frame.
+  A map-ready frame (polygon or sf). The `"leaflet"` engine will attach
+  geometry itself if given a country-level table; the others require it
+  already attached.
 
 - fill:
 
@@ -32,9 +34,11 @@ interactive_map(
 - engine:
 
   `"plotly"` (default), `"ggiraph"`, `"leaflet"` or `"ggsql"`
-  (database-side rendering to a Vega-Lite widget; needs an `sf` frame).
-  `tooltip` is honoured by the `"ggiraph"` and `"leaflet"` engines
-  (defaults to `fill` when omitted); `"plotly"`'s hover is controlled by
+  (database-side rendering to a Vega-Lite widget; needs an `sf` frame
+  and `ggsql` \>= 0.4.1, the version that added the `DRAW spatial`
+  clause). `tooltip` is honoured by the `"ggiraph"` and `"leaflet"`
+  engines (defaults to `fill` when omitted); `"plotly"`'s hover is
+  controlled by
   [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
   aesthetics instead, and `"ggsql"` has no hover concept.
 

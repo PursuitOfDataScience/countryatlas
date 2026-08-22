@@ -100,9 +100,14 @@ Pair it with a `projection` suited to the subset
 (e.g. `"azimuthal_equal_area"` for a single continent, the polar
 projections for the Arctic) so the crop stays area-honest.
 
-A box is the one form that clips the polygons themselves, which is what
+A box is the one form that clips the shapes themselves, which is what
 you want for a region that is neither a continent nor a group — the
-Mediterranean basin, say:
+Mediterranean basin, say. Use the `sf` backend for it: that clip is a
+real
+[`sf::st_crop()`](https://r-spatial.github.io/sf/reference/st_crop.html),
+whereas the polygon backend can only drop the vertices outside the box
+and warns that a country crossing the edge comes back with an
+approximate outline.
 
 ``` r
 
@@ -119,10 +124,12 @@ ggplot(med) +
 
 High-resolution geometry can be thinned for fast plotting with
 [`simplify_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/simplify_geometry.md)
-(which uses `rmapshaper` when available).
+(which uses `rmapshaper` when available). `scale = "medium"` is the 50m
+Natural Earth data; `"large"` is 10m and additionally needs the
+`rnaturalearthhires` package, which is not on CRAN.
 
 ``` r
 
-world_geometry(geometry = "sf", scale = "large") |>
+world_geometry(geometry = "sf", scale = "medium") |>
   simplify_geometry(keep = 0.1)
 ```
