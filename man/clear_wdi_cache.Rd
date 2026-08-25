@@ -20,9 +20,12 @@ Forget memoised World Bank fetches, both in-session and (optionally) on disk.
 The persistent cache goes in the standard per-user cache location,
 \code{tools::R_user_dir("countryatlas", "cache")}. Point it elsewhere with
 \code{options(countryatlas.cache_dir = )}, or skip the disk entirely by passing
-\code{cache = FALSE} to \code{\link[=world_data]{world_data()}} / \code{\link[=country_data]{country_data()}}. Nothing is written
-until a World Bank fetch actually succeeds, so a purely offline session
-(examples, tests, the bundled \link{world_snapshot}) never creates it.
+\code{cache = FALSE} to \code{\link[=world_data]{world_data()}} / \code{\link[=country_data]{country_data()}}. The directory itself is
+created the first time a cached fetch is attempted, whether or not the World
+Bank answers; only a successful fetch leaves a response in it, and reading the
+bundled \link{world_snapshot} never goes near it. Under \code{R CMD check} the whole
+cache moves to the session temp directory, so a check never writes to the
+user's file space.
 }
 
 \examples{

@@ -1,7 +1,7 @@
 Package: countryatlas
 Type: Package
 Title: Join World Bank Data, Country Codes and Maps on the ISO Spine
-Version: 2.0.0
+Version: 2.0.1
 Authors@R:
     person(given = "Youzhi",
            family = "Yu",
@@ -68,7 +68,8 @@ Suggests:
     scales,
     sf,
     stringdist,
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    withr
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 Roxygen: list(markdown = TRUE)

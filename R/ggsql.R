@@ -98,6 +98,24 @@ ggsql_parquet_path <- function(name, path = NULL) {
   path %||% file.path(tempdir(), paste0(name, ".parquet"))
 }
 
+# A throwaway in-memory DuckDB for handing one table to ggsql.
+#
+# duckdb keeps downloaded extensions and secrets in ~/.duckdb by default and
+# announces it on every connection. Seeding a directory in the user's home just
+# to hold a temporary table is exactly what CRAN policy asks packages not to do,
+# and `R CMD check` reports a new ~/.duckdb under "new files in some other
+# directories" (~ is snapshotted, so a directory directly inside it shows up).
+# shared_home = FALSE puts that state in a temp directory instead. The argument
+# arrived in duckdb 1.4 and DESCRIPTION pins no version, so only pass it when
+# the installed duckdb actually has it.
+wdj_duckdb <- function() {
+  if ("shared_home" %in% names(formals(duckdb::duckdb))) {
+    duckdb::duckdb(shared_home = FALSE)
+  } else {
+    duckdb::duckdb()
+  }
+}
+
 #' Export a countryatlas table as a ggsql source
 #'
 #' Hand countryatlas's curated, ISO-reconciled, WDI-joined spatial table to
@@ -144,7 +162,7 @@ as_ggsql_source <- function(data, name = "countryatlas_world",
 
   need_pkg(c("DBI", "duckdb"), sprintf("for as_ggsql_source(format = \"%s\")", format))
   own_con <- is.null(con)
-  con <- con %||% DBI::dbConnect(duckdb::duckdb())
+  con <- con %||% DBI::dbConnect(wdj_duckdb())
   DBI::dbWriteTable(con, name, as.data.frame(df), overwrite = TRUE)
 
   if (format == "parquet") {

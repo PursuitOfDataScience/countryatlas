@@ -123,9 +123,12 @@ get_fetch_fun <- function(cache = TRUE) {
 #' The persistent cache goes in the standard per-user cache location,
 #' `tools::R_user_dir("countryatlas", "cache")`. Point it elsewhere with
 #' `options(countryatlas.cache_dir = )`, or skip the disk entirely by passing
-#' `cache = FALSE` to [world_data()] / [country_data()]. Nothing is written
-#' until a World Bank fetch actually succeeds, so a purely offline session
-#' (examples, tests, the bundled [world_snapshot]) never creates it.
+#' `cache = FALSE` to [world_data()] / [country_data()]. The directory itself is
+#' created the first time a cached fetch is attempted, whether or not the World
+#' Bank answers; only a successful fetch leaves a response in it, and reading the
+#' bundled [world_snapshot] never goes near it. Under `R CMD check` the whole
+#' cache moves to the session temp directory, so a check never writes to the
+#' user's file space.
 #'
 #' @param disk Whether to also delete the persistent on-disk cache.
 #' @return Invisibly `TRUE`.

@@ -1,3 +1,37 @@
+## Why this submission
+
+2.0.1 fixes the test failure reported for 2.0.0 on
+`r-devel-linux-x86_64-fedora-clang` and `r-devel-linux-x86_64-fedora-gcc`
+(CRAN mail of 2026-08-25, correct-by date 2026-09-15). One test, 2456 passing
+around it:
+
+    Failure ('test-standardize.R:71:5'): de-accenting only helps inside a UTF-8 locale
+    Expected `is.na(de) || is.na(suppressWarnings(convert_country(de, to = "iso3c")))` to be TRUE.
+
+The test, not the package, was wrong. It asserted that outside a UTF-8 locale
+`iconv(x, to = "ASCII//TRANSLIT")` cannot produce a resolvable spelling,
+generalising from `LC_CTYPE=C` -- the case `?country_overrides` documents. The
+input is written `"Cura\u00e7ao"`, and that escape makes the string UTF-8
+*marked* in every locale, so `iconv` reads it as UTF-8 and only the target
+charmap matters. Latin-1 has glibc transliteration data and still yields
+`"Curacao"` (which resolves to `CUW`); only `C`/POSIX, which has none, degrades
+to `NA` or `"Cura?ao"`. So the assertion held under `C` and failed under the
+latin1 locale the Fedora flavours use, and the Debian/Windows pretests -- both
+UTF-8 -- took the other branch and never saw it.
+
+The test now asserts the invariant that holds in every locale: de-accenting may
+or may not resolve, but it never resolves to a *different* country. Reproduced
+and verified locally by running `R CMD check --as-cran --run-donttest` under
+`LC_ALL=en_US.iso88591` (`session charset: ISO8859-1`), and the test file
+separately under `C`, `en_US.iso88591`, `en_US.iso885915` and `en_US.UTF-8` --
+failing before the change in latin1, passing in all four after.
+
+Also in this release, unrelated to the failure but visible in the same CRAN
+logs: `as_ggsql_source(format = "duckdb")` now opens its connection with
+`duckdb(shared_home = FALSE)` where the installed duckdb supports it, so a
+throwaway in-memory table no longer causes duckdb to keep extensions and secrets
+in `~/.duckdb`.
+
 ## R CMD check results
 
 0 errors | 0 warnings | 1 note
@@ -11,7 +45,48 @@ cannot be installed there (`duckdb`, `ggsql`, `gifski`, `magick`), no `qpdf`
 or `tidy` binary, and "unable to verify current time". None of those arise on
 CRAN's own check machines or on the GitHub Actions runners listed below.
 
-* This is an update (1.0.0 -> 2.0.0). 2.0.0 is a planned major release: it adds
+## The `donttest` additional issue reported for 1.0.0 (resolved in 2.0.0)
+
+*Retained for the record.* The 2.0.0 auto-check returned OK on
+`r-devel-linux-x86_64-debian-special-donttest`, confirming this is fixed.
+
+The auto-check flagged 1.0.0's `donttest` result: "checking for new files in
+some other directories" found `~/.cache/R/countryatlas` and two entries in it.
+1.0.0 cached World Bank responses in `tools::R_user_dir("countryatlas",
+"cache")` unconditionally, and its `\donttest{}` examples fetch, so running
+them wrote into the checking account's home.
+
+2.0.0 fixes it. `wdj_cache_dir()` returns a path under `tempdir()` whenever
+`_R_CHECK_PACKAGE_NAME_` is set, which `R CMD check` sets for the whole run and
+its example, test and vignette subprocesses; real use still gets
+`tools::R_user_dir()`. A test pins both branches.
+
+Verified by reproducing the reported check rather than by inspection: `R CMD
+check --as-cran --run-donttest` with `_R_CHECK_THINGS_IN_OTHER_DIRS_=true`, an
+empty `HOME` and `XDG_CACHE_HOME`/`XDG_DATA_HOME`/`XDG_CONFIG_HOME` pointed
+inside it, with the World Bank reachable so the examples really did fetch (the
+`world_data` example took 6.3s). No `countryatlas` path appears anywhere in the
+snapshot.
+
+That run did surface a write from a suggested package rather than from
+countryatlas: `interactive_map(engine = "ggiraph")` renders a `girafe()` widget,
+and `gdtools` then installs 90 Liberation font files into
+`tools::R_user_dir("gdtools", "data")`. 2.0.0 is the first version whose tests
+render such a widget. `tests/testthat/setup-user-dirs.R` now redirects the R
+user directories to the session temp directory for the duration of the test run,
+so the tests still exercise the `ggiraph` engine without writing outside
+`tempdir()`; re-running the same check confirms those 90 files are gone.
+
+The only path that remains in that sandbox is `~/.cache/fontconfig` (5 entries),
+and it is not ours to move: the system fontconfig library builds it the first
+time R's cairo PNG device renders anything, which during a check happens in the
+process that re-builds the vignettes. Any package whose vignettes draw a plot
+creates it, and it shows up here only because the sandbox starts from an empty
+`HOME` -- on a machine that has ever rendered a PNG the paths already exist and
+are not new. It is reported for completeness, not as an outstanding issue.
+
+* This is a patch update (2.0.0 -> 2.0.1); see "Why this submission" above.
+  For context, 2.0.0 was a planned major release: it added
   an optional bridge to `ggsql`'s `DRAW spatial` API and fixes several
   correctness bugs found by auditing 1.0.0 (quantile break computation,
   centroid de-duplication, label placement, the `plate_carree` CRS,
@@ -47,6 +122,12 @@ CRAN's own check machines or on the GitHub Actions runners listed below.
     strings described below. Checked statically as well: nothing in the package
     uses a base function newer than 4.1, and `%||%`, which only entered base R
     in 4.4, is imported from `rlang`.
+  * four locales, run because this package's behaviour is locale-sensitive and
+    2.0.0 shipped without this axis being covered: `en_US.UTF-8`,
+    `en_US.iso88591` (`session charset: ISO8859-1`, matching CRAN's Fedora
+    flavours), `en_US.iso885915` and `C`. The `test-standardize.R` failure was
+    only reachable outside a UTF-8 locale, so no number of UTF-8 runs could
+    have found it.
   * `_R_CHECK_DEPENDS_ONLY_=true` (the `noSuggests` configuration, every
     optional package absent) -- OK
   * every URL in `DESCRIPTION`, the README, the vignettes and the help pages

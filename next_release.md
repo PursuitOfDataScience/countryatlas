@@ -6,8 +6,12 @@ features/functions, (C) **fix bugs found in 1.0.0** (the important part), and
 
 ## Status (branch `v2.0.0-dev`, now merged to `main`)
 
-The `v2.0.0-dev` branch has been **merged into `main`** (fast-forward); 1.0.0 is
-the version currently on CRAN, and 2.0.0 is the release being prepared next.
+The `v2.0.0-dev` branch has been **merged into `main`** (fast-forward).
+**2.0.0 was accepted and published on CRAN on 2026-08-25.** It then failed one
+test on the two r-devel Fedora flavours (latin1 locale, `test-standardize.R`),
+so 2.0.1 is the patch release fixing that -- see `NEWS.md` and
+`cran-comments.md`. Everything below is the 2.0.0 planning record, kept for the
+design notes; it is not a description of unreleased work.
 
 **Implemented in 2.0.0** (see `NEWS.md`): ggsql bridge (`as_ggsql_source()`,
 `world_query()`, `interactive_map(engine = "ggsql")`); all eight bug fixes in §3;

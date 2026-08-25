@@ -52,7 +52,7 @@ test_that("ASCII spellings resolve regardless of locale", {
   expect_false(any(grepl("[^ -~]", names(country_overrides()))))
 })
 
-test_that("de-accenting only helps inside a UTF-8 locale", {
+test_that("de-accenting resolves in UTF-8 and never resolves wrongly elsewhere", {
   # The behaviour the corrected documentation describes. Asserted against the
   # session's own locale rather than against the Rd text: reading Rd from a test
   # needs the source tree, which is not there under R CMD check.
@@ -66,10 +66,17 @@ test_that("de-accenting only helps inside a UTF-8 locale", {
     expect_equal(suppressWarnings(convert_country(de, to = "iso3c")), "CUW")
     expect_equal(suppressWarnings(convert_country(accented, to = "iso3c")), "CUW")
   } else {
-    # Outside UTF-8, //TRANSLIT cannot produce a resolvable spelling -- which is
-    # why the documentation no longer offers it as an alternative.
-    expect_true(is.na(de) || is.na(
-      suppressWarnings(convert_country(de, to = "iso3c"))))
+    # Outside UTF-8 the outcome belongs to the platform's iconv, not to us. The
+    # \u escape makes `accented` UTF-8 *marked* in every locale, so iconv reads
+    # it as UTF-8 and only the target charmap varies: glibc has transliteration
+    # data for latin1 and still yields "Curacao", while C/POSIX has none and
+    # gives NA or "Cura?ao". This assertion used to demand the C outcome from
+    # every non-UTF-8 locale, so it failed on CRAN's latin1 Fedora flavours
+    # while passing under LC_CTYPE=C. ?country_overrides documents the C case;
+    # the invariant that holds everywhere is weaker -- de-accenting may or may
+    # not resolve, but it never resolves to a *different* country.
+    res <- suppressWarnings(convert_country(de, to = "iso3c"))
+    expect_true(is.na(res) || identical(res, "CUW"))
   }
   # Either way, the ASCII spelling in the override table resolves.
   expect_equal(suppressWarnings(convert_country("Curacao", to = "iso3c")), "CUW")
