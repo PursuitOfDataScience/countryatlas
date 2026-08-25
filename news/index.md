@@ -1,6 +1,56 @@
 # Changelog
 
+## countryatlas 2.0.1
+
+A patch release. The only behaviour change is to a test and to where an
+optional DuckDB connection keeps its state; nothing in the package’s own
+API moves.
+
+### CRAN check failures
+
+- `test-standardize.R`’s de-accenting test failed on CRAN’s two r-devel
+  Fedora flavours, which run in a latin1 locale. The test asserted that
+  outside a UTF-8 locale `iconv(x, to = "ASCII//TRANSLIT")` cannot
+  produce a resolvable spelling – generalising from `LC_CTYPE=C`, which
+  is the case
+  [`?country_overrides`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)
+  actually documents. That is not what glibc does: the `\u00e7` escape
+  makes the input UTF-8 *marked* in every locale, so `iconv` reads it as
+  UTF-8 and only the target charmap matters. Latin-1 has transliteration
+  data and still yields `"Curacao"`; only `C`/POSIX, which has none,
+  degrades to `NA` or `"Cura?ao"`. The test now asserts the invariant
+  that holds in every locale – de-accenting may or may not resolve, but
+  it never resolves to a *different* country – and passes under `C`,
+  latin1, latin9 and UTF-8.
+
+### Housekeeping
+
+- `as_ggsql_source(format = "duckdb")` now opens its connection with
+  `duckdb(shared_home = FALSE)` where the installed duckdb supports it
+  (1.4 and later). By default duckdb keeps downloaded extensions and
+  secrets in `~/.duckdb`, which a throwaway in-memory table has no
+  business creating in the user’s home; `R CMD check` also reports a new
+  `~/.duckdb` among “new files in some other directories”.
+- The test suite no longer writes into the checking account’s file
+  space. Rendering one `girafe()` widget – which
+  `interactive_map(engine = "ggiraph")` does, and which no 1.0.0 test
+  did – makes `gdtools` copy 90 Liberation font files into
+  `tools::R_user_dir("gdtools", "data")`. `R CMD check` snapshots that
+  tree and reports anything new, which is the NOTE CRAN raised against
+  1.0.0 for our own WDI cache (fixed separately, in `wdj_cache_dir()`).
+  A new `tests/testthat/setup-user-dirs.R` points the R user directories
+  at the session temp directory before any test runs, so the widget
+  still renders, just somewhere disposable.
+- [`?clear_wdi_cache`](https://pursuitofdatascience.github.io/countryatlas/reference/clear_wdi_cache.md)
+  claimed nothing was written until a World Bank fetch succeeded, so an
+  offline session “never creates” the cache directory. The directory is
+  in fact created the first time a *cached* fetch is attempted, because
+  that is when the location has to be proved writable – a failed fetch
+  leaves it behind empty. The help page now describes what happens.
+
 ## countryatlas 2.0.0
+
+CRAN release: 2026-08-25
 
 A major release that wires countryatlas into the database-rendering
 world via ‘ggsql’, widens the map vocabulary, and fixes several

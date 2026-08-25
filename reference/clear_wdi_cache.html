@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">countryatlas</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">2.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">2.0.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -70,9 +70,12 @@
 <p>The persistent cache goes in the standard per-user cache location,
 <code>tools::R_user_dir("countryatlas", "cache")</code>. Point it elsewhere with
 <code>options(countryatlas.cache_dir = )</code>, or skip the disk entirely by passing
-<code>cache = FALSE</code> to <code><a href="world_data.html">world_data()</a></code> / <code><a href="country_data.html">country_data()</a></code>. Nothing is written
-until a World Bank fetch actually succeeds, so a purely offline session
-(examples, tests, the bundled <a href="world_snapshot.html">world_snapshot</a>) never creates it.</p>
+<code>cache = FALSE</code> to <code><a href="world_data.html">world_data()</a></code> / <code><a href="country_data.html">country_data()</a></code>. The directory itself is
+created the first time a cached fetch is attempted, whether or not the World
+Bank answers; only a successful fetch leaves a response in it, and reading the
+bundled <a href="world_snapshot.html">world_snapshot</a> never goes near it. Under <code>R CMD check</code> the whole
+cache moves to the session temp directory, so a check never writes to the
+user's file space.</p>
     </div>
 
     <div class="section level2">

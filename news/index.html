@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">countryatlas</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">2.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">2.0.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -42,7 +42,24 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="2.0.0" id="countryatlas-200">countryatlas 2.0.0<a class="anchor" aria-label="anchor" href="#countryatlas-200"></a></h2>
+<h2 class="pkg-version" data-toc-text="2.0.1" id="countryatlas-201">countryatlas 2.0.1<a class="anchor" aria-label="anchor" href="#countryatlas-201"></a></h2>
+<p>A patch release. The only behaviour change is to a test and to where an optional DuckDB connection keeps its state; nothing in the package’s own API moves.</p>
+<div class="section level3">
+<h3 id="cran-check-failures-2-0-1">CRAN check failures<a class="anchor" aria-label="anchor" href="#cran-check-failures-2-0-1"></a></h3>
+<ul><li>
+<code>test-standardize.R</code>’s de-accenting test failed on CRAN’s two r-devel Fedora flavours, which run in a latin1 locale. The test asserted that outside a UTF-8 locale <code>iconv(x, to = "ASCII//TRANSLIT")</code> cannot produce a resolvable spelling – generalising from <code>LC_CTYPE=C</code>, which is the case <code><a href="../reference/wdj_overrides.html">?country_overrides</a></code> actually documents. That is not what glibc does: the <code>\u00e7</code> escape makes the input UTF-8 <em>marked</em> in every locale, so <code>iconv</code> reads it as UTF-8 and only the target charmap matters. Latin-1 has transliteration data and still yields <code>"Curacao"</code>; only <code>C</code>/POSIX, which has none, degrades to <code>NA</code> or <code>"Cura?ao"</code>. The test now asserts the invariant that holds in every locale – de-accenting may or may not resolve, but it never resolves to a <em>different</em> country – and passes under <code>C</code>, latin1, latin9 and UTF-8.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="housekeeping-2-0-1">Housekeeping<a class="anchor" aria-label="anchor" href="#housekeeping-2-0-1"></a></h3>
+<ul><li>
+<code>as_ggsql_source(format = "duckdb")</code> now opens its connection with <code>duckdb(shared_home = FALSE)</code> where the installed duckdb supports it (1.4 and later). By default duckdb keeps downloaded extensions and secrets in <code>~/.duckdb</code>, which a throwaway in-memory table has no business creating in the user’s home; <code>R CMD check</code> also reports a new <code>~/.duckdb</code> among “new files in some other directories”.</li>
+<li>The test suite no longer writes into the checking account’s file space. Rendering one <code>girafe()</code> widget – which <code>interactive_map(engine = "ggiraph")</code> does, and which no 1.0.0 test did – makes <code>gdtools</code> copy 90 Liberation font files into <code>tools::R_user_dir("gdtools", "data")</code>. <code>R CMD check</code> snapshots that tree and reports anything new, which is the NOTE CRAN raised against 1.0.0 for our own WDI cache (fixed separately, in <code>wdj_cache_dir()</code>). A new <code>tests/testthat/setup-user-dirs.R</code> points the R user directories at the session temp directory before any test runs, so the widget still renders, just somewhere disposable.</li>
+<li>
+<code><a href="../reference/clear_wdi_cache.html">?clear_wdi_cache</a></code> claimed nothing was written until a World Bank fetch succeeded, so an offline session “never creates” the cache directory. The directory is in fact created the first time a <em>cached</em> fetch is attempted, because that is when the location has to be proved writable – a failed fetch leaves it behind empty. The help page now describes what happens.</li>
+</ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="2.0.0" id="countryatlas-200">countryatlas 2.0.0<a class="anchor" aria-label="anchor" href="#countryatlas-200"></a></h2><p class="text-muted">CRAN release: 2026-08-25</p>
 <p>A major release that wires countryatlas into the database-rendering world via ‘ggsql’, widens the map vocabulary, and fixes several correctness issues found by auditing 1.0.0. The version is bumped to 2.0.0 because the bug fixes change the output of <code><a href="../reference/world_map.html">world_map()</a></code> (quantile binning), <code><a href="../reference/bubble_map.html">bubble_map()</a></code> / <code><a href="../reference/flow_map.html">flow_map()</a></code> (de-duplicated symbols), <code><a href="../reference/geom_country_labels.html">geom_country_labels()</a></code> (label placement) and <code><a href="../reference/convert_country.html">convert_country()</a></code> (override-only entities) — code that depended on the old behaviour may see different maps or values.</p>
 <div class="section level3">
 <h3 id="new-database-side-rendering-with-ggsql-2-0-0">New: database-side rendering with ggsql<a class="anchor" aria-label="anchor" href="#new-database-side-rendering-with-ggsql-2-0-0"></a></h3>

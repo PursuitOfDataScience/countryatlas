@@ -28,10 +28,13 @@ passing `cache = FALSE` to
 [`world_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_data.md)
 /
 [`country_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_data.md).
-Nothing is written until a World Bank fetch actually succeeds, so a
-purely offline session (examples, tests, the bundled
-[world_snapshot](https://pursuitofdatascience.github.io/countryatlas/reference/world_snapshot.md))
-never creates it.
+The directory itself is created the first time a cached fetch is
+attempted, whether or not the World Bank answers; only a successful
+fetch leaves a response in it, and reading the bundled
+[world_snapshot](https://pursuitofdatascience.github.io/countryatlas/reference/world_snapshot.md)
+never goes near it. Under `R CMD check` the whole cache moves to the
+session temp directory, so a check never writes to the user's file
+space.
 
 ## Examples
 
