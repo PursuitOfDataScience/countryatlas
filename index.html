@@ -73,240 +73,62 @@
 </div>
 <!-- badges: start -->
 
-<p>Country names never line up across data sources. <code>"US"</code>, <code>"U.S."</code>, <code>"United States"</code>, <code>"United States of America"</code> and <code>"America"</code> are the same country, but a naïve <code><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">left_join()</a></code> treats them as five. <strong>countryatlas</strong> kills that pain by making <strong>ISO codes the universal join key</strong> and handing you a single, ready-to-map tibble that already stitches together three otherwise disjoint worlds:</p>
-<ul>
-<li>
-<strong><code>ggplot2::map_data("world")</code></strong> (or Natural Earth <code>sf</code>) — <em>where</em> countries are,</li>
-<li>
-<strong><a href="https://github.com/vincentarelbundock/WDI" class="external-link">WDI</a></strong> — <em>what</em> is true about them (World Bank indicators),</li>
-<li>
-<strong><a href="https://github.com/vincentarelbundock/countrycode" class="external-link">countrycode</a></strong> — the Rosetta stone (ISO codes, continents, regions) that makes the join possible.</li>
-</ul>
-<p>The happy path is one call: <code>world_data(2020)</code>. Everything else is opt-in.</p>
+<blockquote>
+<p><strong>Country data onto honest maps — joined on ISO codes, never on country names.</strong></p>
+</blockquote>
+<p>Join the World Bank’s life-expectancy table to <code>map_data("world")</code> by country name and <strong>42 of 215 countries silently vanish</strong>: nobody spells Czechia, Côte d’Ivoire or <code>"Congo, Dem. Rep."</code> the same way twice. <code>countryatlas</code> makes the ISO code the join key, so nothing goes missing — then draws the map.</p>
+<p><img src="reference/figures/README-hook-1.png" alt="Two world choropleths of life expectancy side by side. Joining on country name leaves dozens of countries grey and unfilled; joining with join_world() fills every one of them." width="100%"></p>
 <div class="section level2">
-<h2 id="new-in-200">New in 2.0.0<a class="anchor" aria-label="anchor" href="#new-in-200"></a>
-</h2>
-<ul>
-<li>
-<strong>Render maps in the database</strong> with <a href="https://ggsql.org" class="external-link">ggsql</a>: <code><a href="reference/as_ggsql_source.html">as_ggsql_source()</a></code>, <code><a href="reference/world_query.html">world_query()</a></code>, <code>interactive_map(engine = "ggsql")</code>.</li>
-<li>
-<strong>More map types</strong>: an orthographic globe (<code><a href="reference/globe_map.html">globe_map()</a></code>), small multiples (<code><a href="reference/facet_map.html">facet_map()</a></code>), and 8 more projections (Winkel tripel, orthographic, Gall–Peters, …).</li>
-<li>
-<strong>Point data onto the spine</strong>: <code><a href="reference/locate_country.html">locate_country()</a></code> (point-in-polygon).</li>
-<li>
-<strong>Cleaner joins</strong>: <code><a href="reference/repair_country_names.html">repair_country_names()</a></code> auto-fixes typos; <code><a href="reference/country_join_all.html">country_join_all()</a></code> reduce-joins many tables at once.</li>
-<li>
-<strong>More analysis</strong>: <code><a href="reference/growth_rate.html">growth_rate()</a></code>, <code><a href="reference/index_to.html">index_to()</a></code>, <code><a href="reference/share_of_world.html">share_of_world()</a></code>.</li>
-<li>
-<strong>More country groups</strong>: Mercosur, GCC, Nordic, Visegrád.</li>
-<li>
-<strong>Spatial structure</strong>: <code><a href="reference/country_borders.html">country_borders()</a></code> / <code><a href="reference/neighbors.html">neighbors()</a></code> (who borders whom), <code><a href="reference/distance_between.html">distance_between()</a></code> (great-circle distance, no <code>sf</code> needed) and <code><a href="reference/morans_i.html">morans_i()</a></code> (spatial autocorrelation on the package’s own adjacency — no <code>spdep</code>).</li>
-<li>
-<strong>Historical entities</strong>: <code><a href="reference/dissolve_country.html">dissolve_country()</a></code> + the <code>historical_codes</code> crosswalk resolve the USSR / Yugoslavia / Czechoslovakia to successor states; <code><a href="reference/check_country_match.html">check_country_match()</a></code> now flags them (countrycode silently maps <code>"USSR"</code> to Russia — caught).</li>
-<li>
-<strong>Inequality &amp; convergence</strong>: <code><a href="reference/gini.html">gini()</a></code>, <code><a href="reference/theil.html">theil()</a></code> (population-weighted, between/within decomposition), <code><a href="reference/beta_convergence.html">beta_convergence()</a></code>, <code><a href="reference/sigma_convergence.html">sigma_convergence()</a></code>, <code><a href="reference/correlate_indicators.html">correlate_indicators()</a></code>, <code><a href="reference/lag_by_country.html">lag_by_country()</a></code> / <code><a href="reference/lag_by_country.html">diff_by_country()</a></code>.</li>
-<li>
-<strong><code><a href="reference/dorling_map.html">dorling_map()</a></code></strong> and <strong><code><a href="reference/spike_map.html">spike_map()</a></code></strong>: two more honest displays for totals.</li>
-<li>
-<strong>Localized names</strong>: <code>convert_country(to = "name_fr" / "name_es" / …)</code>.</li>
-<li>
-<strong>Correctness fixes</strong> that change map output (quantile binning, centroids, label placement, projections, override-only lookups) — full <a href="NEWS.html">changelog</a>.</li>
-</ul>
-</div>
-<div class="section level2">
-<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
+<h2 id="install">Install<a class="anchor" aria-label="anchor" href="#install"></a>
 </h2>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># install.packages("devtools")</span></span>
-<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"PursuitOfDataScience/countryatlas"</span><span class="op">)</span></span></code></pre></div>
-<p>The base install is light. Heavy spatial extras (<code>sf</code>, <code>rnaturalearth</code>, <code>cartogram</code>, <code>biscale</code>, <code>gganimate</code>, <code>leaflet</code>, …) live in <code>Suggests</code> and are only needed for the features that use them.</p>
-<div class="section level3">
-<h3 id="optional-features-at-a-glance">Optional features at a glance<a class="anchor" aria-label="anchor" href="#optional-features-at-a-glance"></a>
-</h3>
-<table class="table">
-<colgroup>
-<col width="50%">
-<col width="50%">
-</colgroup>
-<thead><tr>
-<th>Feature / verb</th>
-<th>Optional packages required</th>
-</tr></thead>
-<tbody>
-<tr>
-<td>
-<code><a href="reference/world_map.html">world_map()</a></code> polygon backend, <code><a href="reference/spike_map.html">spike_map()</a></code>, <code><a href="reference/flow_map.html">flow_map()</a></code>, <code><a href="reference/bubble_map.html">bubble_map()</a></code>
-</td>
-<td><code>maps</code></td>
-</tr>
-<tr>
-<td>sf geometry: <code>world_map(sf)</code>, <code>world_geometry(sf)</code>, <code><a href="reference/locate_country.html">locate_country()</a></code>, <code><a href="reference/country_borders.html">country_borders()</a></code>, <code><a href="reference/neighbors.html">neighbors()</a></code>, <code><a href="reference/morans_i.html">morans_i()</a></code>
-</td>
-<td>
-<code>sf</code>, <code>rnaturalearth</code>, <code>rnaturalearthdata</code>
-</td>
-</tr>
-<tr>
-<td><code>globe_map(backend = "polygon")</code></td>
-<td>
-<code>maps</code>, <code>mapproj</code>
-</td>
-</tr>
-<tr>
-<td>
-<code><a href="reference/spin_globe.html">spin_globe()</a></code> (animated GIF)</td>
-<td>its backend’s packages, plus <code>gifski</code> or <code>magick</code>
-</td>
-</tr>
-<tr>
-<td><code><a href="reference/bivariate_map.html">bivariate_map()</a></code></td>
-<td>
-<code>biscale</code>, <code>sf</code>
-</td>
-</tr>
-<tr>
-<td>
-<code><a href="reference/cartogram_map.html">cartogram_map()</a></code>, <code><a href="reference/dorling_map.html">dorling_map()</a></code>
-</td>
-<td>
-<code>cartogram</code>, <code>sf</code>
-</td>
-</tr>
-<tr>
-<td>
-<code><a href="reference/animate_world.html">animate_world()</a></code> (animated GIF)</td>
-<td>
-<code>gganimate</code> (+ <code>gifski</code> or <code>magick</code>)</td>
-</tr>
-<tr>
-<td><code>interactive_map(engine = "plotly")</code></td>
-<td><code>plotly</code></td>
-</tr>
-<tr>
-<td><code>interactive_map(engine = "ggiraph")</code></td>
-<td><code>ggiraph</code></td>
-</tr>
-<tr>
-<td><code>interactive_map(engine = "leaflet")</code></td>
-<td>
-<code>leaflet</code>, <code>sf</code>
-</td>
-</tr>
-<tr>
-<td><code>interactive_map(engine = "ggsql")</code></td>
-<td>
-<code>ggsql</code> (&gt;= 0.4.1), <code>duckdb</code>, <code>DBI</code>, <code>sf</code>
-</td>
-</tr>
-<tr>
-<td><code><a href="reference/as_ggsql_source.html">as_ggsql_source()</a></code></td>
-<td>
-<code>duckdb</code> + <code>DBI</code>, or <code>nanoarrow</code> for <code>format = "arrow"</code>
-</td>
-</tr>
-<tr>
-<td><code><a href="reference/simplify_geometry.html">simplify_geometry()</a></code></td>
-<td>
-<code>sf</code>; <code>rmapshaper</code> for the better simplifier</td>
-</tr>
-<tr>
-<td>
-<code><a href="reference/repair_country_names.html">repair_country_names()</a></code> / <code><a href="reference/check_country_match.html">check_country_match()</a></code> with <code>stringdist</code>
-</td>
-<td><code>stringdist</code></td>
-</tr>
-</tbody>
-</table>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"countryatlas"</span><span class="op">)</span>                            <span class="co"># CRAN</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"PursuitOfDataScience/countryatlas"</span><span class="op">)</span>               <span class="co"># development</span></span></code></pre></div>
+<p>The base install is light. Every heavy spatial dependency (<code>sf</code>, <code>cartogram</code>, <code>leaflet</code>, …) is a <code>Suggests</code> you only need for the feature that uses it.</p>
+</div>
+<div class="section level2">
+<h2 id="one-call">One call<a class="anchor" aria-label="anchor" href="#one-call"></a>
+</h2>
+<p><code><a href="reference/world_data.html">world_data()</a></code> fetches the indicator, attaches the geometry and keys the whole thing on <code>iso3c</code> — three worlds (<code>ggplot2</code> maps, <a href="https://github.com/vincentarelbundock/WDI" class="external-link">WDI</a>, <a href="https://github.com/vincentarelbundock/countrycode" class="external-link">countrycode</a>) stitched together in one line.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://pursuitofdatascience.github.io/countryatlas/">countryatlas</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://dplyr.tidyverse.org" class="external-link">dplyr</a></span><span class="op">)</span></span></code></pre></div>
-</div>
-</div>
-<div class="section level2">
-<h2 id="one-call-to-a-map-ready-tibble">One call to a map-ready tibble<a class="anchor" aria-label="anchor" href="#one-call-to-a-map-ready-tibble"></a>
-</h2>
+<code class="sourceCode R"><span><span class="fu"><a href="reference/world_map.html">world_map</a></span><span class="op">(</span><span class="fu"><a href="reference/world_data.html">world_data</a></span><span class="op">(</span><span class="fl">2020</span><span class="op">)</span>, <span class="va">gdp_per_capita</span>, style <span class="op">=</span> <span class="st">"quantile"</span><span class="op">)</span></span></code></pre></div>
+<p><img src="reference/figures/README-hero-1.png" alt="World choropleth of GDP per capita in 2020, shaded in five quantile bins." width="100%"></p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">data_2020</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/world_data.html">world_data</a></span><span class="op">(</span><span class="fl">2020</span><span class="op">)</span></span>
-<span><span class="va">data_2020</span></span>
-<span><span class="co">#&gt; # A tibble: 99,338 × 12</span></span>
-<span><span class="co">#&gt;     long   lat group order subregion iso3c iso2c country continent region income</span></span>
-<span><span class="co">#&gt;    &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;int&gt; &lt;chr&gt;     &lt;chr&gt; &lt;chr&gt; &lt;chr&gt;   &lt;chr&gt;     &lt;chr&gt;  &lt;fct&gt; </span></span>
-<span><span class="co">#&gt;  1 -69.9  12.5     1     1 &lt;NA&gt;      ABW   AW    Aruba   Americas  Latin… High …</span></span>
-<span><span class="co">#&gt;  2 -69.9  12.4     1     2 &lt;NA&gt;      ABW   AW    Aruba   Americas  Latin… High …</span></span>
-<span><span class="co">#&gt;  3 -69.9  12.4     1     3 &lt;NA&gt;      ABW   AW    Aruba   Americas  Latin… High …</span></span>
-<span><span class="co">#&gt;  4 -70.0  12.5     1     4 &lt;NA&gt;      ABW   AW    Aruba   Americas  Latin… High …</span></span>
-<span><span class="co">#&gt;  5 -70.1  12.5     1     5 &lt;NA&gt;      ABW   AW    Aruba   Americas  Latin… High …</span></span>
-<span><span class="co">#&gt;  6 -70.1  12.6     1     6 &lt;NA&gt;      ABW   AW    Aruba   Americas  Latin… High …</span></span>
-<span><span class="co">#&gt;  7 -70.0  12.6     1     7 &lt;NA&gt;      ABW   AW    Aruba   Americas  Latin… High …</span></span>
-<span><span class="co">#&gt;  8 -70.0  12.6     1     8 &lt;NA&gt;      ABW   AW    Aruba   Americas  Latin… High …</span></span>
-<span><span class="co">#&gt;  9 -69.9  12.5     1     9 &lt;NA&gt;      ABW   AW    Aruba   Americas  Latin… High …</span></span>
-<span><span class="co">#&gt; 10 -69.9  12.5     1    10 &lt;NA&gt;      ABW   AW    Aruba   Americas  Latin… High …</span></span>
-<span><span class="co">#&gt; # ℹ 99,328 more rows</span></span>
-<span><span class="co">#&gt; # ℹ 1 more variable: gdp_per_capita &lt;dbl&gt;</span></span></code></pre></div>
-<p><code><a href="reference/world_data.html">world_data()</a></code> returns the map geometry, the requested World Bank indicator(s), income and continent — already keyed on <code>iso3c</code>/<code>iso2c</code>. Draw a choropleth with the built-in <code><a href="reference/world_map.html">world_map()</a></code> helper (no more hand-rolled <code><a href="https://ggplot2.tidyverse.org/reference/geom_polygon.html" class="external-link">geom_polygon()</a></code> boilerplate):</p>
+<code class="sourceCode R"><span><span class="fu"><a href="reference/world_data.html">world_data</a></span><span class="op">(</span><span class="fl">2020</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>life_exp <span class="op">=</span> <span class="st">"SP.DYN.LE00.IN"</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">glimpse</span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Rows: 99,338</span></span>
+<span><span class="co">#&gt; Columns: 12</span></span>
+<span><span class="co">#&gt; $ long      &lt;dbl&gt; -69.89912, -69.89571, -69.94219, -70.00415, -70.06612, -70.0…</span></span>
+<span><span class="co">#&gt; $ lat       &lt;dbl&gt; 12.45200, 12.42300, 12.43853, 12.50049, 12.54697, 12.59707, …</span></span>
+<span><span class="co">#&gt; $ group     &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, …</span></span>
+<span><span class="co">#&gt; $ order     &lt;int&gt; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 1…</span></span>
+<span><span class="co">#&gt; $ subregion &lt;chr&gt; NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, …</span></span>
+<span><span class="co">#&gt; $ iso3c     &lt;chr&gt; "ABW", "ABW", "ABW", "ABW", "ABW", "ABW", "ABW", "ABW", "ABW…</span></span>
+<span><span class="co">#&gt; $ iso2c     &lt;chr&gt; "AW", "AW", "AW", "AW", "AW", "AW", "AW", "AW", "AW", "AW", …</span></span>
+<span><span class="co">#&gt; $ country   &lt;chr&gt; "Aruba", "Aruba", "Aruba", "Aruba", "Aruba", "Aruba", "Aruba…</span></span>
+<span><span class="co">#&gt; $ continent &lt;chr&gt; "Americas", "Americas", "Americas", "Americas", "Americas", …</span></span>
+<span><span class="co">#&gt; $ region    &lt;chr&gt; "Latin America &amp; Caribbean", "Latin America &amp; Caribbean", "L…</span></span>
+<span><span class="co">#&gt; $ income    &lt;fct&gt; High income, High income, High income, High income, High inc…</span></span>
+<span><span class="co">#&gt; $ life_exp  &lt;dbl&gt; 75.406, 75.406, 75.406, 75.406, 75.406, 75.406, 75.406, 75.4…</span></span></code></pre></div>
+<p>Geometry, codes, classifications and the indicator, in one frame, ready for <code><a href="reference/world_map.html">world_map()</a></code>.</p>
+<p>Drop <code>geometry</code> for a plain country table (<code><a href="reference/country_data.html">country_data()</a></code>), ask for a year range to get a panel, or pass several indicators at once. <code><a href="reference/wdi_search.html">wdi_search()</a></code> finds codes offline; <code>common_indicators</code> keeps the 20 you actually use.</p>
+</div>
+<div class="section level2">
+<h2 id="your-data-on-the-map">Your data, on the map<a class="anchor" aria-label="anchor" href="#your-data-on-the-map"></a>
+</h2>
+<p>Point <code><a href="reference/join_world.html">join_world()</a></code> at whatever column holds the country and it standardises, joins and attaches geometry in one go.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="reference/world_map.html">world_map</a></span><span class="op">(</span><span class="va">data_2020</span>, <span class="va">gdp_per_capita</span>, style <span class="op">=</span> <span class="st">"quantile"</span>,</span>
-<span>          title <span class="op">=</span> <span class="st">"GDP per capita, 2020"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="reference/figures/README-readme-choropleth-1.png" width="100%"></p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="reference/world_map.html">world_map</a></span><span class="op">(</span><span class="va">data_2020</span>, <span class="va">income</span>, style <span class="op">=</span> <span class="st">"categorical"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="reference/figures/README-readme-income-1.png" width="100%"></p>
-</div>
-<div class="section level2">
-<h2 id="any-indicator-any-year-span">Any indicator, any year span<a class="anchor" aria-label="anchor" href="#any-indicator-any-year-span"></a>
-</h2>
-<p>Pass one or many WDI codes with friendly names, or a year range to get a panel:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="reference/country_data.html">country_data</a></span><span class="op">(</span><span class="fl">2020</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>life_exp <span class="op">=</span> <span class="st">"SP.DYN.LE00.IN"</span>, co2 <span class="op">=</span> <span class="st">"EN.GHG.CO2.PC.CE.AR5"</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co">#&gt; # A tibble: 6 × 8</span></span>
-<span><span class="co">#&gt;   iso3c iso2c country        continent region           income life_exp      co2</span></span>
-<span><span class="co">#&gt;   &lt;chr&gt; &lt;chr&gt; &lt;chr&gt;          &lt;chr&gt;     &lt;chr&gt;            &lt;fct&gt;     &lt;dbl&gt;    &lt;dbl&gt;</span></span>
-<span><span class="co">#&gt; 1 AFG   AF    Afghanistan    Asia      Middle East, No… Low i…     61.5  0.311  </span></span>
-<span><span class="co">#&gt; 2 ALB   AL    Albania        Europe    Europe &amp; Centra… Upper…     77.8  1.81   </span></span>
-<span><span class="co">#&gt; 3 DZA   DZ    Algeria        Africa    Middle East, No… Upper…     73.3  3.90   </span></span>
-<span><span class="co">#&gt; 4 ASM   AS    American Samoa Oceania   East Asia &amp; Pac… High …     72.7  0.00201</span></span>
-<span><span class="co">#&gt; 5 AND   AD    Andorra        Europe    Europe &amp; Centra… High …     79.4 NA      </span></span>
-<span><span class="co">#&gt; 6 AGO   AO    Angola         Africa    Sub-Saharan Afr… Lower…     63.1  0.614</span></span></code></pre></div>
-<p>Use the bundled <code>common_indicators</code> catalogue so you never memorise a code, or search the full World Bank catalogue offline with <code><a href="reference/wdi_search.html">wdi_search()</a></code>:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">common_indicators</span><span class="op">)</span></span>
-<span><span class="co">#&gt; # A tibble: 6 × 3</span></span>
-<span><span class="co">#&gt;   name                   code           description                       </span></span>
-<span><span class="co">#&gt;   &lt;chr&gt;                  &lt;chr&gt;          &lt;chr&gt;                             </span></span>
-<span><span class="co">#&gt; 1 population             SP.POP.TOTL    Population, total                 </span></span>
-<span><span class="co">#&gt; 2 gdp                    NY.GDP.MKTP.CD GDP (current US$)                 </span></span>
-<span><span class="co">#&gt; 3 gdp_constant           NY.GDP.MKTP.KD GDP (constant 2015 US$)           </span></span>
-<span><span class="co">#&gt; 4 gdp_per_capita         NY.GDP.PCAP.KD GDP per capita (constant 2015 US$)</span></span>
-<span><span class="co">#&gt; 5 gdp_per_capita_current NY.GDP.PCAP.CD GDP per capita (current US$)      </span></span>
-<span><span class="co">#&gt; 6 gni_per_capita         NY.GNP.PCAP.CD GNI per capita (current US$)</span></span>
-<span><span class="fu"><a href="reference/wdi_search.html">wdi_search</a></span><span class="op">(</span><span class="st">"renewable energy"</span><span class="op">)</span> <span class="op">|&gt;</span> <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fl">3</span><span class="op">)</span></span>
-<span><span class="co">#&gt; # A tibble: 3 × 2</span></span>
-<span><span class="co">#&gt;   indicator                    name                                     </span></span>
-<span><span class="co">#&gt;   &lt;chr&gt;                        &lt;chr&gt;                                    </span></span>
-<span><span class="co">#&gt; 1 2.1_SHARE.TOTAL.RE.IN.TFEC   Renewable energy consumption(% in TFEC)  </span></span>
-<span><span class="co">#&gt; 2 3.1_RE.CONSUMPTION           Renewable energy consumption (TJ)        </span></span>
-<span><span class="co">#&gt; 3 4.1.2_REN.ELECTRICITY.OUTPUT Renewable energy electricity output (GWh)</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="get-your-own-data-onto-a-map">Get <em>your own</em> data onto a map<a class="anchor" aria-label="anchor" href="#get-your-own-data-onto-a-map"></a>
-</h2>
-<p>This is the headline use case. You have a frame keyed on messy country names — <code><a href="reference/join_world.html">join_world()</a></code> standardises it and attaches geometry in one call:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">my_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>  nation <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"U.S."</span>, <span class="st">"S. Korea"</span>, <span class="st">"Czechia"</span>, <span class="st">"Kosovo"</span>, <span class="st">"Cote d'Ivoire"</span><span class="op">)</span>,</span>
-<span>  score  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10</span>, <span class="fl">8</span>, <span class="fl">6</span>, <span class="fl">4</span>, <span class="fl">7</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">my_data</span> <span class="op">|&gt;</span></span>
+<code class="sourceCode R"><span><span class="fu">tibble</span><span class="op">(</span></span>
+<span>  nation <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"U.S."</span>, <span class="st">"S. Korea"</span>, <span class="st">"Czechia"</span>, <span class="st">"Kosovo"</span>, <span class="st">"Cote d'Ivoire"</span>, <span class="st">"Burma"</span><span class="op">)</span>,</span>
+<span>  score  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10</span>, <span class="fl">8</span>, <span class="fl">6</span>, <span class="fl">4</span>, <span class="fl">7</span>, <span class="fl">5</span><span class="op">)</span></span>
+<span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="reference/join_world.html">join_world</a></span><span class="op">(</span><span class="va">nation</span>, warn <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu"><a href="reference/world_map.html">world_map</a></span><span class="op">(</span><span class="va">score</span>, title <span class="op">=</span> <span class="st">"My data, joined on the ISO spine"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="reference/figures/README-readme-join-1.png" width="100%"></p>
-<p>Or reconcile two messy tables directly — <code>"Czech Republic"</code> vs <code>"Czechia"</code>, <code>"South Korea"</code> vs <code>"Korea, Rep."</code> just work:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">a</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>country <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Czechia"</span>, <span class="st">"South Korea"</span><span class="op">)</span>, gdp <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">b</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>nation  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Czech Republic"</span>, <span class="st">"Korea, Rep."</span><span class="op">)</span>, pop <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10</span>, <span class="fl">51</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="reference/world_map.html">world_map</a></span><span class="op">(</span><span class="va">score</span>, title <span class="op">=</span> <span class="st">"Six countries, six spellings, one map"</span><span class="op">)</span></span></code></pre></div>
+<p><img src="reference/figures/README-join-1.png" alt="World map with six countries shaded by a made-up score, joined from a table that spelled each of them differently." width="100%"></p>
+<p>Two messy tables reconcile against each other the same way:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">a</span> <span class="op">&lt;-</span> <span class="fu">tibble</span><span class="op">(</span>country <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Czechia"</span>, <span class="st">"South Korea"</span><span class="op">)</span>, gdp <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">b</span> <span class="op">&lt;-</span> <span class="fu">tibble</span><span class="op">(</span>nation  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Czech Republic"</span>, <span class="st">"Korea, Rep."</span><span class="op">)</span>, pop <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10</span>, <span class="fl">51</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="reference/country_join.html">country_join</a></span><span class="op">(</span><span class="va">a</span>, <span class="va">b</span>, <span class="va">country</span>, <span class="va">nation</span><span class="op">)</span></span>
 <span><span class="co">#&gt; # A tibble: 2 × 5</span></span>
 <span><span class="co">#&gt;   country       gdp iso3c nation           pop</span></span>
@@ -315,147 +137,264 @@
 <span><span class="co">#&gt; 2 South Korea     2 KOR   Korea, Rep.       51</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="never-lose-a-country-silently">Never lose a country silently<a class="anchor" aria-label="anchor" href="#never-lose-a-country-silently"></a>
+<h2 id="nothing-goes-missing-quietly">Nothing goes missing quietly<a class="anchor" aria-label="anchor" href="#nothing-goes-missing-quietly"></a>
 </h2>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="reference/check_country_match.html">check_country_match</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"USA"</span>, <span class="st">"Cote d'Ivoire"</span>, <span class="st">"Yugoslavia"</span>, <span class="st">"Wakanda"</span><span class="op">)</span><span class="op">)</span></span>
+<p><code><a href="reference/check_country_match.html">check_country_match()</a></code> reports before you join — including the entities <code>countrycode</code> resolves <em>wrongly</em> rather than not at all.</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="reference/check_country_match.html">check_country_match</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"USA"</span>, <span class="st">"Cote d'Ivoire"</span>, <span class="st">"USSR"</span>, <span class="st">"Wakanda"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; # A tibble: 4 × 5</span></span>
 <span><span class="co">#&gt;   input         iso3c matched historical suggestion</span></span>
 <span><span class="co">#&gt;   &lt;chr&gt;         &lt;chr&gt; &lt;lgl&gt;   &lt;lgl&gt;      &lt;chr&gt;     </span></span>
 <span><span class="co">#&gt; 1 USA           USA   TRUE    FALSE      &lt;NA&gt;      </span></span>
 <span><span class="co">#&gt; 2 Cote d'Ivoire CIV   TRUE    FALSE      &lt;NA&gt;      </span></span>
-<span><span class="co">#&gt; 3 Yugoslavia    &lt;NA&gt;  FALSE   TRUE       Yugoslavia</span></span>
+<span><span class="co">#&gt; 3 USSR          RUS   TRUE    TRUE       &lt;NA&gt;      </span></span>
 <span><span class="co">#&gt; 4 Wakanda       &lt;NA&gt;  FALSE   FALSE      Canada</span></span></code></pre></div>
+<p><code><a href="reference/repair_country_names.html">repair_country_names()</a></code> fixes typos, <code><a href="reference/audit_coverage.html">audit_coverage()</a></code> grades a finished join, and <code><a href="reference/dissolve_country.html">dissolve_country()</a></code> expands a dead state into its successors.</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="reference/dissolve_country.html">dissolve_country</a></span><span class="op">(</span><span class="st">"Yugoslavia"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; # A tibble: 7 × 5</span></span>
+<span><span class="co">#&gt;   input      historical dissolved iso3c country             </span></span>
+<span><span class="co">#&gt;   &lt;chr&gt;      &lt;chr&gt;          &lt;int&gt; &lt;chr&gt; &lt;chr&gt;               </span></span>
+<span><span class="co">#&gt; 1 Yugoslavia Yugoslavia      1992 BIH   Bosnia &amp; Herzegovina</span></span>
+<span><span class="co">#&gt; 2 Yugoslavia Yugoslavia      1992 HRV   Croatia             </span></span>
+<span><span class="co">#&gt; 3 Yugoslavia Yugoslavia      1992 MKD   North Macedonia     </span></span>
+<span><span class="co">#&gt; 4 Yugoslavia Yugoslavia      1992 MNE   Montenegro          </span></span>
+<span><span class="co">#&gt; 5 Yugoslavia Yugoslavia      1992 SRB   Serbia              </span></span>
+<span><span class="co">#&gt; 6 Yugoslavia Yugoslavia      1992 SVN   Slovenia            </span></span>
+<span><span class="co">#&gt; 7 Yugoslavia Yugoslavia      1992 XKX   Kosovo</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="reference-data-at-your-fingertips">Reference data at your fingertips<a class="anchor" aria-label="anchor" href="#reference-data-at-your-fingertips"></a>
+<h2 id="the-gallery">The gallery<a class="anchor" aria-label="anchor" href="#the-gallery"></a>
 </h2>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="reference/convert_country.html">convert_country</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Japan"</span>, <span class="st">"Brazil"</span>, <span class="st">"Germany"</span><span class="op">)</span>, to <span class="op">=</span> <span class="st">"flag"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "🇯🇵" "🇧🇷" "🇩🇪"</span></span>
-<span><span class="fu"><a href="reference/convert_country.html">convert_country</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Japan"</span>, <span class="st">"Brazil"</span>, <span class="st">"Germany"</span><span class="op">)</span>, to <span class="op">=</span> <span class="st">"currency"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "JPY" "BRL" "EUR"</span></span>
-<span><span class="fu"><a href="reference/in_group.html">in_group</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"France"</span>, <span class="st">"United States"</span>, <span class="st">"Japan"</span><span class="op">)</span>, <span class="st">"EU"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1]  TRUE FALSE FALSE</span></span></code></pre></div>
+<p>Every map below is one function call on the bundled offline snapshot.</p>
+<table class="table">
+<tr>
+<td width="50%">
+<img src="reference/figures/README-g-choropleth.png" alt="Quantile choropleth of GDP per capita"><br><sub><code>world_map(d, gdp_per_capita, style = “quantile”)</code></sub>
+</td>
+<td width="50%">
+<img src="reference/figures/README-g-categorical.png" alt="Categorical world choropleth, one colour per continent"><br><sub><code>world_map(d, continent, style = “categorical”)</code></sub>
+</td>
+</tr>
+<tr>
+<td>
+<img src="reference/figures/README-g-bubble.png" alt="Proportional-symbol map of population"><br><sub><code>bubble_map(d, population)</code></sub>
+</td>
+<td>
+<img src="reference/figures/README-g-spike.png" alt="Spike map of population"><br><sub><code>spike_map(d, population)</code></sub>
+</td>
+</tr>
+<tr>
+<td>
+<img src="reference/figures/README-g-cartogram.png" alt="Contiguous cartogram resized by population"><br><sub><code>cartogram_map(d, population)</code></sub>
+</td>
+<td>
+<img src="reference/figures/README-g-dorling.png" alt="Dorling cartogram of population"><br><sub><code>dorling_map(d, population)</code></sub>
+</td>
+</tr>
+<tr>
+<td>
+<img src="reference/figures/README-g-bivariate.png" alt="Bivariate choropleth of GDP per capita against life expectancy"><br><sub><code>bivariate_map(d, gdp_per_capita, life_expectancy)</code></sub>
+</td>
+<td>
+<img src="reference/figures/README-g-flow.png" alt="World map with great-circle arcs joining pairs of countries, weighted by flow size"><br><sub><code>flow_map(corridors, from, to, people)</code></sub>
+</td>
+</tr>
+<tr>
+<td>
+<img src="reference/figures/README-g-globe.png" alt="Orthographic globe shaded by World Bank income group"><br><sub><code>globe_map(d, income, style = “categorical”)</code></sub>
+</td>
+<td align="center">
+<img src="reference/figures/README-g-spin.gif" width="55%" alt="A globe coloured by continent, spinning through one full rotation"><br><sub><code>spin_globe(d, continent, style = “categorical”)</code></sub>
+</td>
+</tr>
+<tr>
+<td colspan="2">
+<img src="reference/figures/README-g-tile.png" alt="Equal-area tile grid, one labelled square per country"><br><sub><code>tile_map(d, gdp_per_capita)</code> — one square per country, so microstates are as visible as Russia</sub>
+</td>
+</tr>
+<tr>
+<td colspan="2">
+<img src="reference/figures/README-g-facet.png" alt="Small-multiple choropleths of life expectancy in 1990, 2005 and 2020"><br><sub><code>facet_map(panel, life_exp, year, style = “quantile”)</code> — or <code>animate_world(panel, life_exp)</code> for the moving version</sub>
+</td>
+</tr>
+</table>
+<p>Thirteen projections come along for the ride on the <code>sf</code> backend (<code>world_map(d, x, projection = "winkel_tripel")</code>), and <code><a href="reference/interactive_map.html">interactive_map()</a></code> hands the same frame to <strong>plotly</strong>, <strong>ggiraph</strong>, <strong>leaflet</strong> or <strong>ggsql</strong> for a web-ready widget. With <code><a href="reference/as_ggsql_source.html">as_ggsql_source()</a></code> and <code><a href="reference/world_query.html">world_query()</a></code> the drawing happens <em>inside DuckDB</em> — countryatlas reconciles the countries, <a href="https://ggsql.org" class="external-link">ggsql</a> renders them without ggplot2 or <code>sf</code> at runtime.</p>
 </div>
 <div class="section level2">
-<h2 id="a-whole-vocabulary-of-honest-maps">A whole vocabulary of honest maps<a class="anchor" aria-label="anchor" href="#a-whole-vocabulary-of-honest-maps"></a>
+<h2 id="beyond-the-map">Beyond the map<a class="anchor" aria-label="anchor" href="#beyond-the-map"></a>
 </h2>
-<p>Beyond the choropleth: proportional-symbol (<code><a href="reference/bubble_map.html">bubble_map()</a></code>), spikes (<code><a href="reference/spike_map.html">spike_map()</a></code>), bivariate (<code><a href="reference/bivariate_map.html">bivariate_map()</a></code>), area-honest cartograms (<code><a href="reference/cartogram_map.html">cartogram_map()</a></code>, including a first-class <code><a href="reference/dorling_map.html">dorling_map()</a></code>), equal-area tile grids (<code><a href="reference/tile_map.html">tile_map()</a></code>), great-circle flows (<code><a href="reference/flow_map.html">flow_map()</a></code>), an orthographic globe (<code><a href="reference/globe_map.html">globe_map()</a></code>), small multiples (<code><a href="reference/facet_map.html">facet_map()</a></code>), animation (<code><a href="reference/animate_world.html">animate_world()</a></code>) and interactivity (<code><a href="reference/interactive_map.html">interactive_map()</a></code>).</p>
-<p>The world as a globe, not a rectangle — with the <code>"polygon"</code> backend (only <code>maps</code> + <code>mapproj</code>, no <code>sf</code>) you can draw it and even <strong>spin</strong> it:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="reference/globe_map.html">globe_map</a></span><span class="op">(</span><span class="va">world_snapshot</span><span class="op">$</span><span class="va">countries</span>, <span class="va">continent</span>, backend <span class="op">=</span> <span class="st">"polygon"</span>,</span>
-<span>          style <span class="op">=</span> <span class="st">"categorical"</span>, lon <span class="op">=</span> <span class="fl">10</span>, lat <span class="op">=</span> <span class="fl">20</span><span class="op">)</span></span></code></pre></div>
-<p><img src="reference/figures/README-globe-1.png" width="100%"></p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># assemble a rotating GIF (one full turn; needs gifski or magick)</span></span>
-<span><span class="fu"><a href="reference/spin_globe.html">spin_globe</a></span><span class="op">(</span><span class="va">world_snapshot</span><span class="op">$</span><span class="va">countries</span>, <span class="va">continent</span>, backend <span class="op">=</span> <span class="st">"polygon"</span>,</span>
-<span>           style <span class="op">=</span> <span class="st">"categorical"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="reference/figures/README-globe-spin.gif" width="45%"></p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="reference/bubble_map.html">bubble_map</a></span><span class="op">(</span><span class="va">world_snapshot</span><span class="op">$</span><span class="va">countries</span>, <span class="va">population</span><span class="op">)</span></span></code></pre></div>
-<p><img src="reference/figures/README-readme-bubble-1.png" width="100%"></p>
-</div>
-<div class="section level2">
-<h2 id="render-in-the-database-with-ggsql">Render in the database with ggsql<a class="anchor" aria-label="anchor" href="#render-in-the-database-with-ggsql"></a>
-</h2>
-<p><a href="https://ggsql.org" class="external-link">ggsql</a> draws plots <em>in the database</em> (DuckDB) and returns a Vega-Lite widget — no ggplot2 or <code>sf</code> runtime needed. countryatlas does the part ggsql’s static world can’t (ISO reconciliation, overrides, the WDI join); ggsql does the part countryatlas doesn’t (push-down + web-ready output). <code><a href="reference/world_query.html">world_query()</a></code> emits the spatial query (no dependencies):</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="reference/world_query.html">world_query</a></span><span class="op">(</span><span class="va">gdp_per_capita</span>, palette <span class="op">=</span> <span class="st">"magma"</span>, transform <span class="op">=</span> <span class="st">"log10"</span>,</span>
-<span>            title <span class="op">=</span> <span class="st">"GDP per capita"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; VISUALISE gdp_per_capita AS fill</span></span>
-<span><span class="co">#&gt; FROM countryatlas_world</span></span>
-<span><span class="co">#&gt; DRAW spatial</span></span>
-<span><span class="co">#&gt; PROJECT TO equal_earth</span></span>
-<span><span class="co">#&gt; SCALE fill TO magma VIA log10</span></span>
-<span><span class="co">#&gt; LABEL title =&gt; 'GDP per capita'</span></span></code></pre></div>
-<p>…and <code><a href="reference/as_ggsql_source.html">as_ggsql_source()</a></code> / <code>interactive_map(engine = "ggsql")</code> register your curated table and render it in the database. See the <em>countryatlas and ggsql</em> vignette.</p>
-</div>
-<div class="section level2">
-<h2 id="more-ways-in-more-to-compute">More ways in, more to compute<a class="anchor" aria-label="anchor" href="#more-ways-in-more-to-compute"></a>
-</h2>
-<p>Get point data onto the spine, repair messy names, reduce-join many tables, and run panel analysis — all keyed on <code>iso3c</code>:</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># normalise a total by population, so the map isn't just a population map</span></span>
-<span><span class="co"># (omit `pop` and SP.POP.TOTL is fetched for the relevant countries/years)</span></span>
-<span><span class="fu"><a href="reference/per_capita.html">per_capita</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>iso3c <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"USA"</span>, <span class="st">"CHN"</span><span class="op">)</span>, co2 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4.7e6</span>, <span class="fl">1.1e7</span><span class="op">)</span>,</span>
-<span>                      pop <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">331e6</span>, <span class="fl">1412e6</span><span class="op">)</span><span class="op">)</span>, <span class="va">co2</span>, <span class="va">pop</span><span class="op">)</span></span>
-<span><span class="co">#&gt; # A tibble: 2 × 4</span></span>
-<span><span class="co">#&gt;   iso3c      co2        pop co2_per_capita</span></span>
-<span><span class="co">#&gt;   &lt;chr&gt;    &lt;dbl&gt;      &lt;dbl&gt;          &lt;dbl&gt;</span></span>
-<span><span class="co">#&gt; 1 USA    4700000  331000000        0.0142 </span></span>
-<span><span class="co">#&gt; 2 CHN   11000000 1412000000        0.00779</span></span>
-<span></span>
-<span><span class="co"># each country's share of a world total (within year, for a panel)</span></span>
-<span><span class="fu"><a href="reference/share_of_world.html">share_of_world</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>iso3c <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"USA"</span>, <span class="st">"CHN"</span>, <span class="st">"IND"</span><span class="op">)</span>, co2 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">15</span>, <span class="fl">3</span><span class="op">)</span><span class="op">)</span>, <span class="va">co2</span><span class="op">)</span></span>
-<span><span class="co">#&gt; # A tibble: 3 × 3</span></span>
-<span><span class="co">#&gt;   iso3c   co2 co2_share</span></span>
-<span><span class="co">#&gt;   &lt;chr&gt; &lt;dbl&gt;     &lt;dbl&gt;</span></span>
-<span><span class="co">#&gt; 1 USA       5     0.217</span></span>
-<span><span class="co">#&gt; 2 CHN      15     0.652</span></span>
-<span><span class="co">#&gt; 3 IND       3     0.130</span></span>
-<span></span>
-<span><span class="co"># reduce-join several messy tables on the ISO spine at once</span></span>
-<span><span class="va">t1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>country <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Czechia"</span>, <span class="st">"South Korea"</span><span class="op">)</span>, gdp <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">t2</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>country <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Czech Republic"</span>, <span class="st">"Korea, Rep."</span><span class="op">)</span>, pop <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10</span>, <span class="fl">51</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">t3</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>country <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Czechia"</span>, <span class="st">"Korea"</span><span class="op">)</span>, area <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">79</span>, <span class="fl">100</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="reference/country_join_all.html">country_join_all</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">t1</span>, <span class="va">t2</span>, <span class="va">t3</span><span class="op">)</span>, by <span class="op">=</span> <span class="st">"country"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; # A tibble: 2 × 7</span></span>
-<span><span class="co">#&gt;   country.x     gdp iso3c country.y        pop country  area</span></span>
-<span><span class="co">#&gt;   &lt;chr&gt;       &lt;dbl&gt; &lt;chr&gt; &lt;chr&gt;          &lt;dbl&gt; &lt;chr&gt;   &lt;dbl&gt;</span></span>
-<span><span class="co">#&gt; 1 Czechia         1 CZE   Czech Republic    10 Czechia    79</span></span>
-<span><span class="co">#&gt; 2 South Korea     2 KOR   Korea, Rep.       51 Korea     100</span></span>
-<span></span>
-<span><span class="co"># great-circle distance between two countries' centroids (no sf needed)</span></span>
-<span><span class="fu"><a href="reference/distance_between.html">distance_between</a></span><span class="op">(</span><span class="st">"France"</span>, <span class="st">"Germany"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 802.3524</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="historical-data-honest-joins">Historical data, honest joins<a class="anchor" aria-label="anchor" href="#historical-data-honest-joins"></a>
-</h2>
-<p>Dissolved entities poison country joins twice over: most are silently dropped, and some are silently <em>mis</em>matched — countrycode resolves <code>"USSR"</code> to Russia alone, so Soviet-era totals quietly become Russian totals. <code><a href="reference/check_country_match.html">check_country_match()</a></code> flags both cases, and <code><a href="reference/dissolve_country.html">dissolve_country()</a></code> resolves them to successor states (one-to-many, dated) via the curated <code>historical_codes</code> crosswalk:</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="reference/check_country_match.html">check_country_match</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"USSR"</span>, <span class="st">"Yugoslavia"</span>, <span class="st">"France"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; # A tibble: 3 × 5</span></span>
-<span><span class="co">#&gt;   input      iso3c matched historical suggestion</span></span>
-<span><span class="co">#&gt;   &lt;chr&gt;      &lt;chr&gt; &lt;lgl&gt;   &lt;lgl&gt;      &lt;chr&gt;     </span></span>
-<span><span class="co">#&gt; 1 USSR       RUS   TRUE    TRUE       &lt;NA&gt;      </span></span>
-<span><span class="co">#&gt; 2 Yugoslavia &lt;NA&gt;  FALSE   TRUE       Yugoslavia</span></span>
-<span><span class="co">#&gt; 3 France     FRA   TRUE    FALSE      &lt;NA&gt;</span></span>
-<span><span class="fu"><a href="reference/dissolve_country.html">dissolve_country</a></span><span class="op">(</span><span class="st">"Czechoslovakia"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; # A tibble: 2 × 5</span></span>
-<span><span class="co">#&gt;   input          historical     dissolved iso3c country </span></span>
-<span><span class="co">#&gt;   &lt;chr&gt;          &lt;chr&gt;              &lt;int&gt; &lt;chr&gt; &lt;chr&gt;   </span></span>
-<span><span class="co">#&gt; 1 Czechoslovakia Czechoslovakia      1993 CZE   Czechia </span></span>
-<span><span class="co">#&gt; 2 Czechoslovakia Czechoslovakia      1993 SVK   Slovakia</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="inequality-convergence-and-spatial-statistics">Inequality, convergence and spatial statistics<a class="anchor" aria-label="anchor" href="#inequality-convergence-and-spatial-statistics"></a>
-</h2>
-<p>World inequality between <em>people</em>, not country units — and how much of it sits between continents vs within them:</p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">snap</span> <span class="op">&lt;-</span> <span class="va">world_snapshot</span><span class="op">$</span><span class="va">countries</span></span>
+<span></span>
+<span><span class="co"># inequality between people, not between country units</span></span>
 <span><span class="fu"><a href="reference/gini.html">gini</a></span><span class="op">(</span><span class="va">snap</span><span class="op">$</span><span class="va">gdp_per_capita</span>, weights <span class="op">=</span> <span class="va">snap</span><span class="op">$</span><span class="va">population</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 0.6094909</span></span>
+<span></span>
+<span><span class="co"># how much of it sits between continents rather than within them</span></span>
 <span><span class="fu"><a href="reference/theil.html">theil</a></span><span class="op">(</span><span class="va">snap</span><span class="op">$</span><span class="va">gdp_per_capita</span>, weights <span class="op">=</span> <span class="va">snap</span><span class="op">$</span><span class="va">population</span>, groups <span class="op">=</span> <span class="va">snap</span><span class="op">$</span><span class="va">continent</span><span class="op">)</span></span>
 <span><span class="co">#&gt; # A tibble: 3 × 3</span></span>
 <span><span class="co">#&gt;   component value share</span></span>
 <span><span class="co">#&gt;   &lt;chr&gt;     &lt;dbl&gt; &lt;dbl&gt;</span></span>
 <span><span class="co">#&gt; 1 total     0.678 1    </span></span>
 <span><span class="co">#&gt; 2 between   0.310 0.458</span></span>
-<span><span class="co">#&gt; 3 within    0.368 0.542</span></span></code></pre></div>
-<p><code><a href="reference/beta_convergence.html">beta_convergence()</a></code> / <code><a href="reference/sigma_convergence.html">sigma_convergence()</a></code> test whether poor countries are catching up; <code><a href="reference/correlate_indicators.html">correlate_indicators()</a></code> screens indicator pairs (pairwise-complete, with <code>n</code> reported); and <code><a href="reference/morans_i.html">morans_i()</a></code> measures spatial autocorrelation on the package’s own border adjacency — no <code>spdep</code> required.</p>
-<p><code><a href="reference/repair_country_names.html">repair_country_names()</a></code> auto-fixes typos to the closest known country, <code>locate_country(lon, lat)</code> tags coordinates with the country that contains them, <code><a href="reference/neighbors.html">neighbors()</a></code> / <code><a href="reference/country_borders.html">country_borders()</a></code> answer “who shares a border with whom”, <code><a href="reference/growth_rate.html">growth_rate()</a></code> / <code><a href="reference/index_to.html">index_to()</a></code> / <code><a href="reference/complete_years.html">complete_years()</a></code> add panel metrics and fill panel gaps, and <code><a href="reference/country_codes.html">country_codes()</a></code> exposes the whole countrycode crosswalk as a tidy, pipeable lookup.</p>
+<span><span class="co">#&gt; 3 within    0.368 0.542</span></span>
+<span></span>
+<span><span class="co"># who borders whom, and how far apart they are -- no sf required</span></span>
+<span><span class="fu"><a href="reference/distance_between.html">distance_between</a></span><span class="op">(</span><span class="st">"France"</span>, <span class="st">"Germany"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 802.3524</span></span>
+<span><span class="fu"><a href="reference/convert_country.html">convert_country</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Japan"</span>, <span class="st">"Brazil"</span><span class="op">)</span>, to <span class="op">=</span> <span class="st">"flag"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "🇯🇵" "🇧🇷"</span></span></code></pre></div>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<tbody>
+<tr>
+<td><strong>Assemble</strong></td>
+<td>
+<code><a href="reference/world_data.html">world_data()</a></code> <code><a href="reference/country_data.html">country_data()</a></code> <code><a href="reference/world_geometry.html">world_geometry()</a></code> <code><a href="reference/attach_geometry.html">attach_geometry()</a></code> <code><a href="reference/clear_wdi_cache.html">clear_wdi_cache()</a></code>
+</td>
+</tr>
+<tr>
+<td><strong>Join</strong></td>
+<td>
+<code><a href="reference/standardize_country.html">standardize_country()</a></code> <code><a href="reference/join_world.html">join_world()</a></code> <code><a href="reference/country_join.html">country_join()</a></code> <code><a href="reference/country_join_all.html">country_join_all()</a></code> <code><a href="reference/dissolve_country.html">dissolve_country()</a></code>
+</td>
+</tr>
+<tr>
+<td><strong>Diagnose</strong></td>
+<td>
+<code><a href="reference/check_country_match.html">check_country_match()</a></code> <code><a href="reference/repair_country_names.html">repair_country_names()</a></code> <code><a href="reference/audit_coverage.html">audit_coverage()</a></code> <code><a href="reference/wdj_overrides.html">country_overrides()</a></code> <code><a href="reference/wdj_overrides.html">wdj_overrides()</a></code>
+</td>
+</tr>
+<tr>
+<td><strong>Look up</strong></td>
+<td>
+<code><a href="reference/convert_country.html">convert_country()</a></code> <code><a href="reference/country_codes.html">country_codes()</a></code> <code><a href="reference/country_groups.html">country_groups()</a></code> <code><a href="reference/in_group.html">in_group()</a></code> <code><a href="reference/wdi_search.html">wdi_search()</a></code>
+</td>
+</tr>
+<tr>
+<td><strong>Compute</strong></td>
+<td>
+<code><a href="reference/per_capita.html">per_capita()</a></code> <code><a href="reference/share_of_world.html">share_of_world()</a></code> <code><a href="reference/growth_rate.html">growth_rate()</a></code> <code><a href="reference/index_to.html">index_to()</a></code> <code><a href="reference/rank_countries.html">rank_countries()</a></code> <code><a href="reference/aggregate_regions.html">aggregate_regions()</a></code> <code><a href="reference/complete_years.html">complete_years()</a></code> <code><a href="reference/lag_by_country.html">lag_by_country()</a></code> <code><a href="reference/lag_by_country.html">diff_by_country()</a></code> <code><a href="reference/correlate_indicators.html">correlate_indicators()</a></code>
+</td>
+</tr>
+<tr>
+<td><strong>Measure spread</strong></td>
+<td>
+<code><a href="reference/gini.html">gini()</a></code> <code><a href="reference/theil.html">theil()</a></code> <code><a href="reference/beta_convergence.html">beta_convergence()</a></code> <code><a href="reference/sigma_convergence.html">sigma_convergence()</a></code> <code><a href="reference/morans_i.html">morans_i()</a></code>
+</td>
+</tr>
+<tr>
+<td><strong>Locate</strong></td>
+<td>
+<code><a href="reference/locate_country.html">locate_country()</a></code> <code><a href="reference/neighbors.html">neighbors()</a></code> <code><a href="reference/country_borders.html">country_borders()</a></code> <code><a href="reference/distance_between.html">distance_between()</a></code> <code><a href="reference/simplify_geometry.html">simplify_geometry()</a></code>
+</td>
+</tr>
+<tr>
+<td><strong>Draw</strong></td>
+<td>
+<code><a href="reference/world_map.html">world_map()</a></code> <code><a href="reference/globe_map.html">globe_map()</a></code> <code><a href="reference/spin_globe.html">spin_globe()</a></code> <code><a href="reference/facet_map.html">facet_map()</a></code> <code><a href="reference/bubble_map.html">bubble_map()</a></code> <code><a href="reference/spike_map.html">spike_map()</a></code> <code><a href="reference/bivariate_map.html">bivariate_map()</a></code> <code><a href="reference/cartogram_map.html">cartogram_map()</a></code> <code><a href="reference/dorling_map.html">dorling_map()</a></code> <code><a href="reference/tile_map.html">tile_map()</a></code> <code><a href="reference/flow_map.html">flow_map()</a></code> <code><a href="reference/animate_world.html">animate_world()</a></code> <code><a href="reference/interactive_map.html">interactive_map()</a></code> <code><a href="reference/geom_country_labels.html">geom_country_labels()</a></code> <code><a href="reference/theme_world_map.html">theme_world_map()</a></code>
+</td>
+</tr>
+<tr>
+<td><strong>Push to the database</strong></td>
+<td>
+<code><a href="reference/as_ggsql_source.html">as_ggsql_source()</a></code> <code><a href="reference/world_query.html">world_query()</a></code>
+</td>
+</tr>
+<tr>
+<td><strong>Bundled data</strong></td>
+<td>
+<code>world_snapshot</code> <code>country_meta</code> <code>common_indicators</code> <code>country_groups_tbl</code> <code>world_tiles</code> <code>historical_codes</code>
+</td>
+</tr>
+</tbody>
+</table>
 </div>
 <div class="section level2">
 <h2 id="offline-by-default">Offline by default<a class="anchor" aria-label="anchor" href="#offline-by-default"></a>
 </h2>
-<p>The bundled <code>world_snapshot</code> (a curated indicator set for one recent year, plus metadata) means examples, tests and vignettes all run without the World Bank API.</p>
+<p><code>world_snapshot</code> ships a curated indicator set for one recent year, so every example, test and vignette in the package runs with the network unplugged. Live <code><a href="reference/world_data.html">world_data()</a></code> calls are memoised on disk between sessions.</p>
+<details><summary><b>Which optional package does what</b>
+</summary><table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr>
+<th>Needs</th>
+<th>For</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code>maps</code></td>
+<td>the polygon backend: <code><a href="reference/world_map.html">world_map()</a></code>, <code><a href="reference/bubble_map.html">bubble_map()</a></code>, <code><a href="reference/spike_map.html">spike_map()</a></code>, <code><a href="reference/flow_map.html">flow_map()</a></code>, <code>globe_map(backend = "polygon")</code> (with <code>mapproj</code>)</td>
+</tr>
+<tr>
+<td>
+<code>sf</code> + <code>rnaturalearth</code> + <code>rnaturalearthdata</code>
+</td>
+<td>real geometry: <code>world_map(sf)</code>, <code>world_geometry(sf)</code>, <code><a href="reference/locate_country.html">locate_country()</a></code>, <code><a href="reference/country_borders.html">country_borders()</a></code>, <code><a href="reference/neighbors.html">neighbors()</a></code>, <code><a href="reference/morans_i.html">morans_i()</a></code>
+</td>
+</tr>
+<tr>
+<td>
+<code>cartogram</code> + <code>sf</code>
+</td>
+<td>
+<code><a href="reference/cartogram_map.html">cartogram_map()</a></code>, <code><a href="reference/dorling_map.html">dorling_map()</a></code>
+</td>
+</tr>
+<tr>
+<td>
+<code>biscale</code> + <code>sf</code>
+</td>
+<td><code><a href="reference/bivariate_map.html">bivariate_map()</a></code></td>
+</tr>
+<tr>
+<td>
+<code>gganimate</code> + <code>gifski</code> or <code>magick</code>
+</td>
+<td>
+<code><a href="reference/animate_world.html">animate_world()</a></code>, <code><a href="reference/spin_globe.html">spin_globe()</a></code>
+</td>
+</tr>
+<tr>
+<td>
+<code>plotly</code> / <code>ggiraph</code> / <code>leaflet</code> / <code>ggsql</code>
+</td>
+<td>the four <code><a href="reference/interactive_map.html">interactive_map()</a></code> engines</td>
+</tr>
+<tr>
+<td>
+<code>duckdb</code> + <code>DBI</code>, or <code>nanoarrow</code>
+</td>
+<td><code><a href="reference/as_ggsql_source.html">as_ggsql_source()</a></code></td>
+</tr>
+<tr>
+<td><code>stringdist</code></td>
+<td>fuzzy matching in <code><a href="reference/repair_country_names.html">repair_country_names()</a></code> and <code><a href="reference/check_country_match.html">check_country_match()</a></code>
+</td>
+</tr>
+<tr>
+<td><code>rmapshaper</code></td>
+<td>the better simplifier behind <code><a href="reference/simplify_geometry.html">simplify_geometry()</a></code>
+</td>
+</tr>
+<tr>
+<td><code>classInt</code></td>
+<td><code>style = "jenks"</code></td>
+</tr>
+</tbody>
+</table></details>
 </div>
 <div class="section level2">
 <h2 id="learn-more">Learn more<a class="anchor" aria-label="anchor" href="#learn-more"></a>
 </h2>
-<p>See the vignettes — <em>Getting started</em>, <em>Joining your own data</em>, <em>Modern maps with sf &amp; projections</em>, <em>Beyond the choropleth</em>, and <em>countryatlas and ggsql</em> — and the <a href="https://pursuitofdatascience.github.io/countryatlas/">reference site</a>.</p>
+<p><a href="https://pursuitofdatascience.github.io/countryatlas/articles/getting-started.html">Getting started</a> · <a href="https://pursuitofdatascience.github.io/countryatlas/articles/joining-your-own-data.html">Joining your own data</a> · <a href="https://pursuitofdatascience.github.io/countryatlas/articles/sf-and-projections.html">Maps with sf &amp; projections</a> · <a href="https://pursuitofdatascience.github.io/countryatlas/articles/beyond-the-choropleth.html">Beyond the choropleth</a> · <a href="https://pursuitofdatascience.github.io/countryatlas/articles/countryatlas-and-ggsql.html">countryatlas and ggsql</a> · <a href="https://pursuitofdatascience.github.io/countryatlas/">Full reference</a> · <a href="NEWS.html">Changelog</a></p>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">

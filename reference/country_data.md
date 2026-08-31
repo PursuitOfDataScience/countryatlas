@@ -4,9 +4,7 @@ The analysis counterpart to
 [`world_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_data.md):
 no polygons, one tidy row per country (`iso3c`, `iso2c`, `country`,
 classifications and the requested indicators). This is what you actually
-`join()` /
-[`mutate()`](https://dplyr.tidyverse.org/reference/mutate.html) /
-[`summarise()`](https://dplyr.tidyverse.org/reference/summarise.html) /
+`join()` / `mutate()` / `summarise()` /
 [`rank()`](https://rdrr.io/r/base/rank.html) on; attach geometry only at
 draw time with
 [`attach_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/attach_geometry.md).

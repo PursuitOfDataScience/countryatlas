@@ -3,8 +3,8 @@
 The whole
 [countrycode::codelist](https://rdrr.io/pkg/countrycode/man/codelist.html)
 reshaped into a tidy, pipeable lookup you can
-[`filter()`](https://dplyr.tidyverse.org/reference/filter.html) /
-`join()` directly – one row per country.
+[`filter()`](https://rdrr.io/r/stats/filter.html) / `join()` directly –
+one row per country.
 
 ## Usage
 

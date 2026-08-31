@@ -2,6 +2,8 @@
 
 ## countryatlas 2.0.1
 
+CRAN release: 2026-08-28
+
 A patch release. The only behaviour change is to a test and to where an
 optional DuckDB connection keeps its state; nothing in the package’s own
 API moves.
@@ -517,9 +519,7 @@ see different maps or values.
   picture), and a bad `fill` was not caught at all.
 - [`index_to()`](https://pursuitofdatascience.github.io/countryatlas/reference/index_to.md)
   likewise never checked its value column, so a typo produced a `dplyr`
-  error from inside
-  [`mutate()`](https://dplyr.tidyverse.org/reference/mutate.html);
-  `base_year` and `to` are validated too.
+  error from inside `mutate()`; `base_year` and `to` are validated too.
 - Scalar arguments are validated, so a typo or an `NA` names the
   argument instead of surfacing as
   `"missing value where TRUE/FALSE needed"`, `classInt`’s
@@ -592,8 +592,7 @@ see different maps or values.
   `1`; it now errors.
 - `complete_years(value = )` silently ignored a column name that wasn’t
   in `data` under the default `method = "none"`, while erroring from
-  [`all_of()`](https://tidyselect.r-lib.org/reference/all_of.html) for
-  `"locf"` / `"linear"`; it now errors consistently.
+  `all_of()` for `"locf"` / `"linear"`; it now errors consistently.
 - `interactive_map(engine = "ggsql")` now gates on `ggsql` \>= 0.4.1
   rather than mere presence. `DRAW spatial` – the clause
   [`world_query()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_query.md)
@@ -837,17 +836,15 @@ see different maps or values.
   restored immediately afterwards.
 - [`rank_countries()`](https://pursuitofdatascience.github.io/countryatlas/reference/rank_countries.md)
   silently ranked within groups when handed a grouped frame. Its
-  [`mutate()`](https://dplyr.tidyverse.org/reference/mutate.html)
-  honoured the caller’s
-  [`group_by()`](https://dplyr.tidyverse.org/reference/group_by.html),
-  so the same data ranked `4, 1, 3, 2` ungrouped and `2, 1, 2, 1` after
-  an incidental `group_by(region)` upstream in the pipe – with
-  `within = NULL` in both cases, which documents a global ranking.
-  `rank`, `percentile` and `z_score` were all affected. `within` is now
-  the only thing that sets the ranking scope, matching every other
-  function here, which imposes its own grouping rather than inheriting
-  the caller’s. A test asserts that a grouped input changes no answer,
-  and that nothing leaks grouping into its return value.
+  `mutate()` honoured the caller’s `group_by()`, so the same data ranked
+  `4, 1, 3, 2` ungrouped and `2, 1, 2, 1` after an incidental
+  `group_by(region)` upstream in the pipe – with `within = NULL` in both
+  cases, which documents a global ranking. `rank`, `percentile` and
+  `z_score` were all affected. `within` is now the only thing that sets
+  the ranking scope, matching every other function here, which imposes
+  its own grouping rather than inheriting the caller’s. A test asserts
+  that a grouped input changes no answer, and that nothing leaks
+  grouping into its return value.
 - A non-numeric value column now errors by name instead of producing
   nonsense. A factor column is easy to acquire –
   [`read.csv()`](https://rdrr.io/r/utils/read.table.html) on a column
@@ -1331,8 +1328,7 @@ see different maps or values.
 - [`share_of_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/share_of_world.md)
   on a grouped frame with no `year` column returned a share of the
   **group**, not of the world:
-  [`sum()`](https://rdrr.io/r/base/sum.html) inside
-  [`mutate()`](https://dplyr.tidyverse.org/reference/mutate.html) is per
+  [`sum()`](https://rdrr.io/r/base/sum.html) inside `mutate()` is per
   group, so a frame grouped by continent came back with a column that
   summed to 5 instead of 1, under a name and a help page that both say
   “world”. A panel was already safe by accident, because the function
