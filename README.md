@@ -7,7 +7,6 @@
 
 [![CRAN status](https://www.r-pkg.org/badges/version/countryatlas)](https://CRAN.R-project.org/package=countryatlas)
 [![R-CMD-check](https://github.com/PursuitOfDataScience/countryatlas/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/PursuitOfDataScience/countryatlas/actions/workflows/R-CMD-check.yaml)
-[![Codecov test coverage](https://codecov.io/gh/PursuitOfDataScience/countryatlas/branch/main/graph/badge.svg)](https://app.codecov.io/gh/PursuitOfDataScience/countryatlas)
 [![Lifecycle: stable](https://img.shields.io/badge/lifecycle-stable-brightgreen.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable)
 <!-- badges: end -->
 
