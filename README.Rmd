@@ -1,5 +1,10 @@
 ---
-output: github_document
+output:
+  github_document:
+    # -smart: pandoc must not curl the quotes inside the raw-HTML <code> cells
+    # of the gallery. --wrap=preserve: nor rewrap them across lines.
+    md_extensions: -smart
+    pandoc_args: ["--wrap=preserve"]
 ---
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
@@ -11,11 +16,12 @@ knitr::opts_chunk$set(
   message = FALSE,
   warning = FALSE,
   fig.path = "man/figures/README-",
+  dpi = 130,
   out.width = "100%"
 )
 ```
 
-# countryatlas <img src="man/figures/logo.png" align="right" height="120" alt="countryatlas hex logo: an orthographic globe choropleth with population spikes rising off the horizon" />
+# countryatlas <img src="man/figures/logo.png" align="right" height="130" alt="countryatlas hex logo: an orthographic globe choropleth with population spikes rising off the horizon" />
 
 <!-- badges: start -->
 [![CRAN status](https://www.r-pkg.org/badges/version/countryatlas)](https://CRAN.R-project.org/package=countryatlas)
@@ -24,277 +30,259 @@ knitr::opts_chunk$set(
 [![Lifecycle: stable](https://img.shields.io/badge/lifecycle-stable-brightgreen.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable)
 <!-- badges: end -->
 
-Country names never line up across data sources. `"US"`, `"U.S."`,
-`"United States"`, `"United States of America"` and `"America"` are the same
-country, but a naïve `left_join()` treats them as five. **countryatlas** kills
-that pain by making **ISO codes the universal join key** and handing you a
-single, ready-to-map tibble that already stitches together three otherwise
-disjoint worlds:
+> **Country data onto honest maps — joined on ISO codes, never on country names.**
 
-- **`ggplot2::map_data("world")`** (or Natural Earth `sf`) — *where* countries are,
-- **[WDI](https://github.com/vincentarelbundock/WDI)** — *what* is true about them (World Bank indicators),
-- **[countrycode](https://github.com/vincentarelbundock/countrycode)** — the Rosetta stone (ISO codes, continents, regions) that makes the join possible.
+Join the World Bank's life-expectancy table to `map_data("world")` by country
+name and **42 of 215 countries silently vanish**: nobody spells Czechia,
+Côte d'Ivoire or `"Congo, Dem. Rep."` the same way twice. `countryatlas` makes
+the ISO code the join key, so nothing goes missing — then draws the map.
 
-The happy path is one call: `world_data(2020)`. Everything else is opt-in.
-
-## New in 2.0.0
-
-- **Render maps in the database** with [ggsql](https://ggsql.org):
-  `as_ggsql_source()`, `world_query()`, `interactive_map(engine = "ggsql")`.
-- **More map types**: an orthographic globe (`globe_map()`), small multiples
-  (`facet_map()`), and 8 more projections (Winkel tripel, orthographic,
-  Gall–Peters, …).
-- **Point data onto the spine**: `locate_country()` (point-in-polygon).
-- **Cleaner joins**: `repair_country_names()` auto-fixes typos;
-  `country_join_all()` reduce-joins many tables at once.
-- **More analysis**: `growth_rate()`, `index_to()`, `share_of_world()`.
-- **More country groups**: Mercosur, GCC, Nordic, Visegrád.
-- **Spatial structure**: `country_borders()` / `neighbors()` (who borders
-  whom), `distance_between()` (great-circle distance, no `sf` needed) and
-  `morans_i()` (spatial autocorrelation on the package's own adjacency — no
-  `spdep`).
-- **Historical entities**: `dissolve_country()` + the `historical_codes`
-  crosswalk resolve the USSR / Yugoslavia / Czechoslovakia to successor
-  states; `check_country_match()` now flags them (countrycode silently maps
-  `"USSR"` to Russia — caught).
-- **Inequality & convergence**: `gini()`, `theil()` (population-weighted,
-  between/within decomposition), `beta_convergence()`, `sigma_convergence()`,
-  `correlate_indicators()`, `lag_by_country()` / `diff_by_country()`.
-- **`dorling_map()`** and **`spike_map()`**: two more honest displays for
-  totals.
-- **Localized names**: `convert_country(to = "name_fr" / "name_es" / …)`.
-- **Correctness fixes** that change map output (quantile binning, centroids,
-  label placement, projections, override-only lookups) — full
-  [changelog](NEWS.md).
-
-## Installation
-
-```r
-# install.packages("devtools")
-devtools::install_github("PursuitOfDataScience/countryatlas")
-```
-
-The base install is light. Heavy spatial extras (`sf`, `rnaturalearth`,
-`cartogram`, `biscale`, `gganimate`, `leaflet`, …) live in
-`Suggests` and are only needed for the features that use them.
-
-### Optional features at a glance
-
-| Feature / verb | Optional packages required |
-|---|---|
-| `world_map()` polygon backend, `spike_map()`, `flow_map()`, `bubble_map()` | `maps` |
-| sf geometry: `world_map(sf)`, `world_geometry(sf)`, `locate_country()`, `country_borders()`, `neighbors()`, `morans_i()` | `sf`, `rnaturalearth`, `rnaturalearthdata` |
-| `globe_map(backend = "polygon")` | `maps`, `mapproj` |
-| `spin_globe()` (animated GIF) | its backend's packages, plus `gifski` or `magick` |
-| `bivariate_map()` | `biscale`, `sf` |
-| `cartogram_map()`, `dorling_map()` | `cartogram`, `sf` |
-| `animate_world()` (animated GIF) | `gganimate` (+ `gifski` or `magick`) |
-| `interactive_map(engine = "plotly")` | `plotly` |
-| `interactive_map(engine = "ggiraph")` | `ggiraph` |
-| `interactive_map(engine = "leaflet")` | `leaflet`, `sf` |
-| `interactive_map(engine = "ggsql")` | `ggsql` (>= 0.4.1), `duckdb`, `DBI`, `sf` |
-| `as_ggsql_source()` | `duckdb` + `DBI`, or `nanoarrow` for `format = "arrow"` |
-| `simplify_geometry()` | `sf`; `rmapshaper` for the better simplifier |
-| `repair_country_names()` / `check_country_match()` with `stringdist` | `stringdist` |
-
-```{r}
+```{r hook, echo = FALSE, fig.height = 2.6, fig.width = 9, fig.alt = "Two world choropleths of life expectancy side by side. Joining on country name leaves dozens of countries grey and unfilled; joining with join_world() fills every one of them."}
 library(countryatlas)
 library(ggplot2)
 library(dplyr)
+
+life <- WDI::WDI(indicator = c(life_exp = "SP.DYN.LE00.IN"),
+                 start = 2020, end = 2020) |>
+  filter(!is.na(life_exp)) |>
+  select(country, life_exp)
+
+by_name <- map_data("world") |>
+  left_join(life, by = c("region" = "country")) |>
+  mutate(how = 'left_join(map, data, by = "country")')
+by_iso <- join_world(life, country, warn = FALSE) |>
+  mutate(how = "join_world(data, country)")
+
+bind_rows(by_name, by_iso) |>
+  mutate(how = factor(how, unique(how))) |>
+  facet_map(life_exp, how, style = "quantile", ncol = 2) +
+  theme(legend.position = "none", plot.margin = margin(1, 1, 1, 1),
+        strip.text = element_text(size = 10, face = "bold", family = "mono"))
 ```
 
-## One call to a map-ready tibble
+## Install
 
-```{r}
-data_2020 <- world_data(2020)
-data_2020
+```r
+install.packages("countryatlas")                            # CRAN
+pak::pak("PursuitOfDataScience/countryatlas")               # development
 ```
 
-`world_data()` returns the map geometry, the requested World Bank indicator(s),
-income and continent — already keyed on `iso3c`/`iso2c`. Draw a choropleth with
-the built-in `world_map()` helper (no more hand-rolled `geom_polygon()`
-boilerplate):
+The base install is light. Every heavy spatial dependency (`sf`, `cartogram`,
+`leaflet`, …) is a `Suggests` you only need for the feature that uses it.
 
-```{r readme-choropleth}
-world_map(data_2020, gdp_per_capita, style = "quantile",
-          title = "GDP per capita, 2020")
+## One call
+
+`world_data()` fetches the indicator, attaches the geometry and keys the whole
+thing on `iso3c` — three worlds (`ggplot2` maps, [WDI][wdi], [countrycode][cc])
+stitched together in one line.
+
+```{r hero, fig.height = 4.2, fig.width = 9, fig.alt = "World choropleth of GDP per capita in 2020, shaded in five quantile bins."}
+world_map(world_data(2020), gdp_per_capita, style = "quantile")
 ```
 
-```{r readme-income}
-world_map(data_2020, income, style = "categorical")
+```{r peek}
+world_data(2020, c(life_exp = "SP.DYN.LE00.IN")) |>
+  glimpse()
 ```
 
-## Any indicator, any year span
+Geometry, codes, classifications and the indicator, in one frame, ready for
+`world_map()`.
 
-Pass one or many WDI codes with friendly names, or a year range to get a panel:
+Drop `geometry` for a plain country table (`country_data()`), ask for a year
+range to get a panel, or pass several indicators at once. `wdi_search()` finds
+codes offline; `common_indicators` keeps the 20 you actually use.
 
-```{r}
-country_data(2020, c(life_exp = "SP.DYN.LE00.IN", co2 = "EN.GHG.CO2.PC.CE.AR5")) |>
-  head()
-```
+## Your data, on the map
 
-Use the bundled `common_indicators` catalogue so you never memorise a code, or
-search the full World Bank catalogue offline with `wdi_search()`:
+Point `join_world()` at whatever column holds the country and it standardises,
+joins and attaches geometry in one go.
 
-```{r}
-head(common_indicators)
-wdi_search("renewable energy") |> head(3)
-```
-
-## Get *your own* data onto a map
-
-This is the headline use case. You have a frame keyed on messy country names —
-`join_world()` standardises it and attaches geometry in one call:
-
-```{r readme-join, fig.height = 4}
-my_data <- data.frame(
-  nation = c("U.S.", "S. Korea", "Czechia", "Kosovo", "Cote d'Ivoire"),
-  score  = c(10, 8, 6, 4, 7)
-)
-
-my_data |>
+```{r join, fig.height = 3.4, fig.width = 9, fig.alt = "World map with six countries shaded by a made-up score, joined from a table that spelled each of them differently."}
+tibble(
+  nation = c("U.S.", "S. Korea", "Czechia", "Kosovo", "Cote d'Ivoire", "Burma"),
+  score  = c(10, 8, 6, 4, 7, 5)
+) |>
   join_world(nation, warn = FALSE) |>
-  world_map(score, title = "My data, joined on the ISO spine")
+  world_map(score, title = "Six countries, six spellings, one map")
 ```
 
-Or reconcile two messy tables directly — `"Czech Republic"` vs `"Czechia"`,
-`"South Korea"` vs `"Korea, Rep."` just work:
+Two messy tables reconcile against each other the same way:
 
-```{r}
-a <- data.frame(country = c("Czechia", "South Korea"), gdp = c(1, 2))
-b <- data.frame(nation  = c("Czech Republic", "Korea, Rep."), pop = c(10, 51))
+```{r country-join}
+a <- tibble(country = c("Czechia", "South Korea"), gdp = c(1, 2))
+b <- tibble(nation  = c("Czech Republic", "Korea, Rep."), pop = c(10, 51))
 country_join(a, b, country, nation)
 ```
 
-## Never lose a country silently
+## Nothing goes missing quietly
 
-```{r}
-check_country_match(c("USA", "Cote d'Ivoire", "Yugoslavia", "Wakanda"))
+`check_country_match()` reports before you join — including the entities
+`countrycode` resolves *wrongly* rather than not at all.
+
+```{r check}
+check_country_match(c("USA", "Cote d'Ivoire", "USSR", "Wakanda"))
 ```
 
-## Reference data at your fingertips
+`repair_country_names()` fixes typos, `audit_coverage()` grades a finished
+join, and `dissolve_country()` expands a dead state into its successors.
 
-```{r}
-convert_country(c("Japan", "Brazil", "Germany"), to = "flag")
-convert_country(c("Japan", "Brazil", "Germany"), to = "currency")
-in_group(c("France", "United States", "Japan"), "EU")
+```{r dissolve}
+dissolve_country("Yugoslavia")
 ```
 
-## A whole vocabulary of honest maps
+## The gallery
 
-Beyond the choropleth: proportional-symbol (`bubble_map()`), spikes
-(`spike_map()`), bivariate (`bivariate_map()`), area-honest cartograms
-(`cartogram_map()`, including a first-class `dorling_map()`), equal-area tile
-grids (`tile_map()`), great-circle flows (`flow_map()`), an orthographic globe
-(`globe_map()`), small multiples (`facet_map()`), animation
-(`animate_world()`) and interactivity (`interactive_map()`).
+Every map below is one function call on the bundled offline snapshot.
 
-The world as a globe, not a rectangle — with the `"polygon"` backend (only
-`maps` + `mapproj`, no `sf`) you can draw it and even **spin** it:
-
-```{r globe, fig.height = 4.5}
-globe_map(world_snapshot$countries, continent, backend = "polygon",
-          style = "categorical", lon = 10, lat = 20)
-```
-
-```{r eval = FALSE}
-# assemble a rotating GIF (one full turn; needs gifski or magick)
-spin_globe(world_snapshot$countries, continent, backend = "polygon",
-           style = "categorical")
-```
-
-<img src="man/figures/README-globe-spin.gif" width="45%" />
-
-```{r readme-bubble, fig.height = 4}
-bubble_map(world_snapshot$countries, population)
-```
-
-## Render in the database with ggsql
-
-[ggsql](https://ggsql.org) draws plots *in the database* (DuckDB) and returns a
-Vega-Lite widget — no ggplot2 or `sf` runtime needed. countryatlas does the part
-ggsql's static world can't (ISO reconciliation, overrides, the WDI join); ggsql
-does the part countryatlas doesn't (push-down + web-ready output). `world_query()`
-emits the spatial query (no dependencies):
-
-```{r}
-world_query(gdp_per_capita, palette = "magma", transform = "log10",
-            title = "GDP per capita")
-```
-
-…and `as_ggsql_source()` / `interactive_map(engine = "ggsql")` register your
-curated table and render it in the database. See the *countryatlas and ggsql*
-vignette.
-
-## More ways in, more to compute
-
-Get point data onto the spine, repair messy names, reduce-join many tables, and
-run panel analysis — all keyed on `iso3c`:
-
-```{r}
-# normalise a total by population, so the map isn't just a population map
-# (omit `pop` and SP.POP.TOTL is fetched for the relevant countries/years)
-per_capita(data.frame(iso3c = c("USA", "CHN"), co2 = c(4.7e6, 1.1e7),
-                      pop = c(331e6, 1412e6)), co2, pop)
-
-# each country's share of a world total (within year, for a panel)
-share_of_world(data.frame(iso3c = c("USA", "CHN", "IND"), co2 = c(5, 15, 3)), co2)
-
-# reduce-join several messy tables on the ISO spine at once
-t1 <- data.frame(country = c("Czechia", "South Korea"), gdp = c(1, 2))
-t2 <- data.frame(country = c("Czech Republic", "Korea, Rep."), pop = c(10, 51))
-t3 <- data.frame(country = c("Czechia", "Korea"), area = c(79, 100))
-country_join_all(list(t1, t2, t3), by = "country")
-
-# great-circle distance between two countries' centroids (no sf needed)
-distance_between("France", "Germany")
-```
-
-## Historical data, honest joins
-
-Dissolved entities poison country joins twice over: most are silently dropped,
-and some are silently *mis*matched — countrycode resolves `"USSR"` to Russia
-alone, so Soviet-era totals quietly become Russian totals.
-`check_country_match()` flags both cases, and `dissolve_country()` resolves
-them to successor states (one-to-many, dated) via the curated
-`historical_codes` crosswalk:
-
-```{r}
-check_country_match(c("USSR", "Yugoslavia", "France"))
-dissolve_country("Czechoslovakia")
-```
-
-## Inequality, convergence and spatial statistics
-
-World inequality between *people*, not country units — and how much of it sits
-between continents vs within them:
-
-```{r}
+```{r gallery, include = FALSE}
 snap <- world_snapshot$countries
-gini(snap$gdp_per_capita, weights = snap$population)
-theil(snap$gdp_per_capita, weights = snap$population, groups = snap$continent)
+poly <- attach_geometry(snap, geometry = "polygon")
+sfd  <- attach_geometry(snap, geometry = "sf")
+
+bare <- theme(legend.position = "none", plot.margin = margin(1, 1, 1, 1))
+thumb <- function(name, plot, w = 4.4, h = 2.5) {
+  suppressWarnings(ggsave(file.path("man", "figures", paste0("README-", name, ".png")),
+                          plot + bare, width = w, height = h, dpi = 130, bg = "white"))
+}
+
+thumb("g-choropleth", world_map(poly, gdp_per_capita, style = "quantile"))
+thumb("g-categorical", world_map(poly, continent, style = "categorical"))
+thumb("g-bubble", bubble_map(snap, population))
+thumb("g-spike", spike_map(snap, population))
+thumb("g-cartogram", cartogram_map(sfd, population))
+thumb("g-dorling", dorling_map(sfd, population))
+thumb("g-bivariate", bivariate_map(sfd, gdp_per_capita, life_expectancy))
+
+corridors <- tibble(
+  from   = c("Brazil", "Nigeria", "South Africa", "Kenya", "Indonesia", "Peru"),
+  to     = c("Portugal", "United Kingdom", "United Kingdom",
+             "United Kingdom", "Saudi Arabia", "Spain"),
+  people = c(1.4, 2.1, 2.6, 1.7, 1.8, 1.2)
+)
+thumb("g-flow", flow_map(corridors, from, to, people))
+thumb("g-globe", globe_map(snap, income, backend = "polygon",
+                           style = "categorical", palette = "viridis", lon = 10))
+thumb("g-tile", tile_map(snap, gdp_per_capita), w = 11, h = 5.75)
+
+years <- country_data(c(1990, 2005, 2020), c(life_exp = "SP.DYN.LE00.IN"),
+                      panel = TRUE) |>
+  attach_geometry() |>
+  filter(!is.na(year))
+thumb("g-facet", facet_map(years, life_exp, year, style = "quantile", ncol = 3),
+      w = 8.8, h = 2.0)
+
+spin_globe(snap, continent, backend = "polygon", style = "categorical",
+           n_frames = 36, fps = 12, width = 360, height = 360,
+           file = file.path("man", "figures", "README-g-spin.gif"))
 ```
 
-`beta_convergence()` / `sigma_convergence()` test whether poor countries are
-catching up; `correlate_indicators()` screens indicator pairs
-(pairwise-complete, with `n` reported); and `morans_i()` measures spatial
-autocorrelation on the package's own border adjacency — no `spdep` required.
+```{=html}
+<table>
+<tr>
+<td width="50%"><img src="man/figures/README-g-choropleth.png" alt="Quantile choropleth of GDP per capita"><br><sub><code>world_map(d, gdp_per_capita, style = "quantile")</code></sub></td>
+<td width="50%"><img src="man/figures/README-g-categorical.png" alt="Categorical world choropleth, one colour per continent"><br><sub><code>world_map(d, continent, style = "categorical")</code></sub></td>
+</tr>
+<tr>
+<td><img src="man/figures/README-g-bubble.png" alt="Proportional-symbol map of population"><br><sub><code>bubble_map(d, population)</code></sub></td>
+<td><img src="man/figures/README-g-spike.png" alt="Spike map of population"><br><sub><code>spike_map(d, population)</code></sub></td>
+</tr>
+<tr>
+<td><img src="man/figures/README-g-cartogram.png" alt="Contiguous cartogram resized by population"><br><sub><code>cartogram_map(d, population)</code></sub></td>
+<td><img src="man/figures/README-g-dorling.png" alt="Dorling cartogram of population"><br><sub><code>dorling_map(d, population)</code></sub></td>
+</tr>
+<tr>
+<td><img src="man/figures/README-g-bivariate.png" alt="Bivariate choropleth of GDP per capita against life expectancy"><br><sub><code>bivariate_map(d, gdp_per_capita, life_expectancy)</code></sub></td>
+<td><img src="man/figures/README-g-flow.png" alt="World map with great-circle arcs joining pairs of countries, weighted by flow size"><br><sub><code>flow_map(corridors, from, to, people)</code></sub></td>
+</tr>
+<tr>
+<td><img src="man/figures/README-g-globe.png" alt="Orthographic globe shaded by World Bank income group"><br><sub><code>globe_map(d, income, style = "categorical")</code></sub></td>
+<td align="center"><img src="man/figures/README-g-spin.gif" width="55%" alt="A globe coloured by continent, spinning through one full rotation"><br><sub><code>spin_globe(d, continent, style = "categorical")</code></sub></td>
+</tr>
+<tr>
+<td colspan="2"><img src="man/figures/README-g-tile.png" alt="Equal-area tile grid, one labelled square per country"><br><sub><code>tile_map(d, gdp_per_capita)</code> — one square per country, so microstates are as visible as Russia</sub></td>
+</tr>
+<tr>
+<td colspan="2"><img src="man/figures/README-g-facet.png" alt="Small-multiple choropleths of life expectancy in 1990, 2005 and 2020"><br><sub><code>facet_map(panel, life_exp, year, style = "quantile")</code> — or <code>animate_world(panel, life_exp)</code> for the moving version</sub></td>
+</tr>
+</table>
+```
 
-`repair_country_names()` auto-fixes typos to the closest known country,
-`locate_country(lon, lat)` tags coordinates with the country that contains them,
-`neighbors()` / `country_borders()` answer "who shares a border with whom",
-`growth_rate()` / `index_to()` / `complete_years()` add panel metrics and fill
-panel gaps, and `country_codes()` exposes the whole countrycode crosswalk as a
-tidy, pipeable lookup.
+Thirteen projections come along for the ride on the `sf` backend
+(`world_map(d, x, projection = "winkel_tripel")`), and `interactive_map()`
+hands the same frame to **plotly**, **ggiraph**, **leaflet** or **ggsql** for a
+web-ready widget. With `as_ggsql_source()` and `world_query()` the drawing
+happens *inside DuckDB* — countryatlas reconciles the countries, [ggsql][ggsql]
+renders them without ggplot2 or `sf` at runtime.
+
+## Beyond the map
+
+```{r analysis}
+snap <- world_snapshot$countries
+
+# inequality between people, not between country units
+gini(snap$gdp_per_capita, weights = snap$population)
+
+# how much of it sits between continents rather than within them
+theil(snap$gdp_per_capita, weights = snap$population, groups = snap$continent)
+
+# who borders whom, and how far apart they are -- no sf required
+distance_between("France", "Germany")
+convert_country(c("Japan", "Brazil"), to = "flag")
+```
+
+| | |
+|---|---|
+| **Assemble** | `world_data()` `country_data()` `world_geometry()` `attach_geometry()` `clear_wdi_cache()` |
+| **Join** | `standardize_country()` `join_world()` `country_join()` `country_join_all()` `dissolve_country()` |
+| **Diagnose** | `check_country_match()` `repair_country_names()` `audit_coverage()` `country_overrides()` `wdj_overrides()` |
+| **Look up** | `convert_country()` `country_codes()` `country_groups()` `in_group()` `wdi_search()` |
+| **Compute** | `per_capita()` `share_of_world()` `growth_rate()` `index_to()` `rank_countries()` `aggregate_regions()` `complete_years()` `lag_by_country()` `diff_by_country()` `correlate_indicators()` |
+| **Measure spread** | `gini()` `theil()` `beta_convergence()` `sigma_convergence()` `morans_i()` |
+| **Locate** | `locate_country()` `neighbors()` `country_borders()` `distance_between()` `simplify_geometry()` |
+| **Draw** | `world_map()` `globe_map()` `spin_globe()` `facet_map()` `bubble_map()` `spike_map()` `bivariate_map()` `cartogram_map()` `dorling_map()` `tile_map()` `flow_map()` `animate_world()` `interactive_map()` `geom_country_labels()` `theme_world_map()` |
+| **Push to the database** | `as_ggsql_source()` `world_query()` |
+| **Bundled data** | `world_snapshot` `country_meta` `common_indicators` `country_groups_tbl` `world_tiles` `historical_codes` |
 
 ## Offline by default
 
-The bundled `world_snapshot` (a curated indicator set for one recent year, plus
-metadata) means examples, tests and vignettes all run without the World Bank
-API.
+`world_snapshot` ships a curated indicator set for one recent year, so every
+example, test and vignette in the package runs with the network unplugged.
+Live `world_data()` calls are memoised on disk between sessions.
+
+```{=html}
+<details>
+<summary><b>Which optional package does what</b></summary>
+```
+
+| Needs | For |
+|---|---|
+| `maps` | the polygon backend: `world_map()`, `bubble_map()`, `spike_map()`, `flow_map()`, `globe_map(backend = "polygon")` (with `mapproj`) |
+| `sf` + `rnaturalearth` + `rnaturalearthdata` | real geometry: `world_map(sf)`, `world_geometry(sf)`, `locate_country()`, `country_borders()`, `neighbors()`, `morans_i()` |
+| `cartogram` + `sf` | `cartogram_map()`, `dorling_map()` |
+| `biscale` + `sf` | `bivariate_map()` |
+| `gganimate` + `gifski` or `magick` | `animate_world()`, `spin_globe()` |
+| `plotly` / `ggiraph` / `leaflet` / `ggsql` | the four `interactive_map()` engines |
+| `duckdb` + `DBI`, or `nanoarrow` | `as_ggsql_source()` |
+| `stringdist` | fuzzy matching in `repair_country_names()` and `check_country_match()` |
+| `rmapshaper` | the better simplifier behind `simplify_geometry()` |
+| `classInt` | `style = "jenks"` |
+
+```{=html}
+</details>
+```
 
 ## Learn more
 
-See the vignettes — *Getting started*, *Joining your own data*, *Modern maps
-with sf & projections*, *Beyond the choropleth*, and *countryatlas and ggsql* —
-and the [reference site](https://pursuitofdatascience.github.io/countryatlas/).
+[Getting started][v1] · [Joining your own data][v2] ·
+[Maps with sf & projections][v3] · [Beyond the choropleth][v4] ·
+[countryatlas and ggsql][v5] · [Full reference][site] · [Changelog](NEWS.md)
+
+[ggsql]: https://ggsql.org
+[wdi]: https://github.com/vincentarelbundock/WDI
+[cc]: https://github.com/vincentarelbundock/countrycode
+[site]: https://pursuitofdatascience.github.io/countryatlas/
+[v1]: https://pursuitofdatascience.github.io/countryatlas/articles/getting-started.html
+[v2]: https://pursuitofdatascience.github.io/countryatlas/articles/joining-your-own-data.html
+[v3]: https://pursuitofdatascience.github.io/countryatlas/articles/sf-and-projections.html
+[v4]: https://pursuitofdatascience.github.io/countryatlas/articles/beyond-the-choropleth.html
+[v5]: https://pursuitofdatascience.github.io/countryatlas/articles/countryatlas-and-ggsql.html
