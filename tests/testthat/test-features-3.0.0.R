@@ -2676,14 +2676,26 @@ test_that("geom_country_labels accepts a mapping and still honours flag", {
   lyr <- labels_of(ggplot2::aes(colour = continent))
   expect_gt(sum(!is.na(lyr$label)), 100)      # labels survive a custom mapping
   expect_gt(length(unique(lyr$colour)), 1)    # and the mapping took effect
-  # flag = TRUE works with and without a mapping. Regional-indicator pairs
-  # (U+1F1E6..U+1F1FF), not \p{Regional_Indicator} -- this PCRE build has no
-  # such property.
+  # flag = TRUE works with and without a mapping. A flag emoji is a pair of
+  # regional-indicator code points (U+1F1E6..U+1F1FF).
+  #
+  # Compared as code points, not with a regex: `\p{Regional_Identifier}` is not
+  # a property this PCRE build has, and the obvious fallback -- the range
+  # "[\U0001F1E6-\U0001F1FF]" -- is not portable either. R's default engine
+  # (TRE) cannot form a character range over non-BMP code points, so on Windows
+  # that pattern is an error, not a non-match: "invalid regular expression,
+  # reason 'Invalid character range'". utf8ToInt() involves no regex engine and
+  # gives the same answer on every platform.
+  is_flag <- function(x) {
+    cps <- unlist(lapply(enc2utf8(as.character(x)), utf8ToInt),
+                  use.names = FALSE)
+    any(!is.na(cps) & cps >= 0x1F1E6L & cps <= 0x1F1FFL)
+  }
   plain <- stats::na.omit(labels_of()$label)
   for (lab in list(labels_of(flag = TRUE),
                    labels_of(ggplot2::aes(colour = continent), flag = TRUE))) {
     txt <- stats::na.omit(lab$label)
-    expect_true(any(grepl("[\U0001F1E6-\U0001F1FF]", txt)))
+    expect_true(is_flag(txt))
     expect_false(any(txt %in% plain))          # flags, not the ISO codes
   }
 })
