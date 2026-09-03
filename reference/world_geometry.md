@@ -15,7 +15,8 @@ world_geometry(
   scale = "small",
   region = NULL,
   projection = "equal_earth",
-  recenter = NULL
+  recenter = NULL,
+  year = NULL
 )
 ```
 
@@ -32,10 +33,11 @@ world_geometry(
 
 - scale:
 
-  Natural Earth resolution for the `sf` backend: `"small"` (110m),
-  `"medium"` (50m) or `"large"` (10m). `"large"` additionally needs the
-  `rnaturalearthhires` package, which is not on CRAN
-  (`install.packages("rnaturalearthhires", repos =`
+  Natural Earth resolution for the `sf` backend. The polygon backend
+  serves one bundled resolution and warns if asked for another:
+  `"small"` (110m), `"medium"` (50m) or `"large"` (10m). `"large"`
+  additionally needs the `rnaturalearthhires` package, which is not on
+  CRAN (`install.packages("rnaturalearthhires", repos =`
   `"https://ropensci.r-universe.dev")`); `"small"` and `"medium"` need
   nothing beyond `rnaturalearthdata`. Coarser scales carry fewer
   countries as well as less detail – see
@@ -56,10 +58,21 @@ world_geometry(
 
   Projection for the `sf` backend (see
   [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)).
+  The polygon backend returns unprojected longitude/latitude and warns
+  if asked to project.
 
 - recenter:
 
-  Optional central meridian for a recentred map (e.g. `150`).
+  Optional central meridian (e.g. `150`) for the `sf` backend. The
+  polygon backend cannot recentre and warns if asked to.
+
+- year:
+
+  Draw the world as it was in this year, via
+  [`historical_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/historical_geometry.md)
+  and CShapes (1886-2019). Returns `sf` keyed on `gwcode`; only
+  `what = "countries"` is available, and `region` cannot be combined
+  with it.
 
 ## Value
 

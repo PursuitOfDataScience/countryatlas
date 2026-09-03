@@ -105,7 +105,7 @@ and the datasets
 
 ## Options
 
-Three options change the package's behaviour. All are unset by default.
+Four options change the package's behaviour. All are unset by default.
 
 - `countryatlas.cache_dir`:
 
@@ -126,8 +126,16 @@ Three options change the package's behaviour. All are unset by default.
 
   Set to `TRUE` to restore the `gdp_per_capita_2015` column that
   [`world_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_data.md)
-  emitted in 1.0.0. It is a one-cycle deprecation shim and off by
-  default.
+  emitted in 1.0.0. A deprecation shim, off by default, and now warning
+  when used.
+
+- `countryatlas.dispute_policy`:
+
+  Which map convention disputed territories are drawn under: `"none"`
+  (default), `"de_facto"`, `"de_jure"` or `"neutral"`. Set it with
+  [`dispute_policy()`](https://pursuitofdatascience.github.io/countryatlas/reference/dispute_policy.md)
+  rather than directly, which also reports what the setting does and
+  does not change.
 
 ## See also
 

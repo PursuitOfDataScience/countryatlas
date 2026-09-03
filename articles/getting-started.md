@@ -35,16 +35,19 @@ world_map(data_2020, gdp_per_capita, style = "quantile",
           title = "GDP per capita")
 ```
 
-![](getting-started_files/figure-html/unnamed-chunk-4-1.png)
+![World choropleth of GDP per capita in quantile
+bins.](getting-started_files/figure-html/unnamed-chunk-4-1.png)
 
-Income is an ordered factor, so a categorical fill reads naturally:
+Income is a factor whose levels are already in income order, so a
+categorical fill reads naturally:
 
 ``` r
 
 world_map(data_2020, income, style = "categorical")
 ```
 
-![](getting-started_files/figure-html/unnamed-chunk-5-1.png)
+![World map coloured by World Bank income
+group.](getting-started_files/figure-html/unnamed-chunk-5-1.png)
 
 ## Choosing indicators
 

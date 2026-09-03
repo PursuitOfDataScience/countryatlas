@@ -5,8 +5,10 @@ describe a plot *inside a SQL query* and it renders in the database
 (DuckDB), returning a web-ready Vega-Lite widget — no ggplot2 or `sf`
 runtime required. The spatial layer this vignette targets
 (`DRAW spatial`, which reads WKB geometry) arrived in the ggsql *engine*
-at 0.4.0. As of August 2026 the ggsql R package is still at 0.3.3, so
-the bridge below is forward-looking:
+at 0.4.0, and `countryatlas` requires the ggsql **R package** at \>=
+0.4.1, the first release that exposes it – which is the version
+\[interactive_map()\] checks for. At the time of writing the R package
+is still at 0.3.3, so the bridge below is forward-looking:
 [`world_query()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_query.md)
 builds the query today, and the chunks that would execute one are shown
 but not evaluated.

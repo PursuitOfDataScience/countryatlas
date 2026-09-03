@@ -20,7 +20,11 @@ world_query(
   palette = "viridis",
   transform = NULL,
   title = NULL,
-  draw = "spatial"
+  draw = "spatial",
+  layer = c("choropleth", "bubble", "binned"),
+  facet = NULL,
+  size = NULL,
+  n_bins = NULL
 )
 ```
 
@@ -56,6 +60,24 @@ world_query(
 - draw:
 
   The spatial layer (default `"spatial"`).
+
+- layer:
+
+  `"choropleth"` (default), `"bubble"` (proportional symbols – needs
+  `size`) or `"binned"` (classed fill – see `n_bins`).
+
+- facet:
+
+  Optional column to facet the query by, e.g. `"year"` for a
+  small-multiple panel rendered in the database.
+
+- size:
+
+  Column driving symbol size for `layer = "bubble"`.
+
+- n_bins:
+
+  Number of classes for `layer = "binned"` (default `5`).
 
 ## Value
 

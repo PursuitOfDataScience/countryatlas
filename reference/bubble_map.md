@@ -62,8 +62,9 @@ snap <- countryatlas::world_snapshot$countries
 if (requireNamespace("maps", quietly = TRUE)) {
   bubble_map(snap, population)
 }
-#> Warning: Removed 5 rows containing missing values or values outside the scale range
-#> (`geom_point()`).
+#> Warning: population: 5 countries are not drawn -- no bundled centroid.
+#> • "GIB", "HKG", "MAC", "TUV", and "VGB"
+#> ℹ They are counted as missing in the caption and in `map_provenance()`.
 
 # }
 ```

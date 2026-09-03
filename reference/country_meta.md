@@ -11,8 +11,8 @@ country_meta
 
 ## Format
 
-A tibble with one row per country and columns including `iso3c`,
-`iso2c`, `country`, `continent`, `region`, `un_region`, `capital`,
+A tibble with one row per country and columns `iso3c`, `iso2c`,
+`country`, `continent`, `region`, `un_region`, `income`, `capital`,
 `capital_lat`, `capital_lon`, `centroid_lat`, `centroid_lon`,
 `area_km2`, `currency`, `tld`, `landlocked`, `flag`.
 

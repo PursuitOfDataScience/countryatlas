@@ -52,13 +52,17 @@ world_data(
   Natural Earth resolution for the `sf` backend. `"large"` needs the
   non-CRAN `rnaturalearthhires` package; see
   [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md).
+  The other backends warn if asked for a resolution they cannot serve.
 
 - region:
 
   Optional subset: a continent, group name, `iso3c` vector or bounding
-  box. A bounding box clips the shapes rather than selecting whole
-  countries, and only the `sf` backend can do that properly – see
-  [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md).
+  box. Applied whichever `geometry` is used, including `"none"`. A
+  bounding box clips the shapes rather than selecting whole countries,
+  and only the `sf` backend can do that properly – see
+  [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md);
+  with `geometry = "none"` there is nothing to clip, so a box is
+  refused.
 
 - classify:
 
@@ -69,7 +73,8 @@ world_data(
 
   Projection, and optional central meridian, for the `sf` backend (see
   [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
-  for the projections available).
+  for the projections available). The other backends warn if asked,
+  rather than ignoring the request.
 
 - latest:
 

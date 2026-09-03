@@ -16,7 +16,8 @@ attach_geometry(
   region = NULL,
   projection = "equal_earth",
   recenter = NULL,
-  overrides = country_overrides()
+  overrides = country_overrides(),
+  year = NULL
 )
 ```
 
@@ -36,8 +37,9 @@ attach_geometry(
 
 - scale:
 
-  Natural Earth resolution for the `sf` backend. `"large"` needs the
-  non-CRAN `rnaturalearthhires` package; see
+  Natural Earth resolution for the `sf` backend. The polygon backend
+  serves one bundled resolution and warns if asked for another.
+  `"large"` needs the non-CRAN `rnaturalearthhires` package; see
   [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md).
   It also affects which countries are covered at all – see below.
 
@@ -50,7 +52,8 @@ attach_geometry(
 
   Projection, and optional central meridian, for the `sf` backend (see
   [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
-  for the projections available).
+  for the projections available). The polygon backend can do neither and
+  warns if asked.
 
 - overrides:
 
@@ -60,6 +63,14 @@ attach_geometry(
   Pass a custom set built with
   [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)
   to add your own.
+
+- year:
+
+  Attach historical geometry for this year instead of present-day
+  borders, via
+  [`historical_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/historical_geometry.md).
+  Entities that never had an ISO code cannot match on `iso3c`, so a low
+  match rate warns.
 
 ## Value
 

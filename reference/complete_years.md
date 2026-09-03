@@ -37,7 +37,8 @@ complete_years(
 
 ## Value
 
-A completed (and optionally filled) panel tibble.
+A completed (and optionally filled) panel tibble – or an `sf` frame, if
+`data` was one; each invented row carries its country's geometry.
 
 ## Examples
 

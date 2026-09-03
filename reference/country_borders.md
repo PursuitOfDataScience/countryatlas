@@ -17,8 +17,8 @@ country_borders(scale = "small", region = NULL)
 
 - scale:
 
-  Natural Earth resolution to compute adjacency from. Coarser scales
-  simplify small slivers and may miss a handful of short borders.
+  Natural Earth resolution to compute adjacency from. This is not a
+  cosmetic choice – see *Which countries the default leaves out* below.
   `"large"` needs the non-CRAN `rnaturalearthhires` package; see
   [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md).
 
@@ -48,6 +48,30 @@ Attaching `igraph` also masks
 which it exports too, so call that one as
 [`countryatlas::neighbors()`](https://pursuitofdatascience.github.io/countryatlas/reference/neighbors.md)
 from then on.
+
+## Which countries the default leaves out
+
+Adjacency is computed from Natural Earth polygons, and the default
+`scale = "small"` (110m) has no polygon at all for the European
+microstates. **Andorra, Liechtenstein, Monaco, San Marino and the
+Vatican are therefore absent from the table entirely** – not merely
+missing a short border, but contributing no rows, despite a land border
+being the whole of their geography. The default reports 310 pairs over
+153 countries; France comes back with 8 neighbours rather than 10.
+
+`scale = "medium"` (50m) has all five, giving 322 pairs over 162
+countries and France its full list. Use it whenever the microstates
+matter:
+
+    country_borders(scale = "medium")
+
+The same 110m gap is why
+[`morans_i()`](https://pursuitofdatascience.github.io/countryatlas/reference/morans_i.md)'s
+contiguity weights exclude them – see its `n_excluded` – and it is the
+land-border twin of the island problem described in
+[`vignette("honest-maps")`](https://pursuitofdatascience.github.io/countryatlas/articles/honest-maps.md).
+Note the two Guiana borders are real, not artefacts: French Guiana makes
+Brazil and Suriname neighbours of France.
 
 ## Examples
 

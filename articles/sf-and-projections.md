@@ -29,6 +29,37 @@ good-looking), `"robinson"`, `"mollweide"`, `"natural_earth"`,
 `"gall_peters"`, `"orthographic"`, `"azimuthal_equal_area"`,
 `"north_polar"` and `"south_polar"`.
 
+[`projection_info()`](https://pursuitofdatascience.github.io/countryatlas/reference/projection_info.md)
+says what each one preserves, so you do not have to remember:
+
+``` r
+
+projection_info()[, c("projection", "property", "equal_area")]
+#> # A tibble: 13 × 3
+#>    projection           property    equal_area
+#>    <chr>                <chr>       <lgl>     
+#>  1 equal_earth          equal-area  TRUE      
+#>  2 robinson             compromise  FALSE     
+#>  3 mollweide            equal-area  TRUE      
+#>  4 natural_earth        compromise  FALSE     
+#>  5 plate_carree         equidistant FALSE     
+#>  6 mercator             conformal   FALSE     
+#>  7 winkel_tripel        compromise  FALSE     
+#>  8 eckert4              equal-area  TRUE      
+#>  9 gall_peters          equal-area  TRUE      
+#> 10 orthographic         perspective FALSE     
+#> 11 azimuthal_equal_area equal-area  TRUE      
+#> 12 north_polar          equal-area  TRUE      
+#> 13 south_polar          equal-area  TRUE
+```
+
+For a choropleth the equal-area ones are the honest choice, because the
+reader reads coloured area as quantity.
+[`projection_compare()`](https://pursuitofdatascience.github.io/countryatlas/reference/projection_compare.md)
+draws your own data under several at once and
+[`tissot_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/tissot_map.md)
+shows the distortion directly — see the *Honest maps* vignette.
+
 ## The world as a globe
 
 [`globe_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/globe_map.md)
@@ -42,7 +73,8 @@ globe_map(world_snapshot$countries, continent, backend = "polygon",
           style = "categorical", lon = 10, lat = 20)
 ```
 
-![](sf-and-projections_files/figure-html/globe-1.png)
+![Orthographic globe centred on the Indian Ocean, countries coloured by
+continent.](sf-and-projections_files/figure-html/globe-1.png)
 
 ``` r
 
@@ -79,7 +111,8 @@ ggplot(africa) +
   theme_world_map()
 ```
 
-![](sf-and-projections_files/figure-html/unnamed-chunk-6-1.png)
+![Africa drawn on its own under an Equal Earth
+projection.](sf-and-projections_files/figure-html/unnamed-chunk-7-1.png)
 
 ## Recentring and the antimeridian
 
@@ -118,7 +151,8 @@ ggplot(med) +
   theme_world_map()
 ```
 
-![](sf-and-projections_files/figure-html/unnamed-chunk-9-1.png)
+![The Mediterranean basin cropped by bounding box under an Equal Earth
+projection.](sf-and-projections_files/figure-html/unnamed-chunk-10-1.png)
 
 ## Simplifying for the web
 

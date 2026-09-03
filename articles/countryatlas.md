@@ -116,14 +116,16 @@ world_map(mapdf, gdp_per_capita, style = "quantile",
           title = "GDP per capita (quantile bins)")
 ```
 
-![](countryatlas_files/figure-html/unnamed-chunk-5-1.png)
+![World choropleth of GDP per capita in quantile
+bins.](countryatlas_files/figure-html/unnamed-chunk-5-1.png)
 
 ``` r
 
 world_map(mapdf, continent, style = "categorical")
 ```
 
-![](countryatlas_files/figure-html/unnamed-chunk-6-1.png)
+![World map with every country coloured by its
+continent.](countryatlas_files/figure-html/unnamed-chunk-6-1.png)
 
 ### Proportional-symbol maps
 
@@ -136,7 +138,8 @@ centroids is the right idiom:
 bubble_map(snapshot, population)
 ```
 
-![](countryatlas_files/figure-html/unnamed-chunk-7-1.png)
+![Bubble map: population drawn as proportional circles at country
+centroids.](countryatlas_files/figure-html/unnamed-chunk-7-1.png)
 
 ### Equal-area tile grids
 
@@ -148,7 +151,9 @@ every country the same visual weight:
 tile_map(snapshot, life_expectancy)
 ```
 
-![](countryatlas_files/figure-html/unnamed-chunk-8-1.png)
+![Equal-area tile grid: one identically sized tile per country, shaded
+by life
+expectancy.](countryatlas_files/figure-html/unnamed-chunk-8-1.png)
 
 ### Flow maps
 
@@ -166,7 +171,9 @@ flows <- data.frame(
 flow_map(flows, from, to, weight)
 ```
 
-![](countryatlas_files/figure-html/unnamed-chunk-9-1.png)
+![Flow map: great-circle arcs joining four origin-destination country
+pairs, width by
+volume.](countryatlas_files/figure-html/unnamed-chunk-9-1.png)
 
 ## The join engine
 
@@ -585,7 +592,7 @@ sessionInfo()
 #> [1] stats     graphics  grDevices utils     datasets  methods   base     
 #> 
 #> other attached packages:
-#> [1] dplyr_1.2.1        ggplot2_4.0.3      countryatlas_2.0.1
+#> [1] dplyr_1.2.1        ggplot2_4.0.3      countryatlas_3.0.0
 #> 
 #> loaded via a namespace (and not attached):
 #>  [1] tidyr_1.3.2        sass_0.4.10        utf8_1.2.6         generics_0.1.4    
@@ -595,12 +602,12 @@ sessionInfo()
 #> [17] purrr_1.2.2        viridisLite_0.4.3  scales_1.4.0       stringdist_0.9.17 
 #> [21] textshaping_1.0.5  jquerylib_0.1.4    cli_3.6.6          rlang_1.3.0       
 #> [25] withr_3.0.3        cachem_1.1.0       yaml_2.3.12        otel_0.2.0        
-#> [29] tools_4.6.1        parallel_4.6.1     memoise_2.0.1      vctrs_0.7.3       
+#> [29] parallel_4.6.1     tools_4.6.1        memoise_2.0.1      vctrs_0.7.3       
 #> [33] R6_2.6.1           proxy_0.4-29       lifecycle_1.0.5    classInt_0.4-11   
 #> [37] fs_2.1.0           htmlwidgets_1.6.4  ragg_1.5.2         pkgconfig_2.0.3   
 #> [41] desc_1.4.3         pkgdown_2.2.1      pillar_1.11.1      bslib_0.12.0      
 #> [45] gtable_0.3.6       glue_1.8.1         systemfonts_1.3.2  xfun_0.60         
 #> [49] tibble_3.3.1       tidyselect_1.2.1   knitr_1.51         farver_2.1.2      
-#> [53] htmltools_0.5.9    rmarkdown_2.31     labeling_0.4.3     compiler_4.6.1    
+#> [53] htmltools_0.5.9    rmarkdown_2.32     labeling_0.4.3     compiler_4.6.1    
 #> [57] WDI_2.8.0          S7_0.2.2
 ```

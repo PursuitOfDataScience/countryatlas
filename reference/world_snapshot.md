@@ -16,9 +16,10 @@ A list with three elements:
 
 - countries:
 
-  A tibble, one row per country, with `iso3c`, `iso2c`, `country`,
-  classifications and curated indicators (`gdp_per_capita`,
-  `population`, `life_expectancy`, `co2_per_capita`).
+  A tibble, one row per country, with `iso3c`, `iso2c`, `country`, the
+  classifications `continent`, `region` and `income`, and the curated
+  indicators `gdp_per_capita`, `population`, `life_expectancy` and
+  `co2_per_capita`.
 
 - sf:
 

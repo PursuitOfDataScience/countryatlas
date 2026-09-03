@@ -58,6 +58,9 @@ A `ggplot` object.
 if (requireNamespace("maps", quietly = TRUE)) {
   spike_map(countryatlas::world_snapshot$countries, population)
 }
+#> Warning: population: 5 countries are not drawn -- no bundled centroid.
+#> • "GIB", "HKG", "MAC", "TUV", and "VGB"
+#> ℹ They are counted as missing in the caption and in `map_provenance()`.
 
 # }
 ```

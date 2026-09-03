@@ -46,6 +46,9 @@ for which).
 ``` r
 # \donttest{
 tile_map(countryatlas::world_snapshot$countries, gdp_per_capita)
+#> Warning: gdp_per_capita: 2 countries are not drawn -- no tile in the bundled grid.
+#> • "HKG" and "MAC"
+#> ℹ They are counted as missing in the caption and in `map_provenance()`.
 
 # }
 ```

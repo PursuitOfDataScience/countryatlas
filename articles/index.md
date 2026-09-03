@@ -10,6 +10,8 @@
   Spine](https://pursuitofdatascience.github.io/countryatlas/articles/countryatlas.md):
 - [Getting
   started](https://pursuitofdatascience.github.io/countryatlas/articles/getting-started.md):
+- [Honest maps: classification, missingness and
+  distortion](https://pursuitofdatascience.github.io/countryatlas/articles/honest-maps.md):
 - [Joining your own
   data](https://pursuitofdatascience.github.io/countryatlas/articles/joining-your-own-data.md):
 - [Modern maps with sf &

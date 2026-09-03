@@ -40,7 +40,9 @@ my_data |>
   world_map(score, title = "My data on the ISO spine")
 ```
 
-![](joining-your-own-data_files/figure-html/unnamed-chunk-3-1.png)
+![World choropleth of a user-supplied score column after joining to the
+ISO
+spine.](joining-your-own-data_files/figure-html/unnamed-chunk-3-1.png)
 
 ## Reconcile two messy tables
 

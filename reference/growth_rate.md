@@ -32,6 +32,9 @@ growth_rate(data, value, type = c("yoy", "cagr"), suffix = "_growth")
 ## Value
 
 `data` with a growth-rate column added (a proportion, so 0.03 = 3%).
+Rows come back sorted by `iso3c` then `year`: the calculation reads each
+country's series in time order, so a row-aligned vector held alongside
+`data` will no longer line up.
 
 ## Examples
 

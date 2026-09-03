@@ -51,6 +51,9 @@ join_world(
 
   Optional region subset (see
   [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md)).
+  Applied whichever `geometry` is used, including `"none"`; with
+  `"none"` there is nothing to clip, so a bounding box is refused rather
+  than ignored.
 
 - projection, recenter:
 

@@ -34,7 +34,10 @@ diff_by_country(data, value, n = 1, suffix = NULL)
 
 ## Value
 
-`data` with the lagged / differenced column added.
+`data` with the lagged / differenced column added. Rows come back sorted
+by `iso3c` then `year`: the calculation reads each country's series in
+time order, so a row-aligned vector held alongside `data` will no longer
+line up.
 
 ## Examples
 

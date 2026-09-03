@@ -57,6 +57,17 @@ as_ggsql_source(
 Depending on `format`: a DuckDB connection (with the table written), a
 Parquet file path, or a nanoarrow array stream.
 
+**You own the connection** that `format = "duckdb"` returns, and duckdb
+keeps its in-memory database alive until the handle is released, so
+close it when you are done:
+
+    src <- as_ggsql_source(d, format = "duckdb")
+    on.exit(DBI::dbDisconnect(src, shutdown = TRUE))
+
+`format = "parquet"` needs no such care: it closes the connection it
+opened before returning the path. Passing your own `con` leaves it open
+in every case, since it was never ours to close.
+
 ## Examples
 
 ``` r

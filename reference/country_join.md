@@ -17,7 +17,9 @@ country_join(
   origin_x = "country.name",
   origin_y = "country.name",
   type = c("left", "inner", "full"),
-  suffix = c(".x", ".y")
+  suffix = c(".x", ".y"),
+  key = c("iso3c", "cowc", "cown", "gwn"),
+  warn = TRUE
 )
 ```
 
@@ -43,9 +45,39 @@ country_join(
 
   Suffix for clashing non-key columns (default `c(".x", ".y")`).
 
+- key:
+
+  Which code system to join on. `"iso3c"` (default) is the package's
+  spine and the right choice for anything contemporary.
+  `"cowc"`/`"cown"` (Correlates of War) and `"gwn"` (Gleditsch-Ward) are
+  the alternate spines historical work needs – see the section below.
+
+- warn:
+
+  Whether to report values that resolve to no country (default `TRUE`).
+  They join to nothing, so a silent reconciliation failure is the one
+  thing this verb exists to prevent. Each side is reported separately.
+
 ## Value
 
 A tibble joined on a reconciled `iso3c` key.
+
+## Joining historical data
+
+the second spine: ISO 3166 was first published in 1974 and never covered
+colonies, so `iso3c` cannot key anything before about 1970. Correlates
+of War and Gleditsch-Ward codes can, they run back to the nineteenth
+century, and
+[`historical_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/historical_geometry.md)
+is keyed on `gwn`. Setting `key` switches the join onto one of those:
+
+    country_join(a, b, country, nation, key = "gwn")
+
+The trade-off is real and worth stating: COW/GW codes cover states ISO
+never did, but they omit the dependencies and non-sovereign territories
+ISO does cover, so a modern dataset joined on `gwn` loses Hong Kong,
+Puerto Rico and the rest – which the join warns about. Use `iso3c`
+unless you are working before 1970.
 
 ## Examples
 

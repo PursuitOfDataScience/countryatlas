@@ -20,7 +20,10 @@ audit_coverage(data, indicator = NULL, by = c("region", "income", "continent"))
 - indicator:
 
   Optional character vector of value columns to report `NA` rates for.
-  If `NULL`, all numeric columns are used.
+  If `NULL`, all numeric columns are used. `na_rates` covers every one
+  of them; the `by_group` breakdown is computed for a single indicator –
+  the first – and names it in an `indicator` column so it cannot be
+  mistaken for the group's overall coverage.
 
 - by:
 
@@ -54,15 +57,15 @@ audit_coverage(countryatlas::world_snapshot$countries)
 #> 4 co2_per_capita    215        12  0.0558
 #> ── Coverage by group ──
 #> 
-#> # A tibble: 8 × 3
-#>   region                     n_countries na_rate
-#>   <chr>                            <int>   <dbl>
-#> 1 South Asia                           8  0.25  
-#> 2 East Asia & Pacific                 37  0.216 
-#> 3 Middle East & North Africa          21  0.143 
-#> 4 Latin America & Caribbean           41  0.0976
-#> 5 Europe & Central Asia               56  0.0893
-#> 6 Sub-Saharan Africa                  48  0.0417
-#> 7 North America                        3  0     
-#> 8 NA                                   1  0     
+#> # A tibble: 8 × 4
+#>   region                     n_countries indicator      na_rate
+#>   <chr>                            <int> <chr>            <dbl>
+#> 1 South Asia                           8 gdp_per_capita  0.25  
+#> 2 East Asia & Pacific                 37 gdp_per_capita  0.216 
+#> 3 Middle East & North Africa          21 gdp_per_capita  0.143 
+#> 4 Latin America & Caribbean           41 gdp_per_capita  0.0976
+#> 5 Europe & Central Asia               56 gdp_per_capita  0.0893
+#> 6 Sub-Saharan Africa                  48 gdp_per_capita  0.0417
+#> 7 North America                        3 gdp_per_capita  0     
+#> 8 NA                                   1 gdp_per_capita  0     
 ```

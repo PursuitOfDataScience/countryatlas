@@ -12,7 +12,9 @@ country_join_all(
   tables,
   by,
   origin = "country.name",
-  type = c("full", "left", "inner")
+  type = c("full", "left", "inner"),
+  key = c("iso3c", "cowc", "cown", "gwn"),
+  warn = TRUE
 )
 ```
 
@@ -36,9 +38,24 @@ country_join_all(
 
   Join type: `"full"` (default), `"left"` or `"inner"`.
 
+- key:
+
+  Which code system to join on, as in
+  [`country_join()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_join.md):
+  `"iso3c"` (default), or `"cowc"`/`"cown"`/`"gwn"` for historical work
+  that predates ISO 3166. Each table reports separately on the countries
+  the alternate key cannot carry.
+
+- warn:
+
+  Whether to report values that resolve to no country (default `TRUE`),
+  per table, as
+  [`country_join()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_join.md)
+  does per side.
+
 ## Value
 
-A single tibble joined on `iso3c` (clashing non-key columns get dplyr's
+A single tibble joined on `key` (clashing non-key columns get dplyr's
 default `.x`/`.y` suffixes).
 
 ## Examples

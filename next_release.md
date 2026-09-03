@@ -200,9 +200,11 @@ fetchers, all returning the same `iso3c`(+`year`) tidy shape so they
 drop straight into
 [`country_join()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_join.md): -
 `add_indicator(data, source = c("owid","eurostat","oecd","undata","penn"), ...)`
-or per-source `fetch_owid()`, `fetch_eurostat()`, `fetch_vdem()`. - Our
-World in Data and V-Dem are especially natural (we already expose V-Dem
-/ COW / Polity codes via
+or per-source
+[`fetch_owid()`](https://pursuitofdatascience.github.io/countryatlas/reference/source_adapters.md),
+[`fetch_eurostat()`](https://pursuitofdatascience.github.io/countryatlas/reference/source_adapters.md),
+`fetch_vdem()`. - Our World in Data and V-Dem are especially natural (we
+already expose V-Dem / COW / Polity codes via
 [`convert_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/convert_country.md)).
 
 ### 2.2 Join & reconciliation ★ high value
@@ -280,11 +282,13 @@ plumbing, so each is self-contained. Tagged ★ high value / ◐ medium / ◦
 nice-to-have.
 
 **More sources & richer joins** - ◐ **Currency / real-terms helpers** —
-`deflate()` (constant vs current prices via a GDP-deflator/CPI series)
-and `to_ppp()` / `to_usd()`. Country economic data is almost always
-wanted in real or PPP terms; doing it on the spine kills a whole class
-of silent unit mistakes. - ◐ **Population-weighted aggregation** — a
-`weight =` / `weighted = TRUE` path on
+[`deflate()`](https://pursuitofdatascience.github.io/countryatlas/reference/deflate.md)
+(constant vs current prices via a GDP-deflator/CPI series) and
+[`to_ppp()`](https://pursuitofdatascience.github.io/countryatlas/reference/to_ppp.md)
+/ `to_usd()`. Country economic data is almost always wanted in real or
+PPP terms; doing it on the spine kills a whole class of silent unit
+mistakes. - ◐ **Population-weighted aggregation** — a `weight =` /
+`weighted = TRUE` path on
 [`aggregate_regions()`](https://pursuitofdatascience.github.io/countryatlas/reference/aggregate_regions.md)
 so regional means/medians weight by population or GDP instead of by
 country count. - ◦ **Multilingual country names** —
@@ -343,8 +347,9 @@ and a between/within decomposition across countries
 (population-weighted). - ◐ **Panel utilities** — `build_panel()`,
 [`lag_by_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/lag_by_country.md),
 [`diff_by_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/lag_by_country.md),
-and `interpolate_missing()` (linear/LOCF) so panels join cleanly across
-patchy source coverage.
+and
+[`interpolate_missing()`](https://pursuitofdatascience.github.io/countryatlas/reference/interpolate_missing.md)
+(linear/LOCF) so panels join cleanly across patchy source coverage.
 
 **ggsql, Shiny & reporting** - ◐ **Broaden the ggsql render engine** —
 extend
@@ -354,8 +359,10 @@ bubble/binned layers and more `SCALE`/`FACET` verbs as the ggsql spatial
 API stabilises. - ◐ **Shiny module** — `worldMapInput()` /
 `worldMapServer()` so a reconciled choropleth drops into an app in two
 lines (ggplot / leaflet / ggsql engine). - ◦ **`gt` / report helpers** —
-`country_factsheet()` and a `gt`-formatted `world_table()` for
-one-country or top-N summaries.
+[`country_factsheet()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_factsheet.md)
+and a `gt`-formatted
+[`world_table()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_table.md)
+for one-country or top-N summaries.
 
 ### 2.8 Second wave for 2.0.0 (implemented — design notes)
 

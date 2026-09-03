@@ -1,5 +1,60 @@
 # countryatlas — Future Features
 
+> ## Status: fully implemented in 3.0.0
+>
+> **Every wave in §17 is built.** This document is now a record of the
+> design reasoning rather than a plan. 45 new exports and two new
+> datasets landed in 3.0.0; see NEWS.md for the release notes and the
+> per-function help for the details.
+>
+> | Wave | Status |
+> |----|----|
+> | 1 — correctness, honesty, small wins | **Done.** The ggsql guard was already in 2.0.1. Everything else shipped, plus [`tissot_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/tissot_map.md) and [`projection_distortion()`](https://pursuitofdatascience.github.io/countryatlas/reference/projection_distortion.md). |
+> | 2 — the data-source contract | **Done.** [`register_country_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/register_country_source.md), [`country_sources()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_sources.md), [`fetch_indicator()`](https://pursuitofdatascience.github.io/countryatlas/reference/fetch_indicator.md), [`add_indicator()`](https://pursuitofdatascience.github.io/countryatlas/reference/add_indicator.md), [`compare_sources()`](https://pursuitofdatascience.github.io/countryatlas/reference/compare_sources.md), all four adapters, and [`clear_country_cache()`](https://pursuitofdatascience.github.io/countryatlas/reference/clear_country_cache.md). |
+> | 3 — time | **Done.** `country_groups_history` + `as_of`, [`country_timeline()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_timeline.md), [`audit_time_coverage()`](https://pursuitofdatascience.github.io/countryatlas/reference/audit_time_coverage.md), [`historical_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/historical_geometry.md) on CShapes, and the COW/GW second spine via `country_join(key =)`. |
+> | 4 — honesty, continued | **Done.** `disputed_territories` + [`dispute_policy()`](https://pursuitofdatascience.github.io/countryatlas/reference/dispute_policy.md) + [`check_dispute_coverage()`](https://pursuitofdatascience.github.io/countryatlas/reference/check_dispute_coverage.md) + `world_map(disputes =)`; [`rate_check()`](https://pursuitofdatascience.github.io/countryatlas/reference/rate_check.md), [`smooth_rates()`](https://pursuitofdatascience.github.io/countryatlas/reference/smooth_rates.md), [`interpolate_missing()`](https://pursuitofdatascience.github.io/countryatlas/reference/interpolate_missing.md); the VSUP via `world_map(uncertainty =)`; [`deflate()`](https://pursuitofdatascience.github.io/countryatlas/reference/deflate.md), [`to_ppp()`](https://pursuitofdatascience.github.io/countryatlas/reference/to_ppp.md), [`convergence_club()`](https://pursuitofdatascience.github.io/countryatlas/reference/convergence_club.md). |
+> | 5 — reach | **Done.** [`country_weights()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_weights.md) and the full LISA/Geary/Getis-Ord/spatial-lag set; [`flow_matrix()`](https://pursuitofdatascience.github.io/countryatlas/reference/flow_matrix.md), [`country_network()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_network.md), [`od_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/od_map.md); `mapgl` interactivity and the interactive globe; [`country_factsheet()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_factsheet.md), [`world_table()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_table.md). |
+> | 6 — subnational | **Done.** [`standardize_subnational()`](https://pursuitofdatascience.github.io/countryatlas/reference/standardize_subnational.md), [`nuts_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/nuts_geometry.md), [`subnational_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/subnational_map.md), scoped to ISO 3166-2 and NUTS. |
+>
+> ### The §18 open questions, as decided
+>
+> 1.  **Second spine for historical work?** Yes.
+>     `country_join(key = "gwn"/"cowc"/"cown")`, and it warns about the
+>     dependencies COW/GW cannot carry.
+> 2.  **`tmap` as a backend?** Yes, as `world_map(engine = "tmap")` — a
+>     door, not a second front door. The package stays ggplot2-native.
+> 3.  **Equal Earth as default?** It already was. Now documented and
+>     recommended explicitly, with the citation, and
+>     [`projection_distortion()`](https://pursuitofdatascience.github.io/countryatlas/reference/projection_distortion.md)
+>     lets anyone verify the claim.
+> 4.  **`Suggests` vs registration for sources?** Both: registration is
+>     the mechanism, four adapters ship for discoverability.
+> 5.  **How much dispute curation?** A documented subset of 22, with a
+>     mechanical inclusion criterion that requires nobody to judge the
+>     merits, and an explicit statement that the table does not
+>     adjudicate.
+> 6.  **Do we ever impute?** Yes, and the `.imputed` flag is
+>     non-optional.
+>     [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
+>     reads it and notes it in the caption.
+> 7.  **Snapshot cadence?** Unchanged; still 2024, still the thing that
+>     makes every example offline.
+> 8.  **Is
+>     [`check_country_match()`](https://pursuitofdatascience.github.io/countryatlas/reference/check_country_match.md)
+>     still the best matcher?** Not benchmarked against `countries`
+>     1.2.4. The one item here that remains genuinely open.
+>
+> ### What was deliberately *not* built
+>
+> The “explicitly not planned” list in §17 still stands: no general GIS
+> layer, no reimplemented projections or cartogram algorithms, no
+> bundled large or restrictively-licensed geometry, no admin2, no Shiny
+> dependency, and no position on any territorial dispute.
+>
+> Five bugs were also found by auditing 2.0.1 alongside this work — none
+> of them predicted by this document. It is good at naming absent
+> features and poor at naming broken ones.
+
 *A research- and CRAN-grounded feature catalogue for the releases after
 2.0.0. This is a **design and literature document**, not a changelog and
 not a commitment. §2 surveys the cartographic/statistical literature and
@@ -225,11 +280,11 @@ compare_sources(indicator, sources = c("wdi", "owid"), year)
 **Design notes.**
 
 - **Build the contract first, the adapters second.**
-  `register_country_source()` means users reach `vdemdata`, `imfr` or a
-  WID client — none of which are on CRAN — without the package depending
-  on them, and it means a proprietary or internal source is a
-  first-class citizen. This is the same architectural move that keeps
-  `Suggests` from exploding.
+  [`register_country_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/register_country_source.md)
+  means users reach `vdemdata`, `imfr` or a WID client — none of which
+  are on CRAN — without the package depending on them, and it means a
+  proprietary or internal source is a first-class citizen. This is the
+  same architectural move that keeps `Suggests` from exploding.
 - **Live-API testing was the blocker; here is the answer.** Every
   adapter is `Suggests`-gated and every test runs against a **recorded
   fixture**, not the network: ship small recorded responses in
@@ -237,12 +292,13 @@ compare_sources(indicator, sources = c("wdi", "owid"), year)
   and mark the one live-connectivity test `skip_on_cran()` +
   `skip_if_offline()`. This is standard practice and it entirely removes
   the reason for deferral.
-- **`compare_sources()` is the differentiating feature, not the
-  fetchers.** Anyone can call `owidR`. What nobody does is tell you that
-  OWID’s and the World Bank’s GDP-per-capita disagree for 14 countries
-  because of different vintages, PPP bases or territorial definitions.
-  On the ISO spine that comparison is one join, and it is exactly the
-  kind of quiet error the package exists to prevent.
+- **[`compare_sources()`](https://pursuitofdatascience.github.io/countryatlas/reference/compare_sources.md)
+  is the differentiating feature, not the fetchers.** Anyone can call
+  `owidR`. What nobody does is tell you that OWID’s and the World Bank’s
+  GDP-per-capita disagree for 14 countries because of different
+  vintages, PPP bases or territorial definitions. On the ISO spine that
+  comparison is one join, and it is exactly the kind of quiet error the
+  package exists to prevent.
 - **Metadata harmonisation is required, not optional.** Units, currency
   base year, PPP vs market rates, and vintage must travel with the
   values — a joined table with `gdp_pc` from two sources in two units is
@@ -258,8 +314,9 @@ compare_sources(indicator, sources = c("wdi", "owid"), year)
   an alias).
 
 **Deps** `Suggests: owidR`, `eurostat`, `OECD`, `comtradr`. **Effort** M
-for the contract, S per adapter, M for `compare_sources()`. **Risk** low
-once the fixture-testing policy is fixed.
+for the contract, S per adapter, M for
+[`compare_sources()`](https://pursuitofdatascience.github.io/countryatlas/reference/compare_sources.md).
+**Risk** low once the fixture-testing policy is fixed.
 
 ------------------------------------------------------------------------
 
@@ -320,7 +377,8 @@ audit_time_coverage(data)               # entities existing outside their span
   a documented date. The `as_of` argument then makes panel joins honest
   instead of approximately right. Keep the current snapshot behaviour as
   the default (`as_of = NULL`) so nothing breaks.
-- **`audit_time_coverage()` is the diagnostic analogue of
+- **[`audit_time_coverage()`](https://pursuitofdatascience.github.io/countryatlas/reference/audit_time_coverage.md)
+  is the diagnostic analogue of
   [`audit_coverage()`](https://pursuitofdatascience.github.io/countryatlas/reference/audit_coverage.md)**:
   it catches “South Sudan has 1995 data” and “Czechoslovakia has 2001
   data”, which are the errors that survive a successful join.
@@ -370,12 +428,14 @@ world_map(..., projection = "equal_earth")   # documented recommended default
   [`theme_world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/theme_world_map.md)’s
   help, and consider flipping the default at the next major version with
   a NEWS note.
-- **`tissot_map()` is the teaching feature.** Distortion ellipses are
-  the standard cartographic device for showing what a projection does,
-  they are computable from a PROJ transform of small circles, and no R
-  package offers them as a one-liner. It makes the package’s honesty
-  claim visible rather than asserted.
-- **`projection_compare()` is nearly free** —
+- **[`tissot_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/tissot_map.md)
+  is the teaching feature.** Distortion ellipses are the standard
+  cartographic device for showing what a projection does, they are
+  computable from a PROJ transform of small circles, and no R package
+  offers them as a one-liner. It makes the package’s honesty claim
+  visible rather than asserted.
+- **[`projection_compare()`](https://pursuitofdatascience.github.io/countryatlas/reference/projection_compare.md)
+  is nearly free** —
   [`facet_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/facet_map.md)
   already does small multiples; this varies the CRS instead of the data.
   High teaching value, low effort.
@@ -434,13 +494,13 @@ smooth_rates(data, numerator, denominator, method = c("eb", "none"))
   teeth**: a map whose top class contains one country and whose bottom
   contains ninety is a misleading map, and the count-per-class table
   says so immediately.
-- **`rate_check()`/`smooth_rates()` address the problem Roth et
-  al. named.** Country-level data has this in an extreme form: Tuvalu
-  (~11k people) and China sit in the same choropleth, and any per-capita
-  or per-100k rate lets the smallest denominators dominate the colour
-  scale. Empirical-Bayes shrinkage is standard in disease mapping, is a
-  dozen lines of code, and is a defensible alternative to silently
-  plotting noise.
+- **[`rate_check()`](https://pursuitofdatascience.github.io/countryatlas/reference/rate_check.md)/[`smooth_rates()`](https://pursuitofdatascience.github.io/countryatlas/reference/smooth_rates.md)
+  address the problem Roth et al. named.** Country-level data has this
+  in an extreme form: Tuvalu (~11k people) and China sit in the same
+  choropleth, and any per-capita or per-100k rate lets the smallest
+  denominators dominate the colour scale. Empirical-Bayes shrinkage is
+  standard in disease mapping, is a dozen lines of code, and is a
+  defensible alternative to silently plotting noise.
   [`per_capita()`](https://pursuitofdatascience.github.io/countryatlas/reference/per_capita.md)
   (shipped) is where users hit this, so cross-reference it from there.
 - Pair with §8: value-by-alpha and cartograms are the *visual* answers
@@ -501,9 +561,9 @@ world_map(..., footnote = "auto")  # auto-generated "n = 174 of 195; missing: �
   column, a model output). But two package-native sources exist and are
   worth exposing: WDI’s own footnote/estimate flags where the API
   provides them, and interpolation done by a future
-  `interpolate_missing()` (ledger §2.7) — anything the package imputes
-  must be flagged as imputed, not returned as data. Make that a hard
-  rule.
+  [`interpolate_missing()`](https://pursuitofdatascience.github.io/countryatlas/reference/interpolate_missing.md)
+  (ledger §2.7) — anything the package imputes must be flagged as
+  imputed, not returned as data. Make that a hard rule.
 
 **Deps** `Suggests: ggpattern`, `biscale` (already). **Effort** M
 (`na_style`, `coverage_map`, footnotes), L (VSUP + legend). **Risk**
@@ -543,18 +603,21 @@ cartogram_diagnostics(cg)   # area error, shape distortion, convergence
   magnitude faster than diffusion-based approaches. Keep `cartogram` for
   Dorling/non-contiguous, add `cartogramR` for contiguous, and let
   `type =` route.
-- **`value_by_alpha_map()` is the conceptually important one.** It
-  solves the small-number problem (§6) *without* distorting geometry,
-  which is the main complaint against cartograms — Roth et al. designed
-  it precisely as that alternative. It is also easy: a
+- **[`value_by_alpha_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/value_by_alpha_map.md)
+  is the conceptually important one.** It solves the small-number
+  problem (§6) *without* distorting geometry, which is the main
+  complaint against cartograms — Roth et al. designed it precisely as
+  that alternative. It is also easy: a
   [`bivariate_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/bivariate_map.md)
   variant where one channel is alpha over a neutral background. High
-  value-to-effort ratio, and it pairs with §6’s `rate_check()` in the
-  same vignette.
-- **`cartogram_diagnostics()` matters because cartograms fail quietly.**
-  An under-converged cartogram looks plausible while still
-  misrepresenting areas; reporting the residual area error per country
-  makes that visible. Same spirit as §6’s classification report.
+  value-to-effort ratio, and it pairs with §6’s
+  [`rate_check()`](https://pursuitofdatascience.github.io/countryatlas/reference/rate_check.md)
+  in the same vignette.
+- **[`cartogram_diagnostics()`](https://pursuitofdatascience.github.io/countryatlas/reference/cartogram_diagnostics.md)
+  matters because cartograms fail quietly.** An under-converged
+  cartogram looks plausible while still misrepresenting areas; reporting
+  the residual area error per country makes that visible. Same spirit as
+  §6’s classification report.
 - Colour and legend defaults deserve an audit here too: cartogram +
   rainbow is a common and bad combination, and the package’s palette
   presets should be the documented path.
@@ -595,9 +658,11 @@ check_dispute_coverage(data)  # which disputed entities your data does/doesn't h
   one.** Natural Earth draws de facto boundaries by default and supplies
   de jure claim lines as a separate layer. That is a defensible,
   published, citable policy; the package’s contribution is to make it
-  **explicit, switchable and visible** — `dispute_policy()` printing
-  “this map uses de facto boundaries from Natural Earth 5.x; Western
-  Sahara shown separately; Taiwan coded TWN” is the honest artefact.
+  **explicit, switchable and visible** —
+  [`dispute_policy()`](https://pursuitofdatascience.github.io/countryatlas/reference/dispute_policy.md)
+  printing “this map uses de facto boundaries from Natural Earth 5.x;
+  Western Sahara shown separately; Taiwan coded TWN” is the honest
+  artefact.
 - **`hatched` is the option most users actually want** and no R mapping
   package offers it: a territory that is present in the geometry but
   excluded from the colour scale and drawn with a pattern, so the map
@@ -713,16 +778,18 @@ spatial_lag(data, value, weights = ...)      # neighbour-average as a column
   first few) so a user cannot publish a “global” Moran’s I that quietly
   omitted 40 countries. This is a small change with real correctness
   value and it does not alter any computation.
-- **`country_weights()` is the right abstraction** and it generalises
-  beyond autocorrelation: `k`-nearest by centroid (islands get
-  neighbours), distance-band, and — distinctively for this package —
-  **non-geographic weights**: trade volume (`comtradr`, §3/§12),
-  migration flows, colonial or language ties. “Countries near each other
-  in *trade* space” is often the relevant adjacency for economic
-  questions, and having the same API for it is a genuinely novel
-  offering.
+- **[`country_weights()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_weights.md)
+  is the right abstraction** and it generalises beyond autocorrelation:
+  `k`-nearest by centroid (islands get neighbours), distance-band, and —
+  distinctively for this package — **non-geographic weights**: trade
+  volume (`comtradr`, §3/§12), migration flows, colonial or language
+  ties. “Countries near each other in *trade* space” is often the
+  relevant adjacency for economic questions, and having the same API for
+  it is a genuinely novel offering.
 - **LISA was deferred for wanting map integration — and the map
-  integration now exists.** `lisa_map()` is
+  integration now exists.**
+  [`lisa_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/lisa_map.md)
+  is
   [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
   with a categorical HH/LL/HL/LH fill and a significance mask; the
   deferral reason has expired.
@@ -732,7 +799,7 @@ spatial_lag(data, value, weights = ...)      # neighbour-average as a column
   the rest.
 - Cite Anselin (1995) for LISA and Moran (1950); add both to the
   citation set so
-  [`morans_i()`](https://pursuitofdatascience.github.io/countryatlas/reference/morans_i.md)/`local_morans()`
+  [`morans_i()`](https://pursuitofdatascience.github.io/countryatlas/reference/morans_i.md)/[`local_morans()`](https://pursuitofdatascience.github.io/countryatlas/reference/local_morans.md)
   are properly attributed.
 
 **Deps** `Suggests: sfdep` or `spdep` (optional). **Effort** M. **Risk**
@@ -773,10 +840,10 @@ flow_map(..., bundle = TRUE)           # edge bundling for dense flows
 - **OD maps** (Wood, Dykes & Slingsby) are the standard answer to “my
   flow map is spaghetti”, and small-multiple machinery already exists in
   [`facet_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/facet_map.md).
-- `country_network()` returning `igraph`/`tidygraph` (Suggests) makes
-  the adjacency and trade graphs available to the whole network-analysis
-  ecosystem for free — centrality, communities, shortest paths between
-  countries.
+- [`country_network()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_network.md)
+  returning `igraph`/`tidygraph` (Suggests) makes the adjacency and
+  trade graphs available to the whole network-analysis ecosystem for
+  free — centrality, communities, shortest paths between countries.
 - Trade data is large; the §3 cache layer is a prerequisite, not an
   optional extra.
 
@@ -858,19 +925,20 @@ world_map(..., caption = "auto")                # provenance as a plot caption
 
 **Design notes.**
 
-- **`map_provenance()` is the reproducibility feature and it is nearly
-  free**: every input it reports is already known at plot time. Printed
-  into a caption or a methods section it answers the questions a
-  reviewer asks first, and it is a natural pairing with the §6
-  classification report and the §7 coverage footnote.
+- **[`map_provenance()`](https://pursuitofdatascience.github.io/countryatlas/reference/map_provenance.md)
+  is the reproducibility feature and it is nearly free**: every input it
+  reports is already known at plot time. Printed into a caption or a
+  methods section it answers the questions a reviewer asks first, and it
+  is a natural pairing with the §6 classification report and the §7
+  coverage footnote.
 - `inst/CITATION` should credit the package **and** `countrycode`
   (Arel-Bundock et al. 2018), the World Bank, Natural Earth, and — once
   wired — CShapes (Schvitz et al. 2022). Users are obliged to cite the
   data; making `citation("countryatlas")` produce the full set is a
   service and good attribution hygiene.
-- `country_factsheet()`/`world_table()` are the “last mile” for the
-  non-map audience and lean on `gt` (Suggests) with a plain-tibble
-  fallback.
+- [`country_factsheet()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_factsheet.md)/[`world_table()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_table.md)
+  are the “last mile” for the non-map audience and lean on `gt`
+  (Suggests) with a plain-tibble fallback.
 - **Accessibility pass**, worth doing once across all map verbs: verify
   the palette presets under the three common colour-vision deficiencies
   (`colorspace` can simulate), ensure NA is distinguishable without
@@ -910,12 +978,13 @@ convergence_club(data, value)                       # club convergence / groupin
 
 **Design notes.**
 
-- **`deflate()`/`to_ppp()` are the highest-value items here.** Comparing
-  nominal GDP across years, or market-rate GDP across countries, is a
-  mistake that produces plausible-looking wrong answers — exactly the
-  failure mode the package was built to eliminate for country names. The
-  deflator/PPP series come from WDI, so this is a join plus arithmetic
-  plus very careful documentation of which convention was applied.
+- **[`deflate()`](https://pursuitofdatascience.github.io/countryatlas/reference/deflate.md)/[`to_ppp()`](https://pursuitofdatascience.github.io/countryatlas/reference/to_ppp.md)
+  are the highest-value items here.** Comparing nominal GDP across
+  years, or market-rate GDP across countries, is a mistake that produces
+  plausible-looking wrong answers — exactly the failure mode the package
+  was built to eliminate for country names. The deflator/PPP series come
+  from WDI, so this is a join plus arithmetic plus very careful
+  documentation of which convention was applied.
 - **Population-weighted aggregation is a correctness issue, not a
   nicety.** An unweighted regional mean says “the average *country* in
   Sub-Saharan Africa”, which is almost never the intended quantity;
@@ -925,11 +994,12 @@ convergence_club(data, value)                       # club convergence / groupin
   Note that
   [`gini()`](https://pursuitofdatascience.github.io/countryatlas/reference/gini.md)/[`theil()`](https://pursuitofdatascience.github.io/countryatlas/reference/theil.md)
   already support weights — the inconsistency is worth closing.
-- **Anything imputed must be flagged.** `interpolate_missing()` must add
-  an `.imputed` logical column, and §7’s uncertainty/NA machinery must
-  treat imputed values differently from observed ones. Silently
-  interpolating into a map is the single easiest way for this package to
-  mislead someone.
+- **Anything imputed must be flagged.**
+  [`interpolate_missing()`](https://pursuitofdatascience.github.io/countryatlas/reference/interpolate_missing.md)
+  must add an `.imputed` logical column, and §7’s uncertainty/NA
+  machinery must treat imputed values differently from observed ones.
+  Silently interpolating into a map is the single easiest way for this
+  package to mislead someone.
 
 **Deps** none. **Effort** M. **Risk** low.
 
@@ -991,36 +1061,54 @@ guard** (§13) — a live mismatch between the shipped bridge and CRAN’s
 ggsql. 2.
 **[`morans_i()`](https://pursuitofdatascience.github.io/countryatlas/reference/morans_i.md)
 reports `n_excluded`** (§11) — a silent-omission fix. 3.
-**`na_style = "hatched"` + `coverage_map()` + `footnote = "auto"`**
-(§7). 4. **`classification_report` + `classify_compare()`** (§6), with
-the Brewer & Pickle evidence in the docs. 5. **`value_by_alpha_map()`**
+**`na_style = "hatched"` +
+[`coverage_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/coverage_map.md) +
+`footnote = "auto"`** (§7). 4. **`classification_report` +
+[`classify_compare()`](https://pursuitofdatascience.github.io/countryatlas/reference/classify_compare.md)**
+(§6), with the Brewer & Pickle evidence in the docs. 5.
+**[`value_by_alpha_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/value_by_alpha_map.md)**
 and **`cartogramR` as `type = "flow"`** (§8). 6.
-**`projection_compare()` + `projection_info()`**, and Equal Earth
-documented as the recommendation (§5). 7. `map_provenance()` +
+**[`projection_compare()`](https://pursuitofdatascience.github.io/countryatlas/reference/projection_compare.md) +
+[`projection_info()`](https://pursuitofdatascience.github.io/countryatlas/reference/projection_info.md)**,
+and Equal Earth documented as the recommendation (§5). 7.
+[`map_provenance()`](https://pursuitofdatascience.github.io/countryatlas/reference/map_provenance.md) +
 `inst/CITATION` (§14); `vdiffr` snapshots for the map verbs (§16).
 
-**Wave 2 — the data-source contract.** `register_country_source()` +
-`fetch_indicator()`/`add_indicator()` + the OWID/Eurostat/OECD
-adapters + `compare_sources()` + the generalised cache, with
-recorded-fixture tests (§3, §16). This is the deferral that has been
-open longest and the design above removes its blocker.
+**Wave 2 — the data-source contract.**
+[`register_country_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/register_country_source.md) +
+[`fetch_indicator()`](https://pursuitofdatascience.github.io/countryatlas/reference/fetch_indicator.md)/[`add_indicator()`](https://pursuitofdatascience.github.io/countryatlas/reference/add_indicator.md) +
+the OWID/Eurostat/OECD adapters +
+[`compare_sources()`](https://pursuitofdatascience.github.io/countryatlas/reference/compare_sources.md) +
+the generalised cache, with recorded-fixture tests (§3, §16). This is
+the deferral that has been open longest and the design above removes its
+blocker.
 
 **Wave 3 — time.** `country_groups_history` + `as_of` (§4, small and
-entirely offline), then `audit_time_coverage()`, then the COW/GW
-alternate spine and `cshapes` historical geometry (§4). The last is the
-biggest single new capability in this document.
+entirely offline), then
+[`audit_time_coverage()`](https://pursuitofdatascience.github.io/countryatlas/reference/audit_time_coverage.md),
+then the COW/GW alternate spine and `cshapes` historical geometry (§4).
+The last is the biggest single new capability in this document.
 
 **Wave 4 — honesty, continued.** `disputed_territories` + `status` +
-`world_map(disputes =)` + `dispute_policy()` (§9); `rate_check()`/
-`smooth_rates()` (§6); VSUP palettes and legend (§7);
-`deflate()`/`to_ppp()` and weighted
+`world_map(disputes =)` +
+[`dispute_policy()`](https://pursuitofdatascience.github.io/countryatlas/reference/dispute_policy.md)
+(§9);
+[`rate_check()`](https://pursuitofdatascience.github.io/countryatlas/reference/rate_check.md)/
+[`smooth_rates()`](https://pursuitofdatascience.github.io/countryatlas/reference/smooth_rates.md)
+(§6); VSUP palettes and legend (§7);
+[`deflate()`](https://pursuitofdatascience.github.io/countryatlas/reference/deflate.md)/[`to_ppp()`](https://pursuitofdatascience.github.io/countryatlas/reference/to_ppp.md)
+and weighted
 [`aggregate_regions()`](https://pursuitofdatascience.github.io/countryatlas/reference/aggregate_regions.md)
 (§15); the accessibility pass (§14).
 
-**Wave 5 — reach.** `country_weights()` + LISA/`lisa_map()` +
+**Wave 5 — reach.**
+[`country_weights()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_weights.md) +
+LISA/[`lisa_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/lisa_map.md) +
 non-geographic weights (§11); geodesic flows, OD maps,
-`country_network()`, Comtrade (§12); `mapgl` interactive globe (§13);
-`country_factsheet()`/`world_table()` (§14).
+[`country_network()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_network.md),
+Comtrade (§12); `mapgl` interactive globe (§13);
+[`country_factsheet()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_factsheet.md)/[`world_table()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_table.md)
+(§14).
 
 **Wave 6 — subnational.** ISO 3166-2 reconciliation, admin1 geometry,
 NUTS via `giscoR`/`regions` (§10). Last because it is the largest scope
@@ -1057,9 +1145,10 @@ hard dependency; taking a position on any territorial dispute.
     documented rows or the full ~188? Leaning: a documented,
     explicitly-scoped subset with sources — and the scope statement
     matters more than the row count.
-6.  **Do we ever impute?** (§7, §15.) If `interpolate_missing()` ships,
-    the `.imputed` flag must be non-optional and the map verbs must
-    honour it. If we cannot guarantee that, do not ship it.
+6.  **Do we ever impute?** (§7, §15.) If
+    [`interpolate_missing()`](https://pursuitofdatascience.github.io/countryatlas/reference/interpolate_missing.md)
+    ships, the `.imputed` flag must be non-optional and the map verbs
+    must honour it. If we cannot guarantee that, do not ship it.
 7.  **Snapshot cadence and size.** Refreshing `world_snapshot` yearly
     keeps examples current but churns the `.rda` and the package size.
     Yearly at release time, or only when coverage materially improves?

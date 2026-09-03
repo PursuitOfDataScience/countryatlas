@@ -24,7 +24,8 @@ globe_map(
   borders = TRUE,
   title = NULL,
   legend = NULL,
-  na_label = "No data"
+  na_label = "No data",
+  interactive = FALSE
 )
 ```
 
@@ -57,6 +58,13 @@ globe_map(
 
   As in
   [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md).
+
+- interactive:
+
+  If `TRUE`, return a MapLibre WebGL globe you can spin and zoom instead
+  of a static image. Needs `mapgl` and an `sf` frame; `lon` and `lat`
+  become the initial camera position and the drawing arguments above do
+  not apply.
 
 ## Value
 
