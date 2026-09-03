@@ -24,8 +24,10 @@ A documented \code{custom_match} table for entities that map backends
 code. Earlier versions of the package \emph{deleted} these regions; now they are
 \emph{matched} instead, so they stop silently disappearing from maps.
 
-\code{country_overrides()} is the preferred name as of the package's rename to
-countryatlas; \code{wdj_overrides()} is kept as a backward-compatible alias.
+\code{country_overrides()} is the current name, as of the package's rename to
+countryatlas. \strong{\code{wdj_overrides()} is deprecated} and warns once per session;
+it returns the same table and will be removed. The help page kept describing
+it as "a backward-compatible alias" after the code had started warning.
 }
 \details{
 The table maps a country/region name (as spelled by the geometry backends) to
@@ -53,7 +55,7 @@ ASCII spellings directly.
 }
 
 \examples{
-wdj_overrides()
-wdj_overrides(c(Somaliland = "SOM"))
+# `country_overrides()` is the current name; `wdj_overrides()` warns.
 country_overrides()
+country_overrides(c(Somaliland = "SOM"))
 }

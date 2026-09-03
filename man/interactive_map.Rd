@@ -8,7 +8,7 @@ interactive_map(
   data,
   fill,
   tooltip = NULL,
-  engine = c("plotly", "ggiraph", "leaflet", "ggsql"),
+  engine = c("plotly", "ggiraph", "leaflet", "ggsql", "mapgl"),
   ...
 )
 }
@@ -21,15 +21,20 @@ it already attached.}
 
 \item{tooltip}{Optional tooltip column (unquoted).}
 
-\item{engine}{\code{"plotly"} (default), \code{"ggiraph"}, \code{"leaflet"} or \code{"ggsql"}
+\item{engine}{\code{"plotly"} (default), \code{"ggiraph"}, \code{"leaflet"}, \code{"mapgl"} or
+\code{"ggsql"}. \code{"mapgl"} renders through MapLibre GL -- vector tiles, smooth
+zoom and a genuine interactive globe, which is what turns \code{\link[=globe_map]{globe_map()}}
+from a static novelty into something you can turn. It needs an \code{sf} frame
 (database-side rendering to a Vega-Lite widget; needs an \code{sf} frame and
 \code{ggsql} >= 0.4.1, the version that added the \verb{DRAW spatial} clause).
 \code{tooltip} is honoured by the \code{"ggiraph"} and \code{"leaflet"} engines (defaults
 to \code{fill} when omitted); \code{"plotly"}'s hover is controlled by \code{world_map()}
 aesthetics instead, and \code{"ggsql"} has no hover concept.}
 
-\item{...}{Passed to \code{\link[=world_map]{world_map()}} for the plotly/ggiraph engines, or to
-\code{\link[=world_query]{world_query()}} for the \code{"ggsql"} engine.}
+\item{...}{Passed to \code{\link[=world_map]{world_map()}} for the \code{"plotly"} engine, to
+\code{\link[=world_query]{world_query()}} for \code{"ggsql"}, and to \code{\link[mapgl:maplibre]{mapgl::maplibre()}} for \code{"mapgl"}.
+The \code{"ggiraph"} and \code{"leaflet"} engines assemble their own map and take no
+further arguments; they warn rather than ignore what they are given.}
 }
 \value{
 An interactive widget.

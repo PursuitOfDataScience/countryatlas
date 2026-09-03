@@ -117,7 +117,12 @@ common_indicators <- tribble(
   "school_enrollment",    "SE.PRM.ENRR",      "School enrollment, primary (% gross)",
   "health_expenditure",   "SH.XPD.CHEX.GD.ZS","Current health expenditure (% of GDP)",
   "electricity_access",   "EG.ELC.ACCS.ZS",   "Access to electricity (% of pop.)",
-  "mobile_subscriptions", "IT.CEL.SETS.P2",   "Mobile subscriptions (per 100 people)"
+  "mobile_subscriptions", "IT.CEL.SETS.P2",   "Mobile subscriptions (per 100 people)",
+  # The two price-conversion series deflate() and to_ppp() fetch by default.
+  # They belong in the catalogue for the same reason as the rest: a code the
+  # package reaches for should be discoverable without reading the source.
+  "gdp_deflator",         "NY.GDP.DEFL.ZS",   "GDP deflator (index, base year varies by country)",
+  "ppp_conversion",       "PA.NUS.PPP",       "PPP conversion factor, GDP (LCU per international $)"
 )
 
 # --- geometry-derived fields from the maps backend ----------------------------
@@ -166,7 +171,11 @@ cl <- as_tibble(codelist) |>
 
 wdi_meta <- tryCatch({
   as_tibble(WDI::WDI_data$country) |>
-    transmute(iso3c, capital = capital,
+    # WDI_data uses "" for an unknown capital, which passed straight through:
+    # country_meta ended up with five blank capitals alongside 34 NAs, so
+    # is.na(capital) was wrong for five countries and the factsheet printed
+    # "capital: " with nothing after it. One encoding for "unknown".
+    transmute(iso3c, capital = dplyr::na_if(trimws(capital), ""),
               capital_lat = suppressWarnings(as.numeric(latitude)),
               capital_lon = suppressWarnings(as.numeric(longitude)),
               income)

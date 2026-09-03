@@ -16,7 +16,8 @@ globe_map(
   borders = TRUE,
   title = NULL,
   legend = NULL,
-  na_label = "No data"
+  na_label = "No data",
+  interactive = FALSE
 )
 }
 \arguments{
@@ -33,6 +34,11 @@ pointing at the viewer).}
 (via \code{\link[ggplot2:coord_map]{ggplot2::coord_map()}}, no \code{sf} required).}
 
 \item{style, palette, n_bins, borders, title, legend, na_label}{As in \code{\link[=world_map]{world_map()}}.}
+
+\item{interactive}{If \code{TRUE}, return a MapLibre WebGL globe you can spin and
+zoom instead of a static image. Needs \code{mapgl} and an \code{sf} frame; \code{lon} and
+\code{lat} become the initial camera position and the drawing arguments above do
+not apply.}
 }
 \value{
 A \code{ggplot} object.

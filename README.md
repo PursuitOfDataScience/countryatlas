@@ -162,12 +162,156 @@ Every map below is one function call on the bundled offline snapshot.
 </tr>
 </table>
 
-Thirteen projections come along for the ride on the `sf` backend
-(`world_map(d, x, projection = "winkel_tripel")`), and `interactive_map()`
-hands the same frame to **plotly**, **ggiraph**, **leaflet** or **ggsql** for a
-web-ready widget. With `as_ggsql_source()` and `world_query()` the drawing
-happens *inside DuckDB* — countryatlas reconciles the countries, [ggsql](https://ggsql.org)
-renders them without ggplot2 or `sf` at runtime.
+`interactive_map()` hands the same frame to **plotly**, **ggiraph**,
+**leaflet** or **ggsql** for a web-ready widget. With `as_ggsql_source()` and
+`world_query()` the drawing happens *inside DuckDB* — countryatlas reconciles
+the countries, [ggsql](https://ggsql.org) renders them without ggplot2 or `sf` at runtime.
+
+## Honest by construction
+
+"Honest maps" is in the package description, so the package has to earn it.
+Four ways a world map misleads, the verb for each — and one more that makes the
+map admit what it did.
+
+**Your classification is doing the talking.** Equal-interval breaks put 92% of
+countries in one class here; quantiles spread them evenly. Same data, same
+palette, opposite conclusions.
+
+<img src="man/figures/README-h-classify.png" alt="The same GDP choropleth under quantile, Jenks, equal-interval and pretty breaks; the last two are almost entirely one colour">
+
+``` r
+p <- classify_compare(poly, gdp_per_capita)
+attr(p, "countryatlas_classification") |> filter(method %in% c("quantile", "equal"))
+#> # A tibble: 10 × 4
+#>    method   class                     n   share
+#>    <chr>    <chr>                 <int>   <dbl>
+#>  1 quantile [268.7,1662]             38 0.201  
+#>  2 quantile (1662,4594]              38 0.201  
+#>  3 quantile (4594,1.029e+04]         37 0.196  
+#>  4 quantile (1.029e+04,2.937e+04]    38 0.201  
+#>  5 quantile (2.937e+04,2.472e+05]    38 0.201  
+#>  6 equal    [268.7,4.965e+04]       173 0.915  
+#>  7 equal    (4.965e+04,9.903e+04]    13 0.0688 
+#>  8 equal    (9.903e+04,1.484e+05]     2 0.0106 
+#>  9 equal    (1.484e+05,1.978e+05]     0 0      
+#> 10 equal    (1.978e+05,2.472e+05]     1 0.00529
+```
+
+**Your projection is doing the talking too.** Tissot's indicatrix puts circles
+of equal ground radius on the map: whatever the projection does to them, it is
+doing to your data.
+
+<table>
+<tr>
+<td width="50%"><img src="man/figures/README-h-tissot-merc.png" alt="Tissot indicatrices on a Mercator map: circles stay round but grow enormously toward the poles"><br><sub><code>tissot_map("mercator")</code> — shapes right, areas wildly wrong</sub></td>
+<td width="50%"><img src="man/figures/README-h-tissot-ee.png" alt="Tissot indicatrices on an Equal Earth map: ellipses shear but hold constant area"><br><sub><code>tissot_map("equal_earth")</code> — areas right, shapes sheared</sub></td>
+</tr>
+<tr>
+<td colspan="2"><img src="man/figures/README-h-projections.png" alt="One choropleth drawn under Equal Earth, Robinson, Winkel tripel and Mercator"><br><sub><code>projection_compare(d, gdp_per_capita)</code> — and <code>projection_info()</code> for which of the thirteen are equal-area</sub></td>
+</tr>
+</table>
+
+**Grey means "no data", but it reads as "low".** Hatch the gaps so nobody
+mistakes them for a value, or map availability itself.
+
+<table>
+<tr>
+<td width="50%"><img src="man/figures/README-h-hatched.png" alt="Choropleth with the no-data countries drawn in diagonal hatching instead of grey"><br><sub><code>world_map(d, co2_per_capita, na_style = "hatched")</code></sub></td>
+<td width="50%"><img src="man/figures/README-h-coverage.png" alt="Map of which countries report CO2 per capita and which do not"><br><sub><code>coverage_map(d, co2_per_capita)</code></sub></td>
+</tr>
+</table>
+
+**A rate over eleven thousand people should not shout as loudly as one over a
+billion.** Value-by-alpha spends opacity on the denominator, so small-population
+countries recede — the cartogram's answer to the same problem, without
+distorting the geometry.
+
+<p align="center"><img src="man/figures/README-h-alpha.png" width="62%" alt="Value-by-alpha map: GDP per capita in colour, population as opacity, over a dark background"></p>
+
+``` r
+value_by_alpha_map(d, gdp_per_capita, population)
+```
+
+**And the map should say what it is.** `footnote = "auto"` writes the coverage
+line; `map_provenance()` answers the questions a reviewer asks first.
+
+``` r
+world_map(poly, gdp_per_capita, style = "quantile",
+          na_style = "hatched", footnote = "auto") |>
+  map_provenance()
+#> 
+#> ── countryatlas map provenance
+#> package: countryatlas 3.0.0 (snapshot 2024)
+#> fill: gdp_per_capita
+#> geometry: polygon backend, coord_quickmap
+#> classification: quantile, 5 bins
+#> missing data: hatched
+#> coverage: 189 countries shown, 51 missing
+#> breaks: 268.7 | 1662 | 4594 | 10290 | 29370 | 247200
+```
+
+## Other sources, other years, other levels
+
+The ISO spine is not only the World Bank's, and not only 2024's.
+
+<table>
+<tr>
+<td width="50%"><img src="man/figures/README-r-history.png" alt="World choropleth drawn on 1950 sovereign-state borders; most of Africa is absent because it was not yet independent"><br><sub><code>attach_geometry(d, year = 1950)</code> — 1950 borders, via CShapes. Africa is nearly empty because in 1950 almost none of it was sovereign; pass <code>dependencies = TRUE</code> for the colonies.</sub></td>
+<td width="50%"><img src="man/figures/README-r-lisa.png" alt="Map of LISA clusters: high-high, low-low and spatial outliers"><br><sub><code>lisa_map(d, gdp_per_capita, weights = country_weights("knn"))</code></sub></td>
+</tr>
+<tr>
+<td><img src="man/figures/README-r-grid.png" alt="Gridded cartogram: one square per fixed number of people"><br><sub><code>gridded_cartogram(d, population)</code> — one cell per N people, countable</sub></td>
+<td><img src="man/figures/README-h-alpha.png" alt="Value-by-alpha map"><br><sub><code>value_by_alpha_map(d, gdp_per_capita, population)</code></sub></td>
+</tr>
+<tr>
+<td colspan="2"><img src="man/figures/README-r-od.png" alt="Origin-destination small multiples: one panel per origin"><br><sub><code>od_map(flows, from, to, value)</code> — where each origin sends, when <code>flow_map()</code> would be spaghetti</sub></td>
+</tr>
+</table>
+
+**Membership is a function of time**, and a snapshot quietly misstates any panel
+that spans an accession:
+
+``` r
+c(`2016` = in_group("United Kingdom", "EU", as_of = 2016),
+  `2021` = in_group("United Kingdom", "EU", as_of = 2021))
+#>  2016  2021 
+#>  TRUE FALSE
+```
+
+**Islands have no land border**, so the default contiguity weights drop a
+quarter of the world from a "global" Moran's I. `country_weights()` fixes it,
+and the result says how many it dropped either way:
+
+``` r
+snap <- world_snapshot$countries
+cols <- c("i", "n", "n_excluded")
+rbind(
+  cbind(scheme = "contiguity",
+        morans_i(snap, gdp_per_capita, n_perm = 0)[cols]),
+  cbind(scheme = "knn",
+        morans_i(snap, gdp_per_capita, n_perm = 0,
+                 weights = country_weights("knn", k = 5))[cols])
+)
+#>       scheme         i   n n_excluded
+#> 1 contiguity 0.6073182 142         49
+#> 2        knn 0.4720522 189          2
+```
+
+**Any provider, one shape.** `register_country_source()` takes a fetch function
+and a name; `fetch_indicator()` and `compare_sources()` do the rest — including
+telling you where two providers disagree.
+
+``` r
+country_sources()[, c("source", "meta")]
+#> # A tibble: 5 × 2
+#>   source   meta                                                          
+#>   <chr>    <chr>                                                         
+#> 1 comtrade UN Comtrade bilateral trade (via comtradr); needs an API token
+#> 2 eurostat Eurostat (via eurostat); European coverage only               
+#> 3 oecd     OECD statistics (via OECD)                                    
+#> 4 owid     Our World in Data (via owidR)                                 
+#> 5 wdi      World Bank World Development Indicators (via WDI)
+```
 
 ## Beyond the map
 
@@ -196,16 +340,22 @@ convert_country(c("Japan", "Brazil"), to = "flag")
 
 |  |  |
 |----|----|
-| **Assemble** | `world_data()` `country_data()` `world_geometry()` `attach_geometry()` `clear_wdi_cache()` |
-| **Join** | `standardize_country()` `join_world()` `country_join()` `country_join_all()` `dissolve_country()` |
-| **Diagnose** | `check_country_match()` `repair_country_names()` `audit_coverage()` `country_overrides()` `wdj_overrides()` |
+| **Assemble** | `world_data()` `country_data()` `world_geometry()` `attach_geometry()` `clear_country_cache()` |
+| **Other sources** | `register_country_source()` `country_sources()` `fetch_indicator()` `add_indicator()` `compare_sources()` `fetch_owid()` `fetch_eurostat()` `fetch_oecd()` `fetch_comtrade()` |
+| **Join** | `standardize_country()` `join_world()` `country_join()` `country_join_all()` `dissolve_country()` `standardize_subnational()` |
+| **Diagnose** | `check_country_match()` `repair_country_names()` `audit_coverage()` `audit_time_coverage()` `rate_check()` `check_dispute_coverage()` `country_overrides()` |
 | **Look up** | `convert_country()` `country_codes()` `country_groups()` `in_group()` `wdi_search()` |
-| **Compute** | `per_capita()` `share_of_world()` `growth_rate()` `index_to()` `rank_countries()` `aggregate_regions()` `complete_years()` `lag_by_country()` `diff_by_country()` `correlate_indicators()` |
-| **Measure spread** | `gini()` `theil()` `beta_convergence()` `sigma_convergence()` `morans_i()` |
-| **Locate** | `locate_country()` `neighbors()` `country_borders()` `distance_between()` `simplify_geometry()` |
-| **Draw** | `world_map()` `globe_map()` `spin_globe()` `facet_map()` `bubble_map()` `spike_map()` `bivariate_map()` `cartogram_map()` `dorling_map()` `tile_map()` `flow_map()` `animate_world()` `interactive_map()` `geom_country_labels()` `theme_world_map()` |
+| **Compute** | `per_capita()` `share_of_world()` `growth_rate()` `index_to()` `rank_countries()` `aggregate_regions()` `complete_years()` `lag_by_country()` `diff_by_country()` `correlate_indicators()` `deflate()` `to_ppp()` `smooth_rates()` `interpolate_missing()` |
+| **Measure spread** | `gini()` `theil()` `beta_convergence()` `sigma_convergence()` `convergence_club()` |
+| **Spatial statistics** | `country_weights()` `morans_i()` `local_morans()` `lisa_map()` `gearys_c()` `getis_ord()` `spatial_lag()` |
+| **Locate** | `locate_country()` `neighbors()` `country_borders()` `distance_between()` `simplify_geometry()` `nuts_geometry()` |
+| **Travel in time** | `historical_geometry()` `country_timeline()` `country_groups(as_of=)` `in_group(as_of=)` |
+| **Relate** | `flow_matrix()` `country_network()` `od_map()` |
+| **Draw** | `world_map()` `globe_map()` `spin_globe()` `facet_map()` `bubble_map()` `spike_map()` `bivariate_map()` `cartogram_map()` `dorling_map()` `value_by_alpha_map()` `tile_map()` `flow_map()` `animate_world()` `interactive_map()` `gridded_cartogram()` `subnational_map()` `geom_country_labels()` `theme_world_map()` |
+| **Keep honest** | `classify_compare()` `coverage_map()` `projection_info()` `projection_compare()` `projection_distortion()` `tissot_map()` `cartogram_diagnostics()` `map_provenance()` `dispute_policy()` |
+| **Report** | `country_factsheet()` `world_table()` |
 | **Push to the database** | `as_ggsql_source()` `world_query()` |
-| **Bundled data** | `world_snapshot` `country_meta` `common_indicators` `country_groups_tbl` `world_tiles` `historical_codes` |
+| **Bundled data** | `world_snapshot` `country_meta` `common_indicators` `country_groups_tbl` `country_groups_history` `disputed_territories` `world_tiles` `historical_codes` |
 
 ## Offline by default
 
@@ -223,6 +373,14 @@ Live `world_data()` calls are memoised on disk between sessions.
 | `cartogram` + `sf` | `cartogram_map()`, `dorling_map()` |
 | `biscale` + `sf` | `bivariate_map()` |
 | `gganimate` + `gifski` or `magick` | `animate_world()`, `spin_globe()` |
+| `cartogramR` | `cartogram_map(type = "flow")`, the fast Gastner-Seguy-More algorithm |
+| `cshapes` | `historical_geometry()` and `attach_geometry(year=)` |
+| `owidR` / `eurostat` / `OECD` / `comtradr` | the four built-in `fetch_*()` source adapters |
+| `mapgl` | `interactive_map(engine = "mapgl")`, `globe_map(interactive = TRUE)` |
+| `tmap` | `world_map(engine = "tmap")` |
+| `giscoR` / `regions` | `nuts_geometry()`, `standardize_subnational()` |
+| `gt` | `world_table()` |
+| `ggpattern` | `world_map(na_style = "hatched")` |
 | `plotly` / `ggiraph` / `leaflet` / `ggsql` | the four `interactive_map()` engines |
 | `duckdb` + `DBI`, or `nanoarrow` | `as_ggsql_source()` |
 | `stringdist` | fuzzy matching in `repair_country_names()` and `check_country_match()` |

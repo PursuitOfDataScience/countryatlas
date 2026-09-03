@@ -12,7 +12,8 @@ attach_geometry(
   region = NULL,
   projection = "equal_earth",
   recenter = NULL,
-  overrides = country_overrides()
+  overrides = country_overrides(),
+  year = NULL
 )
 }
 \arguments{
@@ -22,18 +23,24 @@ attach_geometry(
 
 \item{geometry}{\code{"polygon"} (default) or \code{"sf"}.}
 
-\item{scale}{Natural Earth resolution for the \code{sf} backend. \code{"large"} needs the
+\item{scale}{Natural Earth resolution for the \code{sf} backend. The polygon
+backend serves one bundled resolution and warns if asked for another. \code{"large"} needs the
 non-CRAN \code{rnaturalearthhires} package; see \code{\link[=world_geometry]{world_geometry()}}. It also
 affects which countries are covered at all -- see below.}
 
 \item{region}{Optional region subset (see \code{\link[=world_geometry]{world_geometry()}}).}
 
 \item{projection, recenter}{Projection, and optional central meridian, for
-the \code{sf} backend (see \code{\link[=world_map]{world_map()}} for the projections available).}
+the \code{sf} backend (see \code{\link[=world_map]{world_map()}} for the projections available). The
+polygon backend can do neither and warns if asked.}
 
 \item{overrides}{Name -> iso3c overrides applied when matching the geometry
 backend's country names (default \code{\link[=country_overrides]{country_overrides()}}). Pass a custom set
 built with \code{\link[=country_overrides]{country_overrides()}} to add your own.}
+
+\item{year}{Attach historical geometry for this year instead of present-day
+borders, via \code{\link[=historical_geometry]{historical_geometry()}}. Entities that never had an ISO code
+cannot match on \code{iso3c}, so a low match rate warns.}
 }
 \value{
 For \code{"polygon"}, a tibble with \code{long}/\code{lat}/\code{group} plus your

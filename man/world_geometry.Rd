@@ -10,7 +10,8 @@ world_geometry(
   scale = "small",
   region = NULL,
   projection = "equal_earth",
-  recenter = NULL
+  recenter = NULL,
+  year = NULL
 )
 }
 \arguments{
@@ -19,7 +20,8 @@ world_geometry(
 
 \item{geometry}{\code{"polygon"} (a tibble of \code{long}/\code{lat}/\code{group}) or \code{"sf"}.}
 
-\item{scale}{Natural Earth resolution for the \code{sf} backend:
+\item{scale}{Natural Earth resolution for the \code{sf} backend. The polygon
+backend serves one bundled resolution and warns if asked for another:
 \code{"small"} (110m), \code{"medium"} (50m) or \code{"large"} (10m). \code{"large"}
 additionally needs the \code{rnaturalearthhires} package, which is not on CRAN
 (\verb{install.packages("rnaturalearthhires", repos =}
@@ -34,9 +36,16 @@ properly, via \code{sf::st_crop()}, on the \code{sf} backend. The polygon backen
 only drop the vertices outside the box, which leaves a country straddling
 the edge with an approximate outline, so it warns.}
 
-\item{projection}{Projection for the \code{sf} backend (see \code{\link[=world_map]{world_map()}}).}
+\item{projection}{Projection for the \code{sf} backend (see \code{\link[=world_map]{world_map()}}). The
+polygon backend returns unprojected longitude/latitude and warns if asked
+to project.}
 
-\item{recenter}{Optional central meridian for a recentred map (e.g. \code{150}).}
+\item{recenter}{Optional central meridian (e.g. \code{150}) for the \code{sf} backend.
+The polygon backend cannot recentre and warns if asked to.}
+
+\item{year}{Draw the world as it was in this year, via \code{\link[=historical_geometry]{historical_geometry()}}
+and CShapes (1886-2019). Returns \code{sf} keyed on \code{gwcode}; only
+\code{what = "countries"} is available, and \code{region} cannot be combined with it.}
 }
 \value{
 A tibble (polygon backend) or \code{sf} object (sf backend), with columns

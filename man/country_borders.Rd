@@ -7,8 +7,8 @@
 country_borders(scale = "small", region = NULL)
 }
 \arguments{
-\item{scale}{Natural Earth resolution to compute adjacency from. Coarser
-scales simplify small slivers and may miss a handful of short borders.
+\item{scale}{Natural Earth resolution to compute adjacency from. This is not
+a cosmetic choice -- see \emph{Which countries the default leaves out} below.
 \code{"large"} needs the non-CRAN \code{rnaturalearthhires} package; see
 \code{\link[=world_geometry]{world_geometry()}}.}
 
@@ -37,6 +37,28 @@ would build edges from each country's code to its own name:
 
 Attaching \code{igraph} also masks \code{\link[=neighbors]{neighbors()}}, which it exports too, so call
 that one as \code{countryatlas::neighbors()} from then on.
+}
+
+\section{Which countries the default leaves out}{
+
+Adjacency is computed from Natural Earth polygons, and the default
+\code{scale = "small"} (110m) has no polygon at all for the European microstates.
+\strong{Andorra, Liechtenstein, Monaco, San Marino and the Vatican are therefore
+absent from the table entirely} -- not merely missing a short border, but
+contributing no rows, despite a land border being the whole of their
+geography. The default reports 310 pairs over 153 countries; France comes
+back with 8 neighbours rather than 10.
+
+\code{scale = "medium"} (50m) has all five, giving 322 pairs over 162 countries
+and France its full list. Use it whenever the microstates matter:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{country_borders(scale = "medium")
+}\if{html}{\out{</div>}}
+
+The same 110m gap is why \code{\link[=morans_i]{morans_i()}}'s contiguity weights exclude them --
+see its \code{n_excluded} -- and it is the land-border twin of the island problem
+described in \code{vignette("honest-maps")}. Note the two Guiana borders are real,
+not artefacts: French Guiana makes Brazil and Suriname neighbours of France.
 }
 
 \examples{

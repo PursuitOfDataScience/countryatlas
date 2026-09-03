@@ -108,8 +108,7 @@ test_that("correlate_indicators reproduces stats::cor on complete pairs", {
 })
 
 test_that("morans_i matches an independently built row-standardised statistic", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   got <- morans_i(snap, gdp_per_capita, n_perm = 0)
 
@@ -197,8 +196,7 @@ test_that("the sf backend de-duplicates divided countries before breaking", {
   # An sf frame is NOT exactly one row per country: Cyprus occupies two rows
   # sharing one iso3c at 110m (Cyprus and India at 50m). Breaking on the raw
   # column double-counted them, which moved real countries into the wrong bin.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   sfd <- attach_geometry(snap, geometry = "sf")
   expect_gt(nrow(sfd), dplyr::n_distinct(sfd$iso3c))   # duplicates really exist
@@ -316,8 +314,7 @@ test_that("the package never reseeds the caller's RNG", {
 })
 
 test_that("morans_i is reproducible under a seed and leaves i deterministic", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   set.seed(42); a <- morans_i(snap, gdp_per_capita, n_perm = 99)
   set.seed(42); b <- morans_i(snap, gdp_per_capita, n_perm = 99)
@@ -336,8 +333,7 @@ test_that("morans_i is reproducible under a seed and leaves i deterministic", {
 })
 
 test_that("n_perm = 0 does not consume the caller's random stream", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   set.seed(1)
   before <- .Random.seed
@@ -354,8 +350,7 @@ test_that("n_perm = 0 does not consume the caller's random stream", {
 })
 
 test_that("the permutation p-value respects its own floor", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   # p = (exceedances + 1) / (n_perm + 1), so it can never be 0 and never below
   # 1/(n_perm + 1).
@@ -410,8 +405,7 @@ test_that("Moran's I matches the standard statistic's properties", {
   # ?morans_i says no spdep is needed because "at ~200 countries the dense
   # arithmetic is trivial". These are the properties that make that claim
   # checkable without spdep, which is not a dependency.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   r <- morans_i(snap, gdp_per_capita, n_perm = 0)
 
@@ -488,8 +482,7 @@ test_that("the verbs do not depend on input row order", {
   expect_equal(ord(complete_years(pan)), ord(complete_years(span)),
                ignore_attr = TRUE)
 
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   sfd <- attach_geometry(snap, geometry = "sf")
   set.seed(9)
   shs <- sfd[sample(nrow(sfd)), ]
@@ -525,9 +518,122 @@ test_that("attach_geometry refuses a frame that already has geometry", {
     expect_silent(globe_map(poly, gdp_per_capita, backend = "polygon"))
   }
 
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   sfd <- attach_geometry(snap, geometry = "sf")
   expect_error(attach_geometry(sfd, geometry = "sf"), "already has map geometry")
   expect_s3_class(attach_geometry(reduced, geometry = "sf"), "sf")
+})
+
+# --- algebraic invariants -----------------------------------------------------
+#
+# The anchors above pin single values. These pin *relationships*, which is what
+# catches a normalisation or off-by-one slip: a wrong divisor can still match a
+# hand-computed anchor for one input while breaking the identity for every
+# other one. None of these properties was pinned before.
+
+test_that("share_of_world shares are a proper distribution", {
+  d <- data.frame(iso3c = rep(c("USA", "FRA", "JPN", "BRA"), each = 2),
+                  year = rep(2019:2020, 4), v = c(10, 20, 30, 40, 50, 60, 70, 80))
+  s <- share_of_world(d, v)
+  # Shares are of the world total *within* each year, so each year sums to one.
+  per_year <- tapply(s$v_share, s$year, sum)
+  expect_equal(as.numeric(per_year), rep(1, length(per_year)))
+  expect_true(all(s$v_share >= 0 & s$v_share <= 1))
+})
+
+test_that("per_capita and the rate helpers satisfy their identities", {
+  d <- data.frame(iso3c = c("USA", "FRA"), year = 2020L, v = c(250, 400),
+                  pop = c(1e6, 5e5), defl = c(100, 100), f = c(1, 1))
+  pc <- per_capita(d, v, pop = pop)
+  # Dividing then multiplying back must land on the original value.
+  expect_equal(pc$v_per_capita * pc$pop, pc$v)
+  # A deflator equal to the base year, and a PPP factor of one, are identities.
+  expect_equal(deflate(d, v, base_year = 2020, deflator = defl)$v_real, d$v)
+  expect_equal(to_ppp(d, v, factor = f)$v_ppp, d$v)
+})
+
+test_that("rank_countries returns a genuine ranking", {
+  d <- data.frame(iso3c = c("USA", "FRA", "JPN", "BRA"), v = c(30, 10, 40, 20))
+  r <- rank_countries(d, v)
+  expect_identical(sort(r$rank), seq_len(nrow(r)))
+  expect_equal(r$v[which.min(r$rank)], max(d$v))   # rank 1 is the largest
+  expect_true(all(r$percentile >= 0 & r$percentile <= 1))
+  expect_equal(mean(r$z_score), 0)
+})
+
+test_that("index_to is exactly `to` at the base year", {
+  d <- data.frame(iso3c = rep(c("USA", "FRA"), each = 3),
+                  year = rep(2018:2020, 2), v = c(50, 60, 70, 80, 90, 100))
+  it <- index_to(d, v, 2018, to = 100)
+  expect_equal(it$v_index[it$year == 2018], c(100, 100))
+  it7 <- index_to(d, v, 2019, to = 7)
+  expect_equal(it7$v_index[it7$year == 2019], c(7, 7))
+})
+
+test_that("compounding growth_rate reconstructs the series", {
+  d <- data.frame(iso3c = "USA", year = 2017:2020, v = c(100, 110, 121, 133.1))
+  g <- growth_rate(d, v)
+  g <- g[order(g$year), ]
+  # Each rate is the step from the previous year, so the cumulative product of
+  # (1 + rate) must walk the original series back out.
+  expect_equal(g$v[1] * cumprod(c(1, 1 + g$v_growth[-1])), g$v)
+})
+
+test_that("gini and theil hit their analytic bounds and are scale free", {
+  expect_equal(gini(rep(5, 10)), 0)
+  expect_equal(theil(rep(5, 10)), 0)
+  # One holder of everything is the maximum for a population of n.
+  expect_equal(gini(c(rep(0, 9), 1)), 9 / 10)
+  # Both indices are relative, so multiplying every value leaves them alone.
+  x <- c(3, 7, 11, 29, 101)
+  expect_equal(gini(x), gini(x * 1000))
+  expect_equal(theil(x), theil(x * 1000))
+})
+
+test_that("the spatial statistics satisfy their algebraic identities", {
+  skip_if_no_sf_geometry()
+  snap <- countryatlas::world_snapshot$countries
+  d <- snap[!is.na(snap$gdp_per_capita), c("iso3c", "gdp_per_capita")]
+  w <- suppressWarnings(country_weights("knn", countries = d$iso3c, k = 5))
+
+  mi <- suppressWarnings(morans_i(d, gdp_per_capita, weights = w, n_perm = 0))
+  gc <- suppressWarnings(gearys_c(d, gdp_per_capita, weights = w, n_perm = 0))
+  lm <- suppressWarnings(local_morans(d, gdp_per_capita, weights = w,
+                                      n_perm = 0))
+
+  # Expectations under the null of no spatial association.
+  expect_equal(mi$expected, -1 / (mi$n - 1))
+  expect_equal(gc$expected, 1)
+
+  # Anselin (1995): with row-standardised weights the local statistics average
+  # to the global one. This is the check that keeps the two implementations
+  # from drifting apart -- each could match a reference on its own and still
+  # disagree with the other.
+  expect_equal(mean(lm$ii, na.rm = TRUE), mi$i, tolerance = 1e-8)
+
+  # Moran's I is built from standardised deviations, so an affine rescaling of
+  # the values must leave it alone.
+  d2 <- d
+  d2$gdp_per_capita <- d$gdp_per_capita * 1000 + 7
+  expect_equal(suppressWarnings(morans_i(d2, gdp_per_capita, weights = w,
+                                         n_perm = 0))$i, mi$i)
+
+  # A constant field has no variance to explain: the statistic is undefined and
+  # the spatial lag is the constant itself.
+  dc <- d
+  dc$gdp_per_capita <- 5
+  expect_true(is.na(suppressWarnings(morans_i(dc, gdp_per_capita, weights = w,
+                                              n_perm = 0))$i))
+  # The lag of a constant is that constant wherever a neighbour exists. It is
+  # NA where the weights cannot place a country -- no centroid under knn, no
+  # land border under the contiguity default, which by documentation excludes
+  # every island -- and that is a coverage fact, not an arithmetic failure. The
+  # comparison needs a tolerance too: row-standardised weights sum to one only
+  # to floating point, so the lag is 5 but not bit-exactly 5.
+  for (wts in list(w, NULL)) {
+    sl <- suppressWarnings(spatial_lag(dc, gdp_per_capita, weights = wts))
+    got <- sl$gdp_per_capita_lag[!is.na(sl$gdp_per_capita_lag)]
+    expect_gt(length(got), 0L)
+    expect_equal(got, rep(5, length(got)))
+  }
 })

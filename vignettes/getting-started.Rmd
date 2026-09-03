@@ -40,14 +40,15 @@ data_2020 <- attach_geometry(world_snapshot$countries, geometry = "polygon")
 
 No `geom_polygon()` boilerplate — `world_map()` does it:
 
-```{r}
+```{r fig.alt = "World choropleth of GDP per capita in quantile bins."}
 world_map(data_2020, gdp_per_capita, style = "quantile",
           title = "GDP per capita")
 ```
 
-Income is an ordered factor, so a categorical fill reads naturally:
+Income is a factor whose levels are already in income order, so a categorical
+fill reads naturally:
 
-```{r}
+```{r fig.alt = "World map coloured by World Bank income group."}
 world_map(data_2020, income, style = "categorical")
 ```
 

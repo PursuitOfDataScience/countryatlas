@@ -101,16 +101,14 @@ test_that("complete_years rejects a value column that isn't there", {
 
 test_that("morans_i validates n_perm", {
   # need_pkg("sf") runs before the scalar check.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   expect_error(morans_i(snap, gdp_per_capita, n_perm = -5), "`n_perm`")
   expect_error(morans_i(snap, gdp_per_capita, n_perm = NA),
                "single finite number")
 })
 
 test_that("simplify_geometry validates keep", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   g <- world_geometry("countries", geometry = "sf")
   expect_error(simplify_geometry(g, keep = 1.5), "between 0 and 1")
   expect_error(simplify_geometry(g, keep = NA), "single finite number")
@@ -137,8 +135,7 @@ test_that("count arguments are bounded so as.integer() cannot make them NA", {
 })
 
 test_that("morans_i bounds n_perm and no longer clamps it redundantly", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   expect_error(morans_i(snap, gdp_per_capita, n_perm = 1e10), "2147483647")
   # n_perm = 0 skips the permutation test; validation admits it.
@@ -153,8 +150,7 @@ test_that("simplify_geometry(keep = 0) is rejected on both backends", {
   # rmapshaper requires keep > 0, but the st_simplify() fallback silently
   # accepted 0 (dTolerance = 10000), so the same call errored or not depending
   # on which optional package the caller had.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   g <- world_geometry("countries", geometry = "sf")
   expect_error(simplify_geometry(g, keep = 0), class = "countryatlas_error")
   expect_error(simplify_geometry(g, keep = 0), "greater than 0")
@@ -477,8 +473,8 @@ test_that("omitting a required argument names that argument", {
                "`from` is required")
   expect_error(world_map(mapdf), class = "countryatlas_error")
   # Optional tidy-eval arguments must stay optional.
-  expect_s3_class(bubble_map(snap, population), "ggplot")
-  expect_s3_class(tile_map(snap, gdp_per_capita), "ggplot")
+  expect_s3_class(suppressWarnings(bubble_map(snap, population)), "ggplot")
+  expect_s3_class(suppressWarnings(tile_map(snap, gdp_per_capita)), "ggplot")
   expect_s3_class(world_map(mapdf, gdp_per_capita), "ggplot")
 })
 
@@ -522,8 +518,7 @@ test_that("locate_country's documented lon/lat contract matches its code", {
   # ?locate_country said lon/lat were "recycled together" while the code has
   # always required equal lengths. The doc now says equal-length; pin the
   # behaviour so the two cannot drift apart again.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   expect_error(locate_country(c(2.3, 10), 48.9), "equal-length")
   expect_error(locate_country(2.3, c(48.9, 50)), "equal-length")
   expect_equal(nrow(locate_country(c(2.3, 10), c(48.9, 50))), 2L)
@@ -574,8 +569,7 @@ test_that("lagging a categorical column is still allowed", {
 })
 
 test_that("morans_i no longer accepts a factor and returns a number anyway", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   snap$gg <- factor(round(snap$gdp_per_capita))
   expect_error(morans_i(snap, gg, n_perm = 0), "must be numeric")
@@ -609,8 +603,7 @@ test_that("world_map()/globe_map() label and palette arguments are checked", {
   # back in their vocabulary, not the package's: a length-2 `palette` hit a bare
   # switch() and produced "EXPR must be a length 1 vector", and a numeric one was
   # accepted without a word. world_query() already validated the same arguments.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   sfd <- attach_geometry(snap, geometry = "sf")
 
@@ -690,8 +683,7 @@ test_that("locate_country validates tolerance_km", {
     expect_error(locate_country(lon = 0, lat = 0, tolerance_km = bad),
                  "tolerance_km", info = paste(deparse(bad), collapse = ""))
   }
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   expect_identical(locate_country(lon = -140, lat = -20, tolerance_km = 25)$iso3c,
                    NA_character_)
 })
@@ -707,8 +699,7 @@ test_that("correlate_indicators validates min_n", {
 
 test_that("dorling_map validates k and itermax", {
   # An sf frame, so the only thing left to reject is the scalar.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   skip_if_not_installed("cartogram")
   sfd <- attach_geometry(countryatlas::world_snapshot$countries, geometry = "sf")
   for (bad in list(NA, "a", c(1, 2), -1)) {
@@ -725,8 +716,7 @@ test_that("a bad argument is reported before any optional-package gate", {
   # argument. (spin_globe had this for its scalars but not for `fill`, and
   # interactive_map(engine = "ggsql") reported a missing ggsql for a non-sf
   # frame -- a package that has not shipped in the R bindings at all.)
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   sfd <- attach_geometry(snap, geometry = "sf")
 
@@ -783,8 +773,7 @@ test_that("every numeric bound is pinned at its own edge", {
   # tolerance_km's bound survived a 0 -> -1 shift because its only rejection
   # test used -5. So assert the value *immediately* outside each bound, and the
   # boundary value itself, which iteration-24's lesson says must actually work.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   sfd <- attach_geometry(snap, geometry = "sf")
   poly <- if (requireNamespace("maps", quietly = TRUE)) {
@@ -868,8 +857,7 @@ test_that("dorling_map rejects k = 0, which cartogram cannot use", {
   # a validator letting through a value the next layer cannot represent, which
   # is the same hole the integer.max ceilings were added to close. Anything
   # above zero is fine.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   skip_if_not_installed("cartogram")
   sfd <- attach_geometry(countryatlas::world_snapshot$countries, geometry = "sf")
   expect_error(dorling_map(sfd, population, k = 0), "greater than 0",
@@ -884,8 +872,7 @@ test_that("a user column named like an internal temp column is harmless", {
   # answer must not change. (An earlier pass reported per_capita() failing on a
   # user `.wdj_pop`; that turned out to be the probe's WDI mock, not a
   # collision -- the control failed identically without the column.)
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   d <- snap[1:6, c("iso3c", "country", "continent", "gdp_per_capita",
                    "population")]
@@ -929,7 +916,10 @@ test_that("a user column named like an internal temp column is harmless", {
     pan <- data.frame(iso3c = rep(c("USA", "FRA"), each = 2),
                       year = c(2022, 2023, 2022, 2023), gdp = 1:4)
     pan$.wdj_pop <- -1
-    expect_identical(nrow(per_capita(pan, gdp, cache = FALSE)), 4L)
+    # The point here is the column collision, not the fetched population, which
+    # in this stubbed environment is unusable and now says so.
+    expect_identical(nrow(suppressWarnings(
+      per_capita(pan, gdp, cache = FALSE))), 4L)
   })
 
   # share_of_world computes its total in a local, so `.wdj_tot` cannot collide.

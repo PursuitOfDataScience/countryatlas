@@ -8,8 +8,9 @@
 A list with three elements:
 \describe{
 \item{countries}{A tibble, one row per country, with \code{iso3c}, \code{iso2c},
-\code{country}, classifications and curated indicators
-(\code{gdp_per_capita}, \code{population}, \code{life_expectancy}, \code{co2_per_capita}).}
+\code{country}, the classifications \code{continent}, \code{region} and \code{income}, and
+the curated indicators \code{gdp_per_capita}, \code{population},
+\code{life_expectancy} and \code{co2_per_capita}.}
 \item{sf}{\code{NULL} in the released package -- geometry is not bundled twice.
 Attach it on demand with \code{\link[=attach_geometry]{attach_geometry()}}:
 \code{attach_geometry(world_snapshot$countries, geometry = "sf")} pulls the

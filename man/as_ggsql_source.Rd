@@ -35,6 +35,18 @@ this used to default to did.}
 \value{
 Depending on \code{format}: a DuckDB connection (with the table written),
 a Parquet file path, or a nanoarrow array stream.
+
+\strong{You own the connection} that \code{format = "duckdb"} returns, and duckdb
+keeps its in-memory database alive until the handle is released, so close
+it when you are done:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{src <- as_ggsql_source(d, format = "duckdb")
+on.exit(DBI::dbDisconnect(src, shutdown = TRUE))
+}\if{html}{\out{</div>}}
+
+\code{format = "parquet"} needs no such care: it closes the connection it
+opened before returning the path. Passing your own \code{con} leaves it open
+in every case, since it was never ours to close.
 }
 \description{
 Hand countryatlas's curated, ISO-reconciled, WDI-joined spatial table to

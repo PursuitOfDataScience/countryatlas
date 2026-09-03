@@ -16,7 +16,7 @@ knitr::opts_chunk$set(
   message = FALSE,
   warning = FALSE,
   fig.path = "man/figures/README-",
-  dpi = 130,
+  dpi = 110,
   out.width = "100%"
 )
 ```
@@ -141,7 +141,7 @@ sfd  <- attach_geometry(snap, geometry = "sf")
 bare <- theme(legend.position = "none", plot.margin = margin(1, 1, 1, 1))
 thumb <- function(name, plot, w = 4.4, h = 2.5) {
   suppressWarnings(ggsave(file.path("man", "figures", paste0("README-", name, ".png")),
-                          plot + bare, width = w, height = h, dpi = 130, bg = "white"))
+                          plot + bare, width = w, height = h, dpi = 110, bg = "white"))
 }
 
 thumb("g-choropleth", world_map(poly, gdp_per_capita, style = "quantile"))
@@ -171,8 +171,40 @@ thumb("g-facet", facet_map(years, life_exp, year, style = "quantile", ncol = 3),
       w = 8.8, h = 2.0)
 
 spin_globe(snap, continent, backend = "polygon", style = "categorical",
-           n_frames = 36, fps = 12, width = 360, height = 360,
+           n_frames = 24, fps = 10, width = 320, height = 320,
            file = file.path("man", "figures", "README-g-spin.gif"))
+
+# --- the honesty verbs ---
+thumb("h-classify", classify_compare(poly, gdp_per_capita, ncol = 4),
+      w = 11, h = 2.2)
+thumb("h-tissot-merc", tissot_map("mercator", spacing = 30))
+thumb("h-tissot-ee", tissot_map("equal_earth", spacing = 30))
+thumb("h-hatched", world_map(poly, co2_per_capita, style = "quantile",
+                             na_style = "hatched"))
+thumb("h-coverage", coverage_map(poly, co2_per_capita))
+thumb("h-alpha", value_by_alpha_map(poly, gdp_per_capita, population))
+thumb("h-projections",
+      projection_compare(sfd, gdp_per_capita, style = "quantile",
+                         labeller = "property", ncol = 4),
+      w = 11, h = 2.6)
+
+# --- reach: other sources, other years, other levels ---
+set.seed(1)
+thumb("r-lisa", lisa_map(poly, gdp_per_capita,
+                         weights = country_weights("knn", k = 5), n_perm = 199))
+thumb("r-history",
+      suppressWarnings(attach_geometry(snap[, c("iso3c", "gdp_per_capita")],
+                                       year = 1950)) |>
+        world_map(gdp_per_capita, style = "quantile"))
+corridor_od <- tibble(
+  from  = rep(c("China", "Germany", "United States"), each = 4),
+  to    = c("United States", "Japan", "Brazil", "Australia",
+            "France", "Italy", "Poland", "Turkey",
+            "Mexico", "Canada", "Japan", "United Kingdom"),
+  value = c(500, 200, 90, 70, 80, 70, 60, 50, 300, 280, 120, 110)
+)
+thumb("r-od", od_map(corridor_od, from, to, value, origins = 3), w = 8.8, h = 2.2)
+thumb("r-grid", gridded_cartogram(snap, population, cells = 600))
 ```
 
 ```{=html}
@@ -206,12 +238,131 @@ spin_globe(snap, continent, backend = "polygon", style = "categorical",
 </table>
 ```
 
-Thirteen projections come along for the ride on the `sf` backend
-(`world_map(d, x, projection = "winkel_tripel")`), and `interactive_map()`
-hands the same frame to **plotly**, **ggiraph**, **leaflet** or **ggsql** for a
-web-ready widget. With `as_ggsql_source()` and `world_query()` the drawing
-happens *inside DuckDB* — countryatlas reconciles the countries, [ggsql][ggsql]
-renders them without ggplot2 or `sf` at runtime.
+`interactive_map()` hands the same frame to **plotly**, **ggiraph**,
+**leaflet** or **ggsql** for a web-ready widget. With `as_ggsql_source()` and
+`world_query()` the drawing happens *inside DuckDB* — countryatlas reconciles
+the countries, [ggsql][ggsql] renders them without ggplot2 or `sf` at runtime.
+
+## Honest by construction
+
+"Honest maps" is in the package description, so the package has to earn it.
+Four ways a world map misleads, the verb for each — and one more that makes the
+map admit what it did.
+
+**Your classification is doing the talking.** Equal-interval breaks put 92% of
+countries in one class here; quantiles spread them evenly. Same data, same
+palette, opposite conclusions.
+
+```{=html}
+<img src="man/figures/README-h-classify.png" alt="The same GDP choropleth under quantile, Jenks, equal-interval and pretty breaks; the last two are almost entirely one colour">
+```
+
+```{r classify-report}
+p <- classify_compare(poly, gdp_per_capita)
+attr(p, "countryatlas_classification") |> filter(method %in% c("quantile", "equal"))
+```
+
+**Your projection is doing the talking too.** Tissot's indicatrix puts circles
+of equal ground radius on the map: whatever the projection does to them, it is
+doing to your data.
+
+```{=html}
+<table>
+<tr>
+<td width="50%"><img src="man/figures/README-h-tissot-merc.png" alt="Tissot indicatrices on a Mercator map: circles stay round but grow enormously toward the poles"><br><sub><code>tissot_map("mercator")</code> — shapes right, areas wildly wrong</sub></td>
+<td width="50%"><img src="man/figures/README-h-tissot-ee.png" alt="Tissot indicatrices on an Equal Earth map: ellipses shear but hold constant area"><br><sub><code>tissot_map("equal_earth")</code> — areas right, shapes sheared</sub></td>
+</tr>
+<tr>
+<td colspan="2"><img src="man/figures/README-h-projections.png" alt="One choropleth drawn under Equal Earth, Robinson, Winkel tripel and Mercator"><br><sub><code>projection_compare(d, gdp_per_capita)</code> — and <code>projection_info()</code> for which of the thirteen are equal-area</sub></td>
+</tr>
+</table>
+```
+
+**Grey means "no data", but it reads as "low".** Hatch the gaps so nobody
+mistakes them for a value, or map availability itself.
+
+```{=html}
+<table>
+<tr>
+<td width="50%"><img src="man/figures/README-h-hatched.png" alt="Choropleth with the no-data countries drawn in diagonal hatching instead of grey"><br><sub><code>world_map(d, co2_per_capita, na_style = "hatched")</code></sub></td>
+<td width="50%"><img src="man/figures/README-h-coverage.png" alt="Map of which countries report CO2 per capita and which do not"><br><sub><code>coverage_map(d, co2_per_capita)</code></sub></td>
+</tr>
+</table>
+```
+
+**A rate over eleven thousand people should not shout as loudly as one over a
+billion.** Value-by-alpha spends opacity on the denominator, so small-population
+countries recede — the cartogram's answer to the same problem, without
+distorting the geometry.
+
+```{=html}
+<p align="center"><img src="man/figures/README-h-alpha.png" width="62%" alt="Value-by-alpha map: GDP per capita in colour, population as opacity, over a dark background"></p>
+```
+
+```r
+value_by_alpha_map(d, gdp_per_capita, population)
+```
+
+**And the map should say what it is.** `footnote = "auto"` writes the coverage
+line; `map_provenance()` answers the questions a reviewer asks first.
+
+```{r provenance, message = TRUE}
+world_map(poly, gdp_per_capita, style = "quantile",
+          na_style = "hatched", footnote = "auto") |>
+  map_provenance()
+```
+
+## Other sources, other years, other levels
+
+The ISO spine is not only the World Bank's, and not only 2024's.
+
+```{=html}
+<table>
+<tr>
+<td width="50%"><img src="man/figures/README-r-history.png" alt="World choropleth drawn on 1950 sovereign-state borders; most of Africa is absent because it was not yet independent"><br><sub><code>attach_geometry(d, year = 1950)</code> — 1950 borders, via CShapes. Africa is nearly empty because in 1950 almost none of it was sovereign; pass <code>dependencies = TRUE</code> for the colonies.</sub></td>
+<td width="50%"><img src="man/figures/README-r-lisa.png" alt="Map of LISA clusters: high-high, low-low and spatial outliers"><br><sub><code>lisa_map(d, gdp_per_capita, weights = country_weights("knn"))</code></sub></td>
+</tr>
+<tr>
+<td><img src="man/figures/README-r-grid.png" alt="Gridded cartogram: one square per fixed number of people"><br><sub><code>gridded_cartogram(d, population)</code> — one cell per N people, countable</sub></td>
+<td><img src="man/figures/README-h-alpha.png" alt="Value-by-alpha map"><br><sub><code>value_by_alpha_map(d, gdp_per_capita, population)</code></sub></td>
+</tr>
+<tr>
+<td colspan="2"><img src="man/figures/README-r-od.png" alt="Origin-destination small multiples: one panel per origin"><br><sub><code>od_map(flows, from, to, value)</code> — where each origin sends, when <code>flow_map()</code> would be spaghetti</sub></td>
+</tr>
+</table>
+```
+
+**Membership is a function of time**, and a snapshot quietly misstates any panel
+that spans an accession:
+
+```{r as-of}
+c(`2016` = in_group("United Kingdom", "EU", as_of = 2016),
+  `2021` = in_group("United Kingdom", "EU", as_of = 2021))
+```
+
+**Islands have no land border**, so the default contiguity weights drop a
+quarter of the world from a "global" Moran's I. `country_weights()` fixes it,
+and the result says how many it dropped either way:
+
+```{r weights}
+snap <- world_snapshot$countries
+cols <- c("i", "n", "n_excluded")
+rbind(
+  cbind(scheme = "contiguity",
+        morans_i(snap, gdp_per_capita, n_perm = 0)[cols]),
+  cbind(scheme = "knn",
+        morans_i(snap, gdp_per_capita, n_perm = 0,
+                 weights = country_weights("knn", k = 5))[cols])
+)
+```
+
+**Any provider, one shape.** `register_country_source()` takes a fetch function
+and a name; `fetch_indicator()` and `compare_sources()` do the rest — including
+telling you where two providers disagree.
+
+```{r sources}
+country_sources()[, c("source", "meta")]
+```
 
 ## Beyond the map
 
@@ -231,16 +382,22 @@ convert_country(c("Japan", "Brazil"), to = "flag")
 
 | | |
 |---|---|
-| **Assemble** | `world_data()` `country_data()` `world_geometry()` `attach_geometry()` `clear_wdi_cache()` |
-| **Join** | `standardize_country()` `join_world()` `country_join()` `country_join_all()` `dissolve_country()` |
-| **Diagnose** | `check_country_match()` `repair_country_names()` `audit_coverage()` `country_overrides()` `wdj_overrides()` |
+| **Assemble** | `world_data()` `country_data()` `world_geometry()` `attach_geometry()` `clear_country_cache()` |
+| **Other sources** | `register_country_source()` `country_sources()` `fetch_indicator()` `add_indicator()` `compare_sources()` `fetch_owid()` `fetch_eurostat()` `fetch_oecd()` `fetch_comtrade()` |
+| **Join** | `standardize_country()` `join_world()` `country_join()` `country_join_all()` `dissolve_country()` `standardize_subnational()` |
+| **Diagnose** | `check_country_match()` `repair_country_names()` `audit_coverage()` `audit_time_coverage()` `rate_check()` `check_dispute_coverage()` `country_overrides()` |
 | **Look up** | `convert_country()` `country_codes()` `country_groups()` `in_group()` `wdi_search()` |
-| **Compute** | `per_capita()` `share_of_world()` `growth_rate()` `index_to()` `rank_countries()` `aggregate_regions()` `complete_years()` `lag_by_country()` `diff_by_country()` `correlate_indicators()` |
-| **Measure spread** | `gini()` `theil()` `beta_convergence()` `sigma_convergence()` `morans_i()` |
-| **Locate** | `locate_country()` `neighbors()` `country_borders()` `distance_between()` `simplify_geometry()` |
-| **Draw** | `world_map()` `globe_map()` `spin_globe()` `facet_map()` `bubble_map()` `spike_map()` `bivariate_map()` `cartogram_map()` `dorling_map()` `tile_map()` `flow_map()` `animate_world()` `interactive_map()` `geom_country_labels()` `theme_world_map()` |
+| **Compute** | `per_capita()` `share_of_world()` `growth_rate()` `index_to()` `rank_countries()` `aggregate_regions()` `complete_years()` `lag_by_country()` `diff_by_country()` `correlate_indicators()` `deflate()` `to_ppp()` `smooth_rates()` `interpolate_missing()` |
+| **Measure spread** | `gini()` `theil()` `beta_convergence()` `sigma_convergence()` `convergence_club()` |
+| **Spatial statistics** | `country_weights()` `morans_i()` `local_morans()` `lisa_map()` `gearys_c()` `getis_ord()` `spatial_lag()` |
+| **Locate** | `locate_country()` `neighbors()` `country_borders()` `distance_between()` `simplify_geometry()` `nuts_geometry()` |
+| **Travel in time** | `historical_geometry()` `country_timeline()` `country_groups(as_of=)` `in_group(as_of=)` |
+| **Relate** | `flow_matrix()` `country_network()` `od_map()` |
+| **Draw** | `world_map()` `globe_map()` `spin_globe()` `facet_map()` `bubble_map()` `spike_map()` `bivariate_map()` `cartogram_map()` `dorling_map()` `value_by_alpha_map()` `tile_map()` `flow_map()` `animate_world()` `interactive_map()` `gridded_cartogram()` `subnational_map()` `geom_country_labels()` `theme_world_map()` |
+| **Keep honest** | `classify_compare()` `coverage_map()` `projection_info()` `projection_compare()` `projection_distortion()` `tissot_map()` `cartogram_diagnostics()` `map_provenance()` `dispute_policy()` |
+| **Report** | `country_factsheet()` `world_table()` |
 | **Push to the database** | `as_ggsql_source()` `world_query()` |
-| **Bundled data** | `world_snapshot` `country_meta` `common_indicators` `country_groups_tbl` `world_tiles` `historical_codes` |
+| **Bundled data** | `world_snapshot` `country_meta` `common_indicators` `country_groups_tbl` `country_groups_history` `disputed_territories` `world_tiles` `historical_codes` |
 
 ## Offline by default
 
@@ -260,6 +417,14 @@ Live `world_data()` calls are memoised on disk between sessions.
 | `cartogram` + `sf` | `cartogram_map()`, `dorling_map()` |
 | `biscale` + `sf` | `bivariate_map()` |
 | `gganimate` + `gifski` or `magick` | `animate_world()`, `spin_globe()` |
+| `cartogramR` | `cartogram_map(type = "flow")`, the fast Gastner-Seguy-More algorithm |
+| `cshapes` | `historical_geometry()` and `attach_geometry(year=)` |
+| `owidR` / `eurostat` / `OECD` / `comtradr` | the four built-in `fetch_*()` source adapters |
+| `mapgl` | `interactive_map(engine = "mapgl")`, `globe_map(interactive = TRUE)` |
+| `tmap` | `world_map(engine = "tmap")` |
+| `giscoR` / `regions` | `nuts_geometry()`, `standardize_subnational()` |
+| `gt` | `world_table()` |
+| `ggpattern` | `world_map(na_style = "hatched")` |
 | `plotly` / `ggiraph` / `leaflet` / `ggsql` | the four `interactive_map()` engines |
 | `duckdb` + `DBI`, or `nanoarrow` | `as_ggsql_source()` |
 | `stringdist` | fuzzy matching in `repair_country_names()` and `check_country_match()` |

@@ -45,23 +45,34 @@ test_that("zero-variance columns give NA/NaN rather than an error", {
     data.frame(a = c(1, 2, 3, 4), b = c(7, 7, 7, 7))))
   expect_equal(nrow(ci), 1L)
   expect_true(is.na(ci$r))
-  # One country in a year has no dispersion.
-  sc <- sigma_convergence(data.frame(iso3c = c("A", "B"),
-                                     year = c(2000L, 2001L), g = c(1, 2)), g)
+  # One country in a year has no dispersion -- and now says so rather than
+  # handing back a blank sigma column in silence.
+  expect_warning(
+    sc <- sigma_convergence(data.frame(iso3c = c("A", "B"),
+                                       year = c(2000L, 2001L), g = c(1, 2)), g),
+    class = "countryatlas_thin_year")
   expect_true(all(is.na(sc$sigma)))
   expect_equal(sc$n, c(1L, 1L))
 })
 
 test_that("panel helpers survive duplicate (iso3c, year) rows", {
-  # Malformed but common; nothing should error.
+  # Malformed but common; nothing should error. And since every one of these
+  # reads neighbouring rows, each now says so rather than quietly lagging
+  # against the duplicate -- surviving the input was never the same as being
+  # right about it.
   dup <- data.frame(iso3c = c("A", "A", "A"), year = c(2000L, 2000L, 2001L),
                     g = c(1, 2, 3))
-  expect_no_error(complete_years(dup))
-  expect_no_error(complete_years(dup, method = "locf"))
-  expect_no_error(growth_rate(dup, g))
-  expect_no_error(lag_by_country(dup, g))
-  expect_no_error(index_to(dup, g, base_year = 2000))
-  expect_no_error(sigma_convergence(dup, g))
+  w <- "repeated country-year"
+  expect_warning(expect_no_error(complete_years(dup)), w)
+  expect_warning(expect_no_error(complete_years(dup, method = "locf")), w)
+  expect_warning(expect_no_error(growth_rate(dup, g)), w)
+  expect_warning(expect_no_error(lag_by_country(dup, g)), w)
+  expect_warning(expect_no_error(index_to(dup, g, base_year = 2000)), w)
+  # Also reports the thin years it found; muffle just that so the assertion
+  # stays on the repeated-country-year warning this test is about.
+  expect_warning(expect_no_error(withCallingHandlers(
+    sigma_convergence(dup, g),
+    countryatlas_thin_year = function(c) invokeRestart("muffleWarning"))), w)
 })
 
 test_that("the geometric kernels handle poles, antipodes and collinearity", {
@@ -85,16 +96,15 @@ test_that("plotting verbs cope with all-NA and all-zero columns", {
   d$all_na <- NA_real_
   d$all_zero <- 0
   expect_no_error(ggplot2::ggplot_build(tile_map(d, all_na)))
-  expect_no_error(ggplot2::ggplot_build(spike_map(d, all_zero)))
-  expect_no_error(ggplot2::ggplot_build(bubble_map(d, all_na)))
+  expect_no_error(suppressWarnings(ggplot2::ggplot_build(spike_map(d, all_zero))))
+  expect_no_error(suppressWarnings(ggplot2::ggplot_build(bubble_map(d, all_na))))
   # An origin-destination pair that is the same country is a zero-length arc.
   od <- data.frame(f = "France", t = "France", v = 1)
   expect_no_error(ggplot2::ggplot_build(flow_map(od, f, t, v)))
 })
 
 test_that("a single-country frame still bins and draws", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   one <- attach_geometry(snap[1, ], geometry = "sf")
   # compute_breaks() widens a single distinct value into a usable interval.
   expect_no_error(ggplot2::ggplot_build(
@@ -168,8 +178,12 @@ test_that("the other summarising verbs are honest about no data", {
   one <- tibble::tibble(iso3c = "USA", year = 2000L, g = 1, h = 2)
   expect_true(is.na(correlate_indicators(one, c("g", "h"))$r))
   # And these all return 0 rows rather than erroring.
+  # sigma_convergence() now says why its result is empty, which is the point of
+  # this block; assert that separately from the shape check.
+  expect_warning(sc_empty <- sigma_convergence(z, g),
+                 class = "countryatlas_no_positive")
   for (out in list(growth_rate(z, g), share_of_world(z, g), rank_countries(z, g),
-                   lag_by_country(z, g), sigma_convergence(z, g),
+                   lag_by_country(z, g), sc_empty,
                    aggregate_regions(z, g, by = "iso3c"))) {
     expect_equal(nrow(out), 0L)
   }
@@ -184,8 +198,7 @@ test_that("the other summarising verbs are honest about no data", {
 # Neither mentions the data. spike_map() already reported this properly.
 
 test_that("bivariate_map says so when no row has both variables", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   skip_if_not_installed("biscale")
   snap <- countryatlas::world_snapshot$countries
   empty <- suppressWarnings(attach_geometry(snap[0, ], geometry = "sf"))
@@ -201,8 +214,7 @@ test_that("bivariate_map says so when no row has both variables", {
 })
 
 test_that("cartogram_map says so when nothing has a positive weight", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   skip_if_not_installed("cartogram")
   snap <- countryatlas::world_snapshot$countries
   empty <- suppressWarnings(attach_geometry(snap[0, ], geometry = "sf"))
@@ -217,18 +229,20 @@ test_that("cartogram_map says so when nothing has a positive weight", {
 })
 
 test_that("the bivariate and cartogram verbs still draw real data", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   skip_if_not_installed("biscale")
   skip_if_not_installed("cartogram")
   snap <- countryatlas::world_snapshot$countries
   sfd <- suppressWarnings(attach_geometry(snap, geometry = "sf"))
   expect_s3_class(bivariate_map(sfd, gdp_per_capita, population), "ggplot")
   expect_s3_class(dorling_map(sfd, population), "ggplot")
-  # Partly-missing columns must still draw from what is there.
+  # Partly-missing columns must still draw from what is there -- and say which
+  # countries dropped out, since a bivariate class needs both variables.
   part <- sfd
   part$population[seq_len(100)] <- NA
-  expect_s3_class(bivariate_map(part, gdp_per_capita, population), "ggplot")
+  expect_warning(
+    expect_s3_class(bivariate_map(part, gdp_per_capita, population), "ggplot"),
+    "no class to give")
   expect_s3_class(dorling_map(part, population), "ggplot")
 })
 
@@ -291,8 +305,7 @@ test_that("the plotting verbs handle an empty frame without leaking", {
   # message: facet_map got ggplot2's "Faceting variables must have at least one
   # value", and geom_country_labels ran polygon_centroids() over nothing, where
   # range() warns twice and dplyr adds a deprecation note.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   skip_if_not_installed("maps")
   snap <- countryatlas::world_snapshot$countries
   sfd <- attach_geometry(snap, geometry = "sf")

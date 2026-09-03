@@ -4,24 +4,56 @@
 \alias{country_groups}
 \title{Country-group membership}
 \usage{
-country_groups(group = NULL)
+country_groups(group = NULL, as_of = NULL)
 }
 \arguments{
 \item{group}{One or more group names: any of \code{"EU"}, \code{"OECD"}, \code{"G7"},
 \code{"G20"}, \code{"BRICS"}, \code{"ASEAN"}, \code{"EFTA"}, \code{"Commonwealth"}, \code{"OPEC"},
 \code{"EuroZone"}, \code{"NATO"}, \code{"Mercosur"}, \code{"GCC"}, \code{"Nordic"}, \code{"Visegrad"}.
 If \code{NULL}, the whole table is returned.}
+
+\item{as_of}{A date (or a year) at which to evaluate membership. \code{NULL}
+(default) uses the current snapshot. \strong{A bare year means 1 January of that
+year}, not "at some point during it": \code{as_of = 2013} is 2013-01-01, so
+Croatia -- which joined the EU on 2013-07-01 -- is not yet a member. Pass a
+\code{"YYYY-MM-DD"} string or a \code{Date} when the month matters. See the section
+below.}
 }
 \value{
-A tibble of \code{group}, \code{iso3c}, \code{country}.
+A tibble of \code{group}, \code{iso3c}, \code{country}; with \code{as_of}, also \code{from}
+and \code{to}.
 }
 \description{
 Answers the constant question "is this country in the EU / OECD / G7 / G20 /
-BRICS / ...?" from a curated, dated membership table (point-in-time
-membership is genuinely fiddly, so it is shipped and maintained, not
-guessed). See \link{country_groups_tbl}.
+BRICS / ...?" from a curated membership table. By default that is the current
+snapshot (\link{country_groups_tbl}); pass \code{as_of} to ask the question of a
+particular date, which is what a panel needs.
 }
+\section{Membership changes, and which groups are dated}{
+
+A snapshot silently misstates any panel that spans an accession. An EU panel
+over 2015-2020 either includes the United Kingdom throughout or excludes it
+throughout, and both are wrong:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{"GBR" \%in\% country_groups("EU", as_of = 2016)$iso3c   # TRUE
+"GBR" \%in\% country_groups("EU", as_of = 2021)$iso3c   # FALSE
+}\if{html}{\out{</div>}}
+
+\link{country_groups_history} carries dated membership for twelve groups: EU,
+EuroZone, NATO, OECD, ASEAN, EFTA, GCC, Mercosur, Nordic, Visegrad, BRICS and
+G7. Commonwealth, G20 and OPEC are \strong{not} dated -- their histories involve
+suspensions, readmissions and contested dates that would have to be sourced
+case by case, and a fabricated date is worse than an absent one. Asking for
+\code{as_of} on those warns and falls back to the snapshot.
+}
+
 \examples{
 country_groups("EU")
 country_groups(c("G7", "BRICS"))
+# the UK was a member in 2016 and not in 2021
+nrow(country_groups("EU", as_of = 2016))
+nrow(country_groups("EU", as_of = 2021))
+}
+\seealso{
+\code{\link[=in_group]{in_group()}}, \link{country_groups_history}, \code{\link[=country_timeline]{country_timeline()}}
 }

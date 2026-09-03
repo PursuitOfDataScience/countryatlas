@@ -117,12 +117,12 @@ dim(mapdf)
 styles. A continuous fill on a skewed indicator hides most of the variation, so
 binned and quantile styles are first-class:
 
-```{r}
+```{r fig.alt = "World choropleth of GDP per capita in quantile bins."}
 world_map(mapdf, gdp_per_capita, style = "quantile",
           title = "GDP per capita (quantile bins)")
 ```
 
-```{r}
+```{r fig.alt = "World map with every country coloured by its continent."}
 world_map(mapdf, continent, style = "categorical")
 ```
 
@@ -132,7 +132,7 @@ Totals (population, total emissions) are misrepresented by a choropleth because
 large values hide in small countries. A bubble map at country centroids is the
 right idiom:
 
-```{r}
+```{r fig.alt = "Bubble map: population drawn as proportional circles at country centroids."}
 bubble_map(snapshot, population)
 ```
 
@@ -141,7 +141,7 @@ bubble_map(snapshot, population)
 Tiny states vanish on a geographic map. An equal-area tile grid gives every
 country the same visual weight:
 
-```{r fig.height = 5}
+```{r fig.height = 5, fig.alt = "Equal-area tile grid: one identically sized tile per country, shaded by life expectancy."}
 tile_map(snapshot, life_expectancy)
 ```
 
@@ -150,7 +150,7 @@ tile_map(snapshot, life_expectancy)
 Origin–destination data (trade, migration, flights) is drawn as great-circle
 arcs, with both endpoints resolved to centroids automatically:
 
-```{r}
+```{r fig.alt = "Flow map: great-circle arcs joining four origin-destination country pairs, width by volume."}
 flows <- data.frame(
   from   = c("China", "Germany", "Brazil", "India"),
   to     = c("United States", "France", "Japan", "United Kingdom"),

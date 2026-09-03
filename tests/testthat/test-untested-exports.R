@@ -198,8 +198,7 @@ test_that("a bounding-box region warns on the polygon backend", {
   expect_silent(world_geometry("countries", geometry = "polygon",
                                region = "Europe"))
   expect_silent(world_geometry("countries", geometry = "polygon"))
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   # The sf backend does a real clip, and says nothing.
   expect_silent(world_geometry("countries", geometry = "sf", region = med))
 })
@@ -207,8 +206,7 @@ test_that("a bounding-box region warns on the polygon backend", {
 test_that("globe_map(backend = 'sf') builds on every style", {
   # This whole branch had no coverage: the only sf-related test in the file ran
   # *when sf was absent*, which is how nine bugs hid in an earlier pass.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   sfd <- attach_geometry(countryatlas::world_snapshot$countries, geometry = "sf")
   for (st in c("continuous", "binned", "quantile", "jenks")) {
     if (st == "jenks") skip_if_not_installed("classInt")

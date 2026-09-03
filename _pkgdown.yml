@@ -28,6 +28,8 @@ navbar:
         href: articles/sf-and-projections.html
       - text: Beyond the choropleth
         href: articles/beyond-the-choropleth.html
+      - text: "Honest maps: classification, missingness and distortion"
+        href: articles/honest-maps.html
       - text: countryatlas and ggsql
         href: articles/countryatlas-and-ggsql.html
       - text: "Full introduction (formal)"
@@ -44,6 +46,29 @@ reference:
   - country_borders
   - neighbors
   - distance_between
+
+- title: Data sources beyond the World Bank
+  desc: >
+    One verb, many providers. A registry rather than more Suggests, so a source
+    with no CRAN package is still first class -- and a way to find out where
+    two providers disagree.
+  contents:
+  - register_country_source
+  - country_sources
+  - fetch_indicator
+  - add_indicator
+  - compare_sources
+  - source_adapters
+  - clear_country_cache
+
+- title: Time
+  desc: >
+    Historical borders, dated group membership, existence spans, and a check
+    that a panel respects when countries actually existed.
+  contents:
+  - historical_geometry
+  - country_timeline
+  - audit_time_coverage
 
 - title: The join engine
   desc: The package's mission, exposed for your own data.
@@ -74,6 +99,12 @@ reference:
 - title: Analysis helpers
   contents:
   - per_capita
+  - rate_check
+  - smooth_rates
+  - deflate
+  - to_ppp
+  - interpolate_missing
+  - convergence_club
   - aggregate_regions
   - rank_countries
   - complete_years
@@ -86,7 +117,20 @@ reference:
   - sigma_convergence
   - gini
   - theil
+
+- title: Spatial statistics
+  desc: >
+    Weights first, statistics second. country_weights() is the piece that lets
+    an island participate at all -- and lets adjacency be something other than
+    geography.
+  contents:
+  - country_weights
   - morans_i
+  - local_morans
+  - lisa_map
+  - gearys_c
+  - getis_ord
+  - spatial_lag
 
 - title: Visualization
   desc: A full vocabulary of projected, area-honest maps.
@@ -104,9 +148,49 @@ reference:
   - flow_map
   - animate_world
   - interactive_map
+  - value_by_alpha_map
+  - gridded_cartogram
   - geom_country_labels
   - theme_world_map
   - simplify_geometry
+
+- title: Honest maps
+  desc: >
+    Say which classification you chose and what it did, show where the data is
+    not, and make projection distortion visible rather than asserted.
+  contents:
+  - classify_compare
+  - coverage_map
+  - projection_info
+  - projection_compare
+  - projection_distortion
+  - tissot_map
+  - cartogram_diagnostics
+  - map_provenance
+  - dispute_policy
+  - check_dispute_coverage
+
+- title: Flows and networks
+  desc: Bilateral data on the ISO spine.
+  contents:
+  - flow_matrix
+  - country_network
+  - od_map
+
+- title: Reporting
+  desc: For the audience that wanted a table.
+  contents:
+  - country_factsheet
+  - world_table
+
+- title: Subnational
+  desc: >
+    Below the country level, scoped to where a maintained code system and free
+    geometry both exist.
+  contents:
+  - standardize_subnational
+  - nuts_geometry
+  - subnational_map
 
 - title: Database rendering (ggsql)
   desc: Hand curated tables to ggsql for database-side spatial rendering.
@@ -126,6 +210,8 @@ reference:
   - country_groups_tbl
   - world_tiles
   - historical_codes
+  - country_groups_history
+  - disputed_territories
 
 - title: Package
   contents:

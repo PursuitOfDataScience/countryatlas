@@ -18,6 +18,9 @@ annual growth rate vs. the first non-\code{NA} year).}
 }
 \value{
 \code{data} with a growth-rate column added (a proportion, so 0.03 = 3\%).
+Rows come back sorted by \code{iso3c} then \code{year}: the calculation reads each
+country's series in time order, so a row-aligned vector held alongside
+\code{data} will no longer line up.
 }
 \description{
 Adds a growth-rate column to a panel: either the period-over-period change

@@ -32,18 +32,21 @@ names, e.g. \code{c(gdp = "NY.GDP.PCAP.KD", pop = "SP.POP.TOTL")}. Defaults to
 (Natural Earth, for \code{geom_sf()} and real projections) or \code{"none"}.}
 
 \item{scale}{Natural Earth resolution for the \code{sf} backend. \code{"large"} needs the
-non-CRAN \code{rnaturalearthhires} package; see \code{\link[=world_geometry]{world_geometry()}}.}
+non-CRAN \code{rnaturalearthhires} package; see \code{\link[=world_geometry]{world_geometry()}}. The other
+backends warn if asked for a resolution they cannot serve.}
 
 \item{region}{Optional subset: a continent, group name, \code{iso3c} vector or
-bounding box. A bounding box clips the shapes rather than selecting whole
-countries, and only the \code{sf} backend can do that properly -- see
-\code{\link[=world_geometry]{world_geometry()}}.}
+bounding box. Applied whichever \code{geometry} is used, including \code{"none"}. A
+bounding box clips the shapes rather than selecting whole countries, and
+only the \code{sf} backend can do that properly -- see \code{\link[=world_geometry]{world_geometry()}}; with
+\code{geometry = "none"} there is nothing to clip, so a box is refused.}
 
 \item{classify}{Which classifications to add (any of \code{"income"},
 \code{"continent"}, \code{"region"}).}
 
 \item{projection, recenter}{Projection, and optional central meridian, for
-the \code{sf} backend (see \code{\link[=world_map]{world_map()}} for the projections available).}
+the \code{sf} backend (see \code{\link[=world_map]{world_map()}} for the projections available). The
+other backends warn if asked, rather than ignoring the request.}
 
 \item{latest}{If \code{TRUE}, use the most recent non-\code{NA} value per country for a
 single-year request.}

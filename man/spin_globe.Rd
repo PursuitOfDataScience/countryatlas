@@ -48,9 +48,19 @@ looping animation with the optional \code{gifski} (preferred) or \code{magick} p
 Embeds directly in R Markdown / Quarto / a README.
 }
 \examples{
-\dontrun{
-# No sf required:
-spin_globe(world_snapshot$countries, continent, backend = "polygon",
-           style = "categorical")
+# Six frames rather than the default 60, so this stays quick enough to be
+# checked: \dontrun{} meant the example was never executed by anything, and
+# an example nothing runs is an example free to rot.
+\donttest{
+if (requireNamespace("maps", quietly = TRUE) &&
+    requireNamespace("mapproj", quietly = TRUE) &&
+    (requireNamespace("gifski", quietly = TRUE) ||
+     requireNamespace("magick", quietly = TRUE))) {
+  # No sf required on the polygon backend.
+  gif <- spin_globe(world_snapshot$countries, continent,
+                    backend = "polygon", style = "categorical",
+                    n_frames = 6, width = 200, height = 200)
+  file.exists(gif)   # written to a temporary file
+}
 }
 }

@@ -10,7 +10,10 @@ audit_coverage(data, indicator = NULL, by = c("region", "income", "continent"))
 \item{data}{A country-level (or map-ready) data frame.}
 
 \item{indicator}{Optional character vector of value columns to report \code{NA}
-rates for. If \code{NULL}, all numeric columns are used.}
+rates for. If \code{NULL}, all numeric columns are used. \code{na_rates} covers every
+one of them; the \code{by_group} breakdown is computed for a single indicator --
+the first -- and names it in an \code{indicator} column so it cannot be mistaken
+for the group's overall coverage.}
 
 \item{by}{Grouping for the coverage breakdown: \code{"region"} (default),
 \code{"income"} or \code{"continent"}.}

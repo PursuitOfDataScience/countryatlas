@@ -14,7 +14,9 @@ rank_countries(data, value, within = NULL, desc = TRUE)
 \item{within}{Optional grouping column(s) (unquoted or character) to rank
 within.}
 
-\item{desc}{Rank descending (largest = rank 1); default \code{TRUE}.}
+\item{desc}{Rank descending (largest = rank 1); default \code{TRUE}. This affects
+\code{rank} only: \code{percentile} is always the percentile of the \emph{value} (0 is the
+lowest value), so under \code{desc = FALSE} rank 1 has percentile 0.}
 }
 \value{
 \code{data} with \code{rank}, \code{percentile} and \code{z_score} columns added.

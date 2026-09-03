@@ -1,5 +1,44 @@
 # countryatlas — Future Features
 
+> ## Status: fully implemented in 3.0.0
+>
+> **Every wave in §17 is built.** This document is now a record of the design
+> reasoning rather than a plan. 45 new exports and two new datasets landed in
+> 3.0.0; see NEWS.md for the release notes and the per-function help for the
+> details.
+>
+> | Wave | Status |
+> |---|---|
+> | 1 — correctness, honesty, small wins | **Done.** The ggsql guard was already in 2.0.1. Everything else shipped, plus `tissot_map()` and `projection_distortion()`. |
+> | 2 — the data-source contract | **Done.** `register_country_source()`, `country_sources()`, `fetch_indicator()`, `add_indicator()`, `compare_sources()`, all four adapters, and `clear_country_cache()`. |
+> | 3 — time | **Done.** `country_groups_history` + `as_of`, `country_timeline()`, `audit_time_coverage()`, `historical_geometry()` on CShapes, and the COW/GW second spine via `country_join(key =)`. |
+> | 4 — honesty, continued | **Done.** `disputed_territories` + `dispute_policy()` + `check_dispute_coverage()` + `world_map(disputes =)`; `rate_check()`, `smooth_rates()`, `interpolate_missing()`; the VSUP via `world_map(uncertainty =)`; `deflate()`, `to_ppp()`, `convergence_club()`. |
+> | 5 — reach | **Done.** `country_weights()` and the full LISA/Geary/Getis-Ord/spatial-lag set; `flow_matrix()`, `country_network()`, `od_map()`; `mapgl` interactivity and the interactive globe; `country_factsheet()`, `world_table()`. |
+> | 6 — subnational | **Done.** `standardize_subnational()`, `nuts_geometry()`, `subnational_map()`, scoped to ISO 3166-2 and NUTS. |
+>
+> ### The §18 open questions, as decided
+>
+> 1. **Second spine for historical work?** Yes. `country_join(key = "gwn"/"cowc"/"cown")`, and it warns about the dependencies COW/GW cannot carry.
+> 2. **`tmap` as a backend?** Yes, as `world_map(engine = "tmap")` — a door, not a second front door. The package stays ggplot2-native.
+> 3. **Equal Earth as default?** It already was. Now documented and recommended explicitly, with the citation, and `projection_distortion()` lets anyone verify the claim.
+> 4. **`Suggests` vs registration for sources?** Both: registration is the mechanism, four adapters ship for discoverability.
+> 5. **How much dispute curation?** A documented subset of 22, with a mechanical inclusion criterion that requires nobody to judge the merits, and an explicit statement that the table does not adjudicate.
+> 6. **Do we ever impute?** Yes, and the `.imputed` flag is non-optional. `world_map()` reads it and notes it in the caption.
+> 7. **Snapshot cadence?** Unchanged; still 2024, still the thing that makes every example offline.
+> 8. **Is `check_country_match()` still the best matcher?** Not benchmarked against `countries` 1.2.4. The one item here that remains genuinely open.
+>
+> ### What was deliberately *not* built
+>
+> The "explicitly not planned" list in §17 still stands: no general GIS layer, no
+> reimplemented projections or cartogram algorithms, no bundled large or
+> restrictively-licensed geometry, no admin2, no Shiny dependency, and no
+> position on any territorial dispute.
+>
+> Five bugs were also found by auditing 2.0.1 alongside this work — none of them
+> predicted by this document. It is good at naming absent features and poor at
+> naming broken ones.
+
+
 *A research- and CRAN-grounded feature catalogue for the releases after 2.0.0.
 This is a **design and literature document**, not a changelog and not a
 commitment. §2 surveys the cartographic/statistical literature and the R data

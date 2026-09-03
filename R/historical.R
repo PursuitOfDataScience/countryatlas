@@ -79,6 +79,9 @@ normalize_historical <- function(x) {
 #' dissolve_country("Yugoslavia")
 dissolve_country <- function(x, warn = TRUE) {
   check_bool(warn, "warn")
+  # Before as.character(), which deparses a data frame column-wise: a frame
+  # came back as the "countries" `c("USA", "FRA")` and `c(1, 2)`.
+  check_country_vector(x)
   x <- as.character(x)
   empty <- tibble::tibble(input = character(), historical = character(),
                           dissolved = integer(), iso3c = character(),

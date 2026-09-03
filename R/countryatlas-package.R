@@ -44,7 +44,7 @@
 #' [clear_wdi_cache()].
 #'
 #' @section Options:
-#' Three options change the package's behaviour. All are unset by default.
+#' Four options change the package's behaviour. All are unset by default.
 #' \describe{
 #'   \item{`countryatlas.cache_dir`}{Where the persistent World Bank cache
 #'     lives. Defaults to `tools::R_user_dir("countryatlas", "cache")`; set it to
@@ -55,8 +55,12 @@
 #'     to 2 under `R CMD check`, per CRAN policy. Must be a single finite
 #'     number; values below one are clamped to one.}
 #'   \item{`countryatlas.gdp_compat`}{Set to `TRUE` to restore the
-#'     `gdp_per_capita_2015` column that [world_data()] emitted in 1.0.0. It is
-#'     a one-cycle deprecation shim and off by default.}
+#'     `gdp_per_capita_2015` column that [world_data()] emitted in 1.0.0. A
+#'     deprecation shim, off by default, and now warning when used.}
+#'   \item{`countryatlas.dispute_policy`}{Which map convention disputed
+#'     territories are drawn under: `"none"` (default), `"de_facto"`,
+#'     `"de_jure"` or `"neutral"`. Set it with [dispute_policy()] rather than
+#'     directly, which also reports what the setting does and does not change.}
 #' }
 #'
 #' @keywords internal
@@ -83,4 +87,17 @@ NULL
 # lazy-data objects are not on the search path, and six exported functions failed
 # with "object 'world_tiles' not found". Declaring them here silenced the NOTE
 # without fixing that, which is exactly the trap described above.
-utils::globalVariables(c("long", "lat", "year"))
+# Only `year` still needs declaring: it is animate_world()'s default
+# `time = year`, an unquoted symbol. Every column reference in the package
+# now goes through .data$, which needs no declaration.
+utils::globalVariables("year")
+
+# Register the built-in data sources at load, so country_sources() is populated
+# without the user having to do anything. Registration is cheap -- it stores a
+# function reference, it does not touch the network or load the provider's
+# package -- and a source whose backing package is absent simply reports
+# `available = FALSE` until it is installed.
+.onLoad <- function(libname, pkgname) {
+  register_builtin_sources()
+  invisible(NULL)
+}

@@ -15,7 +15,14 @@ world_map(
   title = NULL,
   legend = NULL,
   na_label = "No data",
-  recenter = NULL
+  recenter = NULL,
+  na_style = c("grey", "hatched", "outline", "omit"),
+  footnote = NULL,
+  classification_report = FALSE,
+  uncertainty = NULL,
+  n_uncertainty = 3,
+  disputes = c("ignore", "mark"),
+  engine = c("ggplot2", "tmap")
 )
 }
 \arguments{
@@ -43,9 +50,47 @@ or \code{"categorical"}.}
 
 \item{na_label}{Legend key label for missing data, used by the styles with
 a discrete legend (\code{"quantile"}, \code{"jenks"}, \code{"categorical"}); the
-continuous and binned colourbars have no \code{NA} key to name.}
+continuous and binned colourbars have no \code{NA} key to name. Honoured by
+both engines. A length-1 \code{NA} leaves the engine's own formatter alone.}
 
 \item{recenter}{Optional central meridian for the \code{sf} backend.}
+
+\item{na_style}{How to draw countries with no data: \code{"grey"} (default),
+\code{"hatched"} (diagonal hatching via the optional \code{ggpattern}, unmistakable
+and greyscale-safe), \code{"outline"} (white fill, keeping only the border) or
+\code{"omit"} (do not draw them at all). See the section below.}
+
+\item{footnote}{Optional caption. \code{"auto"} generates a coverage line
+("174 of 195 countries shown; 21 missing"), so the map cannot quietly
+overstate what it covers. A string is used verbatim; \code{NULL} (default) adds
+nothing.}
+
+\item{classification_report}{If \code{TRUE}, attach the breaks, the method and
+the count of countries per class to the returned plot as the
+\code{"countryatlas_classification"} attribute, and print them with
+\code{\link[=map_provenance]{map_provenance()}}. A map whose top class holds one country and whose
+bottom holds ninety is misleading, and the counts say so immediately.
+\code{style = "continuous"} draws a colourbar and so has no classes to report:
+there the attribute is \code{NULL} and a warning says why.}
+
+\item{uncertainty}{Optional uncertainty column (unquoted) -- a standard
+error, a confidence half-width, anything where larger means less certain.
+Supplying it switches the fill to a \strong{value-suppressing uncertainty
+palette} (Correll, Moritz & Heer 2018): the value range contracts as
+uncertainty rises, so an uncertain estimate cannot claim an extreme colour,
+and the legend becomes the value x uncertainty grid.}
+
+\item{n_uncertainty}{Number of uncertainty levels for the VSUP (default \code{3}).}
+
+\item{disputes}{\code{"ignore"} (default) or \code{"mark"}, which outlines the
+\link{disputed_territories} present in the data and notes the convention in the
+caption. See \code{\link[=dispute_policy]{dispute_policy()}}.}
+
+\item{engine}{\code{"ggplot2"} (default) or \code{"tmap"}. The package is
+ggplot2-native; the \code{tmap} path is an alternative renderer for people
+already working in tmap, and needs an \code{sf} frame. It honours \code{style},
+\code{n_bins}, \code{palette}, \code{title} and \code{legend}, and ignores the ggplot2-specific
+arguments.}
 }
 \value{
 A \code{ggplot} object.
@@ -58,6 +103,32 @@ jenks styles are offered because a continuous fill on a skewed indicator
 hides almost all the variation; binning is the honest default for
 choropleths.
 }
+\section{Missing data is not zero}{
+
+The default grey reads as "low" to many people, which is exactly wrong for
+"unknown". \code{na_style = "hatched"} draws diagonal hatching instead --
+unambiguous, and it survives greyscale printing. \code{"omit"} leaves a hole,
+which is honest but can be mistaken for ocean. Whichever you pick,
+\code{footnote = "auto"} states the count in words:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{world_map(mapdf, gdp_per_capita, na_style = "hatched", footnote = "auto")
+}\if{html}{\out{</div>}}
+
+\code{\link[=coverage_map]{coverage_map()}} goes further and maps availability itself.
+}
+
+\section{Choosing a classification}{
+
+The classification changes what readers conclude, and not by a little.
+Brewer & Pickle's 56-subject study over nine map series found \strong{quantiles}
+among the best methods for general choropleth reading, and natural breaks
+(Jenks) below 70\% as accurate -- the opposite of the common GIS default.
+\code{style = "quantile"} is therefore the safe choice for a general audience.
+Jenks earns its place on strongly clustered distributions, where quantiles
+would split a natural group across two colours. Use \code{\link[=classify_compare]{classify_compare()}} to
+see the difference on your own data before committing.
+}
+
 \examples{
 \donttest{
 snap <- countryatlas::world_snapshot$countries
@@ -66,4 +137,18 @@ if (requireNamespace("maps", quietly = TRUE)) {
   world_map(mapdf, gdp_per_capita, style = "quantile")
 }
 }
+}
+\references{
+Brewer, C. A. & Pickle, L. (2002). Evaluation of methods for classifying
+epidemiological data on choropleth maps in series. \emph{Annals of the
+Association of American Geographers} 92(4), 662-681.
+\doi{10.1111/1467-8306.00310}
+
+Correll, M., Moritz, D. & Heer, J. (2018). Value-suppressing uncertainty
+palettes. \emph{Proceedings of the 2018 CHI Conference on Human Factors in
+Computing Systems}, 1-11. \doi{10.1145/3173574.3174216}
+}
+\seealso{
+\code{\link[=classify_compare]{classify_compare()}}, \code{\link[=coverage_map]{coverage_map()}}, \code{\link[=projection_compare]{projection_compare()}},
+\code{\link[=map_provenance]{map_provenance()}}, \code{\link[=dispute_policy]{dispute_policy()}}
 }

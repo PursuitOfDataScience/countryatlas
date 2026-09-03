@@ -34,8 +34,35 @@ fetch_one_indicator <- function(code, name, start, end, language = "en") {
                   start = start, end = end,
                   extra = FALSE, language = language)
   raw <- tibble::as_tibble(raw)
+  # memoise caches whatever the function returns -- and for the World Bank that
+  # cache is on disk. WDI() answers a failed download by warning and handing
+  # back a zero-row frame, so one call made while the network was down wrote an
+  # empty result to disk and every later session read it back instead of
+  # retrying: the cache stayed poisoned until someone ran
+  # clear_wdi_cache(disk = TRUE) by hand. An error is never memoised, so raise
+  # one; fetch_one_safe() turns it back into "no data for this indicator".
+  if (!nrow(raw)) {
+    wdj_abort("The World Bank returned no rows for {.val {code}}.",
+              class = "countryatlas_empty_fetch")
+  }
   # WDI returns iso2c + country + year + the named value column.
   if (!"iso3c" %in% names(raw)) {
+    # countrycode() is handed raw$iso2c directly, so a response carrying
+    # neither key raised its own "sourcevar must be a character or numeric
+    # vector" -- which fetch_one_safe() then wrapped as "Could not fetch ...
+    # from the World Bank API". That blames the network for a change in the
+    # provider's response shape and attaches advice about an argument the
+    # caller never passed. adapter_reshape() names this properly for the other
+    # providers; so does this now.
+    if (!"iso2c" %in% names(raw)) {
+      wdj_abort(c(
+        "The World Bank response for {.val {code}} carries no country key.",
+        "x" = "Expected an {.field iso2c} or {.field iso3c} column; got
+               {.val {names(raw)}}.",
+        "i" = "That is a change in the provider's response shape, not a
+               connectivity problem."
+      ), class = "countryatlas_bad_response")
+    }
     raw$iso3c <- suppressWarnings(
       countrycode::countrycode(raw$iso2c, "iso2c", "iso3c", warn = FALSE)
     )
@@ -141,7 +168,15 @@ get_fetch_fun <- function(cache = TRUE) {
 clear_wdi_cache <- function(disk = FALSE) {
   check_bool(disk, "disk")
   memo <- .wdj_state$fetch_memo
-  if (!is.null(memo) && memoise::is.memoised(memo)) {
+  # forget() only when the memo lives in memory. On a filesystem-backed memo it
+  # is not an in-memory operation at all: memoise's cache_filesystem()$reset()
+  # is file.remove(list.files(dir, full.names = TRUE)), so this call -- which
+  # the examples label "forget the in-session memo" -- deleted the persistent
+  # cache, and every unrelated file that happened to share the directory with
+  # it. Dropping the reference below is what "in-session" means here: the next
+  # call rebuilds the memo and reads the existing disk entries straight back.
+  if (!is.null(memo) && memoise::is.memoised(memo) &&
+      !isTRUE(.wdj_state$fetch_on_disk)) {
     memoise::forget(memo)
   }
   .wdj_state$fetch_memo <- NULL
@@ -266,10 +301,23 @@ fetch_one_safe <- function(fetch_fun, code, name, start, end, language) {
     fetch_fun(code, name, start, end, language),
     error = function(e) {
       msg <- conditionMessage(e)
-      if (looks_like_cache_read_error(msg) && !is.null(wdj_disk_cache())) {
+      if (inherits(e, "countryatlas_empty_fetch")) {
+        wdj_warn(c(
+          "No data returned for indicator {.val {code}}.",
+          "i" = "Either the indicator has no observations for the years asked
+                 for, or the download failed. Nothing was cached, so the next
+                 call will try again."
+        ), class = "countryatlas_no_data")
+      } else if (inherits(e, "countryatlas_bad_response")) {
+        # Pass the diagnosis through rather than re-labelling it as a failed
+        # download: the response arrived, it just did not look like WDI's.
+        wdj_warn(c("{msg}",
+                   "i" = "Indicator {.val {code}} is skipped."),
+                 class = "countryatlas_bad_response")
+      } else if (looks_like_cache_read_error(msg) && !is.null(wdj_disk_cache())) {
         wdj_warn(c(
           "Could not read indicator {.val {code}} from the on-disk cache.",
-          "x" = msg,
+          "x" = "{msg}",
           "i" = "A cache entry looks corrupt, which an interrupted write can
                  leave behind. It will keep failing until you clear it:
                  {.code clear_wdi_cache(disk = TRUE)}."
@@ -277,7 +325,7 @@ fetch_one_safe <- function(fetch_fun, code, name, start, end, language) {
       } else {
         wdj_warn(c(
           "Could not fetch indicator {.val {code}} from the World Bank API.",
-          "x" = msg
+          "x" = "{msg}"
         ))
       }
       NULL

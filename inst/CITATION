@@ -1,0 +1,104 @@
+citHeader(
+  "countryatlas is a join layer over other people's data. Citing the package",
+  "alone under-credits the sources it reconciles, so please cite the package",
+  "and whichever of the data sources your analysis actually used."
+)
+
+bibentry(
+  bibtype  = "Manual",
+  title    = "{countryatlas}: Join World Bank Data, Country Codes and Maps on the ISO Spine",
+  author   = person("Youzhi", "Yu"),
+  year     = sub("-.*", "", meta$Date %||% format(Sys.Date())),
+  note     = paste("R package version", meta$Version),
+  url      = "https://pursuitofdatascience.github.io/countryatlas/",
+  header   = "To cite the package:"
+)
+
+bibentry(
+  bibtype  = "Article",
+  title    = "countrycode: An {R} package to convert country names and country codes",
+  author   = c(person("Vincent", "Arel-Bundock"),
+               person("Nils", "Enevoldsen"),
+               person("CJ", "Yetman")),
+  journal  = "Journal of Open Source Software",
+  volume   = "3",
+  number   = "28",
+  pages    = "848",
+  year     = "2018",
+  doi      = "10.21105/joss.00848",
+  header   = "Country-name reconciliation rests on countrycode:"
+)
+
+bibentry(
+  bibtype      = "Manual",
+  title        = "World Development Indicators",
+  author       = person("World Bank"),
+  organization = "The World Bank",
+  year         = "2024",
+  url          = "https://datatopics.worldbank.org/world-development-indicators/",
+  header       = "Indicators fetched with world_data() / country_data() come from the World Bank:"
+)
+
+bibentry(
+  bibtype      = "Manual",
+  title        = "Natural Earth: Free vector and raster map data",
+  author       = person("Natural Earth"),
+  organization = "Natural Earth",
+  year         = "2024",
+  url          = "https://www.naturalearthdata.com/",
+  header       = "The sf geometry backend uses Natural Earth (public domain):"
+)
+
+bibentry(
+  bibtype = "Article",
+  title   = "The Equal Earth map projection",
+  author  = c(person("Bojan", "Savric"), person("Tom", "Patterson"),
+              person("Bernhard", "Jenny")),
+  journal = "International Journal of Geographical Information Science",
+  volume  = "33",
+  number  = "3",
+  pages   = "454--465",
+  year    = "2019",
+  doi     = "10.1080/13658816.2018.1504949",
+  header  = "The default projection is Equal Earth:"
+)
+
+bibentry(
+  bibtype = "Article",
+  title   = "Evaluation of methods for classifying epidemiological data on choropleth maps in series",
+  author  = c(person("Cynthia A.", "Brewer"), person("Linda", "Pickle")),
+  journal = "Annals of the Association of American Geographers",
+  volume  = "92",
+  number  = "4",
+  pages   = "662--681",
+  year    = "2002",
+  doi     = "10.1111/1467-8306.00310",
+  header  = "The classification guidance in world_map() / classify_compare() follows:"
+)
+
+bibentry(
+  bibtype = "Article",
+  title   = "Value-by-alpha maps: an alternative technique to the cartogram",
+  author  = c(person("Robert E.", "Roth"), person("Andrew W.", "Woodruff"),
+              person("Zachary F.", "Johnson")),
+  journal = "The Cartographic Journal",
+  volume  = "47",
+  number  = "2",
+  pages   = "130--140",
+  year    = "2010",
+  doi     = "10.1179/000870409X12488753453372",
+  header  = "value_by_alpha_map() implements:"
+)
+
+bibentry(
+  bibtype = "Article",
+  title   = "Notes on continuous stochastic phenomena",
+  author  = person("P. A. P.", "Moran"),
+  journal = "Biometrika",
+  volume  = "37",
+  number  = "1/2",
+  pages   = "17--23",
+  year    = "1950",
+  doi     = "10.2307/2332142",
+  header  = "morans_i() implements:"
+)

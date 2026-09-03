@@ -7,7 +7,7 @@
 cartogram_map(
   data,
   weight,
-  type = c("contiguous", "dorling", "noncontiguous"),
+  type = c("contiguous", "dorling", "noncontiguous", "flow"),
   fill = NULL,
   projection = "equal_earth",
   ...
@@ -18,7 +18,11 @@ cartogram_map(
 
 \item{weight}{The column to resize by (unquoted).}
 
-\item{type}{\code{"contiguous"} (default), \code{"dorling"} or \code{"noncontiguous"}.}
+\item{type}{\code{"contiguous"} (default), \code{"dorling"}, \code{"noncontiguous"} or
+\code{"flow"}. \code{"flow"} is the Gastner-Seguy-More flow-based algorithm from the
+optional \code{cartogramR} package -- the current state of the art for
+contiguous cartograms, and seconds rather than minutes where the
+diffusion-based \code{"contiguous"} method is slow.}
 
 \item{fill}{Optional fill column (unquoted); defaults to \code{weight}.}
 
@@ -26,7 +30,8 @@ cartogram_map(
 \code{\link[=world_map]{world_map()}} for the projections available.}
 
 \item{...}{Passed to the underlying \verb{cartogram::cartogram_*()} function
-(e.g. \code{itermax}, or \code{k} for \code{type = "dorling"} -- see \code{\link[=dorling_map]{dorling_map()}}).}
+(e.g. \code{itermax}, or \code{k} for \code{type = "dorling"} -- see \code{\link[=dorling_map]{dorling_map()}}), or
+to \code{cartogramR::cartogramR()} for \code{type = "flow"}.}
 }
 \value{
 A \code{ggplot} object.
@@ -36,6 +41,19 @@ Resizes countries by \code{weight} (population, GDP, ...) via the optional
 \code{cartogram} package, defeating the "big empty countries dominate the eye"
 bias of world choropleths.
 }
+\section{Which algorithm}{
+
+\code{"contiguous"} (Dougenik) and \code{"dorling"}/\code{"noncontiguous"} come from
+\code{cartogram}. \code{"flow"} comes from \code{cartogramR} and implements the
+Gastner-Seguy-More flow-based method, which is both the current state of the
+art and far faster than diffusion-based approaches -- prefer it for
+contiguous cartograms when \code{cartogramR} is available.
+
+Cartograms fail quietly: an under-converged one looks plausible while still
+misrepresenting the areas it exists to make honest. Pass a larger \code{itermax}
+if the result still looks close to the true map.
+}
+
 \examples{
 \donttest{
 if (requireNamespace("sf", quietly = TRUE) &&
@@ -45,4 +63,9 @@ if (requireNamespace("sf", quietly = TRUE) &&
     cartogram_map(population, type = "dorling")
 }
 }
+}
+\references{
+Gastner, M. T., Seguy, V. & More, P. (2018). Fast flow-based algorithm for
+creating density-equalizing map projections. \emph{Proceedings of the National
+Academy of Sciences} 115(10), E2156-E2164. \doi{10.1073/pnas.1712674115}
 }

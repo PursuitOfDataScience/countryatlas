@@ -9,7 +9,9 @@ test_that("world_data(year) keeps the classic backward-compatible output", {
   # restored only when options(countryatlas.gdp_compat = TRUE).
   expect_false("gdp_per_capita_2015" %in% names(w))
   opt <- options(countryatlas.gdp_compat = TRUE)
-  w_compat <- world_data(2020)
+  # The compat alias is deprecated and says so; assert that rather than let the
+  # warning leak into the suite's summary.
+  expect_warning(w_compat <- world_data(2020), "gdp_compat")
   options(opt)
   expect_true("gdp_per_capita_2015" %in% names(w_compat))
   expect_true(is.factor(w$income))
@@ -48,8 +50,7 @@ test_that("country_data with no indicator returns the country spine", {
 
 test_that("polygon and sf backends agree on country coverage", {
   skip_if_not_installed("maps")
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   poly <- world_geometry("countries", geometry = "polygon")
   sfg <- world_geometry("countries", geometry = "sf")
   common <- intersect(stats::na.omit(unique(poly$iso3c)), sfg$iso3c)
@@ -58,8 +59,7 @@ test_that("polygon and sf backends agree on country coverage", {
 })
 
 test_that("Natural Earth iso_a3 == -99 countries are recovered (regression)", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   sfg <- world_geometry("countries", geometry = "sf")
   # France, Norway, Kosovo are notorious -99 cases; they must not vanish.
   expect_true(all(c("FRA", "NOR") %in% sfg$iso3c))

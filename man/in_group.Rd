@@ -4,7 +4,7 @@
 \alias{in_group}
 \title{Is a country in a group?}
 \usage{
-in_group(x, group, origin = "country.name")
+in_group(x, group, origin = "country.name", as_of = NULL)
 }
 \arguments{
 \item{x}{A vector of country names or codes.}
@@ -12,6 +12,11 @@ in_group(x, group, origin = "country.name")
 \item{group}{A single group name (see \code{\link[=country_groups]{country_groups()}}).}
 
 \item{origin}{How to read \code{x} (default \code{"country.name"}).}
+
+\item{as_of}{A date or year at which to evaluate membership; \code{NULL} (default)
+uses the current snapshot. A bare year means 1 January of that year, so use
+a \code{"YYYY-MM-DD"} string when an accession or exit falls mid-year. See
+\code{\link[=country_groups]{country_groups()}}.}
 }
 \value{
 A logical vector the same length as \code{x}. A value \code{origin} cannot
@@ -24,4 +29,10 @@ A vectorised membership predicate built on \code{\link[=country_groups]{country_
 }
 \examples{
 in_group(c("France", "United States", "Japan"), "EU")
+# membership is a function of time
+in_group("United Kingdom", "EU", as_of = 2016)
+in_group("United Kingdom", "EU", as_of = 2021)
+}
+\seealso{
+\code{\link[=country_groups]{country_groups()}}, \link{country_groups_history}
 }

@@ -29,7 +29,9 @@ auto-detected.}
 \item{scale}{Natural Earth resolution for the \code{sf} backend. \code{"large"} needs the
 non-CRAN \code{rnaturalearthhires} package; see \code{\link[=world_geometry]{world_geometry()}}.}
 
-\item{region}{Optional region subset (see \code{\link[=world_geometry]{world_geometry()}}).}
+\item{region}{Optional region subset (see \code{\link[=world_geometry]{world_geometry()}}). Applied
+whichever \code{geometry} is used, including \code{"none"}; with \code{"none"} there is
+nothing to clip, so a bounding box is refused rather than ignored.}
 
 \item{projection, recenter}{Projection, and optional central meridian, for
 the \code{sf} backend (see \code{\link[=world_map]{world_map()}} for the projections available).}

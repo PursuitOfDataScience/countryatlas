@@ -215,6 +215,28 @@ test_that("an incidental group_by() never changes an answer", {
   expect_equal(flat(aggregate_regions(grp, g, by = "region")),
                flat(aggregate_regions(panel, g, by = "region")))
   expect_equal(flat(rank_countries(grp, g)), flat(rank_countries(panel, g)))
+  # The 3.0.0 verbs postdate this test, and rank_countries()'s comment claims
+  # "every other function here likewise imposes its own grouping" -- so check
+  # them rather than take the claim.
+  expect_equal(flat(interpolate_missing(grp, "g")),
+               flat(interpolate_missing(panel, "g")))
+  expect_equal(flat(smooth_rates(grp, g, population)),
+               flat(smooth_rates(panel, g, population)))
+  expect_equal(flat(deflate(grp, g, 2000, deflator = population)),
+               flat(deflate(panel, g, 2000, deflator = population)))
+  expect_equal(flat(to_ppp(grp, g, factor = population)),
+               flat(to_ppp(panel, g, factor = population)))
+  expect_equal(flat(sigma_convergence(grp, g)), flat(sigma_convergence(panel, g)))
+  # These reduce to one row per country, so a 4-year panel earns the
+  # countryatlas_panel warning. That is correct and has its own test; here the
+  # question is only whether grouping changed the answer.
+  suppressWarnings({
+    expect_equal(flat(rate_check(grp, g, population)),
+                 flat(rate_check(panel, g, population)))
+    expect_equal(flat(correlate_indicators(grp)),
+                 flat(correlate_indicators(panel)))
+    expect_equal(audit_coverage(grp)$na_rates, audit_coverage(panel)$na_rates)
+  })
 
   # The panel branch was safe by accident: share_of_world() regroups by `year`,
   # which replaces the caller's groups. Without a `year` column nothing replaced

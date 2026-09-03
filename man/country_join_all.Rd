@@ -8,7 +8,9 @@ country_join_all(
   tables,
   by,
   origin = "country.name",
-  type = c("full", "left", "inner")
+  type = c("full", "left", "inner"),
+  key = c("iso3c", "cowc", "cown", "gwn"),
+  warn = TRUE
 )
 }
 \arguments{
@@ -21,9 +23,17 @@ vector giving the column for each table.}
 \code{"country.name"}; length 1 or one per table).}
 
 \item{type}{Join type: \code{"full"} (default), \code{"left"} or \code{"inner"}.}
+
+\item{key}{Which code system to join on, as in \code{\link[=country_join]{country_join()}}: \code{"iso3c"}
+(default), or \code{"cowc"}/\code{"cown"}/\code{"gwn"} for historical work that predates
+ISO 3166. Each table reports separately on the countries the alternate key
+cannot carry.}
+
+\item{warn}{Whether to report values that resolve to no country (default
+\code{TRUE}), per table, as \code{\link[=country_join]{country_join()}} does per side.}
 }
 \value{
-A single tibble joined on \code{iso3c} (clashing non-key columns get
+A single tibble joined on \code{key} (clashing non-key columns get
 dplyr's default \code{.x}/\code{.y} suffixes).
 }
 \description{

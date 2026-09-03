@@ -12,7 +12,9 @@ country_join(
   origin_x = "country.name",
   origin_y = "country.name",
   type = c("left", "inner", "full"),
-  suffix = c(".x", ".y")
+  suffix = c(".x", ".y"),
+  key = c("iso3c", "cowc", "cown", "gwn"),
+  warn = TRUE
 )
 }
 \arguments{
@@ -26,6 +28,15 @@ country_join(
 
 \item{suffix}{Suffix for clashing non-key columns (default
 \code{c(".x", ".y")}).}
+
+\item{key}{Which code system to join on. \code{"iso3c"} (default) is the
+package's spine and the right choice for anything contemporary.
+\code{"cowc"}/\code{"cown"} (Correlates of War) and \code{"gwn"} (Gleditsch-Ward) are the
+alternate spines historical work needs -- see the section below.}
+
+\item{warn}{Whether to report values that resolve to no country (default
+\code{TRUE}). They join to nothing, so a silent reconciliation failure is the
+one thing this verb exists to prevent. Each side is reported separately.}
 }
 \value{
 A tibble joined on a reconciled \code{iso3c} key.
@@ -36,6 +47,24 @@ The generic two-table version of the package's whole reason for being: join
 both sides to \code{iso3c} first. Tables keyed on \code{"Czech Republic"} vs
 \code{"Czechia"}, or \code{"South Korea"} vs \code{"Korea, Rep."}, just work.
 }
+\section{Joining historical data}{
+ the second spine:
+ISO 3166 was first published in 1974 and never covered colonies, so \code{iso3c}
+cannot key anything before about 1970. Correlates of War and Gleditsch-Ward
+codes can, they run back to the nineteenth century, and
+\code{\link[=historical_geometry]{historical_geometry()}} is keyed on \code{gwn}. Setting \code{key} switches the join
+onto one of those:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{country_join(a, b, country, nation, key = "gwn")
+}\if{html}{\out{</div>}}
+
+The trade-off is real and worth stating: COW/GW codes cover states ISO never
+did, but they omit the dependencies and non-sovereign territories ISO does
+cover, so a modern dataset joined on \code{gwn} loses Hong Kong, Puerto Rico and
+the rest -- which the join warns about. Use \code{iso3c} unless you are working
+before 1970.
+}
+
 \examples{
 a <- data.frame(country = c("Czechia", "South Korea"), gdp = c(1, 2))
 b <- data.frame(nation = c("Czech Republic", "Korea, Rep."), pop = c(10, 51))

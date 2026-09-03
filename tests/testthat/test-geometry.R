@@ -20,7 +20,10 @@ test_that("distance_between resolves via iso3c", {
 })
 
 test_that("distance_between returns NA for unknown countries", {
-  d <- distance_between("France", "Atlantis")
+  # And says so: a value that resolves to no country is a mistake, unlike a
+  # country that resolves but has no bundled centroid, which stays quiet.
+  expect_warning(d <- distance_between("France", "Atlantis"),
+                 "did not resolve to a country")
   expect_true(is.na(d))
 })
 
@@ -31,8 +34,7 @@ test_that("distance_between works on vectors of length 1 (no recycling)", {
 })
 
 test_that("locate_country tags known capitals", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   out <- locate_country(lon = c(2.35, -74.0, 139.7), lat = c(48.85, 40.7, 35.7))
   # Paris, New York, Tokyo
   expect_equal(out$iso3c, c("FRA", "USA", "JPN"))
@@ -40,15 +42,13 @@ test_that("locate_country tags known capitals", {
 })
 
 test_that("locate_country returns NA for open ocean", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   out <- locate_country(lon = -30, lat = -30)   # open Atlantic
   expect_true(is.na(out$iso3c))
 })
 
 test_that("locate_country supports extra attributes", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   out <- locate_country(lon = 2.35, lat = 48.85, add = c("country", "continent"))
   expect_equal(out$country, "France")
   expect_equal(out$continent, "Europe")
@@ -60,8 +60,7 @@ test_that("locate_country errors on mismatched lon/lat lengths", {
 })
 
 test_that("locate_country snaps coastal points but leaves open ocean NA", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   # New York sits ~0.5 km outside the coarse 110m US coastline: the default
   # tolerance snaps it to the US, strict mode (tolerance_km = 0) does not.
   expect_equal(locate_country(lon = -74.0, lat = 40.7)$iso3c, "USA")
@@ -71,8 +70,7 @@ test_that("locate_country snaps coastal points but leaves open ocean NA", {
 })
 
 test_that("country_borders returns a tidy edge list", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   edges <- country_borders()
   expect_s3_class(edges, "tbl_df")
   expect_true(all(c("iso3c_a", "country_a", "iso3c_b", "country_b") %in% names(edges)))
@@ -86,15 +84,13 @@ test_that("country_borders returns a tidy edge list", {
 })
 
 test_that("country_borders never lists a country bordering itself", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   edges <- country_borders()
   expect_false(any(edges$iso3c_a == edges$iso3c_b))
 })
 
 test_that("neighbors lists a country's bordering countries", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   nbr <- neighbors("France")
   expect_s3_class(nbr, "tbl_df")
   expect_true("DEU" %in% nbr$neighbor)
@@ -102,15 +98,13 @@ test_that("neighbors lists a country's bordering countries", {
 })
 
 test_that("neighbors returns zero rows for islands", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   nbr <- neighbors("Japan")
   expect_equal(nrow(nbr), 0)
 })
 
 test_that("locate_country names Kosovo (XKX has no countrycode row)", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   out <- locate_country(lon = 20.9, lat = 42.6, add = c("country", "continent"))
   expect_equal(out$iso3c, "XKX")
   expect_equal(out$country, "Kosovo")
@@ -118,8 +112,7 @@ test_that("locate_country names Kosovo (XKX has no countrycode row)", {
 })
 
 test_that("country_borders names every endpoint, Kosovo included", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   edges <- country_borders()
   expect_false(anyNA(edges$country_a))
   expect_false(anyNA(edges$country_b))
@@ -131,8 +124,7 @@ test_that("world_geometry('coastline') works in every projection", {
   # Two Natural Earth rings are invalid once projected, and st_union() (unlike
   # the predicates) refuses them outright: the coastline used to error with
   # "TopologyException: side location conflict" in all but plate_carree.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   for (proj in c("equal_earth", "robinson", "mollweide", "mercator",
                  "plate_carree", "orthographic")) {
     cl <- world_geometry("coastline", geometry = "sf", projection = proj)
@@ -147,8 +139,7 @@ test_that("world_geometry('coastline') works in every projection", {
 test_that("world_geometry accepts a bounding-box region on the sf backend", {
   # Regression: st_crop() under the strict S2 engine rejected Natural Earth's
   # self-intersecting rings, so region = c(xmin, ymin, xmax, ymax) errored.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   eur <- world_geometry("countries", geometry = "sf",
                         region = c(-10, 35, 30, 60))
   expect_s3_class(eur, "sf")
@@ -206,9 +197,7 @@ test_that("attach_geometry drops rows the backend has no geometry for", {
 })
 
 test_that("sf coverage is monotone in scale, and medium beats small", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
-  skip_if_not_installed("rnaturalearthdata")
+  skip_if_no_sf_geometry()
   codes <- function(sc) {
     unique(stats::na.omit(countryatlas:::get_world_sf(scale = sc,
                                                      project = FALSE)$iso3c))
@@ -232,9 +221,7 @@ test_that("sf coverage is monotone in scale, and medium beats small", {
 # it. The layer drew nothing, in every projection.
 
 test_that("every what value returns a real sf object", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
-  skip_if_not_installed("rnaturalearthdata")
+  skip_if_no_sf_geometry()
   for (w in c("countries", "centroids", "coastline", "borders", "graticule",
               "ocean")) {
     o <- world_geometry(w, geometry = "sf")
@@ -246,9 +233,7 @@ test_that("every what value returns a real sf object", {
 })
 
 test_that("the ocean layer actually covers the map", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
-  skip_if_not_installed("rnaturalearthdata")
+  skip_if_no_sf_geometry()
   earth <- 5.1e14                                  # m^2, Earth's surface
   for (pr in c("equal_earth", "robinson", "mollweide", "eckert4",
                "gall_peters")) {
@@ -268,8 +253,7 @@ test_that("the ocean layer actually covers the map", {
 })
 
 test_that("ocean refuses the cases it cannot draw, and says why", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   for (pr in c("orthographic", "azimuthal_equal_area", "north_polar",
                "south_polar")) {
     expect_error(world_geometry("ocean", geometry = "sf", projection = pr),
@@ -293,8 +277,7 @@ test_that("only orthographic drops the far side; the Lambert three keep it", {
   # Lambert azimuthal equal-area, which images the whole globe with the far side
   # stretched around the rim -- nothing comes back empty. The docs now say so,
   # and a reader who filters on st_is_empty() depends on the difference.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
 
   n_empty <- function(projection) {
     g <- world_geometry("countries", geometry = "sf", projection = projection)
@@ -313,15 +296,13 @@ test_that("only orthographic drops the far side; the Lambert three keep it", {
 test_that("the ISO-less Natural Earth features are documented", {
   # ?world_geometry names these as the rows that come back with iso3c NA; if a
   # future rnaturalearth changes the set, the doc has to change with it.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   g <- world_geometry("countries", geometry = "sf", scale = "small")
   expect_identical(sort(g$name_long[is.na(g$iso3c)]), "Somaliland")
 })
 
 test_that("sf centroid columns are projected units, as documented", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   # ?world_geometry now says these are in the returned object's CRS. Pin it, so
   # nobody reads centroid_lon as a longitude by accident.
   s <- world_geometry("centroids", geometry = "sf")
@@ -340,9 +321,7 @@ test_that("no geometry layer is degenerate in any projection", {
   # nothing caught it: st_bbox() reported the stored extent rather than
   # recomputing it, so every diagnostic looked healthy. Measure the geometry
   # itself, for every layer.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
-  skip_if_not_installed("rnaturalearthdata")
+  skip_if_no_sf_geometry()
   for (pr in c("equal_earth", "robinson", "mollweide", "plate_carree")) {
     for (w in c("countries", "centroids", "coastline", "borders", "graticule",
                 "ocean")) {
@@ -369,9 +348,7 @@ test_that("the countries layer is a homogeneous MULTIPOLYGON column", {
   # MULTIPOLYGON, i.e. an sfc_GEOMETRY column. sf::st_coordinates() is not
   # implemented for that, so pulling vertices out of world_geometry("countries")
   # failed, in every projection including the default.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
-  skip_if_not_installed("rnaturalearthdata")
+  skip_if_no_sf_geometry()
   for (pr in c("equal_earth", "robinson", "mollweide", "plate_carree")) {
     o <- world_geometry("countries", geometry = "sf", projection = pr)
     expect_equal(unique(as.character(sf::st_geometry_type(o))), "MULTIPOLYGON",
@@ -401,8 +378,7 @@ test_that("a hemispheric projection leaves the far side empty, not malformed", {
   # Orthographic hides half the globe, so those countries have no image. The
   # empty geometries are correct; recorded here so the resulting
   # st_coordinates() limitation is not mistaken for the bug fixed above.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   o <- world_geometry("countries", geometry = "sf", projection = "orthographic")
   expect_equal(unique(as.character(sf::st_geometry_type(o))), "MULTIPOLYGON")
   expect_gt(sum(sf::st_is_empty(o)), 0L)
@@ -421,9 +397,7 @@ test_that("a hemispheric projection leaves the far side empty, not malformed", {
 # so the fix applied at the source was undone downstream.
 
 test_that("simplify_geometry preserves a homogeneous geometry column", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
-  skip_if_not_installed("rnaturalearthdata")
+  skip_if_no_sf_geometry()
   g <- world_geometry("countries", geometry = "sf")
   expect_equal(unique(as.character(sf::st_geometry_type(g))), "MULTIPOLYGON")
   for (rm_present in c(TRUE, FALSE)) {
@@ -450,9 +424,7 @@ test_that("the st_simplify fallback is CRS-independent and honours keep", {
   # whatever the CRS: 9 km on a projected frame, which barely simplified
   # anything, and 9000 *degrees* on a lon/lat one, where only
   # preserveTopology kept the result usable at all.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
-  skip_if_not_installed("rnaturalearthdata")
+  skip_if_no_sf_geometry()
   old_s2 <- suppressMessages(sf::sf_use_s2(FALSE))   # NE rings are s2-invalid
   on.exit(suppressMessages(sf::sf_use_s2(old_s2)), add = TRUE)
   proj <- world_geometry("countries", geometry = "sf")
@@ -486,9 +458,7 @@ test_that("every geometry-returning path keeps a usable geometry column", {
   # The invariant broke twice: st_break_antimeridian() downgraded the source
   # column (fixed in get_world_sf), and then simplify_geometry() undid the fix
   # downstream. Check the whole surface rather than the two known sites.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
-  skip_if_not_installed("rnaturalearthdata")
+  skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   paths <- list(
     countries  = function() world_geometry("countries", geometry = "sf"),

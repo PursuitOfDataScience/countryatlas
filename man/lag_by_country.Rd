@@ -20,7 +20,10 @@ diff_by_country(data, value, n = 1, suffix = NULL)
 (with \code{n} appended when \code{n > 1}, e.g. \code{"_lag5"}).}
 }
 \value{
-\code{data} with the lagged / differenced column added.
+\code{data} with the lagged / differenced column added. Rows come back
+sorted by \code{iso3c} then \code{year}: the calculation reads each country's series
+in time order, so a row-aligned vector held alongside \code{data} will no
+longer line up.
 }
 \description{
 The two panel primitives everyone hand-rolls (and gets subtly wrong when the

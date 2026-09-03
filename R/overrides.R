@@ -37,20 +37,23 @@
 #' @return A named character vector suitable for `countrycode(custom_match=)`.
 #' @export
 #' @examples
-#' wdj_overrides()
-#' wdj_overrides(c(Somaliland = "SOM"))
+#' # `country_overrides()` is the current name; `wdj_overrides()` warns.
+#' country_overrides()
+#' country_overrides(c(Somaliland = "SOM"))
 wdj_overrides <- function(extra = NULL) {
-  # Soft-deprecated in 2.0.0; prefer country_overrides(). The note belongs to
-  # *this* name only. It used to live in the shared body, so it fired for
-  # country_overrides() -- the replacement it recommends -- and for every public
-  # function that takes `overrides = country_overrides()` as a default, telling
-  # interactive callers to stop using a function they had never written.
-  if (interactive()) {
-    cli::cli_inform(
-      c("i" = "{.fn wdj_overrides} is soft-deprecated; use {.fn country_overrides} instead."),
-      .frequency = "once", .frequency_id = "wdj_overrides-deprecated"
-    )
-  }
+  # Soft-deprecated in 2.0.0, and now a real warning: the cycle has run a full
+  # release and an interactive-only note never reaches the scripts that are
+  # actually still calling it. The note belongs to *this* name only -- it used to
+  # live in the shared body, so it fired for country_overrides(), the
+  # replacement it recommends, and for every public function that takes
+  # `overrides = country_overrides()` as a default.
+  wdj_warn(
+    c("{.fn wdj_overrides} is deprecated; use {.fn country_overrides} instead.",
+      "i" = "The two return the same table. {.fn wdj_overrides} is a holdover
+             from the {.pkg worlddatajoin} name and will be removed."),
+    class = "deprecatedWarning", .frequency = "once",
+    .frequency_id = "wdj_overrides-deprecated"
+  )
   build_overrides(extra)
 }
 
@@ -99,12 +102,12 @@ build_overrides <- function(extra = NULL) {
 }
 
 #' @description
-#' `country_overrides()` is the preferred name as of the package's rename to
-#' countryatlas; `wdj_overrides()` is kept as a backward-compatible alias.
+#' `country_overrides()` is the current name, as of the package's rename to
+#' countryatlas. **`wdj_overrides()` is deprecated** and warns once per session;
+#' it returns the same table and will be removed. The help page kept describing
+#' it as "a backward-compatible alias" after the code had started warning.
 #' @rdname wdj_overrides
 #' @export
-#' @examples
-#' country_overrides()
 country_overrides <- function(extra = NULL) {
   build_overrides(extra)
 }

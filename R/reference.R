@@ -74,6 +74,13 @@ convert_country <- function(x, to = "iso3c", from = "country.name",
   } else {
     to
   }
+  # `to` reached countrycode as `destination` with only check_string() behind
+  # it, so a typo produced "The `destination` argument must be a string ... one
+  # of the column names in the conversion directory (by default: `codelist`)"
+  # -- an argument and a directory the caller never mentioned. Check it here,
+  # against the mapped value, so shortcuts and name_xx still pass.
+  dest_ok <- tryCatch(names(countrycode::codelist), error = function(e) NULL)
+  if (length(dest_ok) && !dest %in% dest_ok) abort_bad_destination(to, "to")
   # When reading names or iso3c, resolve to the override-corrected iso3c first
   # and then convert iso3c -> destination, so curated entities (Kosovo, Canary
   # Islands, ...) resolve for EVERY destination, not just iso3c.
@@ -109,8 +116,21 @@ convert_country <- function(x, to = "iso3c", from = "country.name",
     out <- apply_fallback_dest(iso, out, dest)
     return(out)
   }
-  out <- suppressWarnings(
-    countrycode::countrycode(x, origin = from, destination = dest, warn = FALSE)
+  # Any scheme other than country.name/iso3c skips the iso3c hop above, so
+  # this is the one countrycode call `from` reaches directly -- and it was the
+  # one place the guard in wdj_to_iso3c() could not cover. A bad `from` blamed
+  # `origin`, which is not an argument of this function.
+  out <- tryCatch(
+    suppressWarnings(
+      countrycode::countrycode(x, origin = from, destination = dest,
+                               warn = FALSE)
+    ),
+    error = function(e) {
+      if (grepl("`origin`", conditionMessage(e), fixed = TRUE)) {
+        abort_bad_origin(from, e, rlang::caller_env(), "from")
+      }
+      stop(e)
+    }
   )
   # No intermediate iso3c here, so the single hop is the match.
   warn_unmatched_input(x, out, warn)
@@ -163,6 +183,12 @@ warn_unmatched_input <- function(x, matched, warn) {
 #' country_codes()
 #' country_codes(c("iso2c", "continent", "currency"))
 country_codes <- function(codes = NULL) {
+  # `codes` names columns as strings; a bare `codes = iso3c` died on base R's
+  # "object 'iso3c' not found".
+  codes_expr <- substitute(codes)
+  codes <- tryCatch(force(codes), error = function(e) {
+    abort_bare_column(codes_expr, "codes", e)
+  })
   cl <- tibble::as_tibble(countrycode::codelist)
   # Friendly name -> raw codelist column, with the inverse for renaming output.
   raw_of <- c(country = "country.name.en", iso3c = "iso3c", iso2c = "iso2c",
@@ -199,33 +225,114 @@ country_codes <- function(codes = NULL) {
 #' Country-group membership
 #'
 #' Answers the constant question "is this country in the EU / OECD / G7 / G20 /
-#' BRICS / ...?" from a curated, dated membership table (point-in-time
-#' membership is genuinely fiddly, so it is shipped and maintained, not
-#' guessed). See [country_groups_tbl].
+#' BRICS / ...?" from a curated membership table. By default that is the current
+#' snapshot ([country_groups_tbl]); pass `as_of` to ask the question of a
+#' particular date, which is what a panel needs.
 #'
 #' @param group One or more group names: any of `"EU"`, `"OECD"`, `"G7"`,
 #'   `"G20"`, `"BRICS"`, `"ASEAN"`, `"EFTA"`, `"Commonwealth"`, `"OPEC"`,
 #'   `"EuroZone"`, `"NATO"`, `"Mercosur"`, `"GCC"`, `"Nordic"`, `"Visegrad"`.
 #'   If `NULL`, the whole table is returned.
+#' @param as_of A date (or a year) at which to evaluate membership. `NULL`
+#'   (default) uses the current snapshot. **A bare year means 1 January of that
+#'   year**, not "at some point during it": `as_of = 2013` is 2013-01-01, so
+#'   Croatia -- which joined the EU on 2013-07-01 -- is not yet a member. Pass a
+#'   `"YYYY-MM-DD"` string or a `Date` when the month matters. See the section
+#'   below.
 #'
-#' @return A tibble of `group`, `iso3c`, `country`.
+#' @return A tibble of `group`, `iso3c`, `country`; with `as_of`, also `from`
+#'   and `to`.
+#'
+#' @section Membership changes, and which groups are dated:
+#' A snapshot silently misstates any panel that spans an accession. An EU panel
+#' over 2015-2020 either includes the United Kingdom throughout or excludes it
+#' throughout, and both are wrong:
+#' ```r
+#' "GBR" %in% country_groups("EU", as_of = 2016)$iso3c   # TRUE
+#' "GBR" %in% country_groups("EU", as_of = 2021)$iso3c   # FALSE
+#' ```
+#' [country_groups_history] carries dated membership for twelve groups: EU,
+#' EuroZone, NATO, OECD, ASEAN, EFTA, GCC, Mercosur, Nordic, Visegrad, BRICS and
+#' G7. Commonwealth, G20 and OPEC are **not** dated -- their histories involve
+#' suspensions, readmissions and contested dates that would have to be sourced
+#' case by case, and a fabricated date is worse than an absent one. Asking for
+#' `as_of` on those warns and falls back to the snapshot.
+#'
+#' @seealso [in_group()], [country_groups_history], [country_timeline()]
 #' @export
 #' @examples
 #' country_groups("EU")
 #' country_groups(c("G7", "BRICS"))
-country_groups <- function(group = NULL) {
+#' # the UK was a member in 2016 and not in 2021
+#' nrow(country_groups("EU", as_of = 2016))
+#' nrow(country_groups("EU", as_of = 2021))
+country_groups <- function(group = NULL, as_of = NULL) {
   tbl <- countryatlas::country_groups_tbl
-  if (is.null(group)) return(tbl)
   valid <- unique(tbl$group)
-  bad <- setdiff(group, valid)
-  if (length(bad)) {
-    wdj_abort(c(
-      "Unknown group{?s}: {.val {bad}}.",
-      "i" = "Available groups: {.val {valid}}."
+  if (!is.null(group)) {
+    bad <- setdiff(group, valid)
+    if (length(bad)) {
+      wdj_abort(c(
+        "Unknown group{?s}: {.val {bad}}.",
+        "i" = "Available groups: {.val {valid}}."
+      ))
+    }
+  }
+  if (is.null(as_of)) {
+    if (is.null(group)) return(tbl)
+    grp <- group
+    return(dplyr::filter(tbl, .data$group %in% grp))
+  }
+
+  when <- as_of_date(as_of)
+  hist <- countryatlas::country_groups_history
+  want <- group %||% valid
+  dated <- intersect(want, unique(hist$group))
+  undated <- setdiff(want, dated)
+  if (length(undated)) {
+    wdj_warn(c(
+      "No dated membership for {.val {undated}}; using the current snapshot.",
+      "i" = "See {.help countryatlas::country_groups_history} for which groups
+             are dated and why the others are not."
     ))
   }
-  grp <- group
-  dplyr::filter(tbl, .data$group %in% grp)
+  out <- dplyr::filter(
+    hist, .data$group %in% dated, .data$from <= when,
+    is.na(.data$to) | .data$to > when
+  )
+  if (length(undated)) {
+    snap <- dplyr::filter(tbl, .data$group %in% undated)
+    snap$from <- as.Date(NA); snap$to <- as.Date(NA)
+    out <- dplyr::bind_rows(out, snap)
+  }
+  dplyr::arrange(out, .data$group, .data$iso3c)
+}
+
+# Accept a Date, a year number, or a parseable date string. A bare year means
+# "as at 1 January", which is the convention every annual panel already uses.
+as_of_date <- function(as_of, call = rlang::caller_env()) {
+  if (inherits(as_of, "Date")) {
+    if (length(as_of) != 1L || is.na(as_of)) {
+      wdj_abort("{.arg as_of} must be a single non-missing date.", call = call)
+    }
+    return(as_of)
+  }
+  if (is.numeric(as_of) && length(as_of) == 1L && !is.na(as_of) &&
+      as_of == round(as_of) && as_of > 1000 && as_of < 3000) {
+    return(as.Date(sprintf("%d-01-01", as.integer(as_of))))
+  }
+  if (is.character(as_of) && length(as_of) == 1L) {
+    # as.Date() *errors* on an unparseable string ("character string is not in a
+    # standard unambiguous format") rather than returning NA, so the guard below
+    # never ran and the caller got base R's message instead of ours.
+    d <- tryCatch(as.Date(as_of), error = function(e) NA)
+    if (!is.na(d)) return(d)
+  }
+  wdj_abort(c(
+    "{.arg as_of} must be a {.cls Date}, a four-digit year, or a
+     {.val YYYY-MM-DD} string.",
+    "x" = "Got {.val {as_of}}."
+  ), call = call)
 }
 
 #' Is a country in a group?
@@ -235,18 +342,26 @@ country_groups <- function(group = NULL) {
 #' @param x A vector of country names or codes.
 #' @param group A single group name (see [country_groups()]).
 #' @param origin How to read `x` (default `"country.name"`).
+#' @param as_of A date or year at which to evaluate membership; `NULL` (default)
+#'   uses the current snapshot. A bare year means 1 January of that year, so use
+#'   a `"YYYY-MM-DD"` string when an accession or exit falls mid-year. See
+#'   [country_groups()].
 #'
 #' @return A logical vector the same length as `x`. A value `origin` cannot
 #'   resolve to an ISO code answers `FALSE` -- the same as a country that is
 #'   genuinely outside the group -- so run [check_country_match()] first if you
 #'   need to tell "not a member" from "not recognised".
+#' @seealso [country_groups()], [country_groups_history]
 #' @export
 #' @examples
 #' in_group(c("France", "United States", "Japan"), "EU")
-in_group <- function(x, group, origin = "country.name") {
+#' # membership is a function of time
+#' in_group("United Kingdom", "EU", as_of = 2016)
+#' in_group("United Kingdom", "EU", as_of = 2021)
+in_group <- function(x, group, origin = "country.name", as_of = NULL) {
   if (length(group) != 1L) wdj_abort("{.arg group} must be a single group name.")
   iso <- wdj_to_iso3c(x, origin = origin)
-  members <- country_groups(group)$iso3c
+  members <- country_groups(group, as_of = as_of)$iso3c
   iso %in% members
 }
 
@@ -268,7 +383,21 @@ in_group <- function(x, group, origin = "country.name") {
 #' wdi_search("CO2 emissions")
 #' }
 wdi_search <- function(pattern, field = c("name", "indicator"), cache = NULL) {
-  field <- match.arg(field)
+  field <- rlang::arg_match(field)
+  # `field` was the only argument checked. A non-string `pattern` went straight
+  # into the regex and matched *something*: wdi_search(1) returned 10,125 rows
+  # and wdi_search(NA) the whole 29,495-row catalogue, both silently, while an
+  # empty one leaked base R's "invalid 'pattern' argument".
+  check_string(pattern, "pattern")
+  # `cache` is a WDIcache() object, so a logical or a string reached WDI and
+  # failed on "$ operator is invalid for atomic vectors".
+  if (!is.null(cache) && !is.list(cache)) {
+    wdj_abort(c(
+      "{.arg cache} must be a {.fn WDI::WDIcache} object, or {.code NULL}.",
+      "x" = "Got {.cls {class(cache)[1]}}.",
+      "i" = "{.code NULL} uses the cache bundled with {.pkg WDI}, offline."
+    ))
+  }
   res <- WDI::WDIsearch(string = pattern, field = field, short = TRUE,
                         cache = cache)
   if (is.null(dim(res))) {

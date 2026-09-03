@@ -41,7 +41,7 @@ standardize_country(my_data, nation, warn = FALSE)
 `join_world()` auto-detects the country column, standardises it and attaches
 geometry:
 
-```{r}
+```{r fig.alt = "World choropleth of a user-supplied score column after joining to the ISO spine."}
 my_data |>
   join_world(nation, warn = FALSE) |>
   world_map(score, title = "My data on the ISO spine")

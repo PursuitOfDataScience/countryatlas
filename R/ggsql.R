@@ -38,6 +38,12 @@ ggsql_wkb_frame <- function(data, geometry_col = "geometry") {
 #'   `"log10"`).
 #' @param title Optional plot title (`LABEL title => ...`).
 #' @param draw The spatial layer (default `"spatial"`).
+#' @param layer `"choropleth"` (default), `"bubble"` (proportional symbols --
+#'   needs `size`) or `"binned"` (classed fill -- see `n_bins`).
+#' @param facet Optional column to facet the query by, e.g. `"year"` for a
+#'   small-multiple panel rendered in the database.
+#' @param size Column driving symbol size for `layer = "bubble"`.
+#' @param n_bins Number of classes for `layer = "binned"` (default `5`).
 #'
 #' @return A `ggsql_query` string (prints as the formatted query).
 #' @section Executing the query:
@@ -55,18 +61,43 @@ ggsql_wkb_frame <- function(data, geometry_col = "geometry") {
 #'             title = "GDP per capita")
 world_query <- function(fill, source = "countryatlas_world",
                         projection = "equal_earth", palette = "viridis",
-                        transform = NULL, title = NULL, draw = "spatial") {
+                        transform = NULL, title = NULL, draw = "spatial",
+                        layer = c("choropleth", "bubble", "binned"),
+                        facet = NULL, size = NULL, n_bins = NULL) {
   fill_name <- quo_arg_name(rlang::enquo(fill), "fill")
+  layer <- rlang::arg_match(layer)
   check_string(source, "source")
   check_string(draw, "draw")
+  if (!is.null(facet)) check_string(facet, "facet")
+  if (!is.null(size)) check_string(size, "size")
+  if (!is.null(n_bins)) {
+    # hi: the value is coerced with as.integer() below, which returns NA past
+    # 2^31-1 with a bare "NAs introduced by coercion" -- the query then read
+    # "BIN fill INTO NA". compute_breaks() has carried this bound all along.
+    check_number(n_bins, "n_bins", lo = 2, hi = .Machine$integer.max)
+  }
+  if (identical(layer, "bubble") && is.null(size)) {
+    wdj_abort(c(
+      '{.code layer = "bubble"} needs a {.arg size} column.',
+      "i" = "A proportional-symbol map has nothing to size the symbols by
+             otherwise."
+    ))
+  }
+  if (identical(layer, "binned") && is.null(n_bins)) n_bins <- 5
   if (!is.null(projection)) check_string(projection, "projection")
   if (!is.null(palette)) check_string(palette, "palette")
   if (!is.null(transform)) check_string(transform, "transform")
   if (!is.null(title)) check_string(title, "title", allow_empty = TRUE)
+  head_line <- sprintf("VISUALISE %s AS fill", fill_name)
+  if (!is.null(size)) {
+    head_line <- paste0(head_line, ", ", size, " AS size")
+  }
   lines <- c(
-    sprintf("VISUALISE %s AS fill", fill_name),
+    head_line,
     sprintf("FROM %s", source),
-    sprintf("DRAW %s", draw)
+    # "bubble" draws symbols rather than filled shapes; the spatial layer name
+    # is the one thing that changes, so the rest of the query is untouched.
+    sprintf("DRAW %s", if (identical(layer, "bubble")) "spatial_point" else draw)
   )
   if (!is.null(projection)) {
     lines <- c(lines, sprintf("PROJECT TO %s", projection))
@@ -75,6 +106,12 @@ world_query <- function(fill, source = "countryatlas_world",
     scale_line <- if (!is.null(palette)) sprintf("SCALE fill TO %s", palette) else "SCALE fill"
     if (!is.null(transform)) scale_line <- paste0(scale_line, " VIA ", transform)
     lines <- c(lines, scale_line)
+  }
+  if (identical(layer, "binned")) {
+    lines <- c(lines, sprintf("BIN fill INTO %d", as.integer(n_bins)))
+  }
+  if (!is.null(facet)) {
+    lines <- c(lines, sprintf("FACET BY %s", facet))
   }
   if (!is.null(title)) {
     lines <- c(lines, sprintf("LABEL title => '%s'", gsub("'", "''", title)))
@@ -139,6 +176,17 @@ wdj_duckdb <- function() {
 #'
 #' @return Depending on `format`: a DuckDB connection (with the table written),
 #'   a Parquet file path, or a nanoarrow array stream.
+#'
+#'   **You own the connection** that `format = "duckdb"` returns, and duckdb
+#'   keeps its in-memory database alive until the handle is released, so close
+#'   it when you are done:
+#'   ```r
+#'   src <- as_ggsql_source(d, format = "duckdb")
+#'   on.exit(DBI::dbDisconnect(src, shutdown = TRUE))
+#'   ```
+#'   `format = "parquet"` needs no such care: it closes the connection it
+#'   opened before returning the path. Passing your own `con` leaves it open
+#'   in every case, since it was never ours to close.
 #' @export
 #' @examples
 #' \dontrun{
@@ -149,7 +197,7 @@ wdj_duckdb <- function() {
 as_ggsql_source <- function(data, name = "countryatlas_world",
                             format = c("duckdb", "parquet", "arrow"),
                             con = NULL, path = NULL, geometry_col = "geometry") {
-  format <- match.arg(format)
+  format <- rlang::arg_match(format)
   check_string(name, "name")
   check_string(geometry_col, "geometry_col")
   if (!is.null(path)) check_string(path, "path")
@@ -163,7 +211,18 @@ as_ggsql_source <- function(data, name = "countryatlas_world",
   need_pkg(c("DBI", "duckdb"), sprintf("for as_ggsql_source(format = \"%s\")", format))
   own_con <- is.null(con)
   con <- con %||% DBI::dbConnect(wdj_duckdb())
+  if (own_con) {
+    # If the write throws, the caller never receives the handle and so cannot
+    # close it, while duckdb holds the in-memory database open. Release a
+    # connection we opened ourselves; one passed in was never ours to close.
+    written <- FALSE
+    on.exit(
+      if (!written) try(DBI::dbDisconnect(con, shutdown = TRUE), silent = TRUE),
+      add = TRUE
+    )
+  }
   DBI::dbWriteTable(con, name, as.data.frame(df), overwrite = TRUE)
+  if (own_con) written <- TRUE
 
   if (format == "parquet") {
     path <- ggsql_parquet_path(name, path)

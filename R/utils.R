@@ -32,6 +32,129 @@ has_pkg <- function(pkg) {
   isTRUE(requireNamespace(pkg, quietly = TRUE))
 }
 
+# Is a package installed? Deliberately *not* has_pkg(): requireNamespace() loads
+# the namespace and so runs .onLoad, and comtradr's .onLoad creates
+# ~/.cache/R/comtradr. That made merely asking "which sources are available?"
+# write to the user's home filespace -- reported by R CMD check as a new file in
+# another directory, and forbidden by CRAN policy. system.file() answers the
+# same question without loading anything. Use this when surveying packages the
+# caller is not about to call; use has_pkg() when the next line calls pkg::fun().
+pkg_installed <- function(pkg) nzchar(system.file(package = pkg))
+
+# Resolve country identifiers to whichever code system is the join key.
+#
+# iso3c stays the default everywhere, and goes through wdj_to_iso3c() so it
+# keeps the override table and the Kosovo special case. The COW and
+# Gleditsch-Ward alternates exist for historical work, where ISO 3166 simply
+# does not reach: it was first published in 1974 and never covered colonies.
+# Those go straight to countrycode, which maintains the crosswalks.
+# Three verbs take column names as strings -- interpolate_missing(value),
+# complete_years(value) and audit_coverage(indicator) -- while the nine verbs
+# around them take a bare column through tidy eval. Writing the bare column
+# that works everywhere else produced base R's "object 'v' not found", naming
+# neither the argument nor the string it wanted. Only reached once evaluation
+# has already failed, so a legitimate expression is never intercepted; and only
+# a bare symbol (or c() of symbols) is claimed, so a real error still surfaces.
+abort_bare_column <- function(expr, arg, cnd, call = rlang::caller_env()) {
+  bare <- is.symbol(expr) ||
+    (is.call(expr) && identical(expr[[1L]], quote(c)) && length(expr) > 1L &&
+       all(vapply(as.list(expr)[-1L], is.symbol, logical(1))))
+  if (!bare) stop(cnd)
+  txt <- vapply(if (is.symbol(expr)) list(expr) else as.list(expr)[-1L],
+                as.character, character(1))
+  shown <- if (length(txt) == 1L) {
+    paste0(arg, ' = "', txt, '"')
+  } else {
+    paste0(arg, " = c(", paste0('"', txt, '"', collapse = ", "), ")")
+  }
+  wdj_abort(c(
+    "{.arg {arg}} takes column names as strings.",
+    "x" = "Got {.code {txt}} unquoted.",
+    "i" = "Write {.code {shown}}."
+  ), call = call, class = "countryatlas_bare_column")
+}
+
+# What a verb hands back after adding columns. as_tibble() was doing double
+# duty at these return points: it normalised the class *and* dropped grouping.
+# Removing it kept an sf frame alive -- join_world(geometry = "sf") |>
+# share_of_world() |> world_map() had died on "`data` has no map geometry"
+# because the class was gone while the geometry column remained -- but leaked a
+# grouped input straight back out, which test-analysis.R pins against. sf is the
+# one class worth carrying through, since the map verbs require it; everything
+# else becomes a tibble, as standardize_country()'s test has always required.
+wdj_return_frame <- function(data) {
+  if (inherits(data, "sf")) dplyr::ungroup(data) else tibble::as_tibble(data)
+}
+
+# Reshaping verbs -- tidyr::complete() and the joins -- return a plain tibble
+# even when the input was `sf` and the geometry column came through untouched.
+# The result then still holds a live `sfc` column, so no data is lost, but the
+# class is gone and st_bbox()/geom_sf() refuse it until the caller thinks to
+# run st_as_sf() again. Put the class back when the geometry actually survived,
+# and leave the frame alone when it did not.
+wdj_restore_sf <- function(out, template) {
+  if (!inherits(template, "sf") || inherits(out, "sf")) return(out)
+  col <- attr(template, "sf_column")
+  if (is.null(col) || !col %in% names(out) || !inherits(out[[col]], "sfc")) {
+    return(out)
+  }
+  # Cheap enough to be worth not trusting: a reshape can leave a geometry
+  # column whose length no longer matches, and st_as_sf() would abort.
+  tryCatch(sf::st_as_sf(out, sf_column_name = col), error = function(e) out)
+}
+
+wdj_to_key <- function(x, origin = "country.name", key = "iso3c",
+                       custom_match = country_overrides(), side = NULL,
+                       warn_unresolved = FALSE) {
+  iso <- wdj_to_iso3c(x, origin = origin, custom_match = custom_match)
+  # Two different failures, and they need different sentences. This one is "the
+  # name is not a country I know" -- reported here rather than by the caller
+  # because only here are the two distinguishable: on an alternate key an
+  # unresolvable name and a country COW/GW simply has no code for both arrive
+  # as NA, and reporting them together told a caller who typed "Freedonia" that
+  # it "resolved to iso3c but has no gwn code", which is false.
+  if (isTRUE(warn_unresolved)) {
+    raw <- as.character(x)
+    bad <- unique(raw[is.na(iso) & !is.na(raw)])
+    if (length(bad)) {
+      where <- if (is.null(side)) "" else sprintf(" in %s", side)
+      wdj_warn(c(
+        "{length(bad)} value{?s}{where} did not resolve to a country and will
+         join to nothing:",
+        "*" = "{.val {utils::head(bad, 8)}}",
+        "i" = "See {.fn check_country_match} for suggestions."
+      ))
+    }
+  }
+  if (identical(key, "iso3c")) return(iso)
+  out <- suppressWarnings(
+    countrycode::countrycode(iso, "iso3c", key, warn = FALSE))
+  # COW/GW cover sovereign states and not dependencies, so a modern dataset
+  # loses Hong Kong, Puerto Rico and the rest. Say so once rather than letting
+  # the join quietly shrink.
+  lost <- sum(!is.na(iso) & is.na(out))
+  if (lost) {
+    # `side` names which table this refers to. A two-sided join calls this once
+    # per side, so without it the user saw the same sentence twice with nothing
+    # to distinguish the two.
+    where <- if (is.null(side)) "" else sprintf(" in %s", side)
+    # `{where}` sits between the count and `ha{?s/ve}`, and cli keys an
+    # agreement marker to the most recent *interpolated value* -- a length-1
+    # string here -- so however many countries were lost the verb came out
+    # singular: "5 countries in `x` resolved to iso3c but has no cowc code."
+    # cli::qty() re-keys it to the count explicitly. (Only literal markup such
+    # as {.field iso3c} is safe to sit between a count and its agreement.)
+    wdj_warn(c(
+      "{lost} countr{?y/ies}{where} resolved to {.field iso3c} but
+       ha{cli::qty(lost)}{?s/ve} no {.field {key}} code.",
+      "i" = "COW and Gleditsch-Ward cover sovereign states, not dependencies
+             and territories. They are the right key before 1970 and the wrong
+             one after it."
+    ))
+  }
+  out
+}
+
 # Every iso3c the package recognises: countrycode's own set plus Kosovo's
 # user-assigned XKX, which has no codelist row at all. One definition, so the
 # name-matcher, the World Bank aggregate filter and region resolution can't
@@ -43,11 +166,34 @@ wdj_known_iso3c <- function() {
 # Validate that columns exist before they are handed to ggplot2 / vctrs, which
 # would otherwise report a bare "object 'x' not found" from deep inside a layer.
 # The non-panel counterpart of check_panel_cols() in R/analysis.R.
+# A repeated header -- what read.csv(check.names = FALSE) gives you for a sheet
+# with two `gdp` columns -- makes every by-name reference ambiguous, and the
+# frame then goes through a dplyr pipeline that rebuilds it.
+# interpolate_missing() already refused it; nothing else did. Ten verbs leaked
+# tibble's "Column name `gdp` must not be duplicated. Use `.name_repair` to
+# specify repair", which names tibble's internals rather than the caller's
+# data, and two -- per_capita() and to_ppp() -- silently computed from
+# whichever column `[[` reached first and dropped the other without a word.
+# Checked here, where every verb already validates the columns it reads.
+check_dup_cols <- function(data, call = rlang::caller_env()) {
+  if (!is.data.frame(data)) return(invisible(TRUE))
+  dup <- unique(names(data)[duplicated(names(data))])
+  if (length(dup)) {
+    wdj_abort(c(
+      "{.arg data} has {length(dup)} duplicated column name{?s}:",
+      "*" = "{.val {dup}}",
+      "i" = "Which one to read is ambiguous. Rename or drop the duplicate."
+    ), call = call, class = "countryatlas_duplicate_columns")
+  }
+  invisible(TRUE)
+}
+
 check_cols <- function(data, cols, call = rlang::caller_env()) {
   missing <- setdiff(cols, names(data))
   if (length(missing)) {
     wdj_abort("Column{?s} {.val {missing}} not found in {.arg data}.", call = call)
   }
+  check_dup_cols(data, call = call)
   invisible(TRUE)
 }
 
@@ -83,6 +229,35 @@ check_number <- function(x, arg, lo = -Inf, hi = Inf,
 # type-checked -- ggplot2 renders `title = 2024` happily and rejecting that would
 # be gratuitous -- whereas `palette` is documented as a *name*, so it has to be a
 # single string.
+# An engine or backend that cannot honour an argument has to say so rather
+# than accept it and draw something else. The polygon backend does this for
+# `scale` / `projection` / `recenter`; the alternative engines did not, and
+# quietly dropped whole groups of ggplot2-specific arguments.
+# `cli::qty()` keys the agreement markers explicitly: {.arg {ignored}} is an
+# interpolation, so anything after it would otherwise agree with the wrong
+# number.
+# Engines that assemble their own plot take `...` and can do nothing with it.
+# Report the names the caller actually used, falling back to a position for an
+# unnamed one, so the message points at their code rather than at ours.
+warn_dots_unused <- function(dots, engine, alternative) {
+  if (!length(dots)) return(invisible(NULL))
+  nm <- names(dots)
+  if (is.null(nm)) nm <- rep("", length(dots))
+  nm[!nzchar(nm)] <- paste0("..", seq_along(nm)[!nzchar(nm)])
+  warn_engine_ignored(nm, engine, alternative)
+}
+
+warn_engine_ignored <- function(ignored, engine, alternative) {
+  if (!length(ignored)) return(invisible(NULL))
+  wdj_warn(c(
+    "{.val {engine}} does not support {cli::qty(length(ignored))}{?this
+     argument/these arguments} and ignores {cli::qty(length(ignored))}{?it/them}:
+     {.arg {ignored}}.",
+    "i" = "Use {.code {alternative}} for {cli::qty(length(ignored))}{?it/them}."
+  ), class = "countryatlas_engine_ignored")
+  invisible(NULL)
+}
+
 check_label_args <- function(palette = NULL, title = NULL, legend = NULL,
                              na_label = NULL, call = rlang::caller_env()) {
   if (!is.null(palette)) check_string(palette, "palette", call = call)
@@ -157,6 +332,122 @@ check_limits_cores <- function() {
 # string builders sprintf() their arguments, and sprintf() vectorises silently:
 # a length-2 value duplicated a whole query clause, a length-0 one made the
 # clause vanish, and NA became the literal text "NA".
+# match.arg() reports R's anonymous "'arg' should be one of ..." -- naming
+# neither the argument the caller passed nor the function they called. It does
+# so *everywhere*, not just in helpers: the message is hard-coded, so calling it
+# on a function's own formal reads no better. Exported functions therefore use
+# rlang::arg_match(), which reads the choices off the formal and names both.
+# check_choice() is the variant for helpers like wdj_crs(), which receive an
+# already-extracted value and so must be told the argument name and the call to
+# blame -- seventeen exported functions take `projection` and nine take `scale`,
+# all routing through two helpers, so fixing it here fixes it everywhere.
+check_choice <- function(x, arg, choices, call = rlang::caller_env()) {
+  if (length(x) == 1L && is.character(x) && x %in% choices) return(x)
+  # A caller that passed nothing gets the documented default, exactly as
+  # match.arg() would.
+  if (length(x) == length(choices) && identical(as.character(x), as.character(choices))) {
+    return(choices[1])
+  }
+  wdj_abort(c(
+    "{.arg {arg}} must be one of {.val {choices}}.",
+    "x" = if (length(x) != 1L) "Got {length(x)} values." else "Got {.val {x}}."
+  ), call = call)
+}
+
+# The four source adapters are exported in their own right, so the validation
+# fetch_indicator() does at the front door has to be repeated at each of them.
+# Called directly with an empty vector they did no work and said nothing:
+# lapply() produced no frames and Reduce() over an empty list returns NULL, so
+# fetch_owid(NULL) handed back a silent NULL instead of an error, and
+# fetch_comtrade(character(0)) leaked a bare "subscript out of bounds".
+# It runs *before* need_pkg() so that a malformed call is reported as one
+# whether or not the optional client happens to be installed -- which also
+# keeps the test for it from having to be skipped on a machine without them.
+check_indicator <- function(indicator, call = rlang::caller_env()) {
+  if (!length(indicator) || !is.character(indicator)) {
+    wdj_abort("{.arg indicator} must be a non-empty character vector.", call = call)
+  }
+  invisible(indicator)
+}
+
+# `top_n = Inf` is the documented way to say "no limit", so check_number() --
+# which rejects non-finite values outright -- cannot validate it. Guarding with
+# is.finite() alone was worse: everything is.finite() rejects then skipped
+# validation entirely, so top_n = "5" and top_n = NA silently returned every row
+# instead of five, and top_n = NULL failed on `if` with R's bare "argument is of
+# length zero", naming neither the argument nor the function.
+check_top_n <- function(x, arg = "top_n", call = rlang::caller_env()) {
+  if (!is.numeric(x) || length(x) != 1L || is.na(x) || x < 1) {
+    wdj_abort(c(
+      "{.arg {arg}} must be a single number of at least 1, or {.code Inf} for
+       no limit.",
+      "x" = "Got {.val {x}}."
+    ), call = call)
+  }
+  invisible(x)
+}
+
+# One row per country, without collapsing the countries that have no code.
+# dplyr::distinct() treats NA as a value, so de-duplicating on iso3c alone folds
+# every uncoded row into a single one: audit_coverage() named one unmatched
+# country out of four (and divided every na_rate by the wrong n), while
+# rate_check() and world_table() quietly returned three rows for a five-row
+# input. Coded rows de-duplicate on the code; uncoded ones are not duplicates of
+# each other, so they de-duplicate on whatever else identifies them -- which
+# still keeps the polygon backend from counting one country once per vertex.
+distinct_countries <- function(df, arg = "data") {
+  if (!"iso3c" %in% names(df)) return(df)
+  # Collapsing to one row per country is for repeated *geometry* rows, not for
+  # time: handed a panel it keeps whichever row sorts first and presents that
+  # year as the answer, with nothing to say a choice was made. Same class as
+  # world_map()'s panel warning, so the verbs built for a panel can muffle it.
+  if ("year" %in% names(df)) {
+    yrs <- unique(stats::na.omit(df$year))
+    if (length(yrs) > 1L) {
+      wdj_warn(c(
+        "{.arg {arg}} spans {length(yrs)} years, and this verb takes one row
+         per country.",
+        "x" = "Only the earliest year of each country is used; the rest are
+               dropped.",
+        "i" = "Filter to the year you mean first."
+      ), class = "countryatlas_panel")
+    }
+  }
+  na_rows <- is.na(df$iso3c)
+  coded <- df[!na_rows, , drop = FALSE]
+  # The warning above promises "only the earliest year of each country is
+  # used", but distinct(.keep_all = TRUE) keeps whichever row comes *first in
+  # the frame* -- which is the earliest year only if the caller happened to
+  # sort by year. Shuffle the same panel and rate_check() returned a different
+  # numerator for France, world_map() drew a different year, and nothing said
+  # so. Pick the earliest year explicitly, and keep the survivors in their
+  # original relative order so nothing downstream sees a reordered frame.
+  if ("year" %in% names(coded) && nrow(coded)) {
+    # order() on a factor sorts by level index, not by the label, so a factored
+    # `year` (read.csv(stringsAsFactors = TRUE), or one factored for plotting)
+    # with levels 2002 < 2001 < 2000 would hand back the *latest* year while
+    # the warning still said "earliest". Compare years as numbers where they
+    # are numbers, and fall back to the labels where they are not.
+    yr <- coded$year
+    if (is.factor(yr)) yr <- as.character(yr)
+    if (is.character(yr)) {
+      num <- suppressWarnings(as.numeric(yr))
+      if (!all(is.na(num))) yr <- num
+    }
+    ord <- order(coded$iso3c, yr, na.last = TRUE)
+    keep <- ord[!duplicated(coded$iso3c[ord])]
+    coded <- coded[sort(keep), , drop = FALSE]
+  } else {
+    coded <- dplyr::distinct(coded, .data$iso3c, .keep_all = TRUE)
+  }
+  unc <- df[na_rows, , drop = FALSE]
+  ukey <- intersect(c("country", "group"), names(unc))
+  if (length(ukey) && nrow(unc)) {
+    unc <- dplyr::distinct(unc, .data[[ukey[1]]], .keep_all = TRUE)
+  }
+  dplyr::bind_rows(coded, unc)
+}
+
 check_string <- function(x, arg, allow_empty = FALSE,
                          call = rlang::caller_env()) {
   if (!is.character(x) || length(x) != 1L || is.na(x)) {
@@ -207,6 +498,31 @@ check_along <- function(x, n, arg, along = "x", call = rlang::caller_env()) {
 quo_arg_name <- function(quo, arg, call = rlang::caller_env()) {
   if (rlang::quo_is_missing(quo)) {
     wdj_abort("{.arg {arg}} is required.", call = call)
+  }
+  # rlang::as_name() on anything that is not a symbol or a string throws its own
+  # error -- "Can't convert a double vector to a string", or for `gdp + 1` the
+  # even less helpful "Can't convert a call to a string". That names neither the
+  # argument nor the function nor what was expected, and it reached the user
+  # from all ~66 places this helper is called: every unquoted column argument in
+  # the package. `world_map(d, gdp_per_capita + 1)` is a natural thing to try.
+  expr <- rlang::quo_get_expr(quo)
+  if (!rlang::is_symbol(expr) && !rlang::is_string(expr)) {
+    shown <- paste(deparse(expr), collapse = " ")
+    # Built as plain strings and interpolated whole: cli does not re-interpolate
+    # a substituted value, whereas nesting {arg} inside {.code ...} here mangled
+    # the message.
+    hint <- if (rlang::is_call(expr, "$") && identical(expr[[2]], quote(.data))) {
+      sprintf("Name the column directly: %s = %s.", arg,
+              paste(deparse(expr[[3]]), collapse = " "))
+    } else if (rlang::is_call(expr)) {
+      sprintf(paste("Expressions are not evaluated here. Compute the column",
+                    "first -- dplyr::mutate(data, my_col = %s) -- then pass",
+                    "%s = my_col."), shown, arg)
+    } else {
+      sprintf("Pass the column unquoted (%s = my_col) or as a string.", arg)
+    }
+    wdj_abort(c("{.arg {arg}} must name a column, not {.code {shown}}.",
+                "i" = "{hint}"), call = call)
   }
   rlang::as_name(quo)
 }
@@ -381,7 +697,13 @@ wdj_workers <- function(n_tasks = Inf) {
     if (is.na(cores) || cores < 1L) cores <- 1L
     workers <- max(1L, cores - 1L)
   }
-  as.integer(min(workers, n_tasks))
+  # Clamp to at least one. Every branch above already guarantees it, and then
+  # min(workers, n_tasks) undid the guarantee for n_tasks = 0 -- returning a
+  # worker count of zero, which is what `mc.cores` refuses. wdj_lapply() happens
+  # to short-circuit an empty input before it gets here, so nothing hits it
+  # today; the point is that the contract this function documents should not
+  # depend on its only caller remembering to.
+  as.integer(max(1L, min(workers, n_tasks)))
 }
 
 # Parallel-or-serial lapply. Uses forking (parallel::mclapply) on Unix-alikes
@@ -412,7 +734,11 @@ wdj_lapply <- function(X, FUN, ..., parallel = TRUE, workers = NULL) {
   errs <- vapply(res, inherits, logical(1), what = "try-error")
   if (any(errs)) {
     msg <- conditionMessage(attr(res[[which(errs)[1]]], "condition"))
-    wdj_abort(c("Parallel computation failed.", "x" = msg))
+    # "{msg}", not msg: a bullet is a cli template, so a brace in the worker's
+    # own message got interpolated. A FUN failing with "bad json {\"a\": 1}"
+    # reported "Could not evaluate cli `{}` expression: `\"a\"`" and the real
+    # failure was gone. Interpolating the value passes it through verbatim.
+    wdj_abort(c("Parallel computation failed.", "x" = "{msg}"))
   }
   res
 }
@@ -464,3 +790,53 @@ clean_income <- function(x) {
   x[x %in% c("Not Classified", "Not classified", "NA", "Aggregates")] <- "Not classified"
   factor(x, levels = income_levels())
 }
+
+# The European microstates have no polygon in Natural Earth at 110m, so they
+# contribute nothing to country_borders() / neighbors() at the default scale.
+# Both lists are pinned by a test against scale = "medium", which does have
+# them, so a Natural Earth update cannot leave these silently stale.
+WDJ_MICROSTATES <- c("AND", "LIE", "MCO", "SMR", "VAT")
+WDJ_MICROSTATE_NEIGHBOURS <- list(
+  AUT = "LIE", CHE = "LIE", ESP = "AND", FRA = c("AND", "MCO"),
+  ITA = c("SMR", "VAT")
+)
+
+# "1 country" / "240 countries", for the plain-text captions and print blocks
+# that cannot use cli's {?s}. sprintf() alone gave "All 1 countries shown."
+countries_noun <- function(n) if (isTRUE(n == 1L)) "country" else "countries"
+
+# A year arrives as a number, a Date, or a string, and the source decides
+# which. Providers disagree and `...` forwards to their client, so a caller
+# can change it: eurostat's time_format = "num" gives a
+# numeric year, "raw" a character one, the default a Date. OECD's Time is
+# usually a character year, sometimes "2020-Q1", occasionally a Date. Reading
+# each with a single assumption failed either loudly or -- worse -- quietly:
+# format(numeric, "%Y") is base R's opaque "invalid 'trim' argument", while
+# as.integer() on a Date returned 18262, the day count, as the year. The
+# same assumption sat in audit_time_coverage(), where a Date year column
+# turned the whole existence audit into nonsense.
+read_year <- function(x, source_label) {
+  yr <- if (inherits(x, "Date") || inherits(x, "POSIXt")) {
+    as.integer(format(x, "%Y"))
+  } else {
+    # "2020", "2020-01-01", "2020-Q1", "2020M01" and numeric 2020 all lead
+    # with the four-digit year.
+    suppressWarnings(as.integer(substr(as.character(x), 1L, 4L)))
+  }
+  # Two ways to be unusable, and both were silent: a value that parsed to
+  # something implausible (a Date read as 18262), and one that did not parse at
+  # all ("junk" -> NA). Turning a whole column of either into NA without a word
+  # leaves a panel with no years and no explanation.
+  bad <- (!is.na(yr) & (yr < 1500L | yr > 2200L)) | (!is.na(x) & is.na(yr))
+  if (any(bad)) {
+    wdj_warn(c(
+      "{source_label}: {sum(bad)} time value{?s} {?is/are} not a year and
+       {?is/are} dropped.",
+      "*" = "{.val {unique(as.character(x)[bad])[1:min(4L, sum(bad))]}}",
+      "i" = "Expected a year, a date, or a string starting with one."
+    ), class = "countryatlas_bad_year")
+    yr[bad] <- NA_integer_
+  }
+  yr
+}
+

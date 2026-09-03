@@ -55,15 +55,18 @@ country_classification <- function(iso3c, classify) {
 #' @param geometry `"polygon"` (default; reproduces the classic output), `"sf"`
 #'   (Natural Earth, for `geom_sf()` and real projections) or `"none"`.
 #' @param scale Natural Earth resolution for the `sf` backend. `"large"` needs the
-#'   non-CRAN `rnaturalearthhires` package; see [world_geometry()].
+#'   non-CRAN `rnaturalearthhires` package; see [world_geometry()]. The other
+#'   backends warn if asked for a resolution they cannot serve.
 #' @param region Optional subset: a continent, group name, `iso3c` vector or
-#'   bounding box. A bounding box clips the shapes rather than selecting whole
-#'   countries, and only the `sf` backend can do that properly -- see
-#'   [world_geometry()].
+#'   bounding box. Applied whichever `geometry` is used, including `"none"`. A
+#'   bounding box clips the shapes rather than selecting whole countries, and
+#'   only the `sf` backend can do that properly -- see [world_geometry()]; with
+#'   `geometry = "none"` there is nothing to clip, so a box is refused.
 #' @param classify Which classifications to add (any of `"income"`,
 #'   `"continent"`, `"region"`).
 #' @param projection,recenter Projection, and optional central meridian, for
-#'   the `sf` backend (see [world_map()] for the projections available).
+#'   the `sf` backend (see [world_map()] for the projections available). The
+#'   other backends warn if asked, rather than ignoring the request.
 #' @param latest If `TRUE`, use the most recent non-`NA` value per country for a
 #'   single-year request.
 #' @param cache Whether to use the memoised / on-disk WDI cache.
@@ -115,10 +118,17 @@ world_data <- function(year,
   check_bool(latest, "latest")
   check_bool(cache, "cache")
   check_bool(parallel, "parallel")
-  geometry <- match.arg(geometry)
-  scale <- match.arg(scale)
+  geometry <- rlang::arg_match(geometry)
+  scale <- rlang::arg_match(scale)
   year <- validate_years(year)
-  classify <- intersect(classify, c("income", "continent", "region"))
+  # intersect() silently dropped anything unrecognised, so classify = "incomes"
+  # added no classification columns and said nothing. Empty stays valid -- it
+  # is how you ask for none.
+  if (length(classify)) {
+    classify <- rlang::arg_match(classify, c("income", "continent", "region"),
+                                 multiple = TRUE)
+  }
+  check_string(language, "language")
 
   countries <- country_data(
     year = year, indicator = indicator, latest = latest,
@@ -126,14 +136,49 @@ world_data <- function(year,
     language = language, parallel = parallel
   )
 
-  # Legacy alias: keep gdp_per_capita_2015 readable for one cycle.
+  # Legacy alias from 1.0.0, opt-in since 2.0.0 and now announcing itself. The
+  # deprecation cycle has run long enough: the option still works, so nothing
+  # breaks today, but a user relying on it now hears about it once per session
+  # instead of discovering the removal later.
   if ("gdp_per_capita" %in% names(countries) &&
       !"gdp_per_capita_2015" %in% names(countries) &&
       isTRUE(getOption("countryatlas.gdp_compat", FALSE))) {
+    wdj_warn(c(
+      "{.code countryatlas.gdp_compat} is deprecated.",
+      "!" = "The {.field gdp_per_capita_2015} alias dates from 1.0.0 and will be
+             removed in a future release.",
+      "i" = "Use {.field gdp_per_capita}, which holds the same values."
+    ), class = "deprecatedWarning")
     countries$gdp_per_capita_2015 <- countries$gdp_per_capita
   }
 
   if (geometry == "none") {
+    # `region` is documented as a plain "Optional subset", not an sf-backend
+    # option -- but it only ever took effect inside attach_geometry(), which
+    # this branch skips. So asking for one region with geometry = "none"
+    # returned every country in the world, silently and with no hint that the
+    # argument had been dropped.
+    if (!is.null(region)) {
+      iso <- resolve_region(region)
+      if (inherits(iso, "wdj_bbox")) {
+        wdj_abort(c(
+          "A bounding-box {.arg region} needs geometry to clip against.",
+          "x" = 'There is nothing to clip when {.code geometry = "none"}.',
+          "i" = 'Use {.code geometry = "sf"}, or select whole countries with a
+                 continent, a group name or an {.field iso3c} vector.'
+        ), class = "countryatlas_bbox_without_geometry")
+      }
+      if (!is.null(iso)) {
+        countries <- countries[!is.na(countries$iso3c) &
+                                 countries$iso3c %in% iso, , drop = FALSE]
+      }
+    }
+    # `scale`, `projection` and `recenter` are all documented as sf-backend
+    # options; this branch fetches no geometry at all, so none of them can be
+    # honoured. They were accepted and dropped without a word.
+    warn_scale_ignored(scale)
+    warn_projection_ignored(projection, 'geometry = "none"')
+    warn_recenter_ignored(recenter, 'geometry = "none"')
     return(countries)
   }
 
@@ -209,7 +254,14 @@ country_data <- function(year,
     ))
   }
   panel <- isTRUE(panel) || length(year) > 1L
-  classify <- intersect(classify, c("income", "continent", "region"))
+  # intersect() silently dropped anything unrecognised, so classify = "incomes"
+  # added no classification columns and said nothing. Empty stays valid -- it
+  # is how you ask for none.
+  if (length(classify)) {
+    classify <- rlang::arg_match(classify, c("income", "continent", "region"),
+                                 multiple = TRUE)
+  }
+  check_string(language, "language")
 
   start <- min(year)
   end <- max(year)

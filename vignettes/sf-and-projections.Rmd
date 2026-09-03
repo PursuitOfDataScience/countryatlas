@@ -45,13 +45,25 @@ equal-area and good-looking), `"robinson"`, `"mollweide"`, `"natural_earth"`,
 `"plate_carree"`, `"mercator"`, `"winkel_tripel"`, `"eckert4"`, `"gall_peters"`,
 `"orthographic"`, `"azimuthal_equal_area"`, `"north_polar"` and `"south_polar"`.
 
+`projection_info()` says what each one preserves, so you do not have to
+remember:
+
+```{r}
+projection_info()[, c("projection", "property", "equal_area")]
+```
+
+For a choropleth the equal-area ones are the honest choice, because the reader
+reads coloured area as quantity. `projection_compare()` draws your own data
+under several at once and `tissot_map()` shows the distortion directly — see
+the *Honest maps* vignette.
+
 ## The world as a globe
 
 `globe_map()` draws an orthographic globe centred on `lon`/`lat`. The default
 `"sf"` backend gives the cleanest limb; the `"polygon"` backend below needs only
 `maps` + `mapproj` (no `sf`):
 
-```{r globe, eval = has_globe, fig.width = 5.5, fig.height = 5}
+```{r globe, eval = has_globe, fig.width = 5.5, fig.height = 5, fig.alt = "Orthographic globe centred on the Indian Ocean, countries coloured by continent."}
 globe_map(world_snapshot$countries, continent, backend = "polygon",
           style = "categorical", lon = 10, lat = 20)
 ```
@@ -76,7 +88,7 @@ spin_globe(world_snapshot$countries, continent, backend = "polygon",
 without any data — country polygons, label-ready centroids, coastlines, a
 graticule or an ocean rectangle:
 
-```{r eval = has_sf}
+```{r eval = has_sf, fig.alt = "Africa drawn on its own under an Equal Earth projection."}
 africa <- world_geometry("countries", geometry = "sf", region = "Africa",
                          projection = "equal_earth")
 ggplot(africa) +
@@ -111,7 +123,7 @@ say. Use the `sf` backend for it: that clip is a real `sf::st_crop()`, whereas
 the polygon backend can only drop the vertices outside the box and warns that a
 country crossing the edge comes back with an approximate outline.
 
-```{r eval = has_sf}
+```{r eval = has_sf, fig.alt = "The Mediterranean basin cropped by bounding box under an Equal Earth projection."}
 med <- world_geometry("countries", geometry = "sf",
                       region = c(-10, 30, 40, 48), projection = "equal_earth")
 ggplot(med) +

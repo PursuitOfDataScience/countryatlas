@@ -11,7 +11,11 @@ world_query(
   palette = "viridis",
   transform = NULL,
   title = NULL,
-  draw = "spatial"
+  draw = "spatial",
+  layer = c("choropleth", "bubble", "binned"),
+  facet = NULL,
+  size = NULL,
+  n_bins = NULL
 )
 }
 \arguments{
@@ -32,6 +36,16 @@ world_query(
 \item{title}{Optional plot title (\verb{LABEL title => ...}).}
 
 \item{draw}{The spatial layer (default \code{"spatial"}).}
+
+\item{layer}{\code{"choropleth"} (default), \code{"bubble"} (proportional symbols --
+needs \code{size}) or \code{"binned"} (classed fill -- see \code{n_bins}).}
+
+\item{facet}{Optional column to facet the query by, e.g. \code{"year"} for a
+small-multiple panel rendered in the database.}
+
+\item{size}{Column driving symbol size for \code{layer = "bubble"}.}
+
+\item{n_bins}{Number of classes for \code{layer = "binned"} (default \code{5}).}
 }
 \value{
 A \code{ggsql_query} string (prints as the formatted query).

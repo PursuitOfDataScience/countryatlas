@@ -71,7 +71,8 @@ test_that("reference and join verbs return their documented shape", {
   expect_false(anyNA(cc$iso3c))
   expect_equal(anyDuplicated(cc$iso3c), 0L)
   expect_named(wdi_search("CO2 emissions"), c("indicator", "name"))
-  d <- distance_between(c("France", "Wakanda"), "Germany")
+  expect_warning(d <- distance_between(c("France", "Wakanda"), "Germany"),
+                 "did not resolve to a country")
   expect_type(d, "double")
   expect_true(is.na(d[2]))                                   # NA for unmatched
   expect_true(all(c("iso3c", "iso2c", "continent", "region") %in%
@@ -98,13 +99,19 @@ test_that("plot and geometry verbs return their documented objects", {
 })
 
 test_that("sf-backed verbs return their documented shape", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   expect_s3_class(world_geometry("countries", geometry = "sf"), "sf")
   expect_s3_class(attach_geometry(snap, geometry = "sf"), "sf")
   m <- morans_i(snap, gdp_per_capita, n_perm = 0)
   expect_equal(nrow(m), 1L)
-  expect_named(m, c("i", "expected", "n", "n_links", "p_value"))
+  expect_named(m, c("i", "expected", "n", "n_excluded", "n_links", "p_value",
+                    "excluded"))
+  # The exclusion report is the point: islands carry no land-border weight, so
+  # `n` alone cannot reveal how much of the world sat the analysis out.
+  expect_type(m$excluded, "list")
+  expect_equal(m$n_excluded, length(m$excluded[[1]]))
+  expect_true(m$n_excluded > 0)
+  expect_true("JPN" %in% m$excluded[[1]])
   b <- country_borders(region = "Europe")
   expect_named(b, c("iso3c_a", "country_a", "iso3c_b", "country_b"))
   expect_true(all(b$iso3c_a <= b$iso3c_b))                   # canonical order
@@ -159,4 +166,82 @@ test_that("every shortcut in convert_dest_map resolves to a real destination", {
     v <- convert_country("France", to = k, warn = FALSE)
     expect_length(v, 1L)
   }
+})
+
+test_that("the 2.0.0 exports keep their leading argument order", {
+  # Positional calls are the part of an API users cannot see changing. 3.0.0
+  # deliberately inserted `data` as geom_country_labels()'s second argument --
+  # the one break NEWS records -- and an audit against the installed 2.0.0
+  # confirmed it is the *only* one: nothing was removed, no argument was
+  # dropped, and no other shared argument moved. Nothing pinned that, though:
+  # the suite had a single formals() assertion in it. Pin the first three
+  # formals of every 2.0.0-era export so a future reordering has to be
+  # deliberate rather than accidental.
+  expected <- c(
+    aggregate_regions = "data, value, by",
+    animate_world = "data, fill, time",
+    as_ggsql_source = "data, name, format",
+    attach_geometry = "data, by, geometry",
+    audit_coverage = "data, indicator, by",
+    beta_convergence = "data, value",
+    bivariate_map = "data, fill_x, fill_y",
+    bubble_map = "data, size, color",
+    cartogram_map = "data, weight, type",
+    check_country_match = "x, origin, custom_match",
+    clear_wdi_cache = "disk",
+    complete_years = "data, years, value",
+    convert_country = "x, to, from",
+    correlate_indicators = "data, ..., method",
+    country_borders = "scale, region",
+    country_codes = "codes",
+    country_data = "year, indicator, latest",
+    country_groups = "group, as_of",
+    country_join = "x, y, by_x",
+    country_join_all = "tables, by, origin",
+    country_overrides = "extra",
+    diff_by_country = "data, value, n",
+    dissolve_country = "x, warn",
+    distance_between = "a, b, origin",
+    dorling_map = "data, weight, fill",
+    facet_map = "data, fill, facet",
+    flow_map = "data, from, to",
+    geom_country_labels = "mapping, data, repel",
+    gini = "x, weights, na.rm",
+    globe_map = "data, fill, lon",
+    growth_rate = "data, value, type",
+    in_group = "x, group, origin",
+    index_to = "data, value, base_year",
+    interactive_map = "data, fill, tooltip",
+    join_world = "data, country_col, origin",
+    lag_by_country = "data, value, n",
+    locate_country = "lon, lat, points",
+    morans_i = "data, value, scale",
+    neighbors = "x, origin, scale",
+    per_capita = "data, value, pop",
+    rank_countries = "data, value, within",
+    repair_country_names = "x, threshold, origin",
+    share_of_world = "data, value, suffix",
+    sigma_convergence = "data, value, measure",
+    simplify_geometry = "x, keep, ...",
+    spike_map = "data, height, max_height",
+    spin_globe = "data, fill, lat",
+    standardize_country = "data, country_col, origin",
+    theil = "x, weights, groups",
+    theme_world_map = "base_size, base_family",
+    tile_map = "data, fill, label",
+    wdi_search = "pattern, field, cache",
+    wdj_overrides = "extra",
+    world_data = "year, indicator, geometry",
+    world_geometry = "what, geometry, scale",
+    world_map = "data, fill, style",
+    world_query = "fill, source, projection"
+  )
+  for (fn in names(expected)) {
+    got <- paste(utils::head(names(formals(get(fn, envir = asNamespace(
+      "countryatlas")))), 3), collapse = ", ")
+    expect_equal(got, expected[[fn]], info = fn)
+  }
+  # And every one of them still exists.
+  expect_length(setdiff(names(expected),
+                        getNamespaceExports(asNamespace("countryatlas"))), 0L)
 })

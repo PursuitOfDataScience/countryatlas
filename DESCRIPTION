@@ -1,7 +1,7 @@
 Package: countryatlas
 Type: Package
 Title: Join World Bank Data, Country Codes and Maps on the ISO Spine
-Version: 2.0.1
+Version: 3.0.0
 Authors@R:
     person(given = "Youzhi",
            family = "Yu",
@@ -19,16 +19,22 @@ Description: A complete toolkit for getting country data onto honest maps.
     analysis helpers (per-capita, regional roll-ups, ranking, inequality and
     convergence statistics); and turns one hand-drawn choropleth into a full
     vocabulary of projected, area-honest maps (binned and quantile
-    choropleths, proportional-symbol, spike, bivariate, cartogram, tile-grid,
-    flow, small-multiple, animated, globe and interactive), and can hand its
-    curated, ISO-reconciled tables to 'ggsql' for database-side spatial
-    rendering. Heavy spatial dependencies stay optional, and a bundled offline
-    snapshot lets every example, test and vignette run without the network.
+    choropleths, proportional-symbol, spike, bivariate, value-by-alpha,
+    cartogram, tile-grid, flow, small-multiple, animated, globe and
+    interactive), and can hand its curated, ISO-reconciled tables to 'ggsql'
+    for database-side spatial rendering. Honesty is treated as a feature
+    rather than a slogan: classification methods can be compared side by
+    side, missing data can be hatched rather than greyed, coverage and
+    provenance travel with the plot, and projection distortion is inspectable
+    via Tissot's indicatrix. Heavy spatial dependencies stay optional, and a
+    bundled offline snapshot lets every example, test and vignette run
+    without the network.
 License: GPL (>= 3)
 URL: https://pursuitofdatascience.github.io/countryatlas/,
     https://github.com/PursuitOfDataScience/countryatlas
 BugReports: https://github.com/PursuitOfDataScience/countryatlas/issues
 Encoding: UTF-8
+Language: en-GB
 LazyData: true
 Depends:
     R (>= 4.1.0)
@@ -45,30 +51,44 @@ Imports:
 Suggests:
     biscale,
     cartogram,
+    cartogramR,
     classInt,
+    comtradr,
     covr,
+    cshapes,
     DBI,
     duckdb,
+    eurostat,
     gganimate,
     ggiraph,
+    ggpattern,
     ggrepel,
     ggsql,
     gifski,
+    giscoR,
+    gt,
     knitr,
     leaflet,
     magick,
+    mapgl,
     mapproj,
     maps,
     nanoarrow,
+    OECD,
+    owidR,
     plotly,
+    regions,
     rmapshaper,
     rmarkdown,
     rnaturalearth,
     rnaturalearthdata,
     scales,
     sf,
+    spdep,
     stringdist,
-    testthat (>= 3.0.0),
+    testthat (>= 3.2.0),
+    tmap,
+    vdiffr,
     withr
 VignetteBuilder: knitr
 Config/testthat/edition: 3

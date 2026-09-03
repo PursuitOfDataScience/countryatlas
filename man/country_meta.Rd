@@ -5,8 +5,8 @@
 \alias{country_meta}
 \title{Static per-country metadata}
 \format{
-A tibble with one row per country and columns including \code{iso3c},
-\code{iso2c}, \code{country}, \code{continent}, \code{region}, \code{un_region}, \code{capital},
+A tibble with one row per country and columns \code{iso3c}, \code{iso2c},
+\code{country}, \code{continent}, \code{region}, \code{un_region}, \code{income}, \code{capital},
 \code{capital_lat}, \code{capital_lon}, \code{centroid_lat}, \code{centroid_lon}, \code{area_km2},
 \code{currency}, \code{tld}, \code{landlocked}, \code{flag}.
 

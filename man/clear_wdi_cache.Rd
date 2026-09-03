@@ -23,7 +23,7 @@ The persistent cache goes in the standard per-user cache location,
 \code{cache = FALSE} to \code{\link[=world_data]{world_data()}} / \code{\link[=country_data]{country_data()}}. The directory itself is
 created the first time a cached fetch is attempted, whether or not the World
 Bank answers; only a successful fetch leaves a response in it, and reading the
-bundled \link{world_snapshot} never goes near it. Under \code{R CMD check} the whole
+bundled \link{world_snapshot} never goes near it. Under \verb{R CMD check} the whole
 cache moves to the session temp directory, so a check never writes to the
 user's file space.
 }

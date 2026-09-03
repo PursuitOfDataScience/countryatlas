@@ -68,7 +68,7 @@ The happy path stays one call: \code{\link[=world_data]{world_data()}}. Everythi
 
 \section{Options}{
 
-Three options change the package's behaviour. All are unset by default.
+Four options change the package's behaviour. All are unset by default.
 \describe{
 \item{\code{countryatlas.cache_dir}}{Where the persistent World Bank cache
 lives. Defaults to \code{tools::R_user_dir("countryatlas", "cache")}; set it to
@@ -79,8 +79,12 @@ survive a fork). Defaults to one fewer than the available cores, and
 to 2 under \verb{R CMD check}, per CRAN policy. Must be a single finite
 number; values below one are clamped to one.}
 \item{\code{countryatlas.gdp_compat}}{Set to \code{TRUE} to restore the
-\code{gdp_per_capita_2015} column that \code{\link[=world_data]{world_data()}} emitted in 1.0.0. It is
-a one-cycle deprecation shim and off by default.}
+\code{gdp_per_capita_2015} column that \code{\link[=world_data]{world_data()}} emitted in 1.0.0. A
+deprecation shim, off by default, and now warning when used.}
+\item{\code{countryatlas.dispute_policy}}{Which map convention disputed
+territories are drawn under: \code{"none"} (default), \code{"de_facto"},
+\code{"de_jure"} or \code{"neutral"}. Set it with \code{\link[=dispute_policy]{dispute_policy()}} rather than
+directly, which also reports what the setting does and does not change.}
 }
 }
 

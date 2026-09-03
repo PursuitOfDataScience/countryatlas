@@ -1,0 +1,244 @@
+---
+title: "Honest maps: classification, missingness and distortion"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Honest maps: classification, missingness and distortion}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE, comment = "#>", message = FALSE, warning = FALSE,
+  fig.width = 7, fig.height = 3.6, fig.align = "center", dpi = 96
+)
+library(countryatlas)
+library(ggplot2)
+snap <- world_snapshot$countries
+has_maps <- requireNamespace("maps", quietly = TRUE)
+has_sf <- requireNamespace("sf", quietly = TRUE) &&
+  requireNamespace("rnaturalearth", quietly = TRUE) &&
+  requireNamespace("rnaturalearthdata", quietly = TRUE)
+```
+
+```{r setup-data, eval = has_maps}
+mapdf <- attach_geometry(snap, geometry = "polygon")
+```
+
+A world choropleth makes four claims before it says anything about your data: that
+the classes it drew are the natural ones, that grey means nothing rather than
+zero, that a rate over eleven thousand people is worth as much attention as one
+over a billion, and that the shapes on screen are the shapes on the ground.
+All four are usually false. This vignette is the tour of what `countryatlas`
+gives you for each.
+
+## 1. The classification is doing the talking
+
+Brewer & Pickle (2002) ran 56 subjects over nine series of mortality maps and
+found **quantiles** among the most accurately read classifications, with natural
+breaks (Jenks) below 70% as accurate. That is the reverse of the common GIS
+default, and it matters because the choice is not cosmetic: it decides what the
+reader concludes.
+
+`classify_compare()` draws the same data under several methods at once.
+
+```{r classify, eval = has_maps, fig.height = 3.2, fig.alt = "GDP per capita under quantile, Jenks, equal-interval and pretty breaks."}
+cmp <- classify_compare(mapdf, gdp_per_capita, ncol = 2)
+cmp
+```
+
+The picture is only half of it. The counts are attached to the plot:
+
+```{r classify-report, eval = has_maps}
+attr(cmp, "countryatlas_classification")
+```
+
+Equal-interval and pretty breaks put over 90% of countries into a single class,
+because GDP per capita is strongly right-skewed and the top of the range is one
+country. A map like that is technically correct and communicates nothing.
+Quantiles put roughly 38 countries in each class.
+
+You do not need the comparison to get the report — any *classified*
+`world_map()` will produce it. (A continuous colourbar has no classes, so
+asking there returns nothing and says why.)
+
+```{r one-report, eval = has_maps}
+p <- world_map(mapdf, gdp_per_capita, style = "quantile",
+               classification_report = TRUE)
+attr(p, "countryatlas_classification")
+```
+
+Jenks still earns its place: on a strongly clustered distribution, quantiles will
+split a natural group across two colours where Jenks keeps it together. The point
+is to look, not to take the default.
+
+## 2. Grey is not a value
+
+The default no-data grey reads as "low" to a lot of readers, which is precisely
+the wrong inference. `na_style` gives you three alternatives, and `"hatched"`
+(via the optional `ggpattern`) is the one that survives both colour-blindness and
+a black-and-white printer.
+
+```{r na-style, eval = has_maps, fig.alt = "World choropleth with missing countries drawn in diagonal hatching."}
+world_map(mapdf, co2_per_capita, style = "quantile",
+          na_style = "hatched", footnote = "auto")
+```
+
+`footnote = "auto"` writes the coverage line into the caption, so the map cannot
+quietly overstate what it covers.
+
+When the missingness *is* the story, map it directly:
+
+```{r coverage, eval = has_maps, fig.alt = "Map of which countries report CO2 per capita."}
+coverage_map(mapdf, co2_per_capita)
+```
+
+`audit_coverage()` is the same question as a table, and is the better tool when
+you want to act on the answer rather than look at it.
+
+## 3. Small denominators shout
+
+Any per-capita or per-100k figure computed over a tiny population is mostly
+noise, and on a choropleth it gets exactly as much ink as a figure computed over
+a billion people. There are two answers. The cartogram distorts geometry until
+area matches the denominator; **value-by-alpha** (Roth, Woodruff & Johnson 2010)
+leaves the geometry alone and spends *opacity* instead.
+
+```{r vba, eval = has_maps, fig.alt = "Value-by-alpha map: GDP per capita in colour, population as opacity, over a dark background."}
+value_by_alpha_map(mapdf, gdp_per_capita, population)
+```
+
+Countries fade toward the background in proportion to how little population
+stands behind their number. Compare with the cartogram answer to the same
+problem, `cartogram_map()` / `dorling_map()`, in *Beyond the choropleth*: the
+trade-off is that a cartogram makes the weighting unmissable but costs you the
+recognisable world.
+
+## 4. The projection is doing the talking too
+
+Every flat world map distorts something. `projection_info()` says what each of
+the thirteen preserves:
+
+```{r proj-info}
+projection_info()[, c("projection", "property", "equal_area", "conformal")]
+```
+
+For a choropleth the honest choice is **equal-area**, because the eye reads
+coloured area as quantity — a projection that inflates Greenland makes
+Greenland's value look more important than it is. Equal Earth is the package
+default and the recommendation (Šavrič, Patterson & Jenny 2019).
+
+```{r equal-area}
+subset(projection_info(), equal_area)$projection
+```
+
+Tissot's indicatrix makes the cost visible. Each circle has the same radius on
+the ground; whatever the projection does to them, it is doing to your data.
+
+```{r tissot-merc, eval = has_sf, fig.height = 4, fig.alt = "Tissot indicatrices on Mercator: circles stay circular but grow enormously toward the poles."}
+tissot_map("mercator")
+```
+
+```{r tissot-ee, eval = has_sf, fig.alt = "Tissot indicatrices on Equal Earth: ellipses shear but hold constant area."}
+tissot_map("equal_earth")
+```
+
+Mercator keeps every circle round — it is conformal, so local shapes are right —
+and grows them without limit toward the poles. Equal Earth keeps every circle's
+*area* and shears the shapes instead. Neither is wrong; they are answers to
+different questions, and only one of them belongs under a choropleth.
+
+To see it on your own data, vary the CRS and hold everything else fixed:
+
+```{r proj-compare, eval = has_sf, fig.height = 4.2, fig.alt = "One choropleth drawn under four projections."}
+attach_geometry(snap, geometry = "sf") |>
+  projection_compare(gdp_per_capita, style = "quantile", labeller = "property")
+```
+
+## 5. Say what the map is
+
+Everything above is a decision, and a published map should carry its decisions.
+`map_provenance()` reads them back off the plot.
+
+```{r provenance, eval = has_maps, message = TRUE}
+world_map(mapdf, gdp_per_capita, style = "quantile", n_bins = 5,
+          na_style = "hatched", footnote = "auto") |>
+  map_provenance()
+```
+
+Every field there was already known when the plot was built; the only new thing
+is that you can read it. Paired with `footnote = "auto"` on the plot itself and
+the classification report, that is most of a methods note.
+
+Finally, `citation("countryatlas")` produces the package citation *and* the
+sources it reconciles — `countrycode`, the World Bank, Natural Earth, and the
+papers behind the methods used here. Citing the join layer without the data
+would be the last dishonest thing a map could do.
+
+## 6. Where the data comes from, and when
+
+Two more ways a country map goes quietly wrong, both added in 3.0.0.
+
+**The borders are not the borders.** A 1950 map drawn on 2024 boundaries is
+simply a different world. `attach_geometry(year = )` and
+[historical_geometry()] draw the real ones, from CShapes -- including the
+colonies, without which most of Africa and Asia is absent:
+
+```{r hist, eval = requireNamespace("cshapes", quietly = TRUE) && has_sf, fig.alt = "Choropleth drawn on 1950 borders including colonies and dependencies."}
+attach_geometry(snap[, c("iso3c", "gdp_per_capita")], year = 1950) |>
+  world_map(gdp_per_capita, style = "quantile",
+            title = "1950 borders, 1950 world")
+```
+
+Note what this costs: ISO 3166 was published in 1974 and never covered
+colonies, so historical geometry is keyed on Gleditsch-Ward codes and `iso3c`
+is `NA` for every entity that never had one. `country_join(key = "gwn")` is the
+join that works before 1970.
+
+**Membership is a function of time.** A snapshot silently misstates any panel
+that spans an accession:
+
+```{r asof}
+c(`2016` = in_group("United Kingdom", "EU", as_of = 2016),
+  `2021` = in_group("United Kingdom", "EU", as_of = 2021))
+```
+
+## 7. Islands are not missing at random
+
+`morans_i()`'s default weights are land-border contiguity, and an island has no
+land border. On the bundled snapshot that silently removes a quarter of the
+countries with data -- Japan, Australia, Madagascar, New Zealand, the
+Philippines, Cuba, Sri Lanka, Iceland and every small island state. They are not
+a random quarter.
+
+Not every island goes, either: the United Kingdom keeps its land border with
+Ireland, and Indonesia keeps its borders with Malaysia, Papua New Guinea and
+Timor-Leste. Which is rather the point -- you cannot tell from the finished map
+who dropped out of the statistic.
+
+```{r weights, eval = has_sf}
+rbind(
+  contiguity = morans_i(snap, gdp_per_capita, n_perm = 0)[c("i", "n", "n_excluded")],
+  knn = morans_i(snap, gdp_per_capita, n_perm = 0,
+                 weights = country_weights("knn", k = 5))[c("i", "n", "n_excluded")]
+)
+```
+
+Both numbers are defensible; only one of them is global. `country_weights()`
+also takes `"distance"`, and `"custom"` -- which is how an adjacency that is not
+geographic at all (trade volume, migration, shared language) goes through the
+same API.
+
+## References
+
+Brewer, C. A. & Pickle, L. (2002). Evaluation of methods for classifying
+epidemiological data on choropleth maps in series. *Annals of the Association of
+American Geographers* 92(4), 662–681.
+
+Roth, R. E., Woodruff, A. W. & Johnson, Z. F. (2010). Value-by-alpha maps: an
+alternative technique to the cartogram. *The Cartographic Journal* 47(2),
+130–140.
+
+Šavrič, B., Patterson, T. & Jenny, B. (2019). The Equal Earth map projection.
+*International Journal of Geographical Information Science* 33(3), 454–465.
+

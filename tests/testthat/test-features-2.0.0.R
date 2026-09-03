@@ -102,7 +102,10 @@ test_that("new country groups are present and correctly sized", {
 })
 
 test_that("country_overrides is an alias of wdj_overrides", {
-  expect_identical(country_overrides(), wdj_overrides())
+  # wdj_overrides()'s deprecation note is .frequency = "once", so whether it
+  # fires here depends on which test file ran first. Assert the alias, and let
+  # test-reference.R assert that the replacement itself stays silent.
+  expect_identical(country_overrides(), suppressWarnings(wdj_overrides()))
   expect_equal(unname(country_overrides(c(Somaliland = "SOM"))[["Somaliland"]]),
                "SOM")
 })
@@ -148,7 +151,9 @@ test_that("distance_between computes symmetric great-circle distances", {
   expect_equal(d1, d2)
   expect_gt(d1, 0)
   expect_lt(d1, 2000)
-  expect_true(is.na(distance_between("Wakanda", "France")))
+  expect_warning(w <- distance_between("Wakanda", "France"),
+                 "did not resolve to a country")
+  expect_true(is.na(w))
   # France is closer to Germany than to Australia.
   expect_lt(distance_between("France", "Germany"),
             distance_between("France", "Australia"))
@@ -163,8 +168,7 @@ test_that("country_borders and neighbors need sf", {
 })
 
 test_that("country_borders finds real neighbours (needs sf)", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   b <- country_borders()
   expect_true(all(c("iso3c_a", "country_a", "iso3c_b", "country_b") %in% names(b)))
   expect_false(any(b$iso3c_a == b$iso3c_b))
@@ -176,8 +180,7 @@ test_that("country_borders finds real neighbours (needs sf)", {
 })
 
 test_that("neighbors looks up a country's borders (needs sf)", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   fra <- neighbors("France")
   expect_true(all(fra$iso3c == "FRA"))
   expect_true("DEU" %in% fra$neighbor)
@@ -191,8 +194,7 @@ test_that("neighbors looks up a country's borders (needs sf)", {
 # quietly break, so pin them rather than trusting the comment.
 
 test_that("the border adjacency is irreflexive and de-duplicated", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   b <- country_borders()
   expect_gt(nrow(b), 100L)
   expect_equal(sum(b$iso3c_a == b$iso3c_b), 0L)        # no country borders itself
@@ -209,8 +211,7 @@ test_that("neighbors() builds the adjacency once, however many countries", {
   # per country -- rather than a wall-clock assertion, which would be flaky.
   # Measured cost of getting this wrong: 0.43s for one country, 0.37s for 153,
   # so looping over them would be ~66s, about 177x a single vectorised call.
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   calls <- 0L
   fake <- function(scale = "small", region = NULL) {
     calls <<- calls + 1L
@@ -236,8 +237,7 @@ test_that("neighbors() builds the adjacency once, however many countries", {
 })
 
 test_that("neighbors() is symmetric even though country_borders() is not", {
-  skip_if_not_installed("sf")
-  skip_if_not_installed("rnaturalearth")
+  skip_if_no_sf_geometry()
   # neighbors() returns a tibble (iso3c, neighbor, neighbor_country) -- pin the
   # shape too, since the symmetry check depends on reading the right column.
   nb <- neighbors("France")

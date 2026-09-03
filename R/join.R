@@ -64,7 +64,9 @@ detect_country_col <- function(data, call = rlang::caller_env()) {
 #' @param geometry `"polygon"` (default), `"sf"` or `"none"`.
 #' @param scale Natural Earth resolution for the `sf` backend. `"large"` needs the
 #'   non-CRAN `rnaturalearthhires` package; see [world_geometry()].
-#' @param region Optional region subset (see [world_geometry()]).
+#' @param region Optional region subset (see [world_geometry()]). Applied
+#'   whichever `geometry` is used, including `"none"`; with `"none"` there is
+#'   nothing to clip, so a bounding box is refused rather than ignored.
 #' @param projection,recenter Projection, and optional central meridian, for
 #'   the `sf` backend (see [world_map()] for the projections available).
 #' @param warn Whether to report unmatched countries (default `TRUE`); also
@@ -91,7 +93,7 @@ join_world <- function(data,
                        recenter = NULL,
                        warn = TRUE) {
   check_bool(warn, "warn")
-  geometry <- match.arg(geometry)
+  geometry <- rlang::arg_match(geometry)
   col_q <- rlang::enquo(country_col)
   if (rlang::quo_is_null(col_q) || rlang::quo_is_missing(col_q)) {
     col_name <- detect_country_col(data)
@@ -101,7 +103,7 @@ join_world <- function(data,
     if (missing(origin) && !is.null(detected)) origin <- detected
     col_name <- as.character(col_name)
   } else {
-    col_name <- rlang::as_name(col_q)
+    col_name <- quo_arg_name(col_q, "country_col")
   }
 
   if (isTRUE(warn)) {
@@ -119,7 +121,30 @@ join_world <- function(data,
 
   std <- standardize_country(data, !!rlang::sym(col_name), origin = origin,
                              warn = FALSE)
-  if (geometry == "none") return(std)
+  if (geometry == "none") {
+    # Identical to the world_data() case: this branch returned before any of
+    # the geometry arguments were applied, and `region` is documented as a
+    # plain "region subset" rather than an sf-backend option -- so asking for
+    # one region with geometry = "none" handed back every row.
+    if (!is.null(region)) {
+      iso <- resolve_region(region)
+      if (inherits(iso, "wdj_bbox")) {
+        wdj_abort(c(
+          "A bounding-box {.arg region} needs geometry to clip against.",
+          "x" = 'There is nothing to clip when {.code geometry = "none"}.',
+          "i" = 'Use {.code geometry = "sf"}, or select whole countries with a
+                 continent, a group name or an {.field iso3c} vector.'
+        ), class = "countryatlas_bbox_without_geometry")
+      }
+      if (!is.null(iso)) {
+        std <- std[!is.na(std$iso3c) & std$iso3c %in% iso, , drop = FALSE]
+      }
+    }
+    warn_scale_ignored(scale)
+    warn_projection_ignored(projection, 'geometry = "none"')
+    warn_recenter_ignored(recenter, 'geometry = "none"')
+    return(std)
+  }
   attach_geometry(std, by = "iso3c", geometry = geometry, scale = scale,
                   region = region, projection = projection, recenter = recenter)
 }
@@ -138,6 +163,28 @@ join_world <- function(data,
 #' @param suffix Suffix for clashing non-key columns (default
 #'   `c(".x", ".y")`).
 #'
+#' @param key Which code system to join on. `"iso3c"` (default) is the
+#'   package's spine and the right choice for anything contemporary.
+#'   `"cowc"`/`"cown"` (Correlates of War) and `"gwn"` (Gleditsch-Ward) are the
+#'   alternate spines historical work needs -- see the section below.
+#' @param warn Whether to report values that resolve to no country (default
+#'   `TRUE`). They join to nothing, so a silent reconciliation failure is the
+#'   one thing this verb exists to prevent. Each side is reported separately.
+#' @section Joining historical data: the second spine:
+#' ISO 3166 was first published in 1974 and never covered colonies, so `iso3c`
+#' cannot key anything before about 1970. Correlates of War and Gleditsch-Ward
+#' codes can, they run back to the nineteenth century, and
+#' [historical_geometry()] is keyed on `gwn`. Setting `key` switches the join
+#' onto one of those:
+#' ```r
+#' country_join(a, b, country, nation, key = "gwn")
+#' ```
+#' The trade-off is real and worth stating: COW/GW codes cover states ISO never
+#' did, but they omit the dependencies and non-sovereign territories ISO does
+#' cover, so a modern dataset joined on `gwn` loses Hong Kong, Puerto Rico and
+#' the rest -- which the join warns about. Use `iso3c` unless you are working
+#' before 1970.
+#'
 #' @return A tibble joined on a reconciled `iso3c` key.
 #' @export
 #' @examples
@@ -148,8 +195,12 @@ country_join <- function(x, y, by_x, by_y,
                          origin_x = "country.name",
                          origin_y = "country.name",
                          type = c("left", "inner", "full"),
-                         suffix = c(".x", ".y")) {
-  type <- match.arg(type)
+                         suffix = c(".x", ".y"),
+                         key = c("iso3c", "cowc", "cown", "gwn"),
+                         warn = TRUE) {
+  type <- rlang::arg_match(type)
+  key <- rlang::arg_match(key)
+  check_bool(warn, "warn")
   bx <- quo_arg_name(rlang::enquo(by_x), "by_x")
   by_ <- quo_arg_name(rlang::enquo(by_y), "by_y")
   if (!bx %in% names(x)) wdj_abort("Column {.val {bx}} not found in {.arg x}.")
@@ -157,14 +208,60 @@ country_join <- function(x, y, by_x, by_y,
 
   x <- tibble::as_tibble(x)
   y <- tibble::as_tibble(y)
-  x[["iso3c"]] <- wdj_to_iso3c(x[[bx]], origin = origin_x)
-  y[["iso3c"]] <- wdj_to_iso3c(y[[by_]], origin = origin_y)
+  x[[key]] <- wdj_to_key(x[[bx]], origin = origin_x, key = key, side = "`x`",
+                         warn_unresolved = warn)
+  y[[key]] <- wdj_to_key(y[[by_]], origin = origin_y, key = key, side = "`y`",
+                         warn_unresolved = warn)
 
+  if (warn) {
+    warn_key_collapse(x[[bx]], x[[key]], "`x`", bx, key)
+    warn_key_collapse(y[[by_]], y[[key]], "`y`", by_, key)
+  }
   join_fun <- switch(type,
                      left = dplyr::left_join,
                      inner = dplyr::inner_join,
                      full = dplyr::full_join)
-  join_fun(x, y, by = "iso3c", suffix = suffix, na_matches = "never")
+  join_fun(x, y, by = key, suffix = suffix, na_matches = "never")
+}
+
+# Standardisation can map two distinct inputs onto one code -- "France" and
+# "FRANCE ", or "Congo" and "Congo-Kinshasa" -- and the join then silently
+# multiplies the other side's rows. dplyr does not warn: with unique keys on one
+# side that is an ordinary one-to-many, not the many-to-many it flags. So the
+# user sees a frame that looks fine, in which one country is counted twice.
+# Only the *collapse* is worth reporting: duplicates already present in the
+# input are the caller's own, and a country-by-year panel is a legitimate
+# one-to-many.
+warn_key_collapse <- function(orig, key, side, by_name, key_name,
+                              hint = "Aggregate or de-duplicate {side} first if
+                                      one row per country was intended; pass
+                                      {.code warn = FALSE} to silence this.") {
+  # Returns the codes it reported, so a caller running a second, broader
+  # duplicate check does not say the same thing twice: a collapsed key is by
+  # definition also a repeated one.
+  ok <- !is.na(key)
+  if (!any(ok)) return(invisible(character(0)))
+  orig <- as.character(orig)[ok]
+  key <- key[ok]
+  dup_keys <- unique(key[duplicated(key)])
+  # Keep only the codes reached from more than one distinct input value.
+  collapsed <- dup_keys[vapply(dup_keys, function(k)
+    length(unique(orig[key == k])) > 1L, NA)]
+  if (!length(collapsed)) return(invisible(character(0)))
+  shown <- utils::head(collapsed, 5)
+  detail <- vapply(shown, function(k) {
+    paste0(k, " <- ", paste(unique(orig[key == k]), collapse = ", "))
+  }, character(1))
+  # Both agreements sit directly after the count with nothing interpolated
+  # between: cli keys {?s} to the most recent numeric interpolation, and naming
+  # the column first gave "2 iso3c value in `y` is reached".
+  wdj_warn(c(
+    "{.field {key_name}} in {side}: {length(collapsed)} value{?s} {?is/are}
+     reached from more than one {.field {by_name}}, so the join repeats rows.",
+    "*" = "{.val {detail}}",
+    "i" = hint
+  ), class = "countryatlas_key_collapse")
+  invisible(collapsed)
 }
 
 #' Join many messy country tables on the ISO spine
@@ -179,8 +276,14 @@ country_join <- function(x, y, by_x, by_y,
 #' @param origin countrycode origin scheme(s) for the key column(s) (default
 #'   `"country.name"`; length 1 or one per table).
 #' @param type Join type: `"full"` (default), `"left"` or `"inner"`.
+#' @param key Which code system to join on, as in [country_join()]: `"iso3c"`
+#'   (default), or `"cowc"`/`"cown"`/`"gwn"` for historical work that predates
+#'   ISO 3166. Each table reports separately on the countries the alternate key
+#'   cannot carry.
+#' @param warn Whether to report values that resolve to no country (default
+#'   `TRUE`), per table, as [country_join()] does per side.
 #'
-#' @return A single tibble joined on `iso3c` (clashing non-key columns get
+#' @return A single tibble joined on `key` (clashing non-key columns get
 #'   dplyr's default `.x`/`.y` suffixes).
 #' @export
 #' @examples
@@ -189,8 +292,12 @@ country_join <- function(x, y, by_x, by_y,
 #' d <- data.frame(country = c("Czechia", "Korea"), area = c(79, 100))
 #' country_join_all(list(a, b, d), by = "country")
 country_join_all <- function(tables, by, origin = "country.name",
-                             type = c("full", "left", "inner")) {
-  type <- match.arg(type)
+                             type = c("full", "left", "inner"),
+                             key = c("iso3c", "cowc", "cown", "gwn"),
+                             warn = TRUE) {
+  type <- rlang::arg_match(type)
+  key <- rlang::arg_match(key)
+  check_bool(warn, "warn")
   if (!is.list(tables) || !length(tables)) {
     wdj_abort("{.arg tables} must be a non-empty list of data frames.")
   }
@@ -209,10 +316,17 @@ country_join_all <- function(tables, by, origin = "country.name",
     if (!by[i] %in% names(tb)) {
       wdj_abort("Column {.val {by[i]}} not found in table {i}.")
     }
-    tb[["iso3c"]] <- wdj_to_iso3c(tb[[by[i]]], origin = origin[i])
+    tb[[key]] <- wdj_to_key(tb[[by[i]]], origin = origin[i], key = key,
+                            side = sprintf("table %d", i),
+                            warn_unresolved = warn)
+    # Same collapse hazard as country_join(), once per table.
+    if (warn) {
+      warn_key_collapse(tb[[by[i]]], tb[[key]], sprintf("table %d", i),
+                        by[i], key)
+    }
     tb
   })
   join_fun <- switch(type, left = dplyr::left_join,
                      inner = dplyr::inner_join, full = dplyr::full_join)
-  Reduce(function(x, y) join_fun(x, y, by = "iso3c", na_matches = "never"), prepped)
+  Reduce(function(x, y) join_fun(x, y, by = key, na_matches = "never"), prepped)
 }

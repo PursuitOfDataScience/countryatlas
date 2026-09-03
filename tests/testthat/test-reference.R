@@ -157,9 +157,13 @@ test_that("the soft-deprecation note belongs to the deprecated name alone", {
   # Checked structurally rather than by mocking base::interactive(): that mock
   # does not reliably take effect under R CMD check, and cli's `.frequency =
   # "once"` makes a behavioural test order-dependent within a session.
+  # 3.0.0 escalated this from an interactive-only note to a real warning: an
+  # interactive `cli_inform` never reaches the scripts still calling it, and the
+  # cycle has now run a full release. The structural check is the same -- the
+  # notice belongs to this name and to nothing else.
   has_note <- function(f) {
     src <- paste(deparse(f), collapse = " ")
-    grepl("soft-deprecated", src, fixed = TRUE)
+    grepl("is deprecated", src, fixed = TRUE)
   }
   expect_true(has_note(countryatlas::wdj_overrides))
   expect_false(has_note(countryatlas::country_overrides))
@@ -177,11 +181,20 @@ test_that("the soft-deprecation note belongs to the deprecated name alone", {
 })
 
 test_that("splitting the note off left the override table identical", {
-  a <- suppressMessages(wdj_overrides())
-  b <- country_overrides()
-  expect_identical(a, b)
-  expect_identical(b, countryatlas:::build_overrides())
+  # The deprecation note used to live in the shared body, so it fired for
+  # country_overrides() -- the replacement it recommends -- and for every
+  # public function taking `overrides = country_overrides()` as a default.
+  # That is the regression worth pinning, and it was untested: the old
+  # assertions here compared country_overrides() to build_overrides(), which
+  # is the same function, and so could not fail.
+  b <- expect_silent(country_overrides())
+  # wdj_overrides()'s note is .frequency = "once", so whether it fires here
+  # depends on test order; assert the table, not the note.
+  expect_identical(suppressWarnings(wdj_overrides()), b)
   expect_gt(length(b), 0L)
+  # The note must not reach a caller that merely defaults to the replacement.
+  skip_if_not_installed("maps")
+  expect_silent(countryatlas:::get_world_polygons(region = "Europe"))
   # extra= still merges, and the named-vector check still fires.
   expect_equal(unname(country_overrides(c(Freedonia = "FRE"))[["Freedonia"]]),
                "FRE")

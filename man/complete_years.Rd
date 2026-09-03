@@ -24,7 +24,8 @@ numeric columns except \code{year} are filled.}
 \code{"linear"}.}
 }
 \value{
-A completed (and optionally filled) panel tibble.
+A completed (and optionally filled) panel tibble -- or an \code{sf}
+frame, if \code{data} was one; each invented row carries its country's geometry.
 }
 \description{
 Completes a panel so every country has every year, optionally filling missing
