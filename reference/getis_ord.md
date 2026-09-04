@@ -32,6 +32,12 @@ getis_ord(data, value, weights = NULL, local = TRUE)
   If `TRUE` (default) return the per-country \\G_i^\*\\ with z-scores;
   if `FALSE` return the single global \\G\\.
 
+  The global \\G\\ needs a variable with a natural origin and no
+  negative values: it compares cross-products, so negating the variable
+  leaves it unchanged. Given a negative value it warns and returns `NA`
+  rather than a number computed outside its domain. \\G_i^\*\\
+  standardises and is defined for signed data.
+
 ## Value
 
 With `local = TRUE`, a tibble of `iso3c`, `gi_star`, `z_score` and

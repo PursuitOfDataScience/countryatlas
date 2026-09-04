@@ -7,7 +7,7 @@ lookup built on
 ## Usage
 
 ``` r
-neighbors(x, origin = "country.name", scale = "small")
+neighbors(x, origin = "country.name", scale = "small", warn = TRUE)
 ```
 
 ## Arguments
@@ -25,6 +25,12 @@ neighbors(x, origin = "country.name", scale = "small")
   Natural Earth resolution to compute adjacency from. `"large"` needs
   the non-CRAN `rnaturalearthhires` package; see
   [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md).
+
+- warn:
+
+  Whether to report values that do not resolve to a country (default
+  `TRUE`). They match no border, so without this a typo is
+  indistinguishable from a country that genuinely has no land neighbour.
 
 ## Value
 

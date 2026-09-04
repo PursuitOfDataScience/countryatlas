@@ -36,7 +36,12 @@ spatial_lag(data, value, weights = NULL, suffix = "_lag")
 ## Value
 
 `data` with the lagged column added. Countries the weights cannot reach
-get `NA`.
+get `NA` – and since that `NA` is indistinguishable from one caused by a
+missing input value, the codes themselves are attached as the
+`"countryatlas_excluded"` attribute, the frame-shaped counterpart to the
+`excluded` column
+[`morans_i()`](https://pursuitofdatascience.github.io/countryatlas/reference/morans_i.md)
+returns.
 
 ## See also
 

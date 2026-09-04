@@ -53,6 +53,122 @@ takes `data` as its second argument. Details under **Breaking changes**.
   that resolve to nothing, so code that joins on messy names will start
   emitting a warning it did not before. The join result is unchanged;
   pass `warn = FALSE` for the old silence.
+- **`world_map(engine = "tmap")` failed opaquely on an older tmap.** The
+  engine builds its scales with `tm_scale_intervals()`,
+  `tm_scale_continuous()` and `tm_scale_categorical()` – the tmap 4 API.
+  tmap 3 configured scales through arguments on `tm_polygons()` and
+  exports none of them, and because `DESCRIPTION` pins no version on any
+  `Suggests` package, the `need_pkg("tmap")` gate was satisfied by any
+  tmap at all. An older install then died on R’s own
+  “‘tm_scale_intervals’ is not an exported object from
+  ‘namespace:tmap’”, which names neither the cause nor the cure. The
+  engine now checks for the constructors it needs and says so, pointing
+  at either an upgrade or `engine = "ggplot2"`. The check is on the
+  capability rather than a version number, as
+  [`as_ggsql_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/as_ggsql_source.md)
+  already does for duckdb’s `shared_home`: that is the thing actually
+  required, and it stays correct whichever release introduced it.
+- **[`locate_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/locate_country.md)
+  measured its snap-back distance from the wrong point.** A point
+  falling just outside the coarse coastline is snapped to the nearest
+  country when it is within `tolerance_km`, and that step paired points
+  with countries using `st_nearest_points(..., by_element = TRUE)`. The
+  argument is `pairwise`; `by_element` is not a formal of it, so sf
+  absorbed the name into `...` and ignored it, returning the full
+  *n*×*n* cross product instead of *n* pairs – after which each
+  unmatched point was measured against a different point’s country.
+  Cuba’s centroid sits 10.8 km off the 110m coastline and should snap;
+  in a 17-point call it was measured against American Samoa’s point,
+  came out at 10167 km, and was dropped to `NA`. One unmatched point was
+  safe, because 1x1 is the same thing as pairwise – which is why every
+  single-point example was correct and only multi-point calls were
+  wrong. The error ran both ways: a bogus distance landing under the
+  tolerance would have attributed a point to a country it is not in.
+  Fixed, with a length check so it cannot silently regress to a cross
+  product again.
+- **[`spatial_lag()`](https://pursuitofdatascience.github.io/countryatlas/reference/spatial_lag.md)
+  did not say which countries its weights excluded.** A country with no
+  neighbour gets `NA`, which the documentation states – but that `NA` is
+  indistinguishable from one caused by a missing input value, and
+  nothing in the result said which countries the weights had dropped.
+  [`morans_i()`](https://pursuitofdatascience.github.io/countryatlas/reference/morans_i.md)
+  and
+  [`gearys_c()`](https://pursuitofdatascience.github.io/countryatlas/reference/gearys_c.md)
+  answer this by returning `excluded`;
+  [`getis_ord()`](https://pursuitofdatascience.github.io/countryatlas/reference/getis_ord.md)
+  and
+  [`local_morans()`](https://pursuitofdatascience.github.io/countryatlas/reference/local_morans.md)
+  omit the row, so a [`setdiff()`](https://rdrr.io/r/base/sets.html)
+  recovers it.
+  [`spatial_lag()`](https://pursuitofdatascience.github.io/countryatlas/reference/spatial_lag.md)
+  returns the caller’s frame, so it now attaches the codes as the
+  `"countryatlas_excluded"` attribute – the same channel this package
+  already uses for `"countryatlas_cartogram"` and
+  `"countryatlas_clubs"`. Not a warning: on real geography some country
+  always lacks a land neighbour, so a warning would fire on every
+  ordinary call. On a panel the attribute holds the union across years,
+  since the weights are geography rather than time.
+- **[`neighbors()`](https://pursuitofdatascience.github.io/countryatlas/reference/neighbors.md)
+  could not tell a typo from an island.** An unresolved name becomes
+  `NA`, and the `%in%` filter simply never matches it, so a misspelling
+  returned no rows – indistinguishable from a country that genuinely has
+  no land border. The function’s own example makes that collision
+  explicit (“Japan has no land border”).
+  [`distance_between()`](https://pursuitofdatascience.github.io/countryatlas/reference/distance_between.md)
+  and
+  [`convert_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/convert_country.md)
+  take the same input and both report an unresolved value;
+  [`neighbors()`](https://pursuitofdatascience.github.io/countryatlas/reference/neighbors.md)
+  now does too, and gains `warn = TRUE`. Iceland still returns zero rows
+  in silence, because that zero is real.
+- **[`country_timeline()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_timeline.md)
+  said nothing about a name it could not resolve.** An unrecognised
+  input came back as a row of `NA`, which reads as a country with no
+  recorded history rather than a name nobody matched – in a package
+  whose whole premise is that unmatched names are the problem worth
+  reporting.
+  [`dissolve_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/dissolve_country.md)
+  takes the same input shape and has warned about exactly this since
+  1.0.0.
+  [`country_timeline()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_timeline.md)
+  now gives the same warning, with the same
+  [`check_country_match()`](https://pursuitofdatascience.github.io/countryatlas/reference/check_country_match.md)
+  pointer, and gains `warn = TRUE` to match its sibling. A historical
+  name is still silent: `"USSR"` is *meant* to fail the ISO lookup and
+  be resolved by the historical spine, which is why that lookup’s own
+  warning stays suppressed.
+- **Three panel verbs did nothing, silently, on a cross-section.**
+  Handed one year per country,
+  [`growth_rate()`](https://pursuitofdatascience.github.io/countryatlas/reference/growth_rate.md),
+  [`lag_by_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/lag_by_country.md)
+  and
+  [`diff_by_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/lag_by_country.md)
+  each added a column that was `NA` in every row and said nothing – the
+  verb accomplished literally nothing, and the result read as a
+  computation that had run. They now report it
+  (`countryatlas_all_na_result`), stating what the verb needs (“a lag of
+  3 needs 4 years for the same country”) and pointing at
+  [`complete_years()`](https://pursuitofdatascience.github.io/countryatlas/reference/complete_years.md).
+  The notice fires only when the whole column is `NA` and the source
+  column had data, so the ordinary panel case – where just the first
+  year per country is `NA` – stays silent.
+- **[`country_network()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_network.md)
+  validated `top_n` after building the network.** It was the one verb
+  here that did its whole job and then rejected an argument it could
+  have rejected at the door. `top_n` only trims the finished edge list,
+  so the check is now made first.
+- **[`share_of_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/share_of_world.md)
+  returned a column of `NA` without saying why.** A zero or non-finite
+  total is a dead end – the division would give `NaN` or `Inf` – and the
+  guard that turns it into `NA` was right. Its silence was not:
+  [`per_capita()`](https://pursuitofdatascience.github.io/countryatlas/reference/per_capita.md)
+  and
+  [`to_ppp()`](https://pursuitofdatascience.github.io/countryatlas/reference/to_ppp.md)
+  both report an unusable denominator, under the same two condition
+  classes, while this one returned nothing but `NA` and read as “these
+  countries have no share” rather than “there was no total to take a
+  share of”. It now reports it, naming the years affected on a panel
+  (only the bad years go `NA`; the rest keep their shares).
 - **`world_map(engine = "tmap")` now projects.** It took `projection`
   and `recenter` and drew in the frame’s own CRS regardless (see the bug
   fix below), so every existing tmap map changes: the default is Equal
@@ -112,6 +228,126 @@ takes `data` as its second argument. Details under **Breaking changes**.
   unaffected.
 
 ### Bug fixes
+
+- **Accented country names written in NFD resolved to `NA`.** The same
+  accent can be encoded as one precomposed code point (NFC) or as a base
+  letter followed by a combining mark (NFD) – identical on screen,
+  different strings to [`match()`](https://rdrr.io/r/base/match.html).
+  countrycode’s tables are NFC, so `"Turkiye"`,
+  `"Sao Tome and Principe"`, `"Aland Islands"`, `"Curacao"` and
+  `"Reunion"` in their accented NFD spellings matched nothing, silently,
+  even in a UTF-8 locale – which is precisely where
+  [`?country_overrides`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)
+  promises accented names do work. macOS returns NFD for filenames and
+  several export paths emit it, so this is input a user gets without
+  choosing it. `Cote d'Ivoire` was unaffected and hid the problem:
+  countrycode’s regex for it keys on an ASCII substring that
+  decomposition leaves alone. Names that resolve to nothing are now
+  retried with their combining marks stripped, which turns an NFD
+  spelling into the ASCII spelling the package already documents as
+  resolving in any locale. Only the unresolved values are retried, so
+  the pass can add a match but never move one: across the 314 names the
+  package and countrycode ship, none changed.
+
+- The README said `common_indicators` “keeps the 20 you actually use”
+  after this release grew it to 22 with the two price-conversion series.
+  Corrected, and the count is now asserted against
+  `nrow(common_indicators)` so the prose cannot drift from the data
+  again.
+
+- **The global `getis_ord(local = FALSE)` gave the same answer for a
+  variable and its negation.** The general G is a ratio of weighted to
+  total cross-products, so every `x_i * x_j` term survives negating the
+  whole variable: `g(x)` and `g(-x)` came back as bit-for-bit the same
+  double, and the statistic could not tell a coldspot pattern from a
+  hotspot one. Getis & Ord (1992) define it for a variable with a
+  natural origin and no negative values, and
+  [`gini()`](https://pursuitofdatascience.github.io/countryatlas/reference/gini.md)
+  – the nearest analogue here, a global index with a positivity domain –
+  already warns and returns `NA` in this case. The global branch now
+  does the same, naming how many values are negative, instead of handing
+  back a plausible-looking number computed outside its domain. Zero is
+  still allowed, positive columns are numerically unchanged, and the
+  local `Gi*` branch standardises and is untouched.
+
+- **`growth_rate(type = "cagr")` returned a bare `NaN` for a negative
+  value, silently.** The compound rate is `(v_t / v_0)^(1/n) - 1`, and
+  the code guarded `v_0 > 0` – the base of the ratio – but not `v_t`. A
+  fractional power of a negative ratio is `NaN`, so a single negative
+  year in an otherwise positive series put a `NaN` in the column with
+  nothing said. Every neighbouring measure reports this:
+  [`theil()`](https://pursuitofdatascience.github.io/countryatlas/reference/theil.md)
+  drops non-positive values and says how many,
+  [`gini()`](https://pursuitofdatascience.github.io/countryatlas/reference/gini.md)
+  warns about negatives,
+  [`sigma_convergence()`](https://pursuitofdatascience.github.io/countryatlas/reference/sigma_convergence.md)
+  warns when no value is positive,
+  [`beta_convergence()`](https://pursuitofdatascience.github.io/countryatlas/reference/beta_convergence.md)
+  errors, and
+  [`growth_rate()`](https://pursuitofdatascience.github.io/countryatlas/reference/growth_rate.md)
+  itself warns when *every* row comes back `NA`. The partial case was
+  the one silent spot, and it is the case real data hits – a deficit or
+  a net flow dipping below zero for a single year. Negative values now
+  give `NA` with a `countryatlas_cagr_negative` warning naming how many
+  rows are affected. A value of exactly `0` is unaffected and still
+  gives `-1`, an annualised -100%, which is the right answer for a
+  series that went to nothing; `type = "yoy"` is a plain ratio change,
+  is defined for negatives, and is untouched.
+
+- **[`getis_ord()`](https://pursuitofdatascience.github.io/countryatlas/reference/getis_ord.md)
+  computed its spread with the unstable one-pass formula, so a tightly
+  clustered column produced `Inf` or `NaN` z-scores.** The spread was
+  `sqrt(sum(x^2)/n - mean(x)^2)`, which subtracts two nearly equal large
+  numbers and loses every significant digit once the mean dwarfs the
+  variation. Measured on 8-country vectors: `1e9 + 1:8` drove the spread
+  to exactly `0`, so the denominator was `0` and every `z_score` came
+  back `Inf` with `p_value` `0` – reading as “every country is a
+  significant hotspot”; `1e10 + 1:8` gave a spread 90 times too large,
+  so nothing was ever significant; and `1e12 + 10 * 1:8` went negative
+  under the `sqrt`, returning `NaN` z-scores and leaking base R’s
+  warning about them. The zero-variance guard caught none of it, because
+  such a column is not constant, only nearly so. Centring before
+  squaring is algebraically the same quantity and unconditionally
+  stable, and it is how
+  [`local_morans()`](https://pursuitofdatascience.github.io/countryatlas/reference/local_morans.md)
+  already computed its second moment. Well-conditioned columns are
+  unaffected to floating-point noise. Gi\* z-scores are shift and scale
+  invariant by construction, which is what the old form violated, so
+  that invariant is now asserted rather than any particular number.
+
+- **A trailing space on `region` silently drew an empty map.**
+  `resolve_region()` trimmed in its `iso3c` branch and nowhere else, so
+  one trailing space gave three different answers: `"FRA "` resolved,
+  `"Europe "` fell through to country-name matching and errored, and
+  `"EU "` was accepted as a three-letter code – `nchar("EU ")` is 3 and
+  it is already uppercase, so it reached the branch that passes an
+  unrecognised code through untouched and came back as the literal
+  string `"EU "`. Every public caller of that helper –
+  [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md),
+  [`world_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_data.md),
+  [`attach_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/attach_geometry.md),
+  [`join_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/join_world.md)
+  and
+  [`country_borders()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_borders.md)
+  – therefore subset to nothing and reported nothing, which is the
+  outcome that branch exists to prevent. Every branch now reads the same
+  trimmed value, so all 15 shipped groups, the continents, codes and
+  names agree across padding. The error message still quotes the
+  caller’s value untrimmed.
+
+- **Padding was tolerated for a code but not for an overridden spelling,
+  and a non-breaking space defeated the trim entirely.**
+  [`trimws()`](https://rdrr.io/r/base/trimws.html)’s default class is
+  `[ \t\r\n]`, so the `iso3c` branch’s deliberate trim missed every
+  non-ASCII space – `"FRA "` resolved and `"FRA\u00a0"`, what a code
+  pasted from a web table or a Word document carries, did not.
+  Separately the override lookup keyed on the raw value while the
+  whitelist was built from the trimmed one, so with
+  `custom_match = c(Somaliland = "SOM")`, `"Somaliland"` gave `SOM` and
+  `"Somaliland "` gave `NA`; an ordinary trailing space was enough. Both
+  now use one Unicode-aware trim. A BOM or a zero-width space is a
+  format character rather than whitespace and is still rejected rather
+  than silently accepted.
 
 - **`top_n` went unvalidated in
   [`world_table()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_table.md)

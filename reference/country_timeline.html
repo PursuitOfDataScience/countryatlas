@@ -55,7 +55,7 @@ bundled <a href="historical_codes.html">historical_codes</a> crosswalk in both d
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">country_timeline</span><span class="op">(</span><span class="va">x</span>, origin <span class="op">=</span> <span class="st">"country.name"</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">country_timeline</span><span class="op">(</span><span class="va">x</span>, origin <span class="op">=</span> <span class="st">"country.name"</span>, warn <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -70,12 +70,35 @@ bundled <a href="historical_codes.html">historical_codes</a> crosswalk in both d
 <dt id="arg-origin">origin<a class="anchor" aria-label="anchor" href="#arg-origin"></a></dt>
 <dd><p>How to read <code>x</code> (default <code>"country.name"</code>).</p></dd>
 
+
+<dt id="arg-warn">warn<a class="anchor" aria-label="anchor" href="#arg-warn"></a></dt>
+<dd><p>Whether to report inputs that match neither a historical entity
+nor a modern country (default <code>TRUE</code>), as <code><a href="dissolve_country.html">dissolve_country()</a></code> does.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A tibble, one row per input: <code>input</code>, <code>iso3c</code>, <code>country</code>,
 <code>dissolved</code> (the year it ceased to exist, or <code>NA</code> if it still does),
-<code>predecessors</code> and <code>successors</code> (list-columns of <code>iso3c</code> codes).</p>
+<code>predecessors</code> and <code>successors</code> (list-columns of <code>iso3c</code> codes). An input
+that resolves to neither spine keeps its <code>input</code> and gets <code>NA</code> elsewhere;
+with <code>warn = TRUE</code> it is reported rather than left to be spotted.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="why-the-two-directions-are-not-mirror-images">Why the two directions are not mirror images<a class="anchor" aria-label="anchor" href="#why-the-two-directions-are-not-mirror-images"></a></h2>
+
+
+<p>Both columns hold codes, so an entity ISO never coded cannot appear in
+either. ISO 3166-3 only records changes from 1974 on, and three entities in
+<a href="historical_codes.html">historical_codes</a> predate it: the United Arab Republic (1961), Tanganyika
+and Zanzibar (both 1964). Asking about one of those by name works –
+<code>country_timeline("Tanganyika")</code> gives <code>TZA</code> as a successor, because the
+table stores that side as a name – but the reverse does not:
+<code>country_timeline("TZA")</code> reports no predecessors, since there is no code to
+report. The other eleven entities carry codes and round-trip in both
+directions. Naming them instead of coding them would break the column's
+type; inventing codes for them would be a guess, which this package does
+not make.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

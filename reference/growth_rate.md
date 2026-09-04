@@ -23,7 +23,11 @@ growth_rate(data, value, type = c("yoy", "cagr"), suffix = "_growth")
 - type:
 
   `"yoy"` (default, period-over-period) or `"cagr"` (compound annual
-  growth rate vs. the first non-`NA` year).
+  growth rate vs. the first non-`NA` year). `"cagr"` needs a positive
+  ratio at both ends, so a negative value gives `NA` for that row (with
+  a warning) and a non-positive base year gives `NA` for that country; a
+  value of exactly `0` is a legitimate annualised -100%. `"yoy"` is a
+  plain ratio change and is defined for negative values.
 
 - suffix:
 

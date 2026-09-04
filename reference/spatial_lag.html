@@ -86,7 +86,10 @@ global work.</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p><code>data</code> with the lagged column added. Countries the weights cannot
-reach get <code>NA</code>.</p>
+reach get <code>NA</code> – and since that <code>NA</code> is indistinguishable from one caused
+by a missing input value, the codes themselves are attached as the
+<code>"countryatlas_excluded"</code> attribute, the frame-shaped counterpart to the
+<code>excluded</code> column <code><a href="morans_i.html">morans_i()</a></code> returns.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

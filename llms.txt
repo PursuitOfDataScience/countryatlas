@@ -71,7 +71,7 @@ Drop `geometry` for a plain country table
 ([`country_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_data.md)),
 ask for a year range to get a panel, or pass several indicators at once.
 [`wdi_search()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdi_search.md)
-finds codes offline; `common_indicators` keeps the 20 you actually use.
+finds codes offline; `common_indicators` keeps the 22 you actually use.
 
 ## Your data, on the map
 
