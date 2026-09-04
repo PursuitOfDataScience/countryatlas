@@ -120,9 +120,15 @@ test_that("share_of_world and per_capita pass through odd but valid values", {
   expect_equal(sum(sw$v_share), 1)
   expect_equal(per_capita(data.frame(iso3c = "A", v = 1, p = -2), v, p)$v_per_capita,
                -0.5)
-  # A zero world total has no meaningful share.
-  z <- share_of_world(data.frame(iso3c = c("A", "B"), v = c(-2, 2)), v)
+  # A zero world total has no meaningful share -- and share_of_world() now
+  # says so rather than returning a column of NA in silence.
+  expect_warning(
+    z <- share_of_world(data.frame(iso3c = c("A", "B"), v = c(-2, 2)), v),
+    class = "countryatlas_no_rates")
   expect_true(all(is.na(z$v_share)))
+  # A usable total, however odd its parts, stays silent.
+  expect_no_warning(share_of_world(data.frame(iso3c = c("A", "B"),
+                                              v = c(-1, 3)), v))
 })
 
 # Every other panel helper returns 0 rows for a 0-row frame. complete_years()
@@ -292,8 +298,10 @@ test_that("the other verbs propagate an infinity visibly", {
   expect_equal(aggregate_regions(d, v, by = "continent", fun = "sum")$v, Inf)
   expect_equal(aggregate_regions(d, v, by = "continent", fun = "mean")$v, Inf)
   expect_equal(per_capita(d, v, pop = pop)$v_per_capita, c(0.1, Inf, 0.1))
-  # share_of_world's non-finite total guard returns NA rather than all-zero.
-  expect_true(all(is.na(share_of_world(d, v)$v_share)))
+  # share_of_world's non-finite total guard returns NA rather than all-zero --
+  # and now says so, as per_capita() and to_ppp() already did.
+  expect_warning(sw <- share_of_world(d, v), class = "countryatlas_no_rates")
+  expect_true(all(is.na(sw$v_share)))
   # The largest value still ranks first.
   expect_identical(rank_countries(d, v)$rank[2], 1L)
 })
@@ -340,4 +348,105 @@ test_that("the plotting verbs handle an empty frame without leaking", {
     world_map(sfd[1, ], gdp_per_capita, style = "quantile")))
   expect_error(morans_i(sfd[1, ], gdp_per_capita, n_perm = 0),
                class = "countryatlas_error")   # needs >= 3 bordering countries
+})
+
+test_that("cagr growth is NA-and-loud for a negative value, but keeps -100% for zero", {
+  # `v0 > 0` guarded the base of the ratio and nothing guarded the current
+  # value, so a fractional power of a negative ratio put a bare NaN in the
+  # column with nothing said. Every neighbouring measure reports this case --
+  # theil() drops non-positive values and says so, gini() warns, and
+  # growth_rate() itself warns when *every* row is NA -- so the partial case
+  # was the one silent spot, and it is the one a real series hits: a deficit
+  # or a net flow dipping below zero for a single year.
+  #
+  # Rows are addressed by iso3c/year rather than by position: the frame comes
+  # back sorted, so "row 1" is DEU, not the first country named.
+  mk <- function(edit = identity) {
+    d <- expand.grid(iso3c = c("FRA", "DEU"), year = 2000:2006,
+                     stringsAsFactors = FALSE)
+    d <- d[order(d$iso3c, d$year), ]
+    rownames(d) <- NULL
+    d$value <- seq_len(nrow(d)) * 1.5 + 10
+    edit(d)
+  }
+  at <- function(d, iso, yr) which(d$iso3c == iso & d$year == yr)
+  set <- function(iso, yr, v) function(d) { d$value[at(d, iso, yr)] <- v; d }
+
+  # A clean positive panel says nothing and is all finite bar the base years.
+  clean <- expect_silent(growth_rate(mk(), value, type = "cagr"))
+  expect_equal(sum(is.na(clean$value_growth)), 2L)   # one base year per country
+  expect_false(any(is.nan(clean$value_growth)))
+
+  # One negative year mid-series: NA, not NaN, and it says how many rows.
+  d_neg <- mk(set("FRA", 2004, -3))
+  expect_warning(got <- growth_rate(d_neg, value, type = "cagr"),
+                 class = "countryatlas_cagr_negative")
+  expect_false(any(is.nan(got$value_growth)))
+  expect_true(is.na(got$value_growth[at(got, "FRA", 2004)]))
+  expect_equal(sum(is.na(got$value_growth)), 3L)     # 2 base years + the row
+  expect_warning(growth_rate(d_neg, value, type = "cagr"), "1 row")
+  # The other country is untouched.
+  expect_false(any(is.na(got$value_growth[got$iso3c == "DEU"] [-1])))
+
+  # A negative *base* takes that country out entirely, and says so rather than
+  # returning a column of NA with no explanation.
+  d_nb <- mk(set("FRA", 2000, -1))
+  expect_warning(got <- growth_rate(d_nb, value, type = "cagr"),
+                 class = "countryatlas_cagr_negative")
+  expect_true(all(is.na(got$value_growth[got$iso3c == "FRA"])))
+  expect_false(all(is.na(got$value_growth[got$iso3c == "DEU"])))
+
+  # A value of exactly 0 is *not* excluded: (0/v0)^(1/n) - 1 is -1, an
+  # annualised -100%, the correct and informative answer for a series that
+  # went to nothing. The first version of this fix wrongly lumped it in with
+  # negatives.
+  d_z <- mk(set("FRA", 2004, 0))
+  gz <- expect_silent(growth_rate(d_z, value, type = "cagr"))
+  expect_equal(gz$value_growth[at(gz, "FRA", 2004)], -1)
+  expect_equal(sum(is.na(gz$value_growth)), 2L)      # no extra NA vs clean
+
+  # All negative: warn_all_na_result() already covers that and says something
+  # more useful, so the per-row warning stands down rather than doubling up.
+  d_all <- mk(function(d) { d$value <- -d$value; d })
+  w <- testthat::capture_warnings(growth_rate(d_all, value, type = "cagr"))
+  expect_length(grep("negative", w, ignore.case = TRUE), 0L)
+  expect_true(any(grepl("every row", w)))
+
+  # yoy is a plain ratio change, defined for negatives -- untouched.
+  expect_silent(y <- growth_rate(d_neg, value, type = "yoy"))
+  expect_false(any(is.nan(y$value_growth)))
+})
+
+test_that("the global G refuses a signed variable instead of ignoring the sign", {
+  # The general G compares cross-products, so x_i * x_j is unchanged when the
+  # whole variable is negated -- g(x) and g(-x) were bit-for-bit identical and
+  # the statistic could not distinguish a coldspot pattern from a hotspot one.
+  # gini(), the nearest analogue, already warns and returns NA for negatives.
+  skip_if_no_sf_geometry()
+  iso <- c("FRA", "DEU", "ITA", "ESP", "BEL", "NLD", "AUT", "CHE")
+  w <- country_weights("knn", k = 3, countries = iso)
+  mk <- function(v) data.frame(iso3c = iso, v = v, stringsAsFactors = FALSE)
+  x <- c(45, 52, 38, 41, 60, 33, 47, 71) * 1000
+
+  # Positive: silent, and a real number.
+  pos <- expect_silent(getis_ord(mk(x), v, weights = w, local = FALSE))
+  expect_true(is.finite(pos$g))
+  # Zero is inside the domain x >= 0.
+  expect_silent(getis_ord(mk(replace(x, 2, 0)), v, weights = w, local = FALSE))
+
+  # One negative, and all negative: NA plus a warning that counts them.
+  for (vals in list(replace(x, 3, -38000), -x)) {
+    expect_warning(got <- getis_ord(mk(vals), v, weights = w, local = FALSE),
+                   class = "countryatlas_global_g_negative")
+    expect_true(is.na(got$g))
+    # The parts that depend only on the weights are still reported.
+    expect_true(is.finite(got$expected))
+    expect_equal(got$n, length(iso))
+  }
+  expect_warning(getis_ord(mk(-x), v, weights = w, local = FALSE), "8 negative")
+
+  # The local branch standardises, so signed data is fine there -- the guard
+  # must not leak across.
+  expect_silent(loc <- getis_ord(mk(-x), v, weights = w, local = TRUE))
+  expect_true(all(is.finite(loc$z_score)))
 })

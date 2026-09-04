@@ -12,7 +12,11 @@ growth_rate(data, value, type = c("yoy", "cagr"), suffix = "_growth")
 \item{value}{The value column (unquoted).}
 
 \item{type}{\code{"yoy"} (default, period-over-period) or \code{"cagr"} (compound
-annual growth rate vs. the first non-\code{NA} year).}
+annual growth rate vs. the first non-\code{NA} year).
+\code{"cagr"} needs a positive ratio at both ends, so a negative value gives
+\code{NA} for that row (with a warning) and a non-positive base year gives \code{NA}
+for that country; a value of exactly \code{0} is a legitimate annualised -100\%.
+\code{"yoy"} is a plain ratio change and is defined for negative values.}
 
 \item{suffix}{Suffix for the new column (default \code{"_growth"}).}
 }

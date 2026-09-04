@@ -26,6 +26,14 @@
 #' listed here -- but in a non-UTF-8 locale (`LC_CTYPE=C`) they cannot be
 #' compared reliably and resolve to `NA`.
 #'
+#' Accented spellings also come in two Unicode forms that look identical: the
+#' accent can be one precomposed code point (NFC) or a base letter followed by
+#' a combining mark (NFD, which macOS returns for filenames). Only NFC matches
+#' [countrycode::countrycode()]'s tables, so a name that resolves to nothing is
+#' retried with its combining marks stripped, which turns an NFD spelling into the
+#' ASCII spelling that resolves anywhere. Only unresolved names are retried, so
+#' this never changes a name that already matched.
+#'
 #' If your input may contain accented country names, run in a UTF-8 locale.
 #' De-accenting with `iconv(x, to = "ASCII//TRANSLIT")` gives ASCII spellings
 #' that resolve everywhere, but it is not an escape from the locale problem:

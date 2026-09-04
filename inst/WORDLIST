@@ -6,6 +6,7 @@ Anselin
 Arel
 B's
 BIH
+BOM
 BRICS
 Biometrika
 Bonaire
@@ -41,6 +42,7 @@ GISCO
 GL
 Gastner
 Getis
+Gi
 Gini
 Girardin
 Gleditsch
@@ -63,6 +65,7 @@ Mayen
 Mercosur
 Mollweide
 Moritz
+NFD
 NSE
 OECD's
 OWID
@@ -113,6 +116,7 @@ choropleth's
 choropleths
 cli
 codelist
+coldspot
 colourbar
 colourbars
 comtradr's
@@ -132,6 +136,7 @@ dotless
 dplyr
 dplyr's
 duckdb
+duckdb's
 ed
 equirectangular
 errored
@@ -173,6 +178,7 @@ pearson
 pipeable
 pkgdown
 plotly
+precomposed
 recentred
 recentring
 regex
@@ -200,6 +206,7 @@ tibble
 tibbles
 tidyr's
 tld
+tm
 tmap
 tmap's
 tripel

@@ -4,7 +4,7 @@
 \alias{neighbors}
 \title{A country's neighbours}
 \usage{
-neighbors(x, origin = "country.name", scale = "small")
+neighbors(x, origin = "country.name", scale = "small", warn = TRUE)
 }
 \arguments{
 \item{x}{A vector of country names or codes.}
@@ -13,6 +13,10 @@ neighbors(x, origin = "country.name", scale = "small")
 
 \item{scale}{Natural Earth resolution to compute adjacency from. \code{"large"} needs the
 non-CRAN \code{rnaturalearthhires} package; see \code{\link[=world_geometry]{world_geometry()}}.}
+
+\item{warn}{Whether to report values that do not resolve to a country
+(default \code{TRUE}). They match no border, so without this a typo is
+indistinguishable from a country that genuinely has no land neighbour.}
 }
 \value{
 A tibble with one row per (\code{iso3c}, \code{neighbor}) pair: the queried

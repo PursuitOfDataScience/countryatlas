@@ -157,15 +157,33 @@ resolve_region <- function(region, call = rlang::caller_env()) {
     return(structure(region, class = "wdj_bbox"))
   }
   region <- as.character(region)
+  # One trim, before any branch, so they all agree about what the value is.
+  # Only the iso3c branch below used to trim, and the disagreement was not
+  # merely cosmetic: "FRA " resolved, "Europe " fell through to name matching
+  # and errored, and "EU " was *silently* accepted as a three-letter code,
+  # because nchar("EU ") is 3 and it is already uppercase, so it reached the
+  # "unknown code taken at face value" branch and returned the string "EU ".
+  # world_geometry(region = "EU "), and every other public caller of this
+  # helper -- world_data(), attach_geometry(), join_world(),
+  # country_borders() -- therefore subset to nothing and said nothing --
+  # the exact outcome the comment on that branch exists to prevent. A trailing
+  # space out of a spreadsheet was all it took.
+  #
+  # [\h\v] rather than trimws()'s ASCII-only [ \t\r\n] default, for the
+  # reason given in wdj_to_iso3c(): a value pasted from a web table or a Word
+  # document carries a non-breaking space, which the default class leaves in
+  # place. `region` itself is kept untrimmed for the error message, so it
+  # still shows exactly what the caller passed.
+  reg <- trimws(region, whitespace = "[\\h\\v]")
   continents <- c("Africa", "Americas", "Asia", "Europe", "Oceania")
-  if (length(region) == 1L && region %in% continents) {
+  if (length(reg) == 1L && reg %in% continents) {
     cl <- countrycode::codelist
-    return(cl$iso3c[!is.na(cl$continent) & cl$continent == region])
+    return(cl$iso3c[!is.na(cl$continent) & cl$continent == reg])
   }
   # A named group (EU, OECD, ...).
   groups <- unique(countryatlas::country_groups_tbl$group)
-  if (length(region) == 1L && region %in% groups) {
-    return(country_groups(region)$iso3c)
+  if (length(reg) == 1L && reg %in% groups) {
+    return(country_groups(reg)$iso3c)
   }
   # Otherwise treat as a vector of iso3c codes (or names to be standardised).
   # Codes are recognised case-insensitively: ISO alpha-3 is canonically
@@ -173,21 +191,21 @@ resolve_region <- function(region, call = rlang::caller_env()) {
   # straight through to name matching resolved some lowercase codes ("usa", via
   # countrycode's case-insensitive name regex) while silently dropping others
   # ("can"), so a lowercase vector lost countries without saying so.
-  up <- ascii_upper(trimws(region))
+  up <- ascii_upper(reg)
   if (all(nchar(up) == 3L) && all(up %in% wdj_known_iso3c())) {
     return(up)
   }
   # An all-uppercase 3-letter vector is still taken at face value even when a
   # code is unknown, so an unrecognised code yields an empty subset rather than
   # being reinterpreted as a country name.
-  if (all(nchar(region) == 3L & ascii_upper(region) == region)) {
-    return(ascii_upper(region))
+  if (all(nchar(reg) == 3L & ascii_upper(reg) == reg)) {
+    return(ascii_upper(reg))
   }
   # Last resort: treat it as country names. If none of them resolves, the
   # subset would be empty and the map would come back blank with nothing said --
   # which is what a typo like "Europ" or "Nowhere" used to produce. (An
   # explicitly-uppercase unknown code is left alone above, deliberately.)
-  iso <- wdj_to_iso3c(region)
+  iso <- wdj_to_iso3c(reg)
   if (!length(iso) || all(is.na(iso))) {
     wdj_abort(c(
       "{.arg region} matched no countries: {.val {region}}.",
@@ -869,7 +887,27 @@ locate_country <- function(lon = NULL, lat = NULL, points = NULL,
     miss <- which(is.na(idx))
     if (length(miss) && tolerance_km > 0) {
       near <- sf::st_nearest_feature(points[miss, ], geom)
-      link <- sf::st_nearest_points(points[miss, ], geom[near, ], by_element = TRUE)
+      # st_nearest_points()'s pairing argument is `pairwise`. This asked for
+      # `by_element`, which is not a formal of it -- sf absorbs the name into
+      # `...` and ignores it -- so instead of length(miss) pairs it returned
+      # the full length(miss)^2 cross product, and link[i] then measured some
+      # *other* point's distance. Cuba's centroid sits 10.8 km off the 110m
+      # coastline and should snap; in a 17-miss call it was measured against
+      # American Samoa's point instead, came out at 10167 km, and was dropped
+      # to NA. With a single missed point 1x1 is the same thing as pairwise,
+      # which is why every one-point example was right and only multi-point
+      # calls were wrong -- and why a wrong snap was equally possible, had the
+      # bogus distance landed under the tolerance.
+      #
+      # The length check is the point of the fix as much as the name is: it
+      # cannot silently regress to a cross product again.
+      link <- sf::st_nearest_points(points[miss, ], geom[near, ],
+                                    pairwise = TRUE)
+      if (length(link) != length(miss)) {
+        link <- do.call(c, lapply(seq_along(miss), function(i) {
+          sf::st_nearest_points(points[miss[i], ], geom[near[i], ])
+        }))
+      }
       dkm <- vapply(seq_along(near), function(i) {
         m <- sf::st_coordinates(link[i])
         haversine_km(m[1, 1], m[1, 2], m[2, 1], m[2, 2])
@@ -1015,6 +1053,10 @@ country_borders <- function(scale = "small", region = NULL) {
 #' country in the world, roughly two orders of magnitude more work than one
 #' vectorised call. The same applies to [country_borders()], which does the work.
 #'
+#' @param warn Whether to report values that do not resolve to a country
+#'   (default `TRUE`). They match no border, so without this a typo is
+#'   indistinguishable from a country that genuinely has no land neighbour.
+#'
 #' @section Name clash with igraph:
 #' `igraph` also exports a `neighbors()`, and it takes a graph and a vertex
 #' rather than country names. Whichever package is attached later wins, so if
@@ -1029,8 +1071,27 @@ country_borders <- function(scale = "small", region = NULL) {
 #'   neighbors(c("FRA", "JPN"), origin = "iso3c")   # Japan has no land border
 #' }
 #' }
-neighbors <- function(x, origin = "country.name", scale = "small") {
+neighbors <- function(x, origin = "country.name", scale = "small",
+                      warn = TRUE) {
+  check_bool(warn, "warn")
   iso <- wdj_to_iso3c(x, origin = origin)
+  # An unresolved name becomes NA, and the %in% filter below simply never
+  # matches it -- so a typo returned no rows, exactly like a country that
+  # genuinely has no land border. This function's own example makes that
+  # collision explicit ("Japan has no land border"), which is why the two
+  # cases have to be told apart. distance_between() takes the same input and
+  # has always reported it; this is its message.
+  if (isTRUE(warn)) {
+    unresolved <- unique(as.character(x)[is.na(iso) & !is.na(x)])
+    if (length(unresolved)) {
+      wdj_warn(c(
+        "{length(unresolved)} value{?s} did not resolve to a country, so
+         {?it has/they have} no neighbours here:",
+        "*" = "{.val {utils::head(unresolved, 8)}}",
+        "i" = "Check {.arg origin}; it is currently {.val {origin}}."
+      ))
+    }
+  }
   borders <- country_borders(scale = scale)
   sym <- dplyr::bind_rows(
     tibble::tibble(iso3c = borders$iso3c_a, neighbor = borders$iso3c_b,

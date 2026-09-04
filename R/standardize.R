@@ -37,33 +37,97 @@ wdj_to_iso3c <- function(x, origin = "country.name", custom_match = country_over
   check_country_vector(x, call = call)
   x <- as.character(x)
   if (identical(origin, "iso3c")) {
-    out <- ascii_upper(trimws(x))
-    # Still let overrides repair known-bad spellings.
+    # trimws()'s default class is [ \t\r\n], which is ASCII whitespace only,
+    # so a non-breaking space -- what a code copied out of a web table or a
+    # Word document carries -- survived the trim and then matched nothing:
+    # "FRA " resolved and "FRA<nbsp>" did not. [\h\v] is PCRE for every
+    # horizontal and vertical Unicode space, and trimws() already substitutes
+    # with perl = TRUE. A BOM or a zero-width space is a format character
+    # rather than whitespace and is deliberately still left alone.
+    xt <- trimws(x, whitespace = "[\\h\\v]")
+    out <- ascii_upper(xt)
+    # Still let overrides repair known-bad spellings -- keyed on the *trimmed*
+    # value. The whitelist below is built from `out`, which is trimmed, so
+    # matching raw `x` here meant padding was tolerated for a real code but
+    # not for an overridden spelling: with country_overrides(),
+    # "Somaliland" gave SOM and "Somaliland " gave NA, because the override
+    # missed and "SOMALILAND" then failed the whitelist. An ordinary trailing
+    # space out of a spreadsheet was enough.
     if (length(custom_match)) {
-      hit <- match(x, names(custom_match))
+      hit <- match(xt, names(custom_match))
       out[!is.na(hit)] <- unname(custom_match[hit[!is.na(hit)]])
     }
     valid <- c(wdj_known_iso3c(), unname(custom_match))
     out[!is.na(out) & !(out %in% valid)] <- NA_character_
     return(out)
   }
-  tryCatch(
-    suppressWarnings(
-      countrycode::countrycode(
-        x,
-        origin = origin,
-        destination = "iso3c",
-        custom_match = if (length(custom_match)) custom_match else NULL,
-        warn = FALSE
-      )
-    ),
-    error = function(e) {
-      if (grepl("`origin`", conditionMessage(e), fixed = TRUE)) {
-        abort_bad_origin(origin, e, call, arg)
+  cc <- function(vals) {
+    tryCatch(
+      suppressWarnings(
+        countrycode::countrycode(
+          vals,
+          origin = origin,
+          destination = "iso3c",
+          custom_match = if (length(custom_match)) custom_match else NULL,
+          warn = FALSE
+        )
+      ),
+      error = function(e) {
+        if (grepl("`origin`", conditionMessage(e), fixed = TRUE)) {
+          abort_bad_origin(origin, e, call, arg)
+        }
+        stop(e)
       }
-      stop(e)
+    )
+  }
+  out <- cc(x)
+  # Second pass for the spellings that resolved to nothing, on the
+  # combining-mark-stripped form. See strip_combining() for why.
+  miss <- is.na(out) & !is.na(x)
+  if (any(miss)) {
+    alt <- strip_combining(x[miss])
+    redo <- alt != x[miss]
+    if (any(redo)) {
+      patch <- out[miss]
+      patch[redo] <- cc(alt[redo])
+      out[miss] <- patch
     }
-  )
+  }
+  out
+}
+
+# Drop Unicode combining marks: "Turkiye" written as `u` + a combining
+# diaeresis rather than as the precomposed u-with-diaeresis becomes plain
+# "Turkiye".
+#
+# Accented country names are a documented concern here (see the "Accented names
+# and locales" section of country_overrides()), but only for the *locale* half
+# of the problem -- the note says accented spellings match natively in a UTF-8
+# locale, and they do, in NFC. NFD is a different byte sequence from the NFC
+# form countrycode's tables carry, so it matched nothing even in a UTF-8
+# locale: Turkiye, Sao Tome and Aland (in their accented spellings) all came
+# back NA. macOS returns NFD for
+# filenames and several export paths emit it, so this is input a user gets
+# without ever choosing it, and the failure is silent -- just an unmatched
+# name.
+#
+# Base R has no Unicode normaliser and DESCRIPTION pins no stringi, so rather
+# than normalise to NFC this strips the marks, which turns an NFD spelling into
+# the ASCII spelling the package already documents as resolving in any locale.
+# Cote d'Ivoire matched before this and still does: countrycode's regex keys on
+# the ASCII substring, which decomposition leaves alone.
+strip_combining <- function(x) {
+  out <- x
+  # Only non-ASCII values can carry a mark, and combining marks are the one
+  # thing removed, so an accent-free name is untouched either way.
+  hi <- !is.na(x) & grepl("[^[:ascii:]]", x, perl = TRUE)
+  if (any(hi)) {
+    # U+0300-U+036F sits inside the BMP. A range over *astral* code points
+    # would not be portable -- Windows wchar_t is 16-bit and TRE rejects
+    # those (it broke a flag-emoji test here) -- but this one is fine.
+    out[hi] <- gsub("[\\x{0300}-\\x{036F}]", "", x[hi], perl = TRUE)
+  }
+  out
 }
 
 # Refuse a data frame where a country vector belongs. Called from the three

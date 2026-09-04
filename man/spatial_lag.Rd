@@ -19,7 +19,10 @@ global work.}
 }
 \value{
 \code{data} with the lagged column added. Countries the weights cannot
-reach get \code{NA}.
+reach get \code{NA} -- and since that \code{NA} is indistinguishable from one caused
+by a missing input value, the codes themselves are attached as the
+\code{"countryatlas_excluded"} attribute, the frame-shaped counterpart to the
+\code{excluded} column \code{\link[=morans_i]{morans_i()}} returns.
 }
 \description{
 The spatially lagged value: for each country, the (weighted) mean of its

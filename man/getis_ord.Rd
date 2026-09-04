@@ -16,7 +16,13 @@ contiguity, which excludes islands -- prefer \code{country_weights("knn")} for
 global work.}
 
 \item{local}{If \code{TRUE} (default) return the per-country \eqn{G_i^*} with
-z-scores; if \code{FALSE} return the single global \eqn{G}.}
+z-scores; if \code{FALSE} return the single global \eqn{G}.
+
+The global \eqn{G} needs a variable with a natural origin and no negative
+values: it compares cross-products, so negating the variable leaves it
+unchanged. Given a negative value it warns and returns \code{NA} rather than a
+number computed outside its domain. \eqn{G_i^*} standardises and is
+defined for signed data.}
 }
 \value{
 With \code{local = TRUE}, a tibble of \code{iso3c}, \code{gi_star}, \code{z_score} and

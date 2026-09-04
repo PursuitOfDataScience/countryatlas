@@ -143,6 +143,11 @@ flow_matrix <- function(data, from, to, weight = NULL,
 #' country_network(od, from, to, value)
 country_network <- function(data, from, to, weight = NULL,
                             origin = "country.name", top_n = 20) {
+  # Checked before the matrix is built, not after the edge list is sorted: this
+  # was the one verb here that did its whole job and *then* rejected an
+  # argument it could have rejected immediately. `top_n` only trims the result,
+  # so nothing about the check needs the computation.
+  check_top_n(top_n)
   m <- flow_matrix(data, {{ from }}, {{ to }}, {{ weight }}, origin = origin)
   iso <- rownames(m)
   total <- sum(m)
@@ -170,7 +175,6 @@ country_network <- function(data, from, to, weight = NULL,
   edges$reciprocity <- ifelse(edges$weight > 0 & back > 0,
                               back / edges$weight, NA_real_)
   edges <- dplyr::arrange(edges, dplyr::desc(.data$weight))
-  check_top_n(top_n)
   if (is.finite(top_n)) edges <- utils::head(edges, as.integer(top_n))
   list(nodes = nodes, edges = edges)
 }

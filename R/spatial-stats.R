@@ -568,6 +568,12 @@ gearys_c <- function(data, value, weights = NULL, n_perm = 999) {
 #' @param local If `TRUE` (default) return the per-country \eqn{G_i^*} with
 #'   z-scores; if `FALSE` return the single global \eqn{G}.
 #'
+#'   The global \eqn{G} needs a variable with a natural origin and no negative
+#'   values: it compares cross-products, so negating the variable leaves it
+#'   unchanged. Given a negative value it warns and returns `NA` rather than a
+#'   number computed outside its domain. \eqn{G_i^*} standardises and is
+#'   defined for signed data.
+#'
 #' @return With `local = TRUE`, a tibble of `iso3c`, `gi_star`, `z_score` and
 #'   `p_value` (two-sided, from the normal approximation). With `local = FALSE`,
 #'   a one-row tibble of `g`, `expected`, `n` and `n_links`.
@@ -588,14 +594,48 @@ getis_ord <- function(data, value, weights = NULL, local = TRUE) {
   al <- align_weights(data, val_name, weights)
   m <- al$m; x <- al$x; n <- length(x)
   if (!local) {
-    g <- sum(m * outer(x, x)) / (sum(outer(x, x)) - sum(x^2))
+    # The general G is a ratio of weighted to total cross-products, so every
+    # x_i * x_j term is unchanged when the whole variable is negated: g(x) and
+    # g(-x) came back as bit-for-bit the same double, and the statistic could
+    # not tell a coldspot pattern from a hotspot one. Getis & Ord (1992)
+    # define it for a variable with a natural origin and positive values, and
+    # gini() -- the nearest analogue here, a global index with a positivity
+    # domain -- already warns and returns NA in this case. Do the same rather
+    # than hand back a plausible-looking number computed outside the domain.
+    # The local Gi* branch below standardises and is fine with signed data.
+    neg <- sum(!is.na(x) & x < 0)
+    if (neg) {
+      wdj_warn(c(
+        "{.field {val_name}} has {neg} negative value{?s}; the global G needs
+         x >= 0.",
+        "i" = "It compares cross-products, so negating the variable leaves the
+               statistic unchanged. Use {.code local = TRUE}, which
+               standardises and is defined for signed data. Returning
+               {.code NA}."
+      ), class = "countryatlas_global_g_negative")
+      g <- NA_real_
+    } else {
+      g <- sum(m * outer(x, x)) / (sum(outer(x, x)) - sum(x^2))
+    }
     return(tibble::tibble(g = g, expected = sum(m) / (n * (n - 1)),
                           n = n, n_links = al$n_links))
   }
   # G_i* includes the focal country (Ord & Getis 1995), so add the diagonal.
   ms <- m; diag(ms) <- 1
   xbar <- mean(x)
-  s <- sqrt(sum(x^2) / n - xbar^2)
+  # sqrt(sum(x^2)/n - xbar^2) is the same quantity algebraically and it is what
+  # stood here, but it subtracts two nearly equal large numbers: for a column
+  # clustered tightly around a big value the result loses every significant
+  # digit. Measured on 5-country vectors -- 1e9 + 1:5 gave s = 0, so den = 0
+  # and every z_score came back Inf with p_value 0, i.e. "every country is a
+  # significant hotspot"; 1e10 + 1:5 gave s 90x too large, so nothing was ever
+  # significant; and 1e12 + (10:50) went negative under the sqrt, returning NaN
+  # z-scores and leaking base R's "NaNs produced" warning. zero_variance()
+  # above catches none of it, because the column is not constant -- only
+  # nearly so. Centring first is unconditionally stable and agrees with the
+  # old form to floating-point noise on well-conditioned data. local_morans()
+  # already computes its second moment this way.
+  s <- sqrt(sum((x - xbar)^2) / n)
   wsum <- rowSums(ms)
   wsq <- rowSums(ms^2)
   num <- as.numeric(ms %*% x) - xbar * wsum
@@ -621,7 +661,10 @@ getis_ord <- function(data, value, weights = NULL, local = TRUE) {
 #' @param suffix Suffix for the new column (default `"_lag"`).
 #'
 #' @return `data` with the lagged column added. Countries the weights cannot
-#'   reach get `NA`.
+#'   reach get `NA` -- and since that `NA` is indistinguishable from one caused
+#'   by a missing input value, the codes themselves are attached as the
+#'   `"countryatlas_excluded"` attribute, the frame-shaped counterpart to the
+#'   `excluded` column [morans_i()] returns.
 #' @seealso [country_weights()], [local_morans()]
 #' @export
 #' @examples
@@ -642,25 +685,44 @@ spatial_lag <- function(data, value, weights = NULL, suffix = "_lag") {
   # 63,409 for all three, and dividing one by the other silently compared 2002
   # with 2000. A lag per year is both the correct answer and the one the
   # column's placement already implies.
+  # Countries the weights exclude -- no neighbour at this scale -- come back
+  # NA, and that NA was indistinguishable from a country whose own value was
+  # missing: nothing in the result said which countries the weights had
+  # dropped. morans_i() and gearys_c() answer this by *returning* `excluded`,
+  # and that is the right vehicle here too rather than a warning: on real
+  # geography some country always lacks a land neighbour, so a warning would
+  # fire on every ordinary call -- noise instead of signal, and a test pins
+  # the silence. An attribute is what this package already uses for a
+  # diagnostic side-channel (see "countryatlas_cartogram" and
+  # "countryatlas_clubs").
+  tag_excluded <- function(out, excluded) {
+    attr(out, "countryatlas_excluded") <- sort(as.character(excluded))
+    out
+  }
   yrs <- if ("year" %in% names(data)) unique(stats::na.omit(data$year)) else NULL
   if (length(yrs) > 1L) {
     # Resolve the weights once: they describe geography, not time, and
     # rebuilding contiguity per year would re-read the basemap each pass.
     if (is.null(weights)) weights <- country_weights("contiguity")
     out <- rep(NA_real_, nrow(data))
+    exc <- character(0)
     for (y in yrs) {
       idx <- which(!is.na(data$year) & data$year == y)
       al_y <- align_weights(data[idx, , drop = FALSE], val_name, weights)
       out[idx] <- as.numeric(al_y$m %*% al_y$x)[
         match(data$iso3c[idx], al_y$iso3c)]
+      exc <- union(exc, al_y$excluded)
     }
     data[[new]] <- out
-    return(wdj_return_frame(data))
+    # The union across years: the weights are geography, so a country excluded
+    # in one year is excluded in all of them.
+    return(tag_excluded(wdj_return_frame(data), exc))
   }
 
   al <- align_weights(data, val_name, weights)
   lagged <- as.numeric(al$m %*% al$x)
   data[[new]] <- lagged[match(data$iso3c, al$iso3c)]
+  data <- tag_excluded(data, al$excluded)
   # Both exits were a bare `data`, so this verb leaked an incoming grouping on
   # either branch and never normalised a data.frame to a tibble.
   wdj_return_frame(data)

@@ -22,16 +22,34 @@
 #' @param x Country names or codes, current or historical (`"USSR"`,
 #'   `"Yugoslavia"`, `"Estonia"`, `"DEU"`).
 #' @param origin How to read `x` (default `"country.name"`).
+#' @param warn Whether to report inputs that match neither a historical entity
+#'   nor a modern country (default `TRUE`), as [dissolve_country()] does.
 #'
 #' @return A tibble, one row per input: `input`, `iso3c`, `country`,
 #'   `dissolved` (the year it ceased to exist, or `NA` if it still does),
-#'   `predecessors` and `successors` (list-columns of `iso3c` codes).
+#'   `predecessors` and `successors` (list-columns of `iso3c` codes). An input
+#'   that resolves to neither spine keeps its `input` and gets `NA` elsewhere;
+#'   with `warn = TRUE` it is reported rather than left to be spotted.
+#'
+#' @section Why the two directions are not mirror images:
+#' Both columns hold codes, so an entity ISO never coded cannot appear in
+#' either. ISO 3166-3 only records changes from 1974 on, and three entities in
+#' [historical_codes] predate it: the United Arab Republic (1961), Tanganyika
+#' and Zanzibar (both 1964). Asking about one of those by name works --
+#' `country_timeline("Tanganyika")` gives `TZA` as a successor, because the
+#' table stores that side as a name -- but the reverse does not:
+#' `country_timeline("TZA")` reports no predecessors, since there is no code to
+#' report. The other eleven entities carry codes and round-trip in both
+#' directions. Naming them instead of coding them would break the column's
+#' type; inventing codes for them would be a guess, which this package does
+#' not make.
 #'
 #' @seealso [dissolve_country()], [historical_codes], [audit_time_coverage()]
 #' @export
 #' @examples
 #' country_timeline(c("USSR", "Estonia", "France"))
-country_timeline <- function(x, origin = "country.name") {
+country_timeline <- function(x, origin = "country.name", warn = TRUE) {
+  check_bool(warn, "warn")
   if (!length(x)) {
     return(tibble::tibble(input = character(0), iso3c = character(0),
                           country = character(0), dissolved = integer(0),
@@ -70,7 +88,26 @@ country_timeline <- function(x, origin = "country.name") {
       predecessors = list(preds), successors = list(character(0))
     )
   })
-  dplyr::bind_rows(rows)
+  out <- dplyr::bind_rows(rows)
+  # wdj_to_iso3c()'s own warning is suppressed above on purpose -- a historical
+  # name like "USSR" is *meant* to fail that lookup and be picked up by the
+  # branch above -- but that left an input matching *neither* spine reported by
+  # nothing at all: the row came back all NA, reading as a country with no
+  # recorded history rather than a name nobody recognised. dissolve_country()
+  # takes the same input shape and has warned about exactly this all along, so
+  # this is its message, down to the {.fn check_country_match} pointer.
+  if (isTRUE(warn)) {
+    miss <- unique(out$input[is.na(out$iso3c)])
+    if (length(miss)) {
+      wdj_warn(c(
+        "{length(miss)} name{?s} matched neither a historical entity nor a
+         modern country:",
+        "*" = "{.val {miss}}",
+        "i" = "See {.fn check_country_match} for close-name suggestions."
+      ))
+    }
+  }
+  out
 }
 
 #' Does the data respect when countries existed?

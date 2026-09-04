@@ -2537,10 +2537,35 @@ viridis_hex <- function(n = 5) {
 # classification choice, not to reproduce ggplot2's output through it. The
 # package stays ggplot2-native -- this is an alternative renderer for people
 # already working in tmap, not a second first-class path.
+# The scale constructors this engine uses are the tmap 4 API; tmap 3 configured
+# scales through arguments on tm_polygons() and exports none of them.
+# DESCRIPTION pins no version on any Suggests package, so need_pkg("tmap") is
+# satisfied by *any* tmap -- and an older one then failed on R's own
+# "'tm_scale_intervals' is not an exported object from 'namespace:tmap'", which
+# names neither the cause nor the cure. Detect the capability rather than a
+# version number, exactly as as_ggsql_source() does for duckdb's `shared_home`:
+# the capability is the thing actually required, and it stays correct whichever
+# release introduced it.
+tmap_scale_api <- c("tm_scale_intervals", "tm_scale_continuous",
+                    "tm_scale_categorical")
+
+check_tmap_api <- function(have = getNamespaceExports("tmap"),
+                           call = rlang::caller_env()) {
+  missing_api <- setdiff(tmap_scale_api, have)
+  if (!length(missing_api)) return(invisible(TRUE))
+  wdj_abort(c(
+    "The installed {.pkg tmap} is too old for {.code engine = \"tmap\"}.",
+    "x" = "It does not export {.fn {missing_api}}.",
+    "i" = "The scale constructors arrived in {.pkg tmap} 4. Upgrade it, or use
+           {.code engine = \"ggplot2\"}."
+  ), class = "countryatlas_old_tmap", call = call)
+}
+
 world_map_tmap <- function(data, fill_name, style, n_bins, palette, title,
                            legend, na_label, borders, sf_mode,
                            projection = "equal_earth", recenter = NULL) {
   need_pkg("tmap", 'for world_map(engine = "tmap")')
+  check_tmap_api()
   if (!sf_mode) {
     wdj_abort(c(
       '{.code engine = "tmap"} needs an sf frame.',

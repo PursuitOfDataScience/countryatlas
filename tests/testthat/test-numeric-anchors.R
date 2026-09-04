@@ -107,6 +107,175 @@ test_that("correlate_indicators reproduces stats::cor on complete pairs", {
   expect_equal(ci$n[hit], 4L)
 })
 
+test_that("deflate and to_ppp rescale by the right factor, not just at unity", {
+  # The existing identity test uses a deflator equal to the base year and a
+  # PPP factor of one. Both are degenerate: they hold whatever the rescaling
+  # formula is, so they cannot catch an inverted ratio. (The same trap caught
+  # a first draft of the Marshall anchor below, where modest counts sent every
+  # case down the full-shrinkage branch.)
+  d <- data.frame(iso3c = "FRA", year = 2000:2002,
+                  v = c(100, 250, 160), defl = c(100, 125, 80))
+
+  got <- deflate(d, v, base_year = 2000, deflator = defl)
+  # real = nominal * deflator[base] / deflator
+  expect_equal(got$v_real, d$v * d$defl[d$year == 2000] / d$defl)
+  # Read economically: 250 at index 125 and 160 at index 80 are the same real
+  # quantity, and an inverted ratio would give 312.5 and 128 instead.
+  expect_equal(got$v_real, c(100, 200, 200))
+
+  # Rebasing moves the level and leaves the ratios alone.
+  reb <- deflate(d, v, base_year = 2001, deflator = defl)
+  expect_equal(reb$v_real, c(125, 250, 250))
+  expect_equal(reb$v_real / reb$v_real[1], got$v_real / got$v_real[1])
+
+  # to_ppp divides by the factor; two countries on different factors that meet
+  # at the same converted level is the case worth pinning.
+  p <- data.frame(iso3c = c("FRA", "DEU"), year = 2000L,
+                  v = c(100, 200), f = c(2, 4))
+  expect_equal(to_ppp(p, v, factor = f)$v_ppp, c(50, 50))
+})
+
+test_that("interpolate_missing puts filled values on the right line", {
+  # The existing tests pin the flags, the warnings and the validation -- not
+  # the numbers. A wrong interpolation would keep every one of them passing.
+  d <- data.frame(iso3c = "FRA", year = 2000:2004,
+                  v = c(100, NA, NA, NA, 140))
+  lin <- interpolate_missing(d, "v", method = "linear")
+  expect_equal(lin$v, c(100, 110, 120, 130, 140))
+  expect_equal(lin$v_imputed, c(FALSE, TRUE, TRUE, TRUE, FALSE))
+
+  # Carry-forward holds the last observation, it does not average.
+  expect_equal(interpolate_missing(d, "v", method = "locf")$v,
+               c(100, 100, 100, 100, 140))
+  # "none" leaves the column exactly as it arrived.
+  expect_equal(interpolate_missing(d, "v", method = "none")$v, d$v)
+
+  # The one that matters on real panels: the line follows the *year*, not the
+  # row. With 2000, 2001, 2005 and 0 .. 100, the 2001 value is a fifth of the
+  # way (20). Interpolating on row position -- which looks identical on an
+  # evenly spaced panel, i.e. on most test fixtures -- would give 50.
+  uneven <- data.frame(iso3c = "FRA", year = c(2000, 2001, 2005),
+                       v = c(0, NA, 100))
+  expect_equal(interpolate_missing(uneven, "v", method = "linear")$v,
+               c(0, 20, 100))
+
+  # It interpolates; it does not extrapolate. A gap outside the observed range
+  # has no two points to sit between, so it stays NA.
+  ends <- data.frame(iso3c = "FRA", year = 2000:2003, v = c(NA, 10, 20, NA))
+  got <- interpolate_missing(ends, "v", method = "linear")
+  expect_true(is.na(got$v[1]))
+  expect_true(is.na(got$v[4]))
+  expect_equal(got$v[2:3], c(10, 20))
+})
+
+test_that("empirical-Bayes shrinkage matches Marshall's published estimator", {
+  # Anchored for the same reason as the log-t below: the existing tests check
+  # that shrinkage *behaves* like shrinkage (small denominators move, large
+  # ones do not), which a wrong constant would still satisfy.
+  #
+  # Marshall (1991) method of moments: with r_i = y_i / d_i,
+  #   rbar = sum(y)/sum(d),  dbar = mean(d),
+  #   s2   = sum(d (r - rbar)^2) / sum(d),   phi = s2 - rbar/dbar,
+  #   w_i  = phi / (phi + rbar/d_i),
+  #   rhat = w r + (1 - w) rbar
+  # and phi <= 0 (no more spread than Poisson noise alone) means full
+  # shrinkage to the global rate.
+  marshall <- function(y, d) {
+    r <- y / d
+    rbar <- sum(y) / sum(d)
+    s2 <- sum(d * (r - rbar)^2) / sum(d)
+    phi <- s2 - rbar / mean(d)
+    w <- if (is.finite(phi) && phi > 0) phi / (phi + rbar / d) else rep(0, length(r))
+    list(rate = r, smoothed = w * r + (1 - w) * rbar, w = w, phi = phi,
+         rbar = rbar)
+  }
+
+  # Genuine between-area variation with large denominators, so phi > 0 and the
+  # branch that actually shrinks is the one under test. (Getting this wrong is
+  # easy: modest counts give phi < 0 and every value collapses to the global
+  # rate, which would "pass" without exercising the formula at all.)
+  pop <- c(500, 800, 1200, 2000, 3000, 5000, 700, 1500, 2500, 4000, 6000, 9000)
+  rate <- c(0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10,
+            0.02, 0.09)
+  d <- data.frame(iso3c = paste0("C", seq_along(pop)), year = 2000L,
+                  cases = round(pop * rate), pop = pop)
+  ref <- marshall(d$cases, d$pop)
+  expect_gt(ref$phi, 0)
+
+  got <- smooth_rates(d, cases, pop)
+  expect_equal(got$cases_rate, ref$rate)
+  expect_equal(got$cases_smoothed, ref$smoothed, tolerance = 1e-12)
+  expect_equal(got$cases_shrinkage, ref$w, tolerance = 1e-12)
+
+  # The estimator's point: a small denominator is pulled toward the global
+  # rate, a large one is left where it is.
+  expect_gt(abs(got$cases_smoothed[1] - got$cases_rate[1]),
+            abs(got$cases_smoothed[12] - got$cases_rate[12]))
+  # ...and every smoothed value lies between its own rate and the global one.
+  between <- (got$cases_smoothed - got$cases_rate) *
+    (got$cases_smoothed - ref$rbar)
+  expect_true(all(between <= 1e-12))
+
+  # phi <= 0: no evidence of real variation, so shrink all the way.
+  flat <- data.frame(iso3c = paste0("C", 1:6), year = 2000L,
+                     cases = rep(10, 6), pop = rep(100, 6))
+  fref <- marshall(flat$cases, flat$pop)
+  expect_lte(fref$phi, 0)
+  fgot <- smooth_rates(flat, cases, pop)
+  expect_equal(fgot$cases_shrinkage, rep(0, 6))
+  expect_equal(unique(fgot$cases_smoothed), fref$rbar)
+})
+
+test_that("the log-t statistic matches Phillips & Sul's published formula", {
+  # Every other statistic here is anchored numerically -- gini and theil on
+  # their closed forms, morans_i on an independently built W, beta_convergence
+  # on a planted beta. The log-t is the most intricate of them and had only
+  # behavioural tests ("separates what should separate"), so a refactor could
+  # change the number without changing which clubs come out.
+  #
+  # Phillips & Sul (2007): with h_it = y_it / mean_i(y_it) and
+  # H_t = mean_i (h_it - 1)^2, regress
+  #   log(H_1 / H_t) - 2 log(log t)  on  log t,   t = [rT] .. T
+  # and take the one-sided t statistic on log t. Written out here from the
+  # formula rather than from the implementation.
+  ps_logt <- function(y, r = 0.3) {
+    tn <- ncol(y)
+    h <- t(apply(y, 1, function(row) row / colMeans(y)))
+    ht <- apply((h - 1)^2, 2, mean)
+    idx <- max(2L, floor(r * tn)):tn
+    lhs <- log(ht[1] / ht[idx]) - 2 * log(log(idx))
+    summary(stats::lm(lhs ~ log(idx)))$coefficients[2, 3]
+  }
+  mk <- function(paths) {
+    y <- do.call(rbind, paths)
+    rownames(y) <- paste0("C", seq_len(nrow(y)))
+    y
+  }
+  tn <- 24L
+  tt <- seq_len(tn)
+  # Spreads collapsing toward a common level, spreads compounding apart, and a
+  # constant spread (which is *not* convergence).
+  converging <- mk(lapply(1:8, function(i) 100 + (i - 4.5) * 20 * exp(-0.25 * tt)))
+  diverging <- mk(lapply(1:8, function(i) 100 * (1 + (i - 4.5) * 0.02)^tt))
+  flat <- mk(lapply(1:8, function(i) rep(100 + i, tn)))
+
+  for (y in list(converging, diverging, flat)) {
+    expect_equal(countryatlas:::log_t_stat(y), ps_logt(y), tolerance = 1e-9)
+  }
+  # And the sign is the decision the procedure actually makes, against the
+  # -1.645 critical value the docs name.
+  expect_gt(countryatlas:::log_t_stat(converging), -1.645)
+  expect_lt(countryatlas:::log_t_stat(diverging), -1.645)
+  expect_lt(countryatlas:::log_t_stat(flat), -1.645)
+
+  # log(log(t)) is singular at t = 1, so the window must never start there.
+  expect_gte(max(2L, floor(0.3 * tn)), 2L)
+  expect_true(is.finite(countryatlas:::log_t_stat(converging)))
+  # Too few periods is NA rather than a number from a 2-point regression.
+  expect_true(is.na(countryatlas:::log_t_stat(converging[, 1:4, drop = FALSE])))
+  expect_true(is.na(countryatlas:::log_t_stat(converging[1, , drop = FALSE])))
+})
+
 test_that("morans_i matches an independently built row-standardised statistic", {
   skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
@@ -636,4 +805,53 @@ test_that("the spatial statistics satisfy their algebraic identities", {
     expect_gt(length(got), 0L)
     expect_equal(got, rep(5, length(got)))
   }
+})
+
+test_that("getis_ord z-scores are shift invariant, and stay finite for a tight column", {
+  # Gi* standardises by the spread, so adding a constant to every value cannot
+  # change a z-score. The old code computed the spread as
+  # sqrt(sum(x^2)/n - mean(x)^2), which subtracts two nearly equal large
+  # numbers, so this invariant broke exactly when the shift was large: 1e9 + 1:5
+  # drove the spread to 0 and every z_score to Inf with p_value 0 -- "every
+  # country is a significant hotspot" -- while 1e12 + (10:50) went negative
+  # under the sqrt and returned NaN. Centring first is stable, so this pins the
+  # property rather than any particular number.
+  skip_if_no_sf_geometry()
+  iso <- c("FRA", "DEU", "ITA", "ESP", "BEL", "NLD", "AUT", "CHE")
+  w <- country_weights("knn", k = 3, countries = iso)
+  base <- c(45000, 52000, 38000, 41000, 60000, 33000, 47000, 71000)
+  mk <- function(v) data.frame(iso3c = iso, v = v, stringsAsFactors = FALSE)
+  ref <- getis_ord(mk(base), v, weights = w)
+
+  # The invariant, over shifts spanning the range where the old form failed.
+  for (shift in c(0, 1e3, 1e6, 1e9, 1e12)) {
+    got <- getis_ord(mk(base + shift), v, weights = w)
+    expect_equal(got$z_score, ref$z_score, tolerance = 1e-6)
+  }
+  # Scaling is likewise absorbed by the standardisation.
+  expect_equal(getis_ord(mk(base * 1000), v, weights = w)$z_score,
+               ref$z_score, tolerance = 1e-6)
+
+  # A column clustered tightly around a large value: finite, and not the
+  # degenerate answer. These are the three shapes that used to fail.
+  for (v0 in list(1e9 + seq_along(iso), 1e10 + seq_along(iso),
+                  1e12 + 10 * seq_along(iso))) {
+    got <- getis_ord(mk(v0), v, weights = w)
+    expect_false(any(is.nan(got$z_score)))
+    expect_false(any(is.infinite(got$z_score)))
+    expect_true(all(is.finite(got$z_score)))
+    # An evenly spaced column is not all-hotspot: p-values must not collapse.
+    expect_false(all(got$p_value < 0.05))
+  }
+  # An evenly spaced ramp has the same shape whatever the offset, so the
+  # z-scores agree with each other too.
+  z9 <- getis_ord(mk(1e9 + seq_along(iso)), v, weights = w)$z_score
+  z12 <- getis_ord(mk(1e12 + 1e3 * seq_along(iso)), v, weights = w)$z_score
+  expect_equal(z9, z12, tolerance = 1e-6)
+
+  # A genuinely constant column still takes the documented NA path, with the
+  # warning -- that guard is about zero variance, not about conditioning.
+  expect_warning(flat <- getis_ord(mk(rep(5, length(iso))), v, weights = w),
+                 class = "countryatlas_zero_variance")
+  expect_true(all(is.na(flat$z_score)))
 })

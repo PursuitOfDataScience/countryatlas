@@ -4,24 +4,44 @@
 \alias{country_timeline}
 \title{A country's existence span, predecessors and successors}
 \usage{
-country_timeline(x, origin = "country.name")
+country_timeline(x, origin = "country.name", warn = TRUE)
 }
 \arguments{
 \item{x}{Country names or codes, current or historical (\code{"USSR"},
 \code{"Yugoslavia"}, \code{"Estonia"}, \code{"DEU"}).}
 
 \item{origin}{How to read \code{x} (default \code{"country.name"}).}
+
+\item{warn}{Whether to report inputs that match neither a historical entity
+nor a modern country (default \code{TRUE}), as \code{\link[=dissolve_country]{dissolve_country()}} does.}
 }
 \value{
 A tibble, one row per input: \code{input}, \code{iso3c}, \code{country},
 \code{dissolved} (the year it ceased to exist, or \code{NA} if it still does),
-\code{predecessors} and \code{successors} (list-columns of \code{iso3c} codes).
+\code{predecessors} and \code{successors} (list-columns of \code{iso3c} codes). An input
+that resolves to neither spine keeps its \code{input} and gets \code{NA} elsewhere;
+with \code{warn = TRUE} it is reported rather than left to be spotted.
 }
 \description{
 When did this country exist, and what came before and after it? Reads the
 bundled \link{historical_codes} crosswalk in both directions -- so it answers both
 "what did the USSR become" and "what was Estonia part of".
 }
+\section{Why the two directions are not mirror images}{
+
+Both columns hold codes, so an entity ISO never coded cannot appear in
+either. ISO 3166-3 only records changes from 1974 on, and three entities in
+\link{historical_codes} predate it: the United Arab Republic (1961), Tanganyika
+and Zanzibar (both 1964). Asking about one of those by name works --
+\code{country_timeline("Tanganyika")} gives \code{TZA} as a successor, because the
+table stores that side as a name -- but the reverse does not:
+\code{country_timeline("TZA")} reports no predecessors, since there is no code to
+report. The other eleven entities carry codes and round-trip in both
+directions. Naming them instead of coding them would break the column's
+type; inventing codes for them would be a guess, which this package does
+not make.
+}
+
 \examples{
 country_timeline(c("USSR", "Estonia", "France"))
 }

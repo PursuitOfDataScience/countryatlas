@@ -99,7 +99,8 @@ test_that("as_ggsql_source errors cleanly without duckdb/DBI", {
   skip_if(requireNamespace("duckdb", quietly = TRUE) &&
           requireNamespace("DBI", quietly = TRUE))
   df <- data.frame(iso3c = "USA", value = 1)
-  expect_error(as_ggsql_source(df, format = "duckdb"))
+  # Pinned to the gate, matching the block below that already does so.
+  expect_error(as_ggsql_source(df, format = "duckdb"), class = "rlib_error_package_not_found")
 })
 
 test_that("world_query omits all optional clauses and escapes quotes", {

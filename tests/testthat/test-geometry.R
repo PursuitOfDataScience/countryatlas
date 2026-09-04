@@ -41,6 +41,38 @@ test_that("locate_country tags known capitals", {
   expect_equal(out$country, c("France", "United States", "Japan"))
 })
 
+test_that("locate_country gives a point the same answer whatever it is with", {
+  skip_if_no_sf_geometry()
+  # st_nearest_points()'s pairing argument is `pairwise`; this asked for
+  # `by_element`, which sf absorbs into `...` and ignores, so the snap-back
+  # step got the length(miss)^2 cross product and measured each unmatched
+  # point against some *other* point's country. One missed point was safe
+  # (1x1 == pairwise), so every single-point example passed and only
+  # multi-point calls were wrong -- in either direction, since a bogus
+  # distance under the tolerance would have snapped a point to a country it
+  # is not in.
+  cm <- countryatlas::country_meta
+  cm <- cm[!is.na(cm$centroid_lon) & !is.na(cm$centroid_lat), ]
+
+  batch <- locate_country(cm$centroid_lon, cm$centroid_lat)$iso3c
+  alone <- vapply(seq_len(nrow(cm)), function(i) {
+    v <- locate_country(cm$centroid_lon[i], cm$centroid_lat[i])$iso3c
+    if (length(v) != 1L) NA_character_ else as.character(v)
+  }, character(1))
+  expect_equal(batch, alone)
+
+  # Cuba is the concrete case: its centroid is ~10.8 km off the 110m
+  # coastline, so it always needs the snap. In a multi-miss call it used to be
+  # measured against American Samoa and dropped to NA.
+  cu <- cm[cm$iso3c == "CUB", ]
+  expect_equal(locate_country(cu$centroid_lon, cu$centroid_lat)$iso3c, "CUB")
+  expect_equal(batch[cm$iso3c == "CUB"], "CUB")
+
+  # Open ocean must still be NA even in a call where other points miss.
+  mixed <- locate_country(c(cu$centroid_lon, 0, -140), c(cu$centroid_lat, 0, 0))
+  expect_equal(mixed$iso3c, c("CUB", NA, NA))
+})
+
 test_that("locate_country returns NA for open ocean", {
   skip_if_no_sf_geometry()
   out <- locate_country(lon = -30, lat = -30)   # open Atlantic
@@ -494,4 +526,121 @@ test_that("every geometry-returning path keeps a usable geometry column", {
     attach_geometry(snap, geometry = "sf"), keep = 0.2))
   expect_length(unique(as.character(sf::st_geometry_type(s1))), 1L)
   expect_no_error(sf::st_coordinates(s1))
+})
+
+test_that("resolve_region reads every branch off the same trimmed value", {
+  # Only the iso3c branch trimmed, so one trailing space produced three
+  # different outcomes: "FRA " resolved, "Europe " fell through to name
+  # matching and errored, and "EU " was silently taken as a three-letter code
+  # -- nchar is 3 and it is already uppercase -- so it reached the
+  # "unknown code at face value" branch and came back as the string "EU ".
+  # world_geometry(region = "EU ") then came back empty and said nothing, as
+  # did world_data(), attach_geometry(), join_world() and country_borders() --
+  # every public caller of this helper. (world_map() has no `region` argument;
+  # it takes geometry that is already subset.)
+  rr <- countryatlas:::resolve_region
+  NB <- intToUtf8(0xA0)
+  pad <- function(z) list(z, paste0(z, " "), paste0(z, NB), paste0(" ", z))
+
+  # The silent one: a padded group must resolve to the group, not to a code.
+  eu <- rr("EU")
+  expect_gt(length(eu), 20L)
+  for (v in pad("EU")) expect_equal(rr(v), eu)
+  for (v in pad("EU")) expect_false(identical(rr(v), v))
+
+  # Every shipped group agrees across padding forms.
+  for (grp in unique(country_groups_tbl$group)) {
+    want <- rr(grp)
+    for (v in pad(grp)) expect_equal(rr(v), want)
+  }
+
+  # Continents, codes and names likewise.
+  for (v in pad("Europe")) expect_equal(rr(v), rr("Europe"))
+  for (v in pad("FRA")) expect_equal(rr(v), "FRA")
+  for (v in pad("France")) expect_equal(rr(v), "FRA")
+  # An unknown uppercase code is still passed through, now consistently.
+  for (v in pad("ZZZ")) expect_equal(rr(v), "ZZZ")
+
+  # Unpadded behaviour is untouched.
+  expect_null(rr(NULL))
+  expect_s3_class(rr(c(-10, 35, 30, 60)), "wdj_bbox")
+  expect_error(rr(NA_character_), "must not contain missing values")
+  expect_error(rr("Nowhere"), "matched no countries")
+  expect_equal(rr(countryatlas:::wdj_known_iso3c()),
+               countryatlas:::wdj_known_iso3c())
+  # The error still quotes what the caller actually passed, untrimmed.
+  expect_error(rr("Nowhere "), "Nowhere ")
+})
+
+test_that("a padded region reaches the public callers intact", {
+  # resolve_region() is internal; the defect was only visible through the
+  # functions that call it, so pin it there too. Without this, the fix is
+  # asserted one level below where a user would ever meet it.
+  skip_if_no_sf_geometry()
+  NB <- intToUtf8(0xA0)
+  eu <- nrow(world_geometry("countries", geometry = "sf", region = "EU"))
+  expect_gt(eu, 20L)
+  for (v in list("EU ", " EU", paste0("EU", NB))) {
+    expect_equal(nrow(world_geometry("countries", geometry = "sf", region = v)),
+                 eu)
+  }
+  # country_borders() takes the same argument through the same helper.
+  b <- nrow(country_borders(region = "EU"))
+  expect_gt(b, 0L)
+  expect_equal(nrow(country_borders(region = "EU ")), b)
+  # And a padded continent, which used to error rather than resolve.
+  af <- nrow(world_geometry("countries", geometry = "sf", region = "Africa"))
+  expect_gt(af, 40L)
+  expect_equal(nrow(world_geometry("countries", geometry = "sf",
+                                   region = "Africa ")), af)
+})
+
+test_that("recentring splits countries at the seam without losing any", {
+  # Recentring rotates the world so a chosen longitude is the middle, which
+  # cuts whatever straddles the new seam. The row count therefore *grows* --
+  # Russia and the USA become two pieces at recenter = 180 -- and that is
+  # correct. What must never happen is a country disappearing, an empty
+  # geometry appearing, or area going missing beyond the sliver the cut
+  # removes. None of the 32 existing recenter assertions covered any of that,
+  # so a regression in the seam handling could have dropped countries from
+  # every recentred map silently.
+  skip_if_no_sf_geometry()
+  gws <- countryatlas:::get_world_sf
+  base <- gws(projection = "equal_earth")
+  iso0 <- sort(unique(stats::na.omit(base$iso3c)))
+  area <- function(x) as.numeric(sum(sf::st_area(sf::st_make_valid(x))))
+  a0 <- area(base)
+  expect_gt(length(iso0), 150L)
+  expect_equal(sum(sf::st_is_empty(base)), 0L)
+
+  for (rc in list(0, 11, 150, 180, -180)) {
+    r <- gws(projection = "equal_earth", recenter = rc)
+    # Not one country may go missing.
+    expect_true(all(iso0 %in% r$iso3c),
+                info = paste("countries lost at recenter =", rc))
+    # Splitting is allowed; shrinking is not.
+    expect_gte(nrow(r), nrow(base))
+    # No empty geometry may appear.
+    expect_equal(sum(sf::st_is_empty(r)), 0L,
+                 info = paste("empty geometry at recenter =", rc))
+    # Area survives the cut: only the seam sliver goes.
+    expect_equal(area(r) / a0, 1, tolerance = 0.01)
+  }
+
+  # recenter = NULL and recenter = 0 both mean "leave it alone", so they must
+  # agree with each other and change nothing.
+  expect_equal(nrow(gws(projection = "equal_earth", recenter = 0)), nrow(base))
+  expect_equal(area(gws(projection = "equal_earth", recenter = 0)) / a0, 1,
+               tolerance = 1e-6)
+
+  # The countries that actually straddle 180 are the ones at risk, so name
+  # them: they must still be there, and non-empty, after the cut.
+  at_seam <- intersect(c("RUS", "USA", "NZL", "FJI"), iso0)
+  expect_gt(length(at_seam), 1L)
+  r180 <- gws(projection = "equal_earth", recenter = 180)
+  for (k in at_seam) {
+    piece <- r180[!is.na(r180$iso3c) & r180$iso3c == k, ]
+    expect_gt(nrow(piece), 0L)
+    expect_false(any(sf::st_is_empty(piece)))
+  }
 })

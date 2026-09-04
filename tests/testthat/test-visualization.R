@@ -92,7 +92,12 @@ test_that("theme_world_map is a theme", {
 
 test_that("sf-only plots error cleanly without sf", {
   skip_if(requireNamespace("sf", quietly = TRUE))
-  expect_error(bivariate_map(snap, gdp_per_capita, life_expectancy))
+  # "cleanly" is the whole point of this test, so assert the package gate
+  # rather than any error at all. bivariate_map() checks biscale before sf, so
+  # the message names whichever is missing first -- pin the class, which holds
+  # either way.
+  expect_error(bivariate_map(snap, gdp_per_capita, life_expectancy),
+               class = "rlib_error_package_not_found")
 })
 
 test_that("bivariate_map builds a ggplot (needs sf + biscale)", {
@@ -150,7 +155,59 @@ test_that("interactive_map(engine='leaflet') accepts a custom tooltip", {
 test_that("dorling_map errors cleanly without sf/cartogram", {
   skip_if(requireNamespace("sf", quietly = TRUE) &&
             requireNamespace("cartogram", quietly = TRUE))
-  expect_error(dorling_map(snap, gdp_per_capita))
+  # cartogram_map()'s need_pkg() runs ahead of its is_sf() check, so the gate
+  # is what fires here -- pinned, so a shape or argument error cannot pass for
+  # it.
+  expect_error(dorling_map(snap, gdp_per_capita), class = "rlib_error_package_not_found")
+})
+
+test_that("a Dorling cartogram is area-proportional and does not overlap", {
+  # Sixteen tests cover this family's validation, package gating, cell counts
+  # and denominators -- none of them the two properties that make the output a
+  # Dorling cartogram at all. Passing the wrong column, or skipping the
+  # equal-area projection, would leave every one of them passing.
+  skip_if_no_sf_geometry()
+  skip_if_not_installed("cartogram")
+  sfd <- suppressWarnings(
+    attach_geometry(countryatlas::world_snapshot$countries, geometry = "sf"))
+  d <- suppressWarnings(dorling_map(sfd, population))$data
+
+  # Areas are only honest in a projected CRS.
+  expect_false(sf::st_is_longlat(d))
+
+  # Circle area is proportional to the value -- so the ratio is one constant,
+  # not merely correlated.
+  a <- as.numeric(suppressWarnings(sf::st_area(d)))
+  v <- d$population
+  ok <- is.finite(a) & is.finite(v) & v > 0 & a > 0
+  expect_gt(sum(ok), 100L)
+  ratio <- a[ok] / v[ok]
+  expect_equal(max(ratio) / min(ratio), 1, tolerance = 1e-6)
+
+  # ...and the whole point of Dorling: the circles do not overlap.
+  old <- sf::sf_use_s2()
+  on.exit(suppressMessages(sf::sf_use_s2(old)), add = TRUE)
+  suppressMessages(sf::sf_use_s2(FALSE))
+  touching <- suppressWarnings(sf::st_intersects(d))
+  expect_equal((sum(lengths(touching)) - nrow(d)) / 2, 0)
+})
+
+test_that("a gridded cartogram keeps countries near where they really are", {
+  # The grid is only a map if a country's cell tracks its real position; a
+  # mis-assignment would draw a plausible-looking grid of the wrong countries.
+  skip_if_no_sf_geometry()
+  snap <- countryatlas::world_snapshot$countries
+  d <- suppressWarnings(gridded_cartogram(snap, population, cells = 900))$data
+  cm <- countryatlas::country_meta
+  lon <- cm$centroid_lon[match(d$iso3c, cm$iso3c)]
+  lat <- cm$centroid_lat[match(d$iso3c, cm$iso3c)]
+  ok <- is.finite(lon) & is.finite(lat) & is.finite(d$x) & is.finite(d$y)
+  expect_gt(sum(ok), 500L)
+  expect_gt(cor(d$x[ok], lon[ok]), 0.9)
+  expect_gt(cor(d$y[ok], lat[ok]), 0.9)
+  # One country per cell (a country may hold several cells -- that is the
+  # value-proportional part).
+  expect_false(any(duplicated(paste(d$x, d$y))))
 })
 
 test_that("dorling_map builds a ggplot (needs sf + cartogram)", {

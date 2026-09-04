@@ -487,6 +487,10 @@ wdj_interp_linear <- function(x, y) {
 #' @param value The value column (unquoted).
 #' @param type `"yoy"` (default, period-over-period) or `"cagr"` (compound
 #'   annual growth rate vs. the first non-`NA` year).
+#'   `"cagr"` needs a positive ratio at both ends, so a negative value gives
+#'   `NA` for that row (with a warning) and a non-positive base year gives `NA`
+#'   for that country; a value of exactly `0` is a legitimate annualised -100%.
+#'   `"yoy"` is a plain ratio change and is defined for negative values.
 #' @param suffix Suffix for the new column (default `"_growth"`).
 #'
 #' @return `data` with a growth-rate column added (a proportion, so 0.03 = 3%).
@@ -521,12 +525,49 @@ growth_rate <- function(data, value, type = c("yoy", "cagr"),
         base_i <- which(!is.na(.data[[val_name]]))[1]
         v0 <- .data[[val_name]][base_i]; y0 <- .data$year[base_i]
         n <- .data$year - y0
-        ifelse(n > 0 & !is.na(v0) & v0 > 0,
+        # `v0 > 0` guarded the base but not the current value, and a
+        # fractional power of a negative ratio is NaN -- so one negative year
+        # in an otherwise positive series put a bare NaN in the column,
+        # silently. Only a *negative* current value is excluded: a value of
+        # exactly 0 gives (0)^(1/n) - 1 = -1, an annualised -100%, which is
+        # both correct and the informative answer for a series that went to
+        # nothing. A non-positive base stays NA as before -- there is no ratio
+        # to take.
+        ifelse(n > 0 & !is.na(v0) & v0 > 0 & !is.na(.data[[val_name]]) &
+                 .data[[val_name]] >= 0,
                (.data[[val_name]] / v0)^(1 / n) - 1, NA_real_)
       }
     )
   }
-  wdj_return_frame(out)
+  out <- wdj_return_frame(out)
+  if (type == "cagr") warn_cagr_negative(out, val_name, new_col)
+  warn_all_na_result(out, val_name, new_col,
+                     "A growth rate needs two years for the same country.")
+  out
+}
+
+# Say when CAGR had to skip rows because a value was negative. Every
+# neighbouring measure reports this -- theil() drops non-positive values and
+# says so, gini() warns about negatives, sigma_convergence() warns when no
+# value is positive, beta_convergence() errors -- and growth_rate() itself
+# warns via warn_all_na_result() when *every* row comes back NA. Only the
+# partial case was mute, which is the case a real series actually hits: a
+# deficit, a net flow or a balance dipping below zero for a single year.
+warn_cagr_negative <- function(out, val_name, new_col,
+                               call = rlang::caller_env()) {
+  v <- out[[val_name]]
+  n_bad <- sum(!is.na(v) & v < 0 & is.na(out[[new_col]]))
+  if (!n_bad) return(invisible(out))
+  # Silent when nothing resolved at all: warn_all_na_result() covers that case
+  # and says something more useful about it.
+  if (all(is.na(out[[new_col]]))) return(invisible(out))
+  wdj_warn(c(
+    "{n_bad} row{?s} had a negative {.field {val_name}}, so
+     {.field {new_col}} is {.code NA} there.",
+    "i" = "A compound annual rate needs a positive ratio at both ends.
+           {.code type = \"yoy\"} is defined for negative values."
+  ), class = "countryatlas_cagr_negative", call = call)
+  invisible(out)
 }
 
 #' Rebase a series to an index (base year = 100)
@@ -684,7 +725,10 @@ lag_by_country <- function(data, value, n = 1, suffix = NULL) {
     dplyr::group_by(.data$iso3c) %>%
     dplyr::arrange(.data$year, .by_group = TRUE) %>%
     dplyr::mutate("{new_col}" := dplyr::lag(.data[[val_name]], n = n))
-  wdj_return_frame(out)
+  out <- wdj_return_frame(out)
+  warn_all_na_result(out, val_name, new_col,
+                     "A lag of {n} needs {n + 1} years for the same country.")
+  out
 }
 
 #' @rdname lag_by_country
@@ -704,7 +748,11 @@ diff_by_country <- function(data, value, n = 1, suffix = NULL) {
     dplyr::mutate(
       "{new_col}" := .data[[val_name]] - dplyr::lag(.data[[val_name]], n = n)
     )
-  wdj_return_frame(out)
+  out <- wdj_return_frame(out)
+  warn_all_na_result(out, val_name, new_col,
+                     "A difference over {n} year{?s} needs {n + 1} years for
+                      the same country.")
+  out
 }
 
 # Shared validation for the panel helpers.
@@ -1173,5 +1221,31 @@ share_of_world <- function(data, value, suffix = "_share") {
     out,
     "{new_col}" := { .wdj_tot <- sum(.data[[val_name]], na.rm = TRUE); if (!is.finite(.wdj_tot) || .wdj_tot == 0) NA_real_ else .data[[val_name]] / .wdj_tot }
   )
-  wdj_return_frame(dplyr::ungroup(out))
+  out <- wdj_return_frame(dplyr::ungroup(out))
+  # The guard in the mutate above is right -- a zero or non-finite total would
+  # divide to NaN or Inf -- but it was the silent one of the three. per_capita()
+  # and to_ppp() both report an unusable denominator, under the same two
+  # condition classes; this returned a column of NA and said nothing, which
+  # reads as "these countries have no share" rather than "there was no total to
+  # take a share of". A value that is present while its share is NA can only
+  # mean the total was unusable, so that identifies the rows exactly.
+  bad <- is.na(out[[new_col]]) & !is.na(out[[val_name]])
+  if (any(bad)) {
+    if (all(bad)) {
+      wdj_warn(c(
+        "No usable {.field {val_name}} total, so no share could be computed.",
+        "i" = "A total must be finite and non-zero; {.field {new_col}} is
+               {.val {NA}} throughout."
+      ), class = "countryatlas_no_rates")
+    } else {
+      yrs <- unique(out$year[bad])
+      wdj_warn(c(
+        "No usable {.field {val_name}} total for {length(yrs)} year{?s}.",
+        "*" = "{.val {yrs}}",
+        "i" = "A total must be finite and non-zero; {.field {new_col}} is
+               {.val {NA}} for {sum(bad)} row{?s}."
+      ), class = "countryatlas_unusable_rows")
+    }
+  }
+  out
 }

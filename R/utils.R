@@ -247,6 +247,39 @@ warn_dots_unused <- function(dots, engine, alternative) {
   warn_engine_ignored(nm, engine, alternative)
 }
 
+# A derived column that comes out NA in every row means the verb accomplished
+# nothing at all. Each of the verbs that calls this reads neighbouring rows, so
+# the usual cause is a cross-section handed to a panel verb: there is no
+# earlier year to compare against, and the result looks like a computation that
+# ran rather than one with nothing to work on -- the same complaint
+# per_capita(), to_ppp() and share_of_world() already answer for an unusable
+# denominator.
+#
+# Requiring the source column to hold something separates "nothing to compute
+# from" (worth saying) from "nothing was given" (the caller's own doing, and
+# reported elsewhere). `env` is the calling verb's frame, so `needs` can
+# interpolate that verb's own arguments; cli would otherwise evaluate it here,
+# where they do not exist.
+warn_all_na_result <- function(data, val_name, new_col, needs,
+                               env = rlang::caller_env()) {
+  v <- data[[new_col]]
+  if (!length(v) || !all(is.na(v)) || all(is.na(data[[val_name]]))) {
+    return(invisible(NULL))
+  }
+  per <- if ("iso3c" %in% names(data)) max(c(0L, table(data$iso3c))) else NA_integer_
+  wdj_warn(c(
+    "{.field {new_col}} came out {.val {NA}} for every row.",
+    "!" = needs,
+    "i" = if (!is.na(per) && per <= 1L) {
+      "Each country appears once here, so there is no other row to compare it
+       with. {.fn complete_years} builds the missing years if you have them."
+    } else {
+      "{.field {val_name}} is unchanged; only the derived column is empty."
+    }
+  ), class = "countryatlas_all_na_result", .envir = env)
+  invisible(NULL)
+}
+
 warn_engine_ignored <- function(ignored, engine, alternative) {
   if (!length(ignored)) return(invisible(NULL))
   wdj_warn(c(

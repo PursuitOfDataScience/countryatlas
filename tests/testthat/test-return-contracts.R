@@ -51,8 +51,15 @@ test_that("panel helpers add the documented column", {
   sw <- share_of_world(data.frame(iso3c = c("A", "B"), v = c(1, 3)), v)
   expect_equal(sum(sw$v_share), 1)                           # proportion in [0,1]
   expect_equal(per_capita(data.frame(iso3c = "A", v = 10, p = 2), v, p)$v_per_capita, 5)
-  expect_true("gdp_lag5" %in% names(lag_by_country(panel, gdp, n = 5)))
-  expect_true("gdp_diff5" %in% names(diff_by_country(panel, gdp, n = 5)))
+  # n = 5 is longer than this panel's span, so both columns come out NA
+  # throughout -- which the verbs now report. The contract under test here is
+  # the column *name* (the suffix carries `n` when n > 1), so assert both.
+  expect_warning(l5 <- lag_by_country(panel, gdp, n = 5),
+                 class = "countryatlas_all_na_result")
+  expect_true("gdp_lag5" %in% names(l5))
+  expect_warning(d5 <- diff_by_country(panel, gdp, n = 5),
+                 class = "countryatlas_all_na_result")
+  expect_true("gdp_diff5" %in% names(d5))
   expect_named(aggregate_regions(snap, population, by = "region"),
                c("region", "population"))
   expect_true(all(c("rank", "percentile", "z_score") %in%

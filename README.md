@@ -65,7 +65,7 @@ Geometry, codes, classifications and the indicator, in one frame, ready for
 
 Drop `geometry` for a plain country table (`country_data()`), ask for a year
 range to get a panel, or pass several indicators at once. `wdi_search()` finds
-codes offline; `common_indicators` keeps the 20 you actually use.
+codes offline; `common_indicators` keeps the 22 you actually use.
 
 ## Your data, on the map
 

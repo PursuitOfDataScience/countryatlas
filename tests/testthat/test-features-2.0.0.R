@@ -130,9 +130,18 @@ test_that("spin_globe needs a gif encoder", {
   # Without gifski/magick it should fail fast, before rendering any frame.
   skip_if(requireNamespace("gifski", quietly = TRUE) ||
             requireNamespace("magick", quietly = TRUE))
+  # Pinned to the encoder gate: unpinned, a mistyped column or any other
+  # early failure would satisfy this, and the block only runs when both
+  # encoders are absent.
   expect_error(
     spin_globe(world_snapshot$countries, continent, backend = "polygon",
-               n_frames = 2L)
+               n_frames = 2L),
+    class = "rlib_error_package_not_found"
+  )
+  expect_error(
+    spin_globe(world_snapshot$countries, continent, backend = "polygon",
+               n_frames = 2L),
+    "gifski"
   )
 })
 
@@ -163,8 +172,19 @@ test_that("distance_between computes symmetric great-circle distances", {
 
 test_that("country_borders and neighbors need sf", {
   skip_if(requireNamespace("sf", quietly = TRUE))
-  expect_error(country_borders())
-  expect_error(neighbors("FRA", origin = "iso3c"))
+  # Pinned to the package gate itself, not merely "it errored". With no
+  # pattern this accepted any condition at all -- a typo in the fixture, or
+  # an argument error raised before the gate was reached -- and this block
+  # only runs when the package is *absent*, which is the one configuration
+  # nobody watches. The already-pinned ggsql block below documents the same
+  # hazard. need_pkg() -> rlang::check_installed() raises
+  # "rlib_error_package_not_found".
+  expect_error(country_borders(), class = "rlib_error_package_not_found")
+  expect_error(country_borders(), "sf")
+  # neighbors() resolves the code first and only then reaches country_borders(),
+  # so this also pins that the gate is what stops it -- not name resolution.
+  expect_error(neighbors("FRA", origin = "iso3c"), class = "rlib_error_package_not_found")
+  expect_error(neighbors("FRA", origin = "iso3c"), "sf")
 })
 
 test_that("country_borders finds real neighbours (needs sf)", {

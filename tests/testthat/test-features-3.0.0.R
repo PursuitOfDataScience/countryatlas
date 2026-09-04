@@ -257,7 +257,11 @@ test_that("an undated group warns and falls back rather than inventing dates", {
 })
 
 test_that("country_timeline reads the crosswalk both ways", {
-  tl <- country_timeline(c("USSR", "Estonia", "France", "Wakanda"))
+  # "Wakanda" matches neither spine, which the function now reports rather than
+  # leaving as a row of NA to be noticed.
+  expect_warning(
+    tl <- country_timeline(c("USSR", "Estonia", "France", "Wakanda")),
+    "matched neither")
   expect_equal(tl$iso3c[1], "SUN")
   expect_equal(tl$dissolved[1], 1991L)
   expect_length(tl$successors[[1]], 15L)
@@ -4186,6 +4190,187 @@ test_that("every character column argument catches a bare symbol", {
   expect_s3_class(rank_countries(d, "gdp", within = "region"), "tbl_df")
 })
 
+test_that("spatial_lag names the countries its weights exclude", {
+  skip_if_no_sf_geometry()
+  w <- country_weights("contiguity")
+  islands <- data.frame(
+    iso3c = c("FRA", "DEU", "ESP", "ITA", "BEL", "NLD", "ISL", "JPN", "AUS"),
+    gdp = as.numeric(1:9))
+  connected <- islands[islands$iso3c %in%
+                         c("FRA", "DEU", "ESP", "ITA", "BEL", "NLD"), ]
+
+  # An NA here is indistinguishable from one caused by a missing input value,
+  # so the codes travel as an attribute -- the frame-shaped counterpart to the
+  # `excluded` column morans_i() returns. Deliberately not a warning: on real
+  # geography some country always lacks a land neighbour, so a warning would
+  # fire on every ordinary call (and test-features-3.0.0.R pins the silence).
+  got <- spatial_lag(islands, "gdp", weights = w)
+  expect_equal(attr(got, "countryatlas_excluded"), c("AUS", "ISL", "JPN"))
+  expect_true(all(is.na(got$gdp_lag[got$iso3c %in% c("ISL", "JPN", "AUS")])))
+  expect_no_warning(spatial_lag(islands, "gdp", weights = w))
+
+  # It agrees with what morans_i() reports for the same input.
+  mi <- morans_i(islands, "gdp", weights = w, n_perm = 0)
+  expect_setequal(attr(got, "countryatlas_excluded"), mi$excluded[[1]])
+  expect_equal(length(attr(got, "countryatlas_excluded")), mi$n_excluded)
+
+  # Empty (not absent) when every country is connected, and values untouched.
+  ok <- spatial_lag(connected, "gdp", weights = w)
+  expect_equal(attr(ok, "countryatlas_excluded"), character(0))
+  expect_false(anyNA(ok$gdp_lag))
+  expect_equal(got$gdp_lag[got$iso3c %in% connected$iso3c], ok$gdp_lag)
+
+  # The panel branch carries the union across years.
+  pan <- rbind(transform(islands, year = 2000L),
+               transform(islands, year = 2001L))
+  expect_equal(attr(spatial_lag(pan, "gdp", weights = w),
+                    "countryatlas_excluded"), c("AUS", "ISL", "JPN"))
+})
+
+test_that("neighbors tells a typo from a country with no land border", {
+  skip_if_no_sf_geometry()
+  # Both return zero rows. Only one of them is a mistake, and the function used
+  # to be silent about either -- while distance_between() and convert_country()
+  # both report an unresolved value.
+  expect_no_warning(fr <- neighbors("France"))
+  expect_gt(nrow(fr), 0L)
+  expect_no_warning(ice <- neighbors("Iceland"))
+  expect_equal(nrow(ice), 0L)            # a real zero stays quiet
+
+  w <- tryCatch(neighbors("Nowhereland"), warning = function(x) x)
+  msg <- gsub("[[:space:]]+", " ",
+              cli::ansi_strip(paste(conditionMessage(w), collapse = " ")))
+  expect_match(msg, "1 value did not resolve", fixed = TRUE)
+  expect_match(msg, "it has no neighbours", fixed = TRUE)
+  expect_match(msg, "Nowhereland", fixed = TRUE)
+  # Agrees at n = 2, verb included.
+  expect_match(gsub("[[:space:]]+", " ", cli::ansi_strip(paste(conditionMessage(
+    tryCatch(neighbors(c("Nowhereland", "Atlantis")), warning = function(x) x)),
+    collapse = " "))), "2 values did not resolve", fixed = TRUE)
+
+  # A resolved name still returns its borders even alongside an unresolved one.
+  got <- suppressWarnings(neighbors(c("France", "Nowhereland")))
+  expect_equal(nrow(got), nrow(fr))
+  expect_no_warning(neighbors("Nowhereland", warn = FALSE))
+  expect_error(neighbors("France", warn = "x"), "`warn`")
+})
+
+test_that("country_timeline reports a name it cannot resolve", {
+  # It returned a row of NA in silence, where dissolve_country() -- same input
+  # shape -- has always warned.
+  w <- tryCatch(country_timeline("Nowhereland"), warning = function(x) x)
+  msg <- gsub("[[:space:]]+", " ",
+              cli::ansi_strip(paste(conditionMessage(w), collapse = " ")))
+  expect_match(msg, "1 name matched neither", fixed = TRUE)
+  expect_match(msg, "Nowhereland", fixed = TRUE)
+  expect_match(msg, "check_country_match", fixed = TRUE)
+  # Agrees at n = 2.
+  expect_match(gsub("[[:space:]]+", " ", cli::ansi_strip(paste(conditionMessage(
+    tryCatch(country_timeline(c("Nowhereland", "Atlantis")),
+             warning = function(x) x)), collapse = " "))),
+    "2 names matched neither", fixed = TRUE)
+
+  # A historical name must stay silent: "USSR" is meant to fail the ISO lookup
+  # and be picked up by the historical spine.
+  expect_no_warning(country_timeline(c("USSR", "Estonia", "France")))
+  expect_no_warning(country_timeline(character(0)))
+  expect_no_warning(country_timeline("Nowhereland", warn = FALSE))
+  expect_error(country_timeline("France", warn = "x"), "`warn`")
+
+  # The returned values are unchanged.
+  out <- suppressWarnings(country_timeline(c("France", "Nowhereland")))
+  expect_equal(out$iso3c, c("FRA", NA))
+  expect_equal(out$input, c("France", "Nowhereland"))
+})
+
+test_that("a panel verb that computes nothing says so", {
+  cs <- data.frame(iso3c = c("FRA", "DEU", "ESP"), year = 2000L,
+                   gdp = c(1, 2, 3))
+  # One year per country: there is no earlier value, so the derived column is
+  # NA throughout and the verb accomplished nothing. It used to say nothing.
+  for (call in list(
+    function() growth_rate(cs, "gdp"),
+    function() growth_rate(cs, "gdp", type = "cagr"),
+    function() lag_by_country(cs, "gdp"),
+    function() diff_by_country(cs, "gdp"))) {
+    expect_warning(call(), class = "countryatlas_all_na_result")
+  }
+  # The message states what the verb needs, with the count agreeing.
+  msg <- function(w) {
+    gsub("[[:space:]]+", " ",
+         cli::ansi_strip(paste(conditionMessage(w), collapse = " ")))
+  }
+  expect_match(msg(tryCatch(lag_by_country(cs, "gdp", n = 3),
+                            warning = function(w) w)),
+               "A lag of 3 needs 4 years", fixed = TRUE)
+  expect_match(msg(tryCatch(diff_by_country(cs, "gdp", n = 1),
+                            warning = function(w) w)),
+               "over 1 year needs", fixed = TRUE)
+  expect_match(msg(tryCatch(diff_by_country(cs, "gdp", n = 2),
+                            warning = function(w) w)),
+               "over 2 years needs", fixed = TRUE)
+
+  # An ordinary panel is silent: only the first year per country is NA.
+  pan <- rbind(cs, transform(cs, year = 2001L, gdp = c(2, 3, 4)))
+  expect_no_warning(growth_rate(pan, "gdp"))
+  expect_no_warning(lag_by_country(pan, "gdp"))
+  expect_no_warning(diff_by_country(pan, "gdp"))
+  # ...and so is a mixed frame where any country has enough years.
+  expect_no_warning(
+    lag_by_country(rbind(cs, data.frame(iso3c = "FRA", year = 2001L, gdp = 9)),
+                   "gdp"))
+  # index_to() keeps its own documented behaviour: NA per country, no notice.
+  expect_no_warning(index_to(cs, "gdp", base_year = 2000))
+})
+
+test_that("country_network checks top_n before building the network", {
+  d <- data.frame(o = c("France", "Germany"), d = c("Germany", "France"),
+                  w = c(1, 2))
+  # It used to build the matrix, node table and sorted edge list first.
+  expect_error(country_network(d, o, d, w, top_n = "x"), "`top_n`")
+  expect_error(country_network(d, o, d, w, top_n = -1), "`top_n`")
+  net <- country_network(d, o, d, w, top_n = 1)
+  expect_equal(nrow(net$edges), 1L)
+  expect_named(net, c("nodes", "edges"))
+})
+
+test_that("share_of_world reports a total it cannot use", {
+  mk <- function(v, y = 2000L) {
+    data.frame(iso3c = c("FRA", "DEU", "ESP"), year = y, gdp = v)
+  }
+  # per_capita() and to_ppp() report an unusable denominator; this returned a
+  # column of NA in silence, which reads as "no share" rather than "no total".
+  expect_warning(share_of_world(mk(c(0, 0, 0)), "gdp"),
+                 class = "countryatlas_no_rates")
+  expect_warning(share_of_world(mk(c(-5, 0, 5)), "gdp"),
+                 class = "countryatlas_no_rates")
+  expect_warning(share_of_world(mk(c(1, Inf, 3)), "gdp"),
+                 class = "countryatlas_no_rates")
+  # A usable total stays silent, and the arithmetic is untouched.
+  expect_no_warning(out <- share_of_world(mk(c(1, 2, 3)), "gdp"))
+  expect_equal(out$gdp_share, c(1, 2, 3) / 6)
+
+  # On a panel only the unusable years go NA, and the message names them.
+  pan <- rbind(mk(c(1, 2, 3), 2000L), mk(c(0, 0, 0), 2001L))
+  w <- tryCatch(share_of_world(pan, "gdp"), warning = function(x) x)
+  expect_s3_class(w, "countryatlas_unusable_rows")
+  msg <- gsub("[[:space:]]+", " ",
+              cli::ansi_strip(paste(conditionMessage(w), collapse = " ")))
+  expect_match(msg, "1 year", fixed = TRUE)     # agrees at n = 1
+  expect_match(msg, "2001", fixed = TRUE)
+  expect_match(msg, "3 rows", fixed = TRUE)
+  got <- suppressWarnings(share_of_world(pan, "gdp"))
+  expect_equal(got$gdp_share[got$year == 2000L], c(1, 2, 3) / 6)
+  expect_true(all(is.na(got$gdp_share[got$year == 2001L])))
+
+  # ...and agrees at n = 2 as well.
+  pan2 <- rbind(pan, mk(c(0, 0, 0), 2002L))
+  w2 <- tryCatch(share_of_world(pan2, "gdp"), warning = function(x) x)
+  expect_match(gsub("[[:space:]]+", " ",
+                    cli::ansi_strip(paste(conditionMessage(w2), collapse = " "))),
+               "2 years", fixed = TRUE)
+})
+
 test_that("a duplicated column name is named, not left to tibble", {
   # read.csv(check.names = FALSE) on a sheet with two `gdp` headers. Ten verbs
   # leaked tibble's ".name_repair" message; per_capita() and to_ppp() silently
@@ -4229,6 +4414,41 @@ test_that("a duplicated column name is named, not left to tibble", {
   names(ok)[5] <- "gdp_alt"
   expect_no_error(per_capita(ok, "gdp", "pop"))
   expect_no_error(rank_countries(ok, "gdp"))
+})
+
+test_that("the tmap engine names an older tmap instead of failing opaquely", {
+  # DESCRIPTION pins no version on any Suggests package, so need_pkg("tmap") is
+  # satisfied by any tmap -- including a 3.x that exports none of the scale
+  # constructors this engine builds with. The capability is checked, not a
+  # version number, so this stays right whichever release introduced them.
+  expect_true(isTRUE(countryatlas:::check_tmap_api(
+    have = countryatlas:::tmap_scale_api)))
+
+  # A tmap 3-shaped export list: tm_shape and tm_polygons, no tm_scale_*().
+  err <- tryCatch(
+    countryatlas:::check_tmap_api(have = c("tm_shape", "tm_polygons")),
+    error = function(e) e)
+  expect_s3_class(err, "countryatlas_old_tmap")
+  msg <- gsub("[[:space:]]+", " ",
+              cli::ansi_strip(paste(conditionMessage(err), collapse = " ")))
+  expect_match(msg, "too old", fixed = TRUE)
+  expect_match(msg, "tm_scale_intervals", fixed = TRUE)
+  expect_match(msg, "ggplot2", fixed = TRUE)
+
+  # A partial upgrade is still too old, and the message names only what is
+  # actually missing.
+  partial <- tryCatch(
+    countryatlas:::check_tmap_api(
+      have = c("tm_scale_intervals", "tm_shape")),
+    error = function(e) e)
+  expect_s3_class(partial, "countryatlas_old_tmap")
+  pmsg <- cli::ansi_strip(paste(conditionMessage(partial), collapse = " "))
+  expect_match(pmsg, "tm_scale_continuous", fixed = TRUE)
+  expect_false(grepl("tm_scale_intervals", pmsg, fixed = TRUE))
+
+  # And the installed tmap really does satisfy it.
+  skip_if_not_installed("tmap")
+  expect_true(isTRUE(countryatlas:::check_tmap_api()))
 })
 
 test_that("the tmap engine honours projection and names what it cannot do", {

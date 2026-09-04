@@ -75,6 +75,33 @@ test_that("world_tiles is a valid one-country-per-cell grid", {
   expect_true(all(wt$row >= 1L & wt$col >= 1L))
 })
 
+test_that("country_timeline's two directions agree wherever a code exists", {
+  # It reads historical_codes both ways ("what did the USSR become" and "what
+  # was Estonia part of"), so the two readings have to agree. They can only
+  # agree where the predecessor has a code: both columns hold iso3c, and ISO
+  # 3166-3 starts at 1974. Pin the split so a new entity either carries a code
+  # or updates ?country_timeline's note about it.
+  hc <- countryatlas::historical_codes
+  ents <- unique(hc[, c("historical", "iso3c_hist", "dissolved")])
+  codeless <- ents$historical[is.na(ents$iso3c_hist)]
+  expect_setequal(codeless,
+                  c("United Arab Republic", "Tanganyika", "Zanzibar"))
+  # ...and every codeless one predates ISO 3166-3.
+  expect_true(all(ents$dissolved[is.na(ents$iso3c_hist)] < 1974))
+  # The coded ones do round-trip: each successor names the entity back.
+  coded <- ents$historical[!is.na(ents$iso3c_hist)]
+  expect_gt(length(coded), 0L)
+  for (e in coded) {
+    hist_code <- unique(hc$iso3c_hist[hc$historical == e])
+    succ <- unique(hc$iso3c[hc$historical == e])
+    tl <- suppressWarnings(country_timeline(succ, origin = "iso3c"))
+    for (k in seq_along(succ)) {
+      expect_true(hist_code %in% tl$predecessors[[k]],
+                  label = paste(e, "->", succ[k], "-> back"))
+    }
+  }
+})
+
 test_that("historical_codes and historical_aliases() stay in step", {
   hc <- countryatlas::historical_codes
   expect_length(setdiff(hc$iso3c, known_iso3c()), 0L)
@@ -351,6 +378,75 @@ test_that("the README lists every verb a reader could reach for", {
   expect_setequal(setdiff(fns, listed), c("wdj_overrides", "clear_wdi_cache"))
   # And the README names nothing the package does not export.
   expect_length(intersect(listed, fns), length(fns) - 2L)
+})
+
+test_that("the README's bundled-data counts match the data", {
+  # A hand-maintained count in the front page drifts the moment the dataset
+  # grows: 3.0.0 added the two price-conversion series to common_indicators,
+  # taking it from 20 rows to 22, and the README still said 20. Assert it
+  # against the data so the next addition has to update the prose too.
+  skip_if_no_source_tree()
+  skip_if_not(file.exists("../../README.Rmd"), "README.Rmd not present")
+  rd_txt <- paste(readLines("../../README.Rmd", warn = FALSE), collapse = "\n")
+  claim <- regmatches(
+    rd_txt,
+    regexpr("`common_indicators` keeps the [0-9]+ you actually use", rd_txt))
+  expect_length(claim, 1L)
+  expect_equal(as.integer(gsub("[^0-9]", "", claim)),
+               nrow(common_indicators))
+})
+
+test_that("the dataset help pages' cross-dataset counts match the data", {
+  # ?country_meta and ?world_snapshot carry four hand-maintained numbers about
+  # how the two tables relate. That is the class of claim that already drifted
+  # here once -- the README said common_indicators kept 20 series after this
+  # release grew it to 22 -- and a data refresh is exactly what moves them.
+  # Read the numbers out of the Rd and assert them against the data, so the
+  # next refresh has to update the prose rather than quietly outdate it.
+  skip_if_no_source_tree()
+  rd_num <- function(file, pattern) {
+    skip_if_not(file.exists(file), paste(file, "not present"))
+    txt <- paste(readLines(file, warn = FALSE), collapse = " ")
+    m <- regmatches(txt, regexpr(pattern, txt))
+    expect_length(m, 1L)
+    # The first run of digits in the match, not every digit in it: the
+    # mismatch sentence carries two numbers ("38 of the 215 countries") and
+    # stripping all non-digits concatenated them into 38215.
+    as.integer(sub("^[^0-9]*([0-9]+).*$", "\\1", m))
+  }
+  # Paths are relative to tests/testthat/, as the README test above is.
+  cm <- "../../man/country_meta.Rd"
+  ws_rd <- "../../man/world_snapshot.Rd"
+
+  # "38 of the 215 countries in world_snapshot"
+  n_ws <- rd_num(cm, "of the [0-9]+ countries in")
+  expect_equal(n_ws, nrow(world_snapshot$countries))
+
+  n_diff <- rd_num(cm, "[0-9]+ of the [0-9]+ countries in")
+  j <- merge(world_snapshot$countries[, c("iso3c", "country")],
+             country_meta[, c("iso3c", "country")],
+             by = "iso3c", suffixes = c("_wb", "_cc"))
+  expect_equal(nrow(j), nrow(world_snapshot$countries))
+  expect_equal(sum(j$country_wb != j$country_cc, na.rm = TRUE), n_diff)
+
+  # ?world_snapshot states the same mismatch count independently, so the two
+  # help pages must agree with each other as well as with the data.
+  expect_equal(rd_num(ws_rd, "for [0-9]+ countries"), n_diff)
+
+  # "Ten further territories have a row but no centroid or area."
+  no_centroid <- sum(is.na(country_meta$centroid_lon) |
+                       is.na(country_meta$centroid_lat))
+  expect_equal(no_centroid, 10L)
+  expect_true(grepl("Ten further territories",
+                    paste(readLines(cm, warn = FALSE), collapse = " "),
+                    fixed = TRUE))
+
+  # "Kosovo (XKX) has no row -- countrycode has none either."
+  expect_false("XKX" %in% country_meta$iso3c)
+  expect_false("XKX" %in% countrycode::codelist$iso3c)
+  # But the paths the page says do handle it, still do.
+  expect_equal(suppressWarnings(convert_country("XKX", from = "iso3c",
+                                                to = "iso3c")), "XKX")
 })
 
 test_that("honest-maps.Rmd's claims hold", {
