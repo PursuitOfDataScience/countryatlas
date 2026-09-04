@@ -22,7 +22,15 @@ index_to(data, value, base_year, to = 100, suffix = "_index")
 
 - base_year:
 
-  The year set equal to `to`.
+  The year set equal to `to`. A country that has no row for this year
+  indexes to `NA` rather than stopping the call, because the rebasing is
+  per country and a partial answer is still a real one. That also means
+  a `base_year` no row anywhere carries – including any non-integer
+  value, which no year can equal – yields an all-`NA` column rather than
+  an error.
+  [`deflate()`](https://pursuitofdatascience.github.io/countryatlas/reference/deflate.md),
+  whose rebasing is global, refuses such a year instead; check with
+  `base_year %in% data$year` if you need that.
 
 - to:
 
@@ -34,7 +42,8 @@ index_to(data, value, base_year, to = 100, suffix = "_index")
 
 ## Value
 
-`data` with an index column added.
+`data` with an index column added. The column is `NA` for any country
+whose series does not cover `base_year` (see the note there).
 
 ## Examples
 
@@ -47,4 +56,13 @@ index_to(df, gdp, base_year = 2000)
 #> 1 USA    2000    50       100
 #> 2 USA    2001    55       110
 #> 3 USA    2002    60       120
+
+# A base year the data does not have gives NA, not an error:
+index_to(df, gdp, base_year = 1999)
+#> # A tibble: 3 × 4
+#>   iso3c  year   gdp gdp_index
+#>   <chr> <int> <dbl>     <dbl>
+#> 1 USA    2000    50        NA
+#> 2 USA    2001    55        NA
+#> 3 USA    2002    60        NA
 ```

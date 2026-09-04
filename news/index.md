@@ -294,6 +294,20 @@ takes `data` as its second argument. Details under **Breaking changes**.
   series that went to nothing; `type = "yoy"` is a plain ratio change,
   is defined for negatives, and is untouched.
 
+- [`index_to()`](https://pursuitofdatascience.github.io/countryatlas/reference/index_to.md)
+  documents what it does when `base_year` is not in the data. A country
+  whose series does not cover the base year indexes to `NA` rather than
+  stopping the call, because the rebasing is per country and a partial
+  answer is still a real one – so a `base_year` no row anywhere carries
+  (including any non-integer value, which no year can equal) gives an
+  all-`NA` column rather than an error. That was pinned by a test and
+  explained in a code comment, but nothing in
+  [`?index_to`](https://pursuitofdatascience.github.io/countryatlas/reference/index_to.md)
+  said it, and the sibling
+  [`deflate()`](https://pursuitofdatascience.github.io/countryatlas/reference/deflate.md)
+  refuses such a year instead. Both behaviours are unchanged; the
+  contrast is now stated, with an example.
+
 - **[`getis_ord()`](https://pursuitofdatascience.github.io/countryatlas/reference/getis_ord.md)
   computed its spread with the unstable one-pass formula, so a tightly
   clustered column produced `Inf` or `NaN` z-scores.** The spread was
