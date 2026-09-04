@@ -578,15 +578,25 @@ warn_cagr_negative <- function(out, val_name, new_col,
 #'
 #' @param data A panel with `iso3c` and `year`.
 #' @param value The value column (unquoted).
-#' @param base_year The year set equal to `to`.
+#' @param base_year The year set equal to `to`. A country that has no row for
+#'   this year indexes to `NA` rather than stopping the call, because the
+#'   rebasing is per country and a partial answer is still a real one. That
+#'   also means a `base_year` no row anywhere carries -- including any
+#'   non-integer value, which no year can equal -- yields an all-`NA` column
+#'   rather than an error. [deflate()], whose rebasing is global, refuses such
+#'   a year instead; check with `base_year %in% data$year` if you need that.
 #' @param to The index value the base year maps to (default `100`).
 #' @param suffix Suffix for the new column (default `"_index"`).
 #'
-#' @return `data` with an index column added.
+#' @return `data` with an index column added. The column is `NA` for any
+#'   country whose series does not cover `base_year` (see the note there).
 #' @export
 #' @examples
 #' df <- data.frame(iso3c = "USA", year = 2000:2002, gdp = c(50, 55, 60))
 #' index_to(df, gdp, base_year = 2000)
+#'
+#' # A base year the data does not have gives NA, not an error:
+#' index_to(df, gdp, base_year = 1999)
 index_to <- function(data, value, base_year, to = 100, suffix = "_index") {
   val_name <- quo_arg_name(rlang::enquo(value), "value")
   check_panel_cols(data, val_name)

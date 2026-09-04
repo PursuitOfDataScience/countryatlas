@@ -11,14 +11,21 @@ index_to(data, value, base_year, to = 100, suffix = "_index")
 
 \item{value}{The value column (unquoted).}
 
-\item{base_year}{The year set equal to \code{to}.}
+\item{base_year}{The year set equal to \code{to}. A country that has no row for
+this year indexes to \code{NA} rather than stopping the call, because the
+rebasing is per country and a partial answer is still a real one. That
+also means a \code{base_year} no row anywhere carries -- including any
+non-integer value, which no year can equal -- yields an all-\code{NA} column
+rather than an error. \code{\link[=deflate]{deflate()}}, whose rebasing is global, refuses such
+a year instead; check with \code{base_year \%in\% data$year} if you need that.}
 
 \item{to}{The index value the base year maps to (default \code{100}).}
 
 \item{suffix}{Suffix for the new column (default \code{"_index"}).}
 }
 \value{
-\code{data} with an index column added.
+\code{data} with an index column added. The column is \code{NA} for any
+country whose series does not cover \code{base_year} (see the note there).
 }
 \description{
 Rescales a value column so the chosen base year equals \code{to} (100 by default),
@@ -28,4 +35,7 @@ different levels.
 \examples{
 df <- data.frame(iso3c = "USA", year = 2000:2002, gdp = c(50, 55, 60))
 index_to(df, gdp, base_year = 2000)
+
+# A base year the data does not have gives NA, not an error:
+index_to(df, gdp, base_year = 1999)
 }
