@@ -24,7 +24,11 @@ locate_country(
 - lon, lat:
 
   Equal-length numeric vectors of longitude / latitude, giving one point
-  per element (ignored if `points` is supplied).
+  per element (ignored if `points` is supplied). A point with a missing
+  coordinate returns `NA`, the same as a point in no country; a
+  longitude outside `[-180, 180]` or a latitude outside `[-90, 90]` is
+  an error rather than a silent `NA`, because it is a mistake and not an
+  ocean.
 
 - points:
 

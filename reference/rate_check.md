@@ -36,7 +36,11 @@ rate_check(data, numerator, denominator, min_denominator = NULL, rate = NULL)
 
 A tibble of `iso3c`, `numerator`, `denominator`, `rate`, `expected_se`
 (the Poisson standard error of the rate, \\\sqrt{r/d}\\) and `flagged`,
-sorted with the least reliable first.
+sorted with the least reliable first. `flagged` is `TRUE` for a
+denominator below the threshold, `FALSE` above it or missing, and `NA`
+for every row when no threshold could be computed at all – which is
+warned about, and means `sum(flagged)` is `NA` rather than a misleading
+`0`.
 
 ## What to do about it
 

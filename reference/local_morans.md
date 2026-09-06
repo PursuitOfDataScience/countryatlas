@@ -45,6 +45,16 @@ average), `ii` (the local statistic), `p_value` and `cluster`
 (`"High-High"`, `"Low-Low"`, `"High-Low"`, `"Low-High"` or
 `"Not significant"`).
 
+`p_value` is a **two-sided** pseudo-p from conditional permutation:
+\\(1 + \\\\\|I_i^{\*}\| \ge \|I_i\|\\) / (n\_{perm} + 1)\\, so it is
+never exactly zero and its floor is \\1/(n\_{perm}+1)\\ – with the
+default 999 permutations, 0.001. Two-sided because a local statistic is
+interesting at both ends: a country surrounded by unlike neighbours is
+as much a finding as one surrounded by like ones. `cluster` is
+`"Not significant"` wherever `p_value > alpha`, and everywhere when
+`n_perm = 0` leaves it `NA`. Set a seed beforehand for a reproducible
+`p_value`.
+
 ## References
 
 Anselin, L. (1995). Local Indicators of Spatial Association – LISA.

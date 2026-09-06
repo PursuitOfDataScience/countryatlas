@@ -90,6 +90,14 @@ skip the test, which leaves <code>p_value</code> as <code>NA</code>).</p></dd>
     <p>A tibble, one row per country: <code>iso3c</code>, <code>value</code>, <code>lag</code> (the
 neighbour average), <code>ii</code> (the local statistic), <code>p_value</code> and <code>cluster</code>
 (<code>"High-High"</code>, <code>"Low-Low"</code>, <code>"High-Low"</code>, <code>"Low-High"</code> or <code>"Not significant"</code>).</p>
+<p><code>p_value</code> is a <strong>two-sided</strong> pseudo-p from conditional permutation:
+\((1 + \#\{|I_i^{*}| \ge |I_i|\}) / (n_{perm} + 1)\), so it is never
+exactly zero and its floor is \(1/(n_{perm}+1)\) – with the default 999
+permutations, 0.001. Two-sided because a local statistic is interesting at
+both ends: a country surrounded by unlike neighbours is as much a finding
+as one surrounded by like ones. <code>cluster</code> is <code>"Not significant"</code> wherever
+<code>p_value &gt; alpha</code>, and everywhere when <code>n_perm = 0</code> leaves it <code>NA</code>. Set a
+seed beforehand for a reproducible <code>p_value</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>

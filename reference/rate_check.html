@@ -86,7 +86,10 @@ Otherwise the rate is <code>numerator / denominator</code>.</p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A tibble of <code>iso3c</code>, <code>numerator</code>, <code>denominator</code>, <code>rate</code>,
 <code>expected_se</code> (the Poisson standard error of the rate, \(\sqrt{r/d}\)) and
-<code>flagged</code>, sorted with the least reliable first.</p>
+<code>flagged</code>, sorted with the least reliable first. <code>flagged</code> is <code>TRUE</code> for a
+denominator below the threshold, <code>FALSE</code> above it or missing, and <code>NA</code> for
+every row when no threshold could be computed at all – which is warned
+about, and means <code>sum(flagged)</code> is <code>NA</code> rather than a misleading <code>0</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="what-to-do-about-it">What to do about it<a class="anchor" aria-label="anchor" href="#what-to-do-about-it"></a></h2>

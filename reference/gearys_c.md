@@ -39,6 +39,14 @@ gearys_c(data, value, weights = NULL, n_perm = 999)
 A one-row tibble: `c` (observed), `expected` (always 1), `n`,
 `n_excluded`, `n_links`, `p_value` and an `excluded` list-column.
 
+`p_value` is **one-sided on the lower tail**: \\(1 + \\\\C^{\*} \le
+C\_{obs}\\) / (n\_{perm} + 1)\\. The lower tail is the clustered one,
+which is the opposite way round from Moran's *I*: Geary's *C* runs from
+0 (neighbours identical) through 1 (no autocorrelation) upwards, so a
+*small* `c` is the evidence of positive spatial association. Never
+exactly zero; the floor is \\1/(n\_{perm}+1)\\. Set a seed beforehand
+for a reproducible `p_value`.
+
 ## References
 
 Geary, R. C. (1954). The contiguity ratio and statistical mapping. *The

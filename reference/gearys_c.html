@@ -91,6 +91,13 @@ skip the test, which leaves <code>p_value</code> as <code>NA</code>).</p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A one-row tibble: <code>c</code> (observed), <code>expected</code> (always 1), <code>n</code>,
 <code>n_excluded</code>, <code>n_links</code>, <code>p_value</code> and an <code>excluded</code> list-column.</p>
+<p><code>p_value</code> is <strong>one-sided on the lower tail</strong>:
+\((1 + \#\{C^{*} \le C_{obs}\}) / (n_{perm} + 1)\). The lower tail is
+the clustered one, which is the opposite way round from Moran's <em>I</em>:
+Geary's <em>C</em> runs from 0 (neighbours identical) through 1 (no
+autocorrelation) upwards, so a <em>small</em> <code>c</code> is the evidence of positive
+spatial association. Never exactly zero; the floor is
+\(1/(n_{perm}+1)\). Set a seed beforehand for a reproducible <code>p_value</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>

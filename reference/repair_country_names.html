@@ -78,10 +78,20 @@ result into <code><a href="standardize_country.html">standardize_country()</a></
 <dd><p>Maximum string distance to accept a repair (0 = identical,
 1 = unrelated). Lower is stricter; default <code>0.2</code>. Uses Jaro-Winkler when
 <code>stringdist</code> is installed, otherwise a length-normalised edit distance.
-The fallback is the more conservative of the two – it repairs a subset of
-what Jaro-Winkler would, mainly missing transposed letters ("Frnace"), and
-never picks a different country – so results can differ between machines
-depending on whether <code>stringdist</code> is available.</p></dd>
+The fallback repairs a subset of what Jaro-Winkler would: it charges two
+edits for a transposition, so at the default threshold <code>"Germny"</code> is
+repaired (one edit out of seven characters, 0.14) but <code>"Frnace"</code> is <em>not</em>
+(two out of six, 0.33). Jaro-Winkler scores that transposition 0.06 and
+repairs it.</p>
+<p><strong>Install <code>stringdist</code> if the repairs matter.</strong> The two metrics choose the
+nearest known name independently, so they can land on <em>different
+countries</em>, not merely on fewer of them: <code>"Libia"</code> is repaired to Liberia
+with <code>stringdist</code> and to Libya without it, and both are accepted at the
+default threshold. Neither metric is uniformly better – Jaro-Winkler also
+repairs <code>"Maroco"</code> to Monaco rather than Morocco – which is the real
+reason to check the reported substitutions rather than to trust either.
+<code>verbose = TRUE</code> (the default) prints them, and they are attached as the
+<code>"repairs"</code> attribute for programmatic checking.</p></dd>
 
 
 <dt id="arg-origin">origin<a class="anchor" aria-label="anchor" href="#arg-origin"></a></dt>

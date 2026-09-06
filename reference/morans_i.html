@@ -91,9 +91,11 @@ contiguity, row-standardised – which excludes every island. See below.</p></dd
     <p>A one-row tibble: <code>i</code> (observed Moran's I), <code>expected</code>
 (\(-1/(n-1)\) under no autocorrelation), <code>n</code> (countries used),
 <code>n_excluded</code> (countries with data that the weights could not reach),
-<code>n_links</code>, <code>p_value</code> (one-sided, \(P(I_{perm} \ge I_{obs})\)) and an
-<code>excluded</code> list-column of the excluded <code>iso3c</code> codes. Set a seed beforehand
-for a reproducible <code>p_value</code>.</p>
+<code>n_links</code>, <code>p_value</code> (one-sided, \(P(I_{perm} \ge I_{obs})\), computed as
+\((1 + \#\{I^{*} \ge I_{obs}\}) / (n_{perm} + 1)\), so never exactly
+zero – the floor is \(1/(n_{perm}+1)\)) and an <code>excluded</code> list-column of
+the excluded <code>iso3c</code> codes. Set a seed beforehand for a reproducible
+<code>p_value</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="which-countries-are-left-out">Which countries are left out<a class="anchor" aria-label="anchor" href="#which-countries-are-left-out"></a></h2>

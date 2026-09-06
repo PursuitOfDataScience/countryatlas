@@ -74,7 +74,11 @@ spine so it can be joined, aggregated and mapped like everything else.</p>
 
 <dl><dt id="arg-lon-lat">lon, lat<a class="anchor" aria-label="anchor" href="#arg-lon-lat"></a></dt>
 <dd><p>Equal-length numeric vectors of longitude / latitude, giving
-one point per element (ignored if <code>points</code> is supplied).</p></dd>
+one point per element (ignored if <code>points</code> is supplied). A point with a
+missing coordinate returns <code>NA</code>, the same as a point in no country; a
+longitude outside <code>[-180, 180]</code> or a latitude outside <code>[-90, 90]</code> is an
+error rather than a silent <code>NA</code>, because it is a mistake and not an
+ocean.</p></dd>
 
 
 <dt id="arg-points">points<a class="anchor" aria-label="anchor" href="#arg-points"></a></dt>

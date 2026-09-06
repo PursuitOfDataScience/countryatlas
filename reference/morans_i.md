@@ -44,9 +44,10 @@ morans_i(data, value, scale = "small", n_perm = 999, weights = NULL)
 A one-row tibble: `i` (observed Moran's I), `expected` (\\-1/(n-1)\\
 under no autocorrelation), `n` (countries used), `n_excluded` (countries
 with data that the weights could not reach), `n_links`, `p_value`
-(one-sided, \\P(I\_{perm} \ge I\_{obs})\\) and an `excluded` list-column
-of the excluded `iso3c` codes. Set a seed beforehand for a reproducible
-`p_value`.
+(one-sided, \\P(I\_{perm} \ge I\_{obs})\\, computed as \\(1 + \\\\I^{\*}
+\ge I\_{obs}\\) / (n\_{perm} + 1)\\, so never exactly zero – the floor
+is \\1/(n\_{perm}+1)\\) and an `excluded` list-column of the excluded
+`iso3c` codes. Set a seed beforehand for a reproducible `p_value`.
 
 ## Which countries are left out
 
