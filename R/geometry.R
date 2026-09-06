@@ -607,7 +607,36 @@ ring_area_km2 <- function(lon, lat) {
   R <- EARTH_RADIUS_KM; d2r <- pi / 180
   lon <- lon * d2r; lat <- lat * d2r
   i <- seq_len(n); j <- c(2:n, 1L)
-  abs(sum((lon[j] - lon[i]) * (2 + sin(lat[i]) + sin(lat[j]))) * R^2 / 2)
+  # Take each edge the short way round the sphere. Longitudes arrive wrapped
+  # into [-180, 180), so a raw difference jumps by ~360 at the antimeridian,
+  # and the two failure modes point opposite ways: a ring that *crosses* 180
+  # came out 179x too large (a 2-degree square at the equator measured
+  # 8.85e6 km2 instead of 49447), while a ring that *encircles* the pole
+  # cancelled to ~0 (a cap at lat -80 measured 7e-11 instead of 3.87e6).
+  # Either one can hand which.max() the wrong piece, which is exactly the
+  # mislabelling this function exists to prevent. Differencing modulo 360
+  # is right for both: it agrees with the analytic area for an equatorial
+  # square, a wrapped square and a polar cap. The bundled polygon data splits
+  # pieces at the antimeridian, so no centroid changes today -- all 239 match
+  # country_meta either way -- and this is about not depending on that.
+  #
+  # The limit is inherent, not an oversight: from longitudes already wrapped
+  # into [-180, 180) there is no way to tell a ring that crosses 180 from one
+  # that encircles the globe, so a formula has to choose. Differencing modulo
+  # 360 chooses "short way", which is right for any ring whose edges are
+  # shorter than 180 -- true of all real polygon data, and of the densified
+  # polar cap above. It reads a *coarse* whole-globe rectangle (four corners,
+  # one 360-degree edge) as zero area. No country piece has that shape; the
+  # only such ring here is world_outline(), which is sf geometry and never
+  # reaches this function.
+  # Adjust only the edges that actually wrap. Differencing every edge modulo
+  # 2*pi would do the same thing arithmetically, but the round-trip is not
+  # exact in floating point, and R^2/2 is ~2e7, so it turned a ring with
+  # genuinely zero area into ~1e-8 -- enough to fail an exact-zero check.
+  dlon <- lon[j] - lon[i]
+  wrapped <- abs(dlon) > pi
+  dlon[wrapped] <- dlon[wrapped] - sign(dlon[wrapped]) * 2 * pi
+  abs(sum(dlon * (2 + sin(lat[i]) + sin(lat[j]))) * R^2 / 2)
 }
 
 # One centroid per iso3c from polygon rows: the bounding-box midpoint of the
@@ -811,7 +840,11 @@ attach_geometry <- function(data,
 #' spine so it can be joined, aggregated and mapped like everything else.
 #'
 #' @param lon,lat Equal-length numeric vectors of longitude / latitude, giving
-#'   one point per element (ignored if `points` is supplied).
+#'   one point per element (ignored if `points` is supplied). A point with a
+#'   missing coordinate returns `NA`, the same as a point in no country; a
+#'   longitude outside `[-180, 180]` or a latitude outside `[-90, 90]` is an
+#'   error rather than a silent `NA`, because it is a mistake and not an
+#'   ocean.
 #' @param points Optional `sf` POINT object to use instead of `lon`/`lat`.
 #' @param scale Natural Earth resolution for the lookup geometry. `"large"` needs the
 #'   non-CRAN `rnaturalearthhires` package; see [world_geometry()].
@@ -848,6 +881,45 @@ locate_country <- function(lon = NULL, lat = NULL, points = NULL,
   if (is.null(points)) {
     if (is.null(lon) || is.null(lat) || length(lon) != length(lat)) {
       wdj_abort("Supply equal-length {.arg lon} and {.arg lat}, or a {.arg points} sf object.")
+    }
+    if (!is.numeric(lon) || !is.numeric(lat)) {
+      wdj_abort(c(
+        "{.arg lon} and {.arg lat} must be numeric.",
+        "x" = "Got {.cls {class(lon)[1]}} and {.cls {class(lat)[1]}}."
+      ))
+    }
+    # Out of range came back as a silent NA, indistinguishable from "this point
+    # is in the ocean" -- so a column still in 0-360 degrees, or with latitude
+    # and longitude swapped, looked like a world of open water rather than a
+    # mistake. Say which values and what the range is.
+    bad <- which((!is.na(lon) & abs(lon) > 180) | (!is.na(lat) & abs(lat) > 90))
+    if (length(bad)) {
+      wdj_abort(c(
+        "{length(bad)} coordinate{?s} {?is/are} outside the valid range.",
+        "x" = "{.val {utils::head(sprintf('(%g, %g)', lon[bad], lat[bad]), 5)}}",
+        "i" = "{.arg lon} must be in [-180, 180] and {.arg lat} in [-90, 90].
+               A longitude in 0-360 needs {.code ((lon + 180) %% 360) - 180}."
+      ))
+    }
+    # sf::st_as_sf() refuses an NA coordinate outright ("missing values in
+    # coordinates not allowed") -- a bare simpleError naming neither argument,
+    # for an input that a failed geocoding step produces all the time. The
+    # documented idiom for "no country here" is already an NA row, so give
+    # those rows exactly that and locate the rest.
+    ok <- !is.na(lon) & !is.na(lat)
+    if (!all(ok)) {
+      if (!any(ok)) {
+        # Learn the shape from the normal path instead of naming columns here,
+        # so this keeps matching whatever `add` asks for. (0, 0) is open ocean
+        # and tolerance_km = 0 stops it snapping, so every field is already NA.
+        proto <- locate_country(0, 0, scale = scale, add = add, tolerance_km = 0)
+        return(tibble::as_tibble(proto[rep(NA_integer_, length(lon)), , drop = FALSE]))
+      }
+      found <- locate_country(lon[ok], lat[ok], scale = scale, add = add,
+                              tolerance_km = tolerance_km)
+      out <- found[rep(NA_integer_, length(lon)), , drop = FALSE]
+      out[ok, ] <- found
+      return(tibble::as_tibble(out))
     }
     points <- sf::st_as_sf(data.frame(lon = lon, lat = lat),
                            coords = c("lon", "lat"), crs = 4326L)
@@ -1088,7 +1160,8 @@ neighbors <- function(x, origin = "country.name", scale = "small",
         "{length(unresolved)} value{?s} did not resolve to a country, so
          {?it has/they have} no neighbours here:",
         "*" = "{.val {utils::head(unresolved, 8)}}",
-        "i" = "Check {.arg origin}; it is currently {.val {origin}}."
+        "i" = "Check {.arg origin}; it is currently {.val {origin}}.",
+        wdj_origin_hint(unresolved, origin)
       ))
     }
   }
@@ -1154,7 +1227,8 @@ distance_between <- function(a, b, origin = "country.name") {
       "{length(unresolved)} value{?s} did not resolve to a country, so their
        distances are {.val {NA}}:",
       "*" = "{.val {utils::head(unresolved, 8)}}",
-      "i" = "Check {.arg origin}; it is currently {.val {origin}}."
+      "i" = "Check {.arg origin}; it is currently {.val {origin}}.",
+      wdj_origin_hint(unresolved, origin)
     ))
   }
   meta <- countryatlas::country_meta[, c("iso3c", "centroid_lon", "centroid_lat")]

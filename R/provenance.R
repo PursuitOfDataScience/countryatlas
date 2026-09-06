@@ -75,11 +75,18 @@ map_provenance <- function(x, value = NULL) {
     }
     value_name <- quo_arg_name(value_q, "value")
     check_cols(x, value_name)
+    # n_imputed belongs here, not to the `%||% 0L` fallback below. The other
+    # unset fields are drawing-side and default to NA, which claims nothing;
+    # n_imputed defaults to 0, which claims that nothing was imputed -- so a
+    # map-ready frame carrying two interpolated values reported zero of them,
+    # in a function whose whole job is reporting provenance. It is a data-side
+    # fact, and the frame is right here.
     prov <- list(fill = value_name, style = NA_character_,
                  projection = NA_character_,
                  backend = if (is_sf(x)) "sf" else if (has_map_geometry(x)) "polygon" else NA_character_,
                  n_bins = NA_integer_, na_style = NA_character_,
-                 coverage = na_coverage(x, value_name), breaks = NULL)
+                 coverage = na_coverage(x, value_name), breaks = NULL,
+                 n_imputed = imputed_count(x))
   }
 
   out <- tibble::tibble(

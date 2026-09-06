@@ -17,10 +17,21 @@ repair_country_names(
 \item{threshold}{Maximum string distance to accept a repair (0 = identical,
 1 = unrelated). Lower is stricter; default \code{0.2}. Uses Jaro-Winkler when
 \code{stringdist} is installed, otherwise a length-normalised edit distance.
-The fallback is the more conservative of the two -- it repairs a subset of
-what Jaro-Winkler would, mainly missing transposed letters ("Frnace"), and
-never picks a different country -- so results can differ between machines
-depending on whether \code{stringdist} is available.}
+The fallback repairs a subset of what Jaro-Winkler would: it charges two
+edits for a transposition, so at the default threshold \code{"Germny"} is
+repaired (one edit out of seven characters, 0.14) but \code{"Frnace"} is \emph{not}
+(two out of six, 0.33). Jaro-Winkler scores that transposition 0.06 and
+repairs it.
+
+\strong{Install \code{stringdist} if the repairs matter.} The two metrics choose the
+nearest known name independently, so they can land on \emph{different
+countries}, not merely on fewer of them: \code{"Libia"} is repaired to Liberia
+with \code{stringdist} and to Libya without it, and both are accepted at the
+default threshold. Neither metric is uniformly better -- Jaro-Winkler also
+repairs \code{"Maroco"} to Monaco rather than Morocco -- which is the real
+reason to check the reported substitutions rather than to trust either.
+\code{verbose = TRUE} (the default) prints them, and they are attached as the
+\code{"repairs"} attribute for programmatic checking.}
 
 \item{origin}{countrycode origin scheme (default \code{"country.name"}).}
 

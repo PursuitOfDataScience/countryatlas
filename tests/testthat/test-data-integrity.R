@@ -162,6 +162,66 @@ test_that("the override table maps only to codes the package can resolve", {
   expect_false(anyNA(countryatlas:::wdj_to_iso3c(unname(ov), origin = "iso3c")))
 })
 
+test_that("data-raw/ still rebuilds the hand-curated datasets byte for byte", {
+  # country_groups_history and disputed_territories are curated by hand in
+  # data-raw/, so the script is the source of truth and drift can happen in
+  # either direction: editing the .rda without the script, or the script
+  # without rebuilding. The override snapshot below is already pinned for the
+  # same reason; these two were not, and both scripts are self-contained
+  # (tibble/dplyr/countrycode, no network), so re-running them is cheap.
+  # data-raw is .Rbuildignore'd, so this only runs from a source checkout.
+  rebuild <- function(script, objname) {
+    path <- testthat::test_path("..", "..", "data-raw", script)
+    skip_if_not(file.exists(path), "data-raw/ not present (installed package)")
+    # Drop the script's `usethis::use_data()` call before evaluating anything,
+    # so this can never write to data/. Stubbing it with a local `usethis`
+    # object does NOT work: `::` resolves through the namespace and ignores
+    # any variable of that name, so an earlier version of this test silently
+    # overwrote data/disputed_territories.rda with whatever the script built.
+    code <- parse(path)
+    writes <- vapply(code, function(e) {
+      is.call(e) && grepl("use_data", paste(deparse(e[[1]]), collapse = ""),
+                          fixed = TRUE)
+    }, logical(1))
+    expect_true(any(writes))   # if the script stops writing, this test is moot
+    # The scripts call library(tibble)/library(dplyr), which attach globally
+    # and would stay attached for every test file that runs after this one --
+    # masking stats::filter and stats::lag session-wide. Put the search path
+    # back the way it was found.
+    attached_before <- search()
+    on.exit({
+      for (pkg in setdiff(search(), attached_before)) {
+        try(detach(pkg, character.only = TRUE, unload = FALSE), silent = TRUE)
+      }
+    }, add = TRUE)
+    env <- new.env(parent = globalenv())
+    # The scripts end with their own stopifnot() checks, so drift can surface
+    # as an evaluation error rather than a mismatch below. Catch it and say
+    # what happened -- otherwise the failure reads as a bare assertion from
+    # inside data-raw/ with no hint that a rebuild diverged.
+    err <- tryCatch({
+      for (e in code[!writes]) {
+        suppressMessages(suppressWarnings(eval(e, envir = env)))
+      }
+      NULL
+    }, error = function(e) conditionMessage(e))
+    if (!is.null(err)) {
+      fail(paste0("data-raw/", script, " no longer runs, so it cannot rebuild ",
+                  objname, ": ", err))
+      return(NULL)
+    }
+    get(objname, envir = env)
+  }
+
+  for (case in list(c("country_groups_history.R", "country_groups_history"),
+                    c("disputed_territories.R", "disputed_territories"))) {
+    rebuilt <- rebuild(case[1], case[2])
+    if (is.null(rebuilt)) next          # rebuild() already recorded the failure
+    shipped <- get(case[2])
+    expect_equal(as.data.frame(rebuilt), as.data.frame(shipped), info = case[1])
+  }
+})
+
 test_that("the data-raw override snapshot is still in sync with wdj_overrides()", {
   # data-raw/overrides_snapshot.R keeps a standalone copy so the dataset build
   # does not depend on the installed package. Its header says "keep in sync",

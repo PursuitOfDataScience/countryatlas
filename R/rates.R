@@ -24,7 +24,10 @@
 #'
 #' @return A tibble of `iso3c`, `numerator`, `denominator`, `rate`,
 #'   `expected_se` (the Poisson standard error of the rate, \eqn{\sqrt{r/d}}) and
-#'   `flagged`, sorted with the least reliable first.
+#'   `flagged`, sorted with the least reliable first. `flagged` is `TRUE` for a
+#'   denominator below the threshold, `FALSE` above it or missing, and `NA` for
+#'   every row when no threshold could be computed at all -- which is warned
+#'   about, and means `sum(flagged)` is `NA` rather than a misleading `0`.
 #'
 #' @section What to do about it:
 #' Three answers, in rough order of preference: [smooth_rates()] shrinks the
@@ -88,7 +91,21 @@ rate_check <- function(data, numerator, denominator, min_denominator = NULL,
     # denominator is untrustworthy.
     expected_se = ifelse(is.finite(r) & is.finite(den) & den > 0,
                          sqrt(pmax(r, 0) / den), NA_real_),
-    flagged = is.finite(den) & den < thr
+    # `is.finite(den) & den < thr` yields FALSE, not NA, for a non-finite
+    # denominator, because R short-circuits `FALSE & NA` to FALSE. With *no*
+    # computable threshold that turned the whole column into a confident
+    # "nothing is flagged": an all-NA denominator gave FALSE throughout, so
+    # sum(out$flagged) returned 0 rather than NA -- the exact misreading the
+    # warning above exists to prevent, and it also made that warning's promise
+    # ("flagged is NA throughout") untrue. An all-zero or all-negative
+    # denominator did give NA, so the two cases disagreed with each other too.
+    # No threshold means no row can be compared to one, so say NA for all of
+    # them. The normal path -- a finite threshold -- is untouched, including
+    # its FALSE for a missing denominator, which keeps sum(out$flagged)
+    # working as the comment above intends.
+    flagged = if (!is.finite(thr)) rep(NA, length(den)) else {
+      is.finite(den) & den < thr
+    }
   )
   attr(out, "min_denominator") <- thr
   dplyr::arrange(out, dplyr::desc(.data$expected_se))
@@ -242,6 +259,11 @@ deflate <- function(data, value, base_year, deflator = NULL,
   # both announce it before they clobber a column the caller already had.
   # deflate() wrote over it in silence.
   warn_overwrite(data, paste0(val_name, suffix))
+  # deflate() joins the deflator on `year`, and a character year made dplyr
+  # refuse with "Can't join `x$year` with `y$year` due to incompatible types"
+  # -- an internal join the caller never asked for, named in place of their
+  # column. Same guard complete_years() uses.
+  check_numeric_col(data, "year")
   if (missing(base_year)) wdj_abort("{.arg base_year} is required.")
   # read_year(), not as.integer(): a Date became its day count, so
   # base_year = as.Date("2001-01-01") was reported back as
@@ -452,6 +474,22 @@ convergence_club <- function(data, value, min_size = 2, alpha = 0.05) {
 
   df <- tibble::as_tibble(sf_drop(data))[, c("iso3c", "year", val_name)]
   df <- df[!is.na(df$iso3c) & !is.na(df$year) & is.finite(df[[val_name]]), ]
+  # pivot_wider() collapses a repeated country-year into a list-column, and the
+  # as.matrix() below then died with base R's "invalid 'type' (list) of
+  # argument" -- a bare simpleError naming neither this verb nor the rows that
+  # caused it. check_panel_cols() above already warns about the shape, but for
+  # the log-t test it is fatal rather than merely inaccurate, so stop here and
+  # say which rows to fix.
+  key <- df[, c("iso3c", "year")]
+  dupes <- unique(key[duplicated(key), , drop = FALSE])
+  if (nrow(dupes)) {
+    wdj_abort(c(
+      "Cannot form clubs: {.arg data} has {nrow(dupes)} repeated country-year{?s}.",
+      "*" = "{.val {utils::head(paste(dupes$iso3c, dupes$year), 8)}}",
+      "i" = "The log-t test needs one row per country per year; collapse or drop
+             the duplicates first. {.fn check_panel_unique} lists them."
+    ))
+  }
   wide <- tidyr::pivot_wider(df, names_from = "year", values_from = dplyr::all_of(val_name))
   wide <- wide[stats::complete.cases(wide), ]
   if (nrow(wide) < 2L) {
@@ -483,8 +521,11 @@ convergence_club <- function(data, value, min_size = 2, alpha = 0.05) {
   while (length(remaining) >= min_size) {
     # Grow a core from the top of the remaining ordering while the test holds.
     core <- remaining[1:min_size]
-    if (is.na(log_t_stat(y[core, , drop = FALSE])) ||
-        log_t_stat(y[core, , drop = FALSE]) < crit) {
+    # Once, not twice: log_t_stat() fits a regression over the whole group, and
+    # calling it again for the comparison doubled that work on every pass of a
+    # loop that runs once per candidate club.
+    core_stat <- log_t_stat(y[core, , drop = FALSE])
+    if (is.na(core_stat) || core_stat < crit) {
       # The top country cannot start a club; set it aside and try the next.
       remaining <- remaining[-1]
       next
@@ -522,10 +563,19 @@ log_t_stat <- function(y) {
   if (nrow(y) < 2L || ti < 5L) return(NA_real_)
   h <- sweep(y, 2, colMeans(y), "/")
   Ht <- colMeans((h - 1)^2)
-  if (!all(is.finite(Ht)) || Ht[1] <= 0 || any(Ht <= 0)) return(NA_real_)
   start <- max(2L, floor(0.3 * ti))
   idx <- start:ti
-  lhs <- log(Ht[1] / Ht[idx]) - 2 * log(log(idx))
+  # Only the regression window has to be usable. log(H_1 / H_t) is
+  # log(H_1) - log(H_t), and log(H_1) is one constant across the whole
+  # regression, so it lands entirely in the intercept and cannot move the t
+  # statistic on log(t) -- which is the only thing this returns. Requiring
+  # H_1 > 0 therefore discarded a perfectly computable statistic, and H_1 is
+  # exactly 0 whenever every unit starts equal: index_to() guarantees that by
+  # construction, so convergence_club() on an indexed panel found no clubs at
+  # all where the same panel in levels found seven. Periods before the window
+  # were over-checked for the same reason -- they never enter the fit.
+  if (!all(is.finite(Ht[idx])) || any(Ht[idx] <= 0)) return(NA_real_)
+  lhs <- -log(Ht[idx]) - 2 * log(log(idx))
   rhs <- log(idx)
   fit <- try(stats::lm(lhs ~ rhs), silent = TRUE)
   if (inherits(fit, "try-error")) return(NA_real_)

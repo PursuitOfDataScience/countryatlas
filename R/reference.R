@@ -209,7 +209,7 @@ country_codes <- function(codes = NULL) {
   unknown <- names(raw)[!raw %in% names(cl)]
   if (length(unknown)) {
     wdj_abort(c(
-      "Unknown column{?s}: {.val {unknown}}.",
+      "Unknown column{cli::qty(length(unknown))}{?s}: {.val {unknown}}.",
       "i" = "Use a shortcut ({.val {names(raw_of)}}) or a {.code countrycode::codelist} column name."
     ))
   }
@@ -270,10 +270,29 @@ country_groups <- function(group = NULL, as_of = NULL) {
   tbl <- countryatlas::country_groups_tbl
   valid <- unique(tbl$group)
   if (!is.null(group)) {
+    # setdiff() below coerces, which dies on a function, an environment or a
+    # formula ("cannot coerce type 'closure' to vector of type 'any'",
+    # "duplicated() applies only to vectors") before any check runs -- so the
+    # caller saw a base R message naming neither `group` nor this function.
+    if (!is.atomic(group)) {
+      wdj_abort(c(
+        "{.arg group} must be a group name, or a vector of them.",
+        "x" = "Got {.cls {class(group)[1]}}.",
+        "i" = "Available groups: {.val {valid}}."
+      ))
+    }
     bad <- setdiff(group, valid)
     if (length(bad)) {
       wdj_abort(c(
-        "Unknown group{?s}: {.val {bad}}.",
+        # cli::qty(): with {?s} ahead of the value, cli reaches for the most
+        # recent interpolation to get a quantity, and a *numeric* vector there is
+        # read as the quantity itself -- which must be length 1, so a length-2
+        # numeric died on cli's own "length(object) == 1 is not TRUE" instead of
+        # reporting the bad input. A character vector works, which is why this only
+        # showed up for numeric arguments. qty(length(x)) states the count outright -- qty(x) on a
+# numeric hits the same trap, since cli reads a numeric as the count itself.
+
+        "Unknown group{cli::qty(length(bad))}{?s}: {.val {bad}}.",
         "i" = "Available groups: {.val {valid}}."
       ))
     }

@@ -103,6 +103,32 @@ wdj_restore_sf <- function(out, template) {
   tryCatch(sf::st_as_sf(out, sf_column_name = col), error = function(e) out)
 }
 
+# When values fail to resolve under one `origin` but every one of them is a
+# valid code under a different one, the user picked the wrong `origin` rather
+# than typing a bad country. This is the single most common way to misuse the
+# name-matching verbs: `origin` defaults to "country.name" everywhere, so
+# country_factsheet("FRA") -- the canonical ISO3 code -- was refused, and the
+# advice was to run check_country_match(), which has nothing useful to say
+# about a code. Name the origin that would have worked instead. Returns a
+# ready-to-append cli bullet, or NULL when no other origin explains the input.
+wdj_origin_hint <- function(bad, origin) {
+  bad <- bad[!is.na(bad)]
+  if (!length(bad)) return(NULL)
+  for (cand in setdiff(c("iso3c", "iso2c", "country.name"), origin)) {
+    ok <- suppressWarnings(countrycode::countrycode(
+      bad, origin = cand, destination = "iso3c", warn = FALSE))
+    if (!anyNA(ok)) {
+      # qty(length(bad)), not qty(bad): cli reads a bare numeric as the
+      # quantity and a bare character vector as something to pluralise over,
+      # and only the explicit length is right for both.
+      return(stats::setNames(sprintf(
+        '{cli::qty(%d)}{?It resolves/They all resolve} under {.code origin = "%s"} -- try that instead.',
+        length(bad), cand), "i"))
+    }
+  }
+  NULL
+}
+
 wdj_to_key <- function(x, origin = "country.name", key = "iso3c",
                        custom_match = country_overrides(), side = NULL,
                        warn_unresolved = FALSE) {
@@ -122,7 +148,8 @@ wdj_to_key <- function(x, origin = "country.name", key = "iso3c",
         "{length(bad)} value{?s}{where} did not resolve to a country and will
          join to nothing:",
         "*" = "{.val {utils::head(bad, 8)}}",
-        "i" = "See {.fn check_country_match} for suggestions."
+        "i" = "See {.fn check_country_match} for suggestions.",
+        wdj_origin_hint(bad, origin)
       ))
     }
   }
@@ -191,7 +218,16 @@ check_dup_cols <- function(data, call = rlang::caller_env()) {
 check_cols <- function(data, cols, call = rlang::caller_env()) {
   missing <- setdiff(cols, names(data))
   if (length(missing)) {
-    wdj_abort("Column{?s} {.val {missing}} not found in {.arg data}.", call = call)
+    # cli::qty(): with {?s} ahead of the value, cli reaches for the most
+  # recent interpolation to get a quantity, and a *numeric* vector there is
+  # read as the quantity itself -- which must be length 1, so a length-2
+  # numeric died on cli's own "length(object) == 1 is not TRUE" instead of
+  # reporting the bad input. A character vector works, which is why this only
+  # showed up for numeric arguments. qty(length(x)) states the count outright -- qty(x) on a
+# numeric hits the same trap, since cli reads a numeric as the count itself.
+
+    wdj_abort("Column{cli::qty(length(missing))}{?s} {.val {missing}} not found in {.arg data}.",
+              call = call)
   }
   check_dup_cols(data, call = call)
   invisible(TRUE)
@@ -204,12 +240,29 @@ check_cols <- function(data, cols, call = rlang::caller_env()) {
 check_number <- function(x, arg, lo = -Inf, hi = Inf,
                          call = rlang::caller_env()) {
   if (!is.numeric(x) || length(x) != 1L || !is.finite(x)) {
+    # See check_string(): a function or environment cannot be formatted.
     wdj_abort(
-      "{.arg {arg}} must be a single finite number, not {.val {x}}.",
+      if (is.function(x) || is.environment(x)) "{.arg {arg}} must be a single finite number, not {.cls {class(x)[1]}}."
+      else "{.arg {arg}} must be a single finite number, not {.val {x}}.",
       call = call
     )
   }
-  if (x < lo || x > hi) {
+  # The comparison itself can fail. is.numeric() is TRUE for a units object
+  # (sf's st_area()/st_distance() return them), but `x < lo` then raises the
+  # units package's "both operands of the expression should be units objects"
+  # -- so passing a computed threshold straight through gave a bare error from
+  # units, naming neither the argument nor this package. Ask before comparing,
+  # and say what to do about it. A plain classed numeric that does compare is
+  # left alone.
+  cmp <- tryCatch(x < lo || x > hi, error = function(e) NULL)
+  if (is.null(cmp)) {
+    wdj_abort(c(
+      "{.arg {arg}} must be a plain number.",
+      "x" = "Got {.cls {class(x)[1]}}, which cannot be compared with a number.",
+      "i" = "Drop the unit first, e.g. {.code as.numeric({arg})}."
+    ), call = call)
+  }
+  if (cmp) {
     wdj_abort(c(
       "{.arg {arg}} must be between {lo} and {hi}.",
       "x" = "Got {.val {x}}."
@@ -376,6 +429,17 @@ check_limits_cores <- function() {
 # all routing through two helpers, so fixing it here fixes it everywhere.
 check_choice <- function(x, arg, choices, call = rlang::caller_env()) {
   if (length(x) == 1L && is.character(x) && x %in% choices) return(x)
+  # Refuse a function or an environment before anything tries to coerce it.
+  # as.character() on the next line dies on both ("cannot coerce type
+  # 'closure' to vector of type 'character'"), and {.val } in the message
+  # below would too -- so the argument check crashed rather than reporting
+  # what was wrong. See check_string() for the same guard.
+  if (is.function(x) || is.environment(x)) {
+    wdj_abort(c(
+      "{.arg {arg}} must be one of {.val {choices}}.",
+      "x" = "Got {.cls {class(x)[1]}}."
+    ), call = call)
+  }
   # A caller that passed nothing gets the documented default, exactly as
   # match.arg() would.
   if (length(x) == length(choices) && identical(as.character(x), as.character(choices))) {
@@ -410,13 +474,34 @@ check_indicator <- function(indicator, call = rlang::caller_env()) {
 # instead of five, and top_n = NULL failed on `if` with R's bare "argument is of
 # length zero", naming neither the argument nor the function.
 check_top_n <- function(x, arg = "top_n", call = rlang::caller_env()) {
+  # See check_number(): `x < 1` raises units' own error for a units object,
+  # before any of this package's checks can report the problem.
+  if (is.numeric(x) && length(x) == 1L && !is.na(x) &&
+      is.null(tryCatch(x < 1, error = function(e) NULL))) {
+    wdj_abort(c(
+      "{.arg {arg}} must be a plain number.",
+      "x" = "Got {.cls {class(x)[1]}}, which cannot be compared with a number.",
+      "i" = "Drop the unit first, e.g. {.code as.numeric({arg})}."
+    ), call = call)
+  }
   if (!is.numeric(x) || length(x) != 1L || is.na(x) || x < 1) {
     wdj_abort(c(
       "{.arg {arg}} must be a single number of at least 1, or {.code Inf} for
        no limit.",
-      "x" = "Got {.val {x}}."
+      # See check_string(): a function or environment cannot be formatted.
+      "x" = if (is.function(x) || is.environment(x)) "Got {.cls {class(x)[1]}}." else "Got {.val {x}}."
     ), call = call)
   }
+  # `Inf` is the documented "no limit", and both callers gate on
+  # is.finite(top_n) to detect it. A *finite* value past integer range slipped
+  # through that gate and then broke on the coercion behind it:
+  # as.integer(1e18) is NA, so utils::head(df, NA) surfaced base R's "invalid
+  # 'n' - must contain at least one non-missing element, got none" -- a bare
+  # simpleError with nothing in it naming top_n. Asking for at most 1e18 rows
+  # of a 250-row table means the same thing as Inf, so normalise it rather
+  # than rejecting a request that is merely redundant. Callers assign the
+  # return value.
+  if (x > .Machine$integer.max) return(invisible(Inf))
   invisible(x)
 }
 
@@ -428,6 +513,34 @@ check_top_n <- function(x, arg = "top_n", call = rlang::caller_env()) {
 # input. Coded rows de-duplicate on the code; uncoded ones are not duplicates of
 # each other, so they de-duplicate on whatever else identifies them -- which
 # still keeps the polygon backend from counting one country once per vertex.
+# The earliest row per unit, chosen explicitly rather than by position.
+# distinct(.keep_all = TRUE) keeps whichever row comes *first in the frame* --
+# the earliest year only if the caller happened to sort by year. Shuffle the
+# same panel and rate_check() returned a different numerator for France,
+# world_map() drew a different year, and nothing said so. Survivors keep their
+# original relative order so nothing downstream sees a reordered frame.
+#
+# order() on a factor sorts by level index, not by the label, so a factored
+# `year` (read.csv(stringsAsFactors = TRUE), or one factored for plotting) with
+# levels 2002 < 2001 < 2000 would hand back the *latest* year while the caller
+# was promised the earliest. Compare years as numbers where they are numbers,
+# and fall back to the labels where they are not.
+earliest_per_unit <- function(df, unit) {
+  if (!nrow(df)) return(df)
+  if (!"year" %in% names(df)) {
+    return(df[!duplicated(df[[unit]]), , drop = FALSE])
+  }
+  yr <- df$year
+  if (is.factor(yr)) yr <- as.character(yr)
+  if (is.character(yr)) {
+    num <- suppressWarnings(as.numeric(yr))
+    if (!all(is.na(num))) yr <- num
+  }
+  ord <- order(df[[unit]], yr, na.last = TRUE)
+  keep <- ord[!duplicated(df[[unit]][ord])]
+  df[sort(keep), , drop = FALSE]
+}
+
 distinct_countries <- function(df, arg = "data") {
   if (!"iso3c" %in% names(df)) return(df)
   # Collapsing to one row per country is for repeated *geometry* rows, not for
@@ -455,28 +568,15 @@ distinct_countries <- function(df, arg = "data") {
   # numerator for France, world_map() drew a different year, and nothing said
   # so. Pick the earliest year explicitly, and keep the survivors in their
   # original relative order so nothing downstream sees a reordered frame.
-  if ("year" %in% names(coded) && nrow(coded)) {
-    # order() on a factor sorts by level index, not by the label, so a factored
-    # `year` (read.csv(stringsAsFactors = TRUE), or one factored for plotting)
-    # with levels 2002 < 2001 < 2000 would hand back the *latest* year while
-    # the warning still said "earliest". Compare years as numbers where they
-    # are numbers, and fall back to the labels where they are not.
-    yr <- coded$year
-    if (is.factor(yr)) yr <- as.character(yr)
-    if (is.character(yr)) {
-      num <- suppressWarnings(as.numeric(yr))
-      if (!all(is.na(num))) yr <- num
-    }
-    ord <- order(coded$iso3c, yr, na.last = TRUE)
-    keep <- ord[!duplicated(coded$iso3c[ord])]
-    coded <- coded[sort(keep), , drop = FALSE]
-  } else {
-    coded <- dplyr::distinct(coded, .data$iso3c, .keep_all = TRUE)
-  }
+  coded <- earliest_per_unit(coded, "iso3c")
   unc <- df[na_rows, , drop = FALSE]
   ukey <- intersect(c("country", "group"), names(unc))
+  # The same rule as the coded rows above, not distinct()'s first row. These
+  # two branches sat three lines apart and disagreed: a panel carrying an
+  # unmatchable name in two years kept the earliest year for every country
+  # that resolved and an arbitrary one for the country that did not.
   if (length(ukey) && nrow(unc)) {
-    unc <- dplyr::distinct(unc, .data[[ukey[1]]], .keep_all = TRUE)
+    unc <- earliest_per_unit(unc, ukey[1])
   }
   dplyr::bind_rows(coded, unc)
 }
@@ -484,9 +584,22 @@ distinct_countries <- function(df, arg = "data") {
 check_string <- function(x, arg, allow_empty = FALSE,
                          call = rlang::caller_env()) {
   if (!is.character(x) || length(x) != 1L || is.na(x)) {
+  # Functions and environments first: {.val } coerces to character, which
+  # fails outright for those two ("cannot coerce type 'closure' to vector of
+  # type 'character'"), so the validator's own error crashed instead of
+  # reporting the bad input -- every check_string() caller inherited that.
+  # length() is no defence: length() of a closure is 1, and
+  # length(globalenv()) counts bindings, so an environment said "Got 5
+  # values". Lists, matrices and formulas do coerce, so they keep the value
+  # branch. Tested against is.function/is.environment rather than
+  # !is.atomic(): is.atomic(NULL) is TRUE up to R 4.3 and FALSE from R 4.4, so
+  # that would word the NULL message differently across the versions this
+  # package supports.
     wdj_abort(c(
       "{.arg {arg}} must be a single string.",
-      "x" = if (length(x) != 1L) "Got {length(x)} value{?s}." else "Got {.val {x}}."
+      "x" = if (is.function(x) || is.environment(x)) "Got {.cls {class(x)[1]}}."
+            else if (length(x) != 1L) "Got {length(x)} value{?s}."
+            else "Got {.val {x}}."
     ), call = call)
   }
   if (!allow_empty && !nzchar(x)) {
@@ -505,7 +618,10 @@ check_bool <- function(x, arg, call = rlang::caller_env()) {
   if (!is.logical(x) || length(x) != 1L || is.na(x)) {
     wdj_abort(c(
       "{.arg {arg}} must be {.code TRUE} or {.code FALSE}.",
-      "x" = if (length(x) != 1L) "Got {length(x)} value{?s}." else "Got {.val {x}}."
+      # See check_string(): a function or environment cannot be formatted.
+      "x" = if (is.function(x) || is.environment(x)) "Got {.cls {class(x)[1]}}."
+            else if (length(x) != 1L) "Got {length(x)} value{?s}."
+            else "Got {.val {x}}."
     ), call = call)
   }
   invisible(x)

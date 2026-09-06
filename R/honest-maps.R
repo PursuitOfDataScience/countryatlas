@@ -124,7 +124,15 @@ classify_compare <- function(data, value,
   known <- c("quantile", "jenks", "equal", "pretty", "sd")
   bad <- setdiff(methods, known)
   if (length(bad)) {
-    wdj_abort(c("Unknown classification method{?s} {.val {bad}}.",
+    # cli::qty(): with {?s} ahead of the value, cli reaches for the most
+    # recent interpolation to get a quantity, and a *numeric* vector there is
+    # read as the quantity itself -- which must be length 1, so a length-2
+    # numeric died on cli's own "length(object) == 1 is not TRUE" instead of
+    # reporting the bad input. A character vector works, which is why this only
+    # showed up for numeric arguments. qty(length(x)) states the count outright -- qty(x) on a
+# numeric hits the same trap, since cli reads a numeric as the count itself.
+
+    wdj_abort(c("Unknown classification method{cli::qty(length(bad))}{?s} {.val {bad}}.",
                 "i" = "Available: {.val {known}}."))
   }
   if (!length(methods)) wdj_abort("{.arg methods} must name at least one method.")
@@ -132,9 +140,22 @@ classify_compare <- function(data, value,
   # Break on one value per country, for the same reason world_map() does: on the
   # polygon backend a country contributes one row per boundary vertex, so raw
   # quantiles would weight each country by the complexity of its coastline.
+  #
+  # De-duplicate (country, value) pairs rather than taking one row per country.
+  # Those vertex rows all carry the same value and collapse either way, but
+  # "one row per country" also picked an arbitrary row when a country's rows
+  # genuinely differ, i.e. a panel -- and here that was worse than a different
+  # break set. Every row is cut() against these breaks below, so the rows the
+  # chosen year did not cover fell outside the range and came back NA: half the
+  # panel silently drew as grey, and which half depended on the caller's row
+  # order. Same fix as apply_binned_fill().
   df <- tibble::as_tibble(sf_drop(data))
   key <- wdj_unit_key(names(df))
-  one <- if (length(key)) dplyr::distinct(df, .data[[key[1]]], .keep_all = TRUE) else df
+  one <- if (length(key)) {
+    dplyr::distinct(df, .data[[key[1]]], .data[[value_name]])
+  } else {
+    df
+  }
   vals <- one[[value_name]]
 
   # Map the class *index*, not the interval label. Labels differ between

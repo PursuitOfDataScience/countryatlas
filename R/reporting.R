@@ -33,7 +33,8 @@ country_factsheet <- function(x, indicators = NULL, origin = "country.name") {
   if (is.na(iso)) {
     wdj_abort(c(
       "{.val {x}} did not resolve to a country.",
-      "i" = "Try {.fn check_country_match} for close-name suggestions."
+      "i" = "Try {.fn check_country_match} for close-name suggestions.",
+      wdj_origin_hint(as.character(x), origin)
     ))
   }
   meta <- countryatlas::country_meta
@@ -245,7 +246,7 @@ world_table <- function(data, value = NULL, top_n = 20, desc = TRUE,
     keep <- unique(c(intersect(c("iso3c", "country"), names(df)), num, columns))
   }
   df <- df[, keep, drop = FALSE]
-  check_top_n(top_n)
+  top_n <- check_top_n(top_n)
   # A `rank` column is only honest when something was ranked. With no `value`
   # the frame is in whatever order it arrived (iso3c, for the bundled snapshot),
   # so head() takes an arbitrary slice and numbering it 1..n told the reader

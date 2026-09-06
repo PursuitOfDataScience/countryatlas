@@ -88,6 +88,7 @@ Suggests:
     stringdist,
     testthat (>= 3.2.0),
     tmap,
+    units,
     vdiffr,
     withr
 VignetteBuilder: knitr

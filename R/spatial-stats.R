@@ -400,6 +400,15 @@ align_weights <- function(data, val_name, weights, scale = "small",
 #'   (`"High-High"`, `"Low-Low"`, `"High-Low"`, `"Low-High"` or `"Not
 #'   significant"`).
 #'
+#'   `p_value` is a **two-sided** pseudo-p from conditional permutation:
+#'   \eqn{(1 + \#\{|I_i^{*}| \ge |I_i|\}) / (n_{perm} + 1)}, so it is never
+#'   exactly zero and its floor is \eqn{1/(n_{perm}+1)} -- with the default 999
+#'   permutations, 0.001. Two-sided because a local statistic is interesting at
+#'   both ends: a country surrounded by unlike neighbours is as much a finding
+#'   as one surrounded by like ones. `cluster` is `"Not significant"` wherever
+#'   `p_value > alpha`, and everywhere when `n_perm = 0` leaves it `NA`. Set a
+#'   seed beforehand for a reproducible `p_value`.
+#'
 #' @references
 #' Anselin, L. (1995). Local Indicators of Spatial Association -- LISA.
 #' *Geographical Analysis* 27(2), 93-115.
@@ -521,6 +530,14 @@ lisa_map <- function(data, value, weights = NULL, n_perm = 999, alpha = 0.05,
 #'
 #' @return A one-row tibble: `c` (observed), `expected` (always 1), `n`,
 #'   `n_excluded`, `n_links`, `p_value` and an `excluded` list-column.
+#'
+#'   `p_value` is **one-sided on the lower tail**:
+#'   \eqn{(1 + \#\{C^{*} \le C_{obs}\}) / (n_{perm} + 1)}. The lower tail is
+#'   the clustered one, which is the opposite way round from Moran's *I*:
+#'   Geary's *C* runs from 0 (neighbours identical) through 1 (no
+#'   autocorrelation) upwards, so a *small* `c` is the evidence of positive
+#'   spatial association. Never exactly zero; the floor is
+#'   \eqn{1/(n_{perm}+1)}. Set a seed beforehand for a reproducible `p_value`.
 #' @references
 #' Geary, R. C. (1954). The contiguity ratio and statistical mapping.
 #' *The Incorporated Statistician* 5(3), 115-146. \doi{10.2307/2986645}
@@ -615,7 +632,31 @@ getis_ord <- function(data, value, weights = NULL, local = TRUE) {
       ), class = "countryatlas_global_g_negative")
       g <- NA_real_
     } else {
-      g <- sum(m * outer(x, x)) / (sum(outer(x, x)) - sum(x^2))
+      # outer() once, not twice: it is the same n-by-n matrix both times.
+      cp <- outer(x, x)
+      g <- sum(m * cp) / (sum(cp) - sum(x^2))
+      # Same convention the negative branch above just set, and gini()'s: an
+      # answer outside the statistic's domain is NA plus a word about why, not
+      # a silent NaN. Two ways to land here, and the remedies differ. Every
+      # value zero makes the denominator 0, so 0/0. Extreme magnitudes make the
+      # cross-products non-finite: x * 1e290 overflows outer() to Inf, so the
+      # denominator is Inf - Inf, and x * 1e-290 underflows it to 0. Both came
+      # back as a bare NaN in the `g` column with nothing said.
+      if (!is.finite(g)) {
+        zero <- all(x == 0)
+        wdj_warn(c(
+          "The global G is undefined for {.field {val_name}}.",
+          "x" = if (zero) {
+            "Every value is zero, so there are no cross-products to compare."
+          } else {
+            "The cross-products are not finite at this magnitude."
+          },
+          "i" = if (zero) "Returning {.code NA}." else
+            "The statistic is unchanged by a positive scale factor, so
+             rescaling the column fixes it. Returning {.code NA}."
+        ), class = "countryatlas_undefined_index")
+        g <- NA_real_
+      }
     }
     return(tibble::tibble(g = g, expected = sum(m) / (n * (n - 1)),
                           n = n, n_links = al$n_links))
@@ -747,9 +788,11 @@ spatial_lag <- function(data, value, weights = NULL, suffix = "_lag") {
 #' @return A one-row tibble: `i` (observed Moran's I), `expected`
 #'   (\eqn{-1/(n-1)} under no autocorrelation), `n` (countries used),
 #'   `n_excluded` (countries with data that the weights could not reach),
-#'   `n_links`, `p_value` (one-sided, \eqn{P(I_{perm} \ge I_{obs})}) and an
-#'   `excluded` list-column of the excluded `iso3c` codes. Set a seed beforehand
-#'   for a reproducible `p_value`.
+#'   `n_links`, `p_value` (one-sided, \eqn{P(I_{perm} \ge I_{obs})}, computed as
+#'   \eqn{(1 + \#\{I^{*} \ge I_{obs}\}) / (n_{perm} + 1)}, so never exactly
+#'   zero -- the floor is \eqn{1/(n_{perm}+1)}) and an `excluded` list-column of
+#'   the excluded `iso3c` codes. Set a seed beforehand for a reproducible
+#'   `p_value`.
 #'
 #' @section Which countries are left out:
 #' The default weights are land-border contiguity, and an island has no land

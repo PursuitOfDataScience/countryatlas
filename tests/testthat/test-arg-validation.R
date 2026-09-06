@@ -949,3 +949,152 @@ test_that("a user column named like an internal temp column is harmless", {
   }
 })
 
+
+test_that("unknown-name errors survive a numeric argument", {
+  # These messages put the pluralisation marker ahead of the value:
+  # "Unknown group{?s}: {.val {bad}}". With no quantity set, cli reaches for
+  # the most recent interpolation -- and a *numeric* vector there is read as
+  # the quantity itself, which must be length 1. A length-2 numeric therefore
+  # died on cli's own "length(object) == 1 is not TRUE" instead of reporting
+  # the bad input. Character vectors worked, which is why it stayed hidden.
+  #
+  # cli::qty(length(x)) states the count outright. Note qty(x) is NOT enough
+  # when x is numeric: it hits the same trap, because cli reads the numeric as
+  # the count. That is the form reporting.R already uses.
+  d <- data.frame(iso3c = c("FRA", "DEU"), year = 2020L, value = c(1, 2),
+                  stringsAsFactors = FALSE)
+  numeric_cases <- list(
+    "country_groups"  = function(v) country_groups(v),
+    "check_cols"      = function(v) countryatlas:::check_cols(d, v),
+    "world_table"     = function(v) world_table(countryatlas::world_snapshot$countries,
+                                                gdp_per_capita, columns = v)
+  )
+  for (nm in names(numeric_cases)) {
+    for (v in list(1, c(1, 2), c(1, 2, 3))) {
+      expect_error(numeric_cases[[nm]](v), class = "countryatlas_error",
+                   info = paste(nm, length(v)))
+    }
+  }
+  # Singular and plural both read correctly, for numeric and character alike.
+  expect_error(country_groups(1), "Unknown group:")
+  expect_error(country_groups(c(1, 2)), "Unknown groups:")
+  expect_error(country_groups("nope"), "Unknown group:")
+  expect_error(country_groups(c("a", "b")), "Unknown groups:")
+  expect_error(countryatlas:::check_cols(d, 1), "^Column ")
+  expect_error(countryatlas:::check_cols(d, c(1, 2)), "^Columns ")
+  expect_error(countryatlas:::check_cols(d, "zz"), "^Column ")
+  expect_error(countryatlas:::check_cols(d, c("zz", "yy")), "^Columns ")
+  # A valid group is still accepted.
+  expect_s3_class(country_groups("EU"), "data.frame")
+})
+
+test_that("the scalar validators can report a function or environment", {
+  # These build their message with {.val {x}}, which coerces to character --
+  # and that fails outright for a closure ("cannot coerce type 'closure' to
+  # vector of type 'character'"). So the validator's own error crashed rather
+  # than reporting the bad input, and every caller inherited it: passing a
+  # function to register_country_source(), clear_country_cache(),
+  # as_ggsql_source() or world_query() gave a bare simpleError from base R.
+  #
+  # length() is no help either -- length() of a closure is 1, so the
+  # length branch never caught it, and length(globalenv()) counts bindings, so
+  # an environment reported "Got 5 values".
+  validators <- c("check_string", "check_bool", "check_number", "check_top_n")
+  awkward <- list(fn = mean, env = globalenv(), lst = list(1, 2),
+                  frm = y ~ x, mat = matrix(1:4, 2))
+  for (v in validators) {
+    f <- get(v, envir = asNamespace("countryatlas"))
+    for (nm in names(awkward)) {
+      expect_error(f(awkward[[nm]], "myarg"), class = "countryatlas_error",
+                   info = paste(v, nm))
+    }
+  }
+  # The message names the class rather than trying to print the value.
+  expect_error(countryatlas:::check_string(mean, "myarg"), "<function>")
+  expect_error(countryatlas:::check_string(globalenv(), "myarg"), "<environment>")
+  expect_error(countryatlas:::check_number(mean, "myarg"), "<function>")
+  # Ordinary values are unaffected, including the counts and the value itself.
+  expect_error(countryatlas:::check_string(c("a", "b"), "myarg"), "Got 2 values")
+  expect_error(countryatlas:::check_string(1, "myarg"), "Got 1")
+  expect_error(countryatlas:::check_bool("yes", "myarg"), '"yes"')
+  expect_silent(countryatlas:::check_string("ok", "myarg"))
+  expect_silent(countryatlas:::check_bool(TRUE, "myarg"))
+  expect_silent(countryatlas:::check_number(5, "myarg"))
+
+  # And the public callers that surfaced it now fail cleanly.
+  expect_error(register_country_source(mean, function(...) NULL),
+               class = "countryatlas_error")
+  expect_error(clear_country_cache(source = mean), class = "countryatlas_error")
+  expect_error(world_query(gdp_per_capita, source = mean),
+               class = "countryatlas_error")
+})
+
+test_that("arguments used before validation still refuse a function cleanly", {
+  # Sibling of the scalar-validator fix above, but a different mechanism: here
+  # the value was *consumed* before any check ran, so the crash came from the
+  # consuming call rather than from the message.
+  #   check_choice()   - as.character(x) on the default-detection line
+  #   country_groups() - setdiff(group, valid) coerces
+  #   complete_years() - anyNA(years) errors on an environment, inside the
+  #                      condition of the guard meant to catch it
+  d <- data.frame(iso3c = rep(c("FRA", "DEU"), each = 2),
+                  year = rep(2000:2001, 2), value = 1:4,
+                  stringsAsFactors = FALSE)
+  awkward <- list(fn = mean, env = globalenv())
+  for (nm in names(awkward)) {
+    v <- awkward[[nm]]
+    expect_error(countryatlas:::check_choice(v, "k", c("a", "b")),
+                 class = "countryatlas_error", info = nm)
+    expect_error(country_groups(v), class = "countryatlas_error", info = nm)
+    expect_error(complete_years(d, years = v, value = "value"),
+                 class = "countryatlas_error", info = nm)
+  }
+  # A formula reaches setdiff()'s duplicated(), which also refuses it.
+  expect_error(country_groups(y ~ x), class = "countryatlas_error")
+  # Each names the class rather than trying to print the value.
+  expect_error(countryatlas:::check_choice(mean, "k", c("a", "b")), "<function>")
+  expect_error(country_groups(mean), "<function>")
+  expect_error(complete_years(d, years = mean, value = "value"), "<function>")
+
+  # Ordinary values keep their existing behaviour.
+  expect_equal(countryatlas:::check_choice("a", "k", c("a", "b")), "a")
+  expect_equal(countryatlas:::check_choice(c("a", "b"), "k", c("a", "b")), "a")
+  expect_error(countryatlas:::check_choice("zz", "k", c("a", "b")), 'Got "zz"')
+  expect_s3_class(country_groups("EU"), "data.frame")
+  expect_error(country_groups("nope"), "Unknown group:")
+  expect_s3_class(complete_years(d, years = 2000:2002, value = "value"),
+                  "data.frame")
+  expect_error(complete_years(d, years = "a", value = "value"),
+               class = "countryatlas_error")
+})
+
+test_that("a units value is refused by us, not by the units package", {
+  # sf's st_area() and st_distance() return units objects, so a threshold
+  # computed from geometry and handed to a numeric argument is a natural
+  # mistake. is.numeric() is TRUE for one, so it passed the type check, and
+  # the *range comparison* then raised the units package's own "both operands
+  # of the expression should be units objects" -- naming neither the argument
+  # nor this package.
+  skip_if_not_installed("units")
+  u <- units::set_units(5, "km")
+  for (f in list(function(v) countryatlas:::check_number(v, "cutoff_km"),
+                 function(v) countryatlas:::check_top_n(v))) {
+    expect_error(f(u), class = "countryatlas_error")
+    expect_error(f(u), "plain number")
+    expect_error(f(u), "<units>")
+  }
+  # The hint tells the caller what to do, and names their argument.
+  expect_error(countryatlas:::check_number(u, "cutoff_km"), "as.numeric\\(cutoff_km\\)")
+  # Converting is accepted.
+  expect_silent(countryatlas:::check_number(as.numeric(u), "cutoff_km"))
+
+  # Everything that already worked is untouched, including a classed numeric
+  # that *can* be compared, and a named scalar.
+  expect_silent(countryatlas:::check_number(5, "k"))
+  expect_silent(countryatlas:::check_number(structure(5, class = "myclass"), "k"))
+  expect_silent(countryatlas:::check_number(c(a = 5), "k"))
+  expect_silent(countryatlas:::check_top_n(5))
+  expect_silent(countryatlas:::check_top_n(Inf))
+  expect_error(countryatlas:::check_number(-1, "k", lo = 0), "between 0 and Inf")
+  expect_error(countryatlas:::check_top_n(0), "at least 1")
+})

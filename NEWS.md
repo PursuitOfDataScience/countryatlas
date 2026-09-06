@@ -158,6 +158,254 @@ existing code: `world_map(projection = "mercator")` now produces a different
 
 ## Bug fixes
 
+* **`convergence_club()` found no clubs at all on an indexed panel.** The
+  log-t statistic refused to compute whenever `H_1`, the cross-sectional
+  dispersion in the *first* period, was zero -- and it is exactly zero
+  whenever every country starts equal, which `index_to()` guarantees by
+  construction. So the natural pipeline, `convergence_club(index_to(panel,
+  value, base_year = ...), value_index)`, silently placed nobody: the same
+  panel in levels found seven clubs covering 16 of 20 countries, and indexed
+  found none.
+
+  `H_1` cannot affect the answer. `log(H_1/H_t)` is `log(H_1) - log(H_t)`, and
+  `log(H_1)` is one constant across the regression, so it lands entirely in
+  the intercept while the statistic returned is the *t* on the slope --
+  verified bit-identical for `H_1` of 1e-6, 1 and 1e6, and for omitting it
+  altogether. The guard now requires only the periods inside the regression
+  window to be positive and finite, which also stops earlier periods being
+  over-checked when they never enter the fit. A window with genuinely zero
+  dispersion is still `NA`, since there is no decay rate to estimate.
+
+* **`repair_country_names()` promised something it does not do.** The
+  documentation said the no-`stringdist` fallback "repairs a subset of what
+  Jaro-Winkler would ... and never picks a different country". The second half
+  is false, and not marginally: the two metrics choose the nearest known name
+  independently, so `"Libia"` is repaired to Liberia with `stringdist` and to
+  Libya without it, both accepted at the default threshold. Across a
+  42-misspelling sweep the two disagreed on the candidate five times, once
+  reaching the user as a different substitution. No code change can make two
+  different string metrics agree on a nearest neighbour -- and normalising the
+  candidate gate in the fallback, which was the obvious repair, agrees *less* often
+  (35/42 against 37/42), so the metric is left alone. The documentation now
+  says plainly that the engines can land on different countries, recommends
+  installing `stringdist`, notes that neither metric is uniformly better
+  (Jaro-Winkler repairs `"Maroco"` to Monaco, not Morocco), and points at the
+  reported substitutions and the `"repairs"` attribute as the thing to check.
+  The same paragraph's aside about transpositions was ambiguously worded and is
+  now explicit with the numbers: the fallback charges two edits for a
+  transposition, so `"Germny"` is repaired (0.14) and `"Frnace"` is not
+  (0.33), where Jaro-Winkler scores the latter 0.06 and repairs it.
+
+* **`getis_ord(local = FALSE)` returned a silent `NaN` in three cases.** The
+  global G is a ratio of cross-products, and the denominator is zero when
+  every value is zero (`0/0`) or non-finite when the products overflow or
+  underflow at extreme magnitudes (`Inf - Inf`, or an underflow to `0`). The
+  branch immediately above it already warns and returns `NA` for negative
+  values, citing `gini()` as the precedent for "outside the domain is `NA`
+  plus a word about why"; these three slipped past it. They now warn and
+  return `NA` too, and the overflow message says that the statistic is
+  unchanged by a positive scale factor, so rescaling the column fixes it.
+
+* **The permutation p-values did not say which tail they used.** `morans_i()`
+  documented its own (one-sided, upper); `local_morans()` and `gearys_c()`
+  documented neither their tail nor that they consume the RNG. That matters
+  for reading them: `local_morans()` is two-sided, and `gearys_c()` is
+  one-sided on the *lower* tail -- the opposite way round from Moran's *I*,
+  because Geary's *C* runs from 0 (neighbours identical) up through 1 (no
+  autocorrelation), so a small `c` is the evidence of clustering. All three
+  now give the formula, note that the p-value can never be exactly zero (its
+  floor is 1/(`n_perm` + 1)), and say to set a seed for reproducibility.
+
+* **A categorical map's colours depended on the machine's collation locale.**
+  A character fill column reaches ggplot2 unfactored, and its discrete scale
+  derives the level order by sorting -- which consults `LC_COLLATE`. The same
+  script on the same data gave a legend of *Belgium, Chad, Zambia, aland,
+  Åland* under C collation and *aland, Åland, Belgium, Chad, Zambia* under
+  `en_US`, so every category was drawn in a different colour and two people
+  running identical code got different maps. The level order is now pinned
+  byte-wise (`order(method = "radix")`, which is precisely what a plain
+  `sort()` does not do), so it is the same everywhere. An incoming factor is
+  left alone -- the caller has already chosen an order. Same fix applied to
+  `interactive_map()`'s mapgl branch, where the sorted values are paired
+  positionally with the colour stops, and to the `classification_report`
+  fallback, whose rows came out in a locale-dependent order.
+
+* **`classify_compare()` drew half a panel as grey, and which half depended on
+  row order.** It took the class breaks from one arbitrary row per country --
+  the same flaw as the break computation behind `world_map()` -- but here every
+  row is then `cut()` against those breaks, so the rows the chosen year did not
+  cover fell outside the range and came back `NA`. On a two-year panel one
+  year classified correctly and the other vanished into `na.value`, and
+  swapping the input's row order swapped which. It now de-duplicates
+  `(country, value)` pairs, which still collapses the polygon-backend vertex
+  rows the de-duplication exists for and spans the panel otherwise.
+
+* **`distinct_countries()` disagreed with itself.** The branch for rows that
+  resolved to an ISO code picked the earliest year explicitly; the branch for
+  rows that did not, three lines below, still took `distinct()`'s first row.
+  A panel carrying an unmatchable country name in two years therefore kept the
+  earliest year for every country that resolved and an arbitrary one for the
+  country that did not. Both branches now use the same rule.
+
+* **`compare_sources()` dropped duplicate rows in silence.** A provider
+  answering twice for one country-year hands back whichever row came first,
+  order-dependently. `fetch_wdi()` reports exactly this and its comment argues
+  why -- *"this is the response of a third party, which is more reason to"* --
+  and this path said nothing. It now warns with the count and says the first
+  row was kept.
+
+* **A map's colour classes depended on the caller's row order.** The break
+  computation de-duplicated to one row per country, which is right for a
+  polygon-backend frame -- one row per vertex, hundreds per country, all
+  carrying the same fill, and quantiles must not be weighted by how complex an
+  outline is. But it picked an *arbitrary* row when a country's rows genuinely
+  differ, i.e. a panel: the same panel handed over in a different order gave
+  quantile breaks of `10-100` or of `1000-10000`, so the same data drew a
+  different map and nothing said so. It now de-duplicates `(country, value)`
+  pairs, which collapses the vertex rows exactly as before and spans the whole
+  panel otherwise -- what `facet_map(facet = "year")` wants from a shared
+  scale, and order-independent either way.
+
+* **Coverage counts depended on row order too.** `na_coverage()` -- behind the
+  `world_map()` caption, `map_provenance()` and the honest-maps verbs -- took
+  the first row per country, so the same panel reordered reported 2 of 4
+  countries missing or 0 of 4. It now counts a country as shown if any of its
+  rows has a value, matching `imputed_count()`; identical on the map-ready
+  cross-section it is documented for. This mattered in practice because
+  `facet_map(facet = "year")` deliberately hands `world_map()` the whole
+  panel, so that arbitrary number was the caption on a plot showing every year.
+
+* **`classification_report = TRUE` reported a different table for the same
+  map.** It counts countries per class, so one row per country is the right
+  shape, but it too used `distinct()`'s first row. It now takes the earliest
+  year, the rule `distinct_countries()` already promised, which is also now
+  shared between the two rather than written out twice.
+
+* **`map_provenance()` reported `n_imputed = 0` for every data frame**, no
+  matter how many values were interpolated. The data-frame branch never set
+  the field, and the fallback below it is `%||% 0L` -- so unlike the other
+  unset fields, which default to `NA` and claim nothing, this one asserted
+  that nothing had been imputed. A map-ready frame carrying two interpolated
+  values reported zero of them, in the function whose whole job is reporting
+  provenance. `n_imputed` is a data-side fact and is now computed from the
+  frame; the plot path is unchanged.
+
+* **`imputed_count()` picked an arbitrary row per country.** It counts once
+  per country, because a map draws one polygon per country, but it did so via
+  `distinct(.keep_all = TRUE)` -- the *first* row. Identical on the map-ready
+  cross-section it is documented for, but on a panel the first row is an
+  arbitrary year, so a value interpolated in any other year counted as nothing
+  imputed at all. Now "imputed in any row for this country".
+
+* **Running `interpolate_missing()` twice turned the imputation flag off**,
+  which the documented hard rule says cannot happen. The flag was recomputed
+  from scratch on each call as "was `NA` before, is not now" -- and after the
+  first call the filled cells are no longer `NA`, so every `TRUE` became
+  `FALSE`. `world_map()` reads that column to avoid drawing imputed values as
+  though they were observed, so a second defensive call -- or a re-run
+  notebook cell -- silently produced a map with no provenance caption.
+  "This value was imputed" is a property of the data, not of the call that
+  produced it, so an existing logical flag is now carried forward and the
+  operation is idempotent. Carried as a column rather than a vector, because
+  the pipeline re-sorts by `iso3c` and `year`. A flag column that is *not*
+  logical is somebody else's, and still warns that it is being overwritten.
+
+* **One infinite value silently voided a whole `z_score` column.** `scale()`
+  drops `NA` but runs an infinity straight through the mean and the SD, so a
+  single `Inf` made every `z_score` in `rank_countries()` `NaN` -- beside a
+  `rank` and a `percentile` that were still correct, because both are
+  rank-based and untroubled by an infinity. That is the easiest kind of
+  corruption to miss. `z_score` is now `NA` with a warning saying which two
+  columns are unaffected.
+
+* **`sigma_convergence()` returned a silent `NaN` for a year containing an
+  infinity**, through the same `!is.na()` filter that `beta_convergence()`
+  had: `Inf` passes both the `NA` test and `> 0`, so it reached
+  `sd(log(x))`. The filter now tests `is.finite()`, and the reported `n`
+  already says how many observations survived.
+
+* **An infinite base year made `index_to()` report a country as having
+  collapsed to zero.** The guard already returned `NA` for a base that was
+  missing, `NA` or `0`, but not for one that was infinite -- so every other
+  year of that country became `finite / Inf`, a plain and entirely plausible
+  `0`, while its neighbours indexed correctly. The guard now tests
+  `!is.finite()`, which covers `NA` and `NaN` exactly as before.
+
+* **An infinite value crashed `beta_convergence()` with a base R error.** The
+  filter kept observations that were `!is.na()` and `> 0`, and `Inf` passes
+  both, so an infinity reached `log()` and `lm()` died with *NA/NaN/Inf in
+  'x'* -- unclassed, naming nothing. `gini()` and `theil()` already treat an
+  infinity as unusable; the filter now tests `is.finite()`, dropping it
+  alongside the `NA` and non-positive values it already dropped.
+
+* **A character `year` broke the verbs that do arithmetic on it, each in a
+  different way.** `read.csv()` yields `"2000"` readily, and most verbs here
+  tolerate it because they only sort or group. The four that actually compute
+  with a year did not: `beta_convergence()` died with base R's *non-numeric
+  argument to binary operator*, `growth_rate(type = "cagr")` surfaced a dplyr
+  mutate error quoting an internal expression, and `deflate()` exposed its
+  internal join as *Can't join `x$year` with `y$year`*. All three now use the
+  same guard `complete_years()` already used, so the message names the column
+  and the conversion. `growth_rate(type = "yoy")` is unaffected -- it never
+  does year arithmetic -- and neither are `lag_by_country()`, `index_to()`,
+  `sigma_convergence()` or `convergence_club()`.
+
+* **`locate_country()` crashed on an `NA` coordinate and went quiet on an
+  out-of-range one.** A missing longitude or latitude -- what a failed
+  geocoding step produces all the time -- reached `sf::st_as_sf()` and came
+  back as base R's *missing values in coordinates not allowed*, an unclassed
+  error naming neither argument. Those rows now return `NA`, which is already
+  the documented way this function says "no country here", and the rest of the
+  points are located as usual. Separately, a longitude outside [-180, 180] or
+  a latitude outside [-90, 90] returned a silent `NA`, indistinguishable from
+  open ocean, so a column still in 0-360 degrees -- or with the two swapped --
+  looked like a world of water rather than a mistake; it is now a classed
+  error naming the offending pairs and the conversion.
+
+* **A gap in `year` made `lag_by_country()`, `diff_by_country()` and
+  `growth_rate(type = "yoy")` compare rows that are years apart, silently.**
+  These read the previous *row*, not the previous year, so on a panel of 2000,
+  2002 and 2005 the 2005 growth rate came back as 27.3% -- the change since
+  2002 -- in a column the docs call year-on-year and the argument calls
+  `"yoy"`. The arithmetic is unchanged, because a quinquennial panel is a
+  legitimate design and re-keying the lag would move everyone's results; but
+  the three verbs now warn and name the countries whose years are not
+  consecutive, pointing at `complete_years()`. `type = "cagr"` divides by the
+  real year span and so is silent, as before.
+
+* **`convergence_club()` died with a bare `simpleError` on a repeated
+  country-year.** `pivot_wider()` folds the repeat into a list-column and
+  `as.matrix()` then failed with base R's *invalid 'type' (list) of argument*,
+  naming neither the verb nor the offending rows. A repeat is fatal to the
+  log-t test rather than merely inaccurate, so it is now a classed error that
+  lists the country-years and points at `check_panel_unique()`.
+
+* **`theil()` returned `NaN` for both components when one group's weights
+  summed to zero.** `sw == 0` was guarded for the whole vector, but not per
+  group: the group mean `sum(w[i] * x[i]) / swg` was `0/0`, and the `NaN`
+  poisoned `between` and `within` while `total` came back a perfectly good
+  number -- with no warning to say which group did it. A group with no weight
+  has no share of the population, so its contribution to both components is
+  exactly zero, and the decomposition identity `total == between + within`
+  now holds in that case too.
+
+* **`interpolate_missing()` stripped a column's class when, and only when, the
+  series had a gap.** The fill went through `ifelse()`, which drops attributes,
+  so a `Date` column came back as bare numbers -- `2020-01-01` returned as
+  `18262`. A series with no `NA` took an early return that preserved the
+  column, so the same column changed type depending on its data. The fill now
+  assigns into a copy of the input, which keeps the class.
+
+* **Passing ISO codes to a verb that expects country names gave no usable
+  advice.** `origin` defaults to `"country.name"` throughout, so
+  `country_factsheet("FRA")` -- the canonical ISO3 code -- was refused and the
+  message suggested `check_country_match()`, which has nothing to say about a
+  code. When every unresolved value is a valid code under some other origin,
+  the message now names it: *It resolves under `origin = "iso3c"` -- try that
+  instead.* Applies to `country_factsheet()`, `neighbors()`,
+  `distance_between()` and the join verbs. A genuinely unknown name still gets
+  the close-name suggestion and no misleading hint.
+
 * **Accented country names written in NFD resolved to `NA`.** The same accent
   can be encoded as one precomposed code point (NFC) or as a base letter
   followed by a combining mark (NFD) -- identical on screen, different strings
@@ -219,6 +467,152 @@ existing code: `world_map(projection = "mercator")` now produces a different
   code comment, but nothing in `?index_to` said it, and the sibling
   `deflate()` refuses such a year instead. Both behaviours are unchanged; the
   contrast is now stated, with an example.
+
+* **A `units` value crashed the numeric guards.** `sf`'s `st_area()` and
+  `st_distance()` return units objects, so a threshold computed from geometry
+  and passed to a numeric argument is an easy mistake -- and `is.numeric()` is
+  TRUE for one, so it sailed through the type check. The *range comparison*
+  then raised the units package's own "both operands of the expression should
+  be units objects", naming neither the argument nor this package.
+  `check_number()` and `check_top_n()` now ask whether the comparison is
+  possible before making it, and say what to do: "`cutoff_km` must be a plain
+  number. Got <units> ... Drop the unit first, e.g. `as.numeric(cutoff_km)`."
+  A classed numeric that does compare, and a named scalar, are still accepted
+  as before.
+
+* **Three more arguments consumed a function before checking it.** A sibling
+  of the validator fix below, with a different mechanism: the value was used
+  before any check ran, so the crash came from the consuming call rather than
+  the message. `check_choice()` reached `as.character(x)` on its
+  default-detection line, which is how `world_map(projection = mean)` died;
+  `country_groups()` reached `setdiff(group, valid)`, which coerces (and a
+  formula got as far as "duplicated() applies only to vectors"); and
+  `complete_years()` called `anyNA(years)` *inside the condition* of the guard
+  meant to catch bad input, which errors outright on an environment. All three
+  now refuse a function or environment up front and name the class.
+
+* **Passing a function to a validated argument crashed the validator itself.**
+  `check_string()`, `check_bool()`, `check_number()` and `check_top_n()` build
+  their message with `{.val {x}}`, which coerces the value to character -- and
+  that fails outright for a closure, with base R's "cannot coerce type
+  'closure' to vector of type 'character'". The error path therefore crashed
+  instead of reporting the bad input, and every caller inherited it:
+  `register_country_source(mean, ...)`, `clear_country_cache(source = mean)`,
+  `as_ggsql_source(name = mean)` and `world_query(source = mean)` all gave a
+  bare `simpleError` from base R rather than naming the argument. `length()`
+  was no defence -- a closure has length 1, so the length branch never fired,
+  and `length(globalenv())` counts bindings, so an environment reported "Got 5
+  values". All four now name the class instead: "Got `<function>`". Ordinary
+  values, including the value itself and the wrong-length counts, are
+  unchanged.
+
+* **A numeric argument turned an "unknown name" error into a cli crash.**
+  Several messages put the pluralisation marker ahead of the value --
+  `"Unknown group{?s}: {.val {bad}}"`. With no quantity set, cli reaches for
+  the most recent interpolation to find one, and a *numeric* vector there is
+  read as the quantity itself, which must be length 1. So
+  `country_groups(c(1, 2))` died on cli's own "length(object) == 1 is not
+  TRUE" rather than reporting the bad input, and the same held for
+  `check_cols()`, `world_table(columns = )` and
+  `classify_compare(methods = )`. Character vectors were fine, which is why it
+  went unnoticed. The five affected messages now set the count with
+  `cli::qty(length(x))`, the form `reporting.R` already used. Note `qty(x)`
+  alone is not enough for a numeric `x` -- it hits the same trap. Singular and
+  plural now read correctly for both types, and character messages are
+  unchanged.
+
+* **The spherical-area helper mis-measured rings at the antimeridian.**
+  `ring_area_km2()` picks a country's largest polygon piece so the label lands
+  on the mainland rather than in an ocean. Longitudes arrive wrapped into
+  `[-180, 180)`, so a raw edge difference jumps by ~360 degrees at the
+  antimeridian, and the two failure modes pointed opposite ways: a ring
+  *crossing* 180 measured 179 times too large (a 2-degree equatorial square
+  came out at 8.85e6 km2 instead of 49447), while one *encircling* the pole
+  cancelled to about zero (a cap at latitude -80 measured 7e-11 instead of
+  3.87e6). Either can hand the "largest piece" choice to the wrong ring --
+  exactly the mislabelling the helper exists to prevent. Edges are now
+  differenced modulo 360, which agrees with the analytic area for an
+  equatorial square, a wrapped square and a polar cap alike. No centroid
+  changes: the bundled polygon data splits pieces at the antimeridian, so all
+  239 still match `country_meta`. The point is that the result no longer
+  depends on the data being split that way.
+
+* **`tissot_map()` failed for many ordinary radii.** Its circles are built by
+  walking out along azimuths `0..2*pi` and wrapping longitude into
+  `[-180, 180)`. `az = 0` and `az = 2*pi` are the same point, but the wrap
+  could send the two ends to `-180` and `+180` -- the same meridian, opposite
+  signs -- so `st_polygon()` saw an unclosed ring and sf reported "polygons
+  not (all) closed", a bare `simpleError` naming neither the argument nor the
+  function. Whether it happened depended on the radius, and the default hid
+  it: at `radius_km = 500` no centre in the grid produced such a ring, at
+  `1000` six did and at `5000` fifteen. The failures were not monotonic --
+  `500` and `10000` worked while `1000`, `2000`, `5000`, `8000`, `12000` and
+  `20000` did not. The ring is now closed by construction rather than relying
+  on the arithmetic to reproduce its first vertex, and every radius from 100
+  to 40000 km draws. The antimeridian guard is unchanged, so a larger radius
+  still drops the circles that would smear across the map.
+
+* **An enormous `k` in `dorling_map()` surfaced a GEOS exception.** `k` was
+  bounded below but not above. `check_number()` already refuses `Inf`, so
+  `k = Inf` errored cleanly, but a merely enormous finite value passed and
+  then overflowed the coordinate arithmetic inside GEOS, which reported an
+  illegal-argument exception about encountering non-finite numbers in an
+  orientation test -- a bare `simpleError` from a C++ library, naming neither
+  `k` nor the function. It is now capped at `.Machine$integer.max`, the bound
+  the counting arguments elsewhere use, so the refusal comes from the package
+  and names the argument. Realistic values are unaffected: `k = 1e6` still
+  draws.
+
+* **`top_n` past integer range leaked a base R error.** `Inf` is the
+  documented "no limit", and `world_table()` and `country_network()` both gate
+  on `is.finite(top_n)` to detect it -- so a *finite* value beyond integer
+  range passed the gate and then broke on the coercion behind it.
+  `as.integer(1e18)` is `NA`, so `utils::head(df, NA)` surfaced base R's
+  "invalid 'n' - must contain at least one non-missing element, got none": a
+  bare `simpleError` naming neither `top_n` nor the package. Asking for at
+  most `1e18` rows of a 191-row table is the same request as `Inf`, so it is
+  now normalised to `Inf` rather than rejected. Representable limits are
+  unchanged, `.Machine$integer.max` still works, and `0` / negatives / `NA` /
+  non-numeric are still refused with a `countryatlas_error`. Found by fuzzing
+  argument values, looking for errors the package had not classified.
+
+* The two hand-curated datasets are pinned to the scripts that build them.
+  `country_groups_history` and `disputed_territories` are maintained by hand
+  in `data-raw/`, so the script is the source of truth and drift can happen in
+  either direction -- editing the `.rda` without the script, or the script
+  without rebuilding. Both are now re-run during the tests and compared to the
+  shipped data, the same guard `data-raw/overrides_snapshot.R` already had.
+  Both reproduce byte for byte today.
+
+* `interpolate_missing()` no longer carries a second, unreachable
+  duplicate-column guard. `check_panel_unique()` grew one of its own earlier
+  in this cycle, and it runs five lines earlier, so the copy inside
+  `interpolate_missing()` could never fire -- its stale comment still claimed
+  the function "did not" reject duplicate names. Line coverage showed the
+  block never executing. The rejection itself is unchanged, still raising
+  `countryatlas_duplicate_columns`, and is now covered by a test.
+
+* `audit_time_coverage()`'s three console messages are covered by tests. None
+  of those lines had ever executed, which meant the pluralisation in
+  "{n} row{?s} fall{?s/} outside the country's existence" had never been
+  checked at both counts -- and `{?s}` keys to the most recently interpolated
+  value, a construct this package has got wrong before. Both readings are
+  correct ("1 row falls", "2 rows fall") and are now pinned, along with the
+  no-findings message and the empty-input column contract.
+
+* **`rate_check()` reported "no countries flagged" when it meant "unknown".**
+  When no small-denominator threshold can be computed it warns that `flagged`
+  is `NA` throughout -- but `is.finite(den) & den < thr` yields `FALSE`, not
+  `NA`, for a non-finite denominator, because R short-circuits `FALSE & NA` to
+  `FALSE`. An all-`NA` denominator therefore produced `FALSE` for every row,
+  so `sum(out$flagged)` returned `0`: a confident "nothing is flagged", which
+  is precisely the misreading the warning was written to prevent. An all-zero
+  or all-negative denominator did yield `NA`, so the cases disagreed with each
+  other as well as with the message. With no threshold, no row can be compared
+  to one, so `flagged` is now `NA` for every row and the warning fires exactly
+  when that is true. The normal path is unchanged, including its `FALSE` for a
+  missing denominator among usable ones, which keeps `sum(out$flagged)`
+  working as intended.
 
 * **`getis_ord()` computed its spread with the unstable one-pass formula, so
   a tightly clustered column produced `Inf` or `NaN` z-scores.** The spread

@@ -416,8 +416,27 @@ na_coverage <- function(data, fill_name, shown = NULL) {
   # where provenance could name only 16.
   if ("iso3c" %in% names(df)) df <- df[!is.na(df$iso3c), , drop = FALSE]
   key <- wdj_unit_key(names(df))
-  if (length(key)) df <- dplyr::distinct(df, .data[[key[1]]], .keep_all = TRUE)
   ok <- if (is.null(shown)) !is.na(df[[fill_name]]) else df[[".wdj_shown"]]
+  if (length(key)) {
+    # Counted once per country, as imputed_count() does, and by "has a value in
+    # any of its rows" rather than distinct()'s first row. On the map-ready
+    # cross-section this is documented for, the two are identical. On a panel
+    # the first row is whichever year happens to come first, so the same panel
+    # reordered reported 2 of 4 countries missing or 0 of 4 -- and
+    # facet_map(facet = "year") hands world_map() the whole panel, so that
+    # arbitrary number was the caption on a plot showing every year.
+    unit <- as.character(df[[key[1]]])
+    agg <- vapply(split(ok, unit), function(z) any(z, na.rm = TRUE), logical(1))
+    iso <- if ("iso3c" %in% names(df)) {
+      vapply(split(as.character(df$iso3c), unit), function(z) z[1L], character(1))
+    } else NULL
+    # unname(): split() names its result by the grouping value, and the caller
+    # gets this vector straight into a caption and into expect_equal(). It was
+    # unnamed before the per-unit aggregation and has to stay that way.
+    return(list(n_total = length(agg), n_shown = sum(agg), n_missing = sum(!agg),
+                missing_iso3c = if (is.null(iso)) character(0) else
+                  unname(sort(iso[!agg]))))
+  }
   list(n_total = length(ok), n_shown = sum(ok), n_missing = sum(!ok),
        missing_iso3c = if ("iso3c" %in% names(df)) sort(df$iso3c[!ok]) else character(0))
 }
@@ -567,7 +586,11 @@ na_hatch_layer <- function(data, fill_name, sf_mode, borders) {
 classification_table <- function(data, fill_name, style, n_bins, breaks) {
   df <- tibble::as_tibble(sf_drop(data))
   key <- wdj_unit_key(names(df))
-  if (length(key)) df <- dplyr::distinct(df, .data[[key[1]]], .keep_all = TRUE)
+  # One row per country is the right shape here -- the report counts countries
+  # per class, so a country must not land in two. But by the earliest year
+  # rather than distinct()'s first row, or the same panel reordered gave a
+  # different report of the same map.
+  if (length(key)) df <- earliest_per_unit(df, key[1])
   vals <- df[[fill_name]]
   # With no breaks the fallback was as.factor(vals) -- one "class" per distinct
   # value. For a continuous scale that produced a 189-row report of n = 1, which
@@ -585,7 +608,11 @@ classification_table <- function(data, fill_name, style, n_bins, breaks) {
   cls <- if (!is.null(breaks)) {
     cut(vals, breaks = breaks, include.lowest = TRUE, dig.lab = 4)
   } else {
-    as.factor(vals)
+    # as.factor() orders its levels with the session's collation locale, so the
+    # report's rows came out in a different order on a different machine.
+    # Byte order, as for the fill levels themselves.
+    lv <- unique(as.character(vals[!is.na(vals)]))
+    factor(as.character(vals), levels = lv[order(lv, method = "radix")])
   }
   tab <- as.data.frame(table(class = cls, useNA = "no"), stringsAsFactors = FALSE)
   tibble::tibble(
@@ -608,14 +635,38 @@ classification_table <- function(data, fill_name, style, n_bins, breaks) {
 # the key whenever there is one, on either backend.
 apply_binned_fill <- function(data, fill_q, fill_name, style, n_bins) {
   vals <- data[[fill_name]]
+  # A character fill column reaches ggplot2 unfactored, and its discrete scale
+  # then derives the level order by sorting -- using the session's collation
+  # locale. Same script, same data, different machine: the legend read
+  # "Belgium, Chad, Zambia, aland, <A-ring>land" under C collation and
+  # "aland, <A-ring>land, Belgium, Chad, Zambia" under en_US, so every category
+  # was drawn in a different colour. Pin the order here, byte-wise, so it is
+  # the same everywhere. method = "radix" is the point: plain sort() is what
+  # consults the locale. An incoming factor is left alone -- the caller has
+  # already chosen an order, and overriding it would be the real surprise.
+  if (is.character(vals)) {
+    lv <- unique(vals[!is.na(vals)])
+    data[[fill_name]] <- factor(vals, levels = lv[order(lv, method = "radix")])
+  }
   if (!style %in% c("quantile", "jenks", "binned") || !is.numeric(vals)) {
     return(structure(list(data = data, fill = fill_q), breaks = NULL))
   }
   break_vals <- vals
   key <- wdj_unit_key(names(data))
   if (length(key)) {
+    # De-duplicate (unit, value) pairs, not "one row per unit". The de-dup is
+    # here so a polygon-backend frame -- one row per vertex, hundreds per
+    # country, all carrying the same fill -- does not weight the quantiles by
+    # how complex a country's outline is; those rows collapse to one either
+    # way. What "one row per unit" also did was pick an arbitrary row when a
+    # country's rows genuinely differ, i.e. a panel: the same panel reordered
+    # gave breaks of 10-100 or of 1000-10000, so the map's colours depended on
+    # the caller's row order and nothing said so. Keeping the distinct values
+    # spans the whole panel instead, which is what facet_map(facet = "year")
+    # wants from a shared scale, and is order-independent either way because
+    # breaks depend on the multiset of values and not their order.
     break_vals <- dplyr::distinct(tibble::as_tibble(data),
-                                  .data[[key[1]]], .keep_all = TRUE)[[fill_name]]
+                                  .data[[key[1]]], .data[[fill_name]])[[fill_name]]
   }
   br <- compute_breaks(break_vals, if (style == "binned") "equal" else style,
                        n_bins)
@@ -1229,7 +1280,14 @@ dorling_map <- function(data, weight, fill = NULL, k = 5, itermax = 1000,
   # Unchecked, these surfaced as cartogram's own diagnostics -- "all sizes are
   # missing and/or non-positive" for k, and an assertion naming cartogram's
   # internal `maxiter` rather than our `itermax`.
-  check_number(k, "k", lo = 0)
+  # Bounded above as well as below: check_number() already refuses Inf, but a
+  # merely enormous finite k passed and then overflowed the coordinate
+  # arithmetic inside GEOS, which surfaced as "IllegalArgumentException:
+  # CGAlgorithmsDD::orientationIndex encountered NaN/Inf numbers" -- a bare
+  # simpleError from a C++ library, naming neither k nor this function.
+  # k = 1e12 still works; only values that cannot produce finite geometry are
+  # refused. The cap matches the one the counting arguments elsewhere use.
+  check_number(k, "k", lo = 0, hi = .Machine$integer.max)
   check_number(itermax, "itermax", lo = 1, hi = .Machine$integer.max)
   # check_number()'s bounds are inclusive, but cartogram needs k > 0 and reports
   # a zero as "all sizes are missing and/or non-positive". Same shape as
@@ -1616,7 +1674,14 @@ interactive_map <- function(data, fill, tooltip = NULL,
                                    palette = viridis_hex)$expression
       } else {
         mapgl::match_expr(column = fill_name,
-                          values = sort(unique(as.character(g[[fill_name]]))),
+                          # method = "radix": plain sort() consults the
+                          # collation locale, and these values are paired
+                          # positionally with the colour stops below, so the
+                          # same categories were drawn in different colours on
+                          # machines with different locales.
+                          values = { .v <- unique(as.character(g[[fill_name]]))
+                                     .v <- .v[!is.na(.v)]
+                                     .v[order(.v, method = "radix")] },
                           stops = viridis_hex(
                             length(unique(stats::na.omit(g[[fill_name]])))))
       },
@@ -2238,8 +2303,20 @@ imputed_count <- function(data) {
   if (!length(flags)) return(0L)
   df <- tibble::as_tibble(sf_drop(data))
   key <- wdj_unit_key(names(df))
-  if (length(key)) df <- dplyr::distinct(df, .data[[key[1]]], .keep_all = TRUE)
-  sum(vapply(flags, function(f) sum(df[[f]], na.rm = TRUE), integer(1)))
+  if (!length(key)) {
+    return(sum(vapply(flags, function(f) sum(df[[f]], na.rm = TRUE), integer(1))))
+  }
+  # Counted once per country, because a map draws one polygon per country. But
+  # "imputed in any row for this country" rather than distinct()'s first row:
+  # identical on the map-ready cross-section this is documented for, and honest
+  # on a panel, where the first row is an arbitrary year -- a value
+  # interpolated in any other year was reported as nothing imputed at all.
+  unit <- df[[key[1]]]
+  sum(vapply(flags, function(f) {
+    v <- df[[f]]
+    v[is.na(v)] <- FALSE
+    sum(vapply(split(v, unit), any, logical(1)))
+  }, integer(1)))
 }
 
 # The caption fragment for imputed values. Not optional and not suppressible:

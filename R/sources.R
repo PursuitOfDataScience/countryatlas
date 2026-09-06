@@ -488,7 +488,21 @@ compare_sources <- function(indicator, sources = c("wdi", "owid"), year,
       if (!length(num)) wdj_abort("Source {.val {s}} returned no numeric column.")
       d[[s]] <- d[[num[1]]]
     }
-    dplyr::distinct(d[, c("iso3c", s)], .data$iso3c, .keep_all = TRUE)
+    # A provider answering twice for one country-year hands back whichever row
+    # came first, order-dependently. fetch_wdi() reports exactly this and
+    # argues why -- "this is the response of a third party, which is more
+    # reason to" -- and this path was silent about the same thing.
+    one <- dplyr::distinct(d[, c("iso3c", s)], .data$iso3c, .keep_all = TRUE)
+    n_drop <- nrow(d) - nrow(one)
+    if (n_drop > 0L) {
+      wdj_warn(c(
+        "Source {.val {s}} returned {n_drop} duplicate countr{?y/ies} for
+         {.val {year}}, now dropped.",
+        "i" = "The first row for each country was kept, so the comparison uses
+               whichever value the provider listed first."
+      ), class = "countryatlas_duplicate_rows")
+    }
+    one
   })
   out <- Reduce(function(a, b) dplyr::full_join(a, b, by = "iso3c",
                                          na_matches = "never"), vals)

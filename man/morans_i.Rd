@@ -25,9 +25,11 @@ contiguity, row-standardised -- which excludes every island. See below.}
 A one-row tibble: \code{i} (observed Moran's I), \code{expected}
 (\eqn{-1/(n-1)} under no autocorrelation), \code{n} (countries used),
 \code{n_excluded} (countries with data that the weights could not reach),
-\code{n_links}, \code{p_value} (one-sided, \eqn{P(I_{perm} \ge I_{obs})}) and an
-\code{excluded} list-column of the excluded \code{iso3c} codes. Set a seed beforehand
-for a reproducible \code{p_value}.
+\code{n_links}, \code{p_value} (one-sided, \eqn{P(I_{perm} \ge I_{obs})}, computed as
+\eqn{(1 + \#\{I^{*} \ge I_{obs}\}) / (n_{perm} + 1)}, so never exactly
+zero -- the floor is \eqn{1/(n_{perm}+1)}) and an \code{excluded} list-column of
+the excluded \code{iso3c} codes. Set a seed beforehand for a reproducible
+\code{p_value}.
 }
 \description{
 Do neighbouring countries have similar values? Global Moran's I on the country

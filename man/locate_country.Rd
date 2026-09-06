@@ -15,7 +15,11 @@ locate_country(
 }
 \arguments{
 \item{lon, lat}{Equal-length numeric vectors of longitude / latitude, giving
-one point per element (ignored if \code{points} is supplied).}
+one point per element (ignored if \code{points} is supplied). A point with a
+missing coordinate returns \code{NA}, the same as a point in no country; a
+longitude outside \verb{[-180, 180]} or a latitude outside \verb{[-90, 90]} is an
+error rather than a silent \code{NA}, because it is a mistake and not an
+ocean.}
 
 \item{points}{Optional \code{sf} POINT object to use instead of \code{lon}/\code{lat}.}
 

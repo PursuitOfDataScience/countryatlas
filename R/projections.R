@@ -269,7 +269,17 @@ tissot_map <- function(projection = "equal_earth", spacing = 30,
     phi <- asin(sin(phi1) * cos(d) + cos(phi1) * sin(d) * cos(az))
     lam <- lam1 + atan2(sin(az) * sin(d) * cos(phi1),
                         cos(d) - sin(phi1) * sin(phi))
-    cbind((lam * 180 / pi + 180) %% 360 - 180, phi * 180 / pi)
+    xy <- cbind((lam * 180 / pi + 180) %% 360 - 180, phi * 180 / pi)
+    # az = 0 and az = 2*pi are the same point, but the wrap above can send the
+    # two ends to -180 and +180 -- the same meridian, opposite signs -- and
+    # st_polygon() then rejects the ring as not closed. Whether that happened
+    # depended on the radius: at the default 500 km no centre in the grid
+    # produced such a ring, at 1000 km six did and at 5000 km fifteen, so
+    # tissot_map(radius_km = 1000) failed with sf's "polygons not (all)
+    # closed" while 500 and 10000 drew fine. Close the ring by construction
+    # instead of relying on the arithmetic to reproduce the first vertex.
+    xy[nrow(xy), ] <- xy[1L, ]
+    xy
   }
   polys <- lapply(seq_len(nrow(centres)), function(i) {
     xy <- circle(centres$lon[i], centres$lat[i])

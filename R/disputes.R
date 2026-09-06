@@ -223,20 +223,13 @@ interpolate_missing <- function(data, value = NULL,
   # "is not NA" and neither was ever NA. The comparison below is documented as
   # catching a filler that changes an observed value; it cannot catch this one,
   # so the malformed input has to be reported instead.
+  # This function used to carry its own duplicate-column-name guard as well,
+  # which became unreachable once check_panel_unique() grew one; coverage
+  # showed the block never running, so it is gone. Note the name check is
+  # belt-and-braces -- a validator further down rejects duplicate names too,
+  # so removing this call still errors on them. What only this call catches is
+  # the duplicate *row* case above, which is why it stays.
   check_panel_unique(data)
-  # complete_years() and audit_coverage() both reject a frame with duplicate
-  # column names -- vctrs does it for them -- but this one did not, and the
-  # dplyr pipeline below quietly repaired the names instead: given two columns
-  # called `v` it filled the first and handed back the second as `v.1`, a
-  # column the caller never created and was never told about.
-  dup_names <- unique(names(data)[duplicated(names(data))])
-  if (length(dup_names)) {
-    wdj_abort(c(
-      "{.arg data} has {length(dup_names)} duplicated column name{?s}:",
-      "*" = "{.val {dup_names}}",
-      "i" = "Rename or drop the duplicate -- which one to fill is ambiguous."
-    ))
-  }
   measures <- setdiff(names(data)[vapply(data, is.numeric, logical(1))], "year")
   value_expr <- substitute(value)
   value <- tryCatch(value %||% measures, error = function(e) {
@@ -249,7 +242,26 @@ interpolate_missing <- function(data, value = NULL,
   if (identical(method, "none")) return(wdj_return_frame(data))
 
   flags <- paste0(value, "_imputed")
-  warn_overwrite(data, flags)
+  # Warn only about a flag column we cannot carry forward. A logical one is
+  # this function's own provenance record and is preserved below, so
+  # warn_overwrite()'s "rename them first to keep the original values" would be
+  # false advice; anything else really is being clobbered.
+  warn_overwrite(data, flags[vapply(flags, function(f)
+    f %in% names(data) && !is.logical(data[[f]]), logical(1))])
+  # "This value was imputed" is a property of the data, not of the call that
+  # produced it. Running interpolate_missing() twice on the same column
+  # recomputed the flag from scratch, and the cells the first call filled are
+  # no longer NA -- so every TRUE became FALSE and the flag was, in effect,
+  # turned off. The documented hard rule is that it cannot be, and world_map()
+  # relies on that to avoid drawing imputed values as observed with no caption.
+  # Carried as a column for the same reason the "was missing" flags below are:
+  # the pipeline arranges by (iso3c, year), so a vector held aside would land
+  # the old flags on the wrong rows.
+  prior <- paste0(".countryatlas_prior_", flags)
+  for (i in seq_along(flags)) {
+    p <- if (flags[i] %in% names(data)) data[[flags[i]]] else NULL
+    data[[prior[i]]] <- if (is.logical(p)) !is.na(p) & p else FALSE
+  }
   # Record "was missing" as columns, so it travels with the rows. It used to be
   # captured as plain vectors off `data` and compared against `out` further
   # down -- but the pipeline below arranges by (iso3c, year), so the two lined
@@ -272,8 +284,9 @@ interpolate_missing <- function(data, value = NULL,
   # comparison rather than tracked inside the filler, so a filler that ever
   # changes an observed value would show up here as a flagged cell.
   for (i in seq_along(value)) {
-    out[[flags[i]]] <- out[[flags[i]]] & !is.na(out[[value[i]]])
+    out[[flags[i]]] <- (out[[flags[i]]] & !is.na(out[[value[i]]])) | out[[prior[i]]]
   }
+  out <- out[, setdiff(names(out), prior), drop = FALSE]
   attr(out, "countryatlas_imputed") <- flags
   out
 }
@@ -295,11 +308,23 @@ fill_capped <- function(x, y, method, max_gap) {
   filled <- if (identical(method, "linear")) {
     wdj_interp_linear(x, y)
   } else {
-    # LOCF, without pulling in another dependency.
+    # LOCF, without pulling in another dependency. Assignment rather than
+    # ifelse() so the fill keeps whatever type arrived; positions before the
+    # first observation are left holding y's own typed NA.
     idx <- cumsum(!is.na(y))
-    ifelse(idx == 0L, NA, y[!is.na(y)][pmax(idx, 1L)])
+    seen <- idx > 0L
+    out <- y
+    out[seen] <- y[!is.na(y)][idx[seen]]
+    out
   }
-  ifelse(keep, filled, y)
+  # ifelse() drops attributes, so a classed column came back stripped: a Date
+  # of 2020-01-01 returned as the bare number 18262. Worse, it only happened
+  # when the series actually had a gap, because the no-NA path above returns
+  # `y` untouched -- so the same column changed type depending on its data.
+  # Assigning into a copy of `y` preserves the class through `[<-`.
+  out <- y
+  out[keep] <- filled[keep]
+  out
 }
 
 # --- Value-Suppressing Uncertainty Palettes -------------------------------------

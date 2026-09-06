@@ -21,6 +21,14 @@ skip the test, which leaves \code{p_value} as \code{NA}).}
 \value{
 A one-row tibble: \code{c} (observed), \code{expected} (always 1), \code{n},
 \code{n_excluded}, \code{n_links}, \code{p_value} and an \code{excluded} list-column.
+
+\code{p_value} is \strong{one-sided on the lower tail}:
+\eqn{(1 + \#\{C^{*} \le C_{obs}\}) / (n_{perm} + 1)}. The lower tail is
+the clustered one, which is the opposite way round from Moran's \emph{I}:
+Geary's \emph{C} runs from 0 (neighbours identical) through 1 (no
+autocorrelation) upwards, so a \emph{small} \code{c} is the evidence of positive
+spatial association. Never exactly zero; the floor is
+\eqn{1/(n_{perm}+1)}. Set a seed beforehand for a reproducible \code{p_value}.
 }
 \description{
 The other classical global autocorrelation statistic. Where Moran's I is a

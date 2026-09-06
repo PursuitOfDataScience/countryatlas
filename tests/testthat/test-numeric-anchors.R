@@ -855,3 +855,217 @@ test_that("getis_ord z-scores are shift invariant, and stay finite for a tight c
                  class = "countryatlas_zero_variance")
   expect_true(all(is.na(flat$z_score)))
 })
+
+test_that("ring_area_km2 measures wrapped and encircling rings correctly", {
+  # Longitudes arrive wrapped into [-180, 180), so a raw edge difference jumps
+  # by ~360 at the antimeridian. The two failure modes pointed opposite ways:
+  # a ring *crossing* 180 came out 179x too large, and one *encircling* the
+  # pole cancelled to ~0. Either can hand which.max() the wrong piece, which
+  # is the mislabelling this function exists to prevent.
+  f <- countryatlas:::ring_area_km2
+  R <- 6371
+  # An equatorial 2-degree square, against the flat-earth approximation.
+  eq <- f(c(0, 2, 2, 0), c(0, 0, 2, 2))
+  expect_equal(eq, (2 * pi / 180 * R)^2, tolerance = 1e-3)
+  # The same square with its longitudes wrapped across the antimeridian must
+  # measure the same. This was 179x larger.
+  wrapped <- (c(178, 180, 180, 178) + 180) %% 360 - 180
+  expect_equal(f(wrapped, c(0, 0, 2, 2)), eq, tolerance = 1e-9)
+  # A ring encircling the pole is a spherical cap, not zero. This was ~7e-11.
+  lons <- c(seq(-180, 179, by = 5), 180)
+  cap <- f(lons, rep(-80, length(lons)))
+  expect_equal(cap, 2 * pi * R^2 * (1 - cos(10 * pi / 180)), tolerance = 1e-4)
+  expect_gt(cap, 1e6)
+  # Degenerate input is still zero rather than an error.
+  expect_equal(f(c(0, 1), c(0, 1)), 0)
+  expect_equal(f(numeric(0), numeric(0)), 0)
+  expect_equal(f(c(0, 1, NA), c(0, 1, NA)), 0)
+
+  # And the property that actually matters: every bundled centroid is the
+  # midpoint of the country's largest piece, unchanged by the fix.
+  skip_if_not_installed("maps")
+  poly <- attach_geometry(countryatlas::world_snapshot$countries,
+                          geometry = "polygon")
+  cm <- countryatlas::country_meta
+  checked <- 0L
+  for (k in c("FJI", "RUS", "USA", "NZL", "ATA", "FRA")) {
+    rows <- poly[!is.na(poly$iso3c) & poly$iso3c == k, ]
+    ref <- cm[cm$iso3c == k, ]
+    if (!nrow(rows) || !nrow(ref) || is.na(ref$centroid_lon[1])) next
+    pc <- countryatlas:::polygon_centroids(rows)
+    expect_equal(pc$centroid_lon[1], ref$centroid_lon[1], tolerance = 1e-6,
+                 info = k)
+    checked <- checked + 1L
+  }
+  expect_gt(checked, 3L)
+})
+
+test_that("Moran's I, Geary's C and local Moran's I agree with spdep exactly", {
+  skip_if_not_installed("spdep")
+  skip_on_cran()
+
+  snap <- countryatlas::world_snapshot$countries
+  M <- as.matrix(country_weights("knn", k = 4))
+  d <- snap[match(rownames(M), snap$iso3c), c("iso3c", "gdp_per_capita")]
+  keep <- !is.na(d$gdp_per_capita)
+  M <- M[keep, keep]; d <- d[keep, ]
+
+  # Our verbs drop units the weights cannot reach, and dropping them can
+  # isolate others, so iterate to the fixed point where nothing is excluded.
+  # Only then do both implementations see the same graph and the comparison
+  # means anything -- without this the two disagree purely over which
+  # countries are in the sample.
+  for (i in 1:12) {
+    rs <- rowSums(M)
+    wc <- country_weights("custom", w = M / ifelse(rs == 0, 1, rs))
+    p <- suppressWarnings(morans_i(d, gdp_per_capita, weights = wc, n_perm = 0))
+    ex <- as.character(unlist(p$excluded, use.names = FALSE))
+    if (!length(ex) || all(is.na(ex))) break
+    k <- !(d$iso3c %in% ex); M <- M[k, k]; d <- d[k, ]
+  }
+  rs <- rowSums(M); M <- M / ifelse(rs == 0, 1, rs)
+  wc <- country_weights("custom", w = M)
+  x <- as.vector(d$gdp_per_capita)
+  lw <- suppressWarnings(spdep::mat2listw(M, style = "W", zero.policy = TRUE))
+  expect_equal(suppressWarnings(morans_i(d, gdp_per_capita, weights = wc,
+                                         n_perm = 0))$n_excluded, 0)
+
+  mi <- suppressWarnings(morans_i(d, gdp_per_capita, weights = wc, n_perm = 0))
+  expect_equal(mi$i, spdep::moran(x, lw, n = length(x),
+                                  S0 = spdep::Szero(lw))$I)
+  expect_equal(mi$expected, -1 / (length(x) - 1))
+
+  gc_ <- suppressWarnings(gearys_c(d, gdp_per_capita, weights = wc, n_perm = 0))
+  expect_equal(gc_$c, spdep::geary(x, lw, n = length(x), n1 = length(x) - 1,
+                                   S0 = spdep::Szero(lw))$C)
+  expect_equal(gc_$expected, 1)
+
+  sl <- suppressWarnings(spatial_lag(d, gdp_per_capita, weights = wc))
+  expect_equal(sl$gdp_per_capita_lag, as.numeric(spdep::lag.listw(lw, x)))
+
+  lm_ <- suppressWarnings(local_morans(d, gdp_per_capita, weights = wc, n_perm = 0))
+  expect_equal(lm_$ii, as.numeric(spdep::localmoran(x, lw, zero.policy = TRUE)[, "Ii"]))
+  # The local values must average to the global one -- the identity that makes
+  # them a decomposition rather than an unrelated statistic.
+  expect_equal(sum(lm_$ii) / length(x), mi$i)
+})
+
+test_that("getis_ord() matches the Ord & Getis (1995) definition", {
+  snap <- countryatlas::world_snapshot$countries
+  M <- as.matrix(country_weights("knn", k = 4))
+  d <- snap[match(rownames(M), snap$iso3c), c("iso3c", "gdp_per_capita")]
+  keep <- !is.na(d$gdp_per_capita)
+  M <- M[keep, keep]; d <- d[keep, ]
+  # Iterate to the fixed point: getis_ord() drops units the weights cannot
+  # reach, and dropping them isolates others, so the reference has to be built
+  # on exactly the set that survives.
+  for (i in 1:12) {
+    rs <- rowSums(M)
+    wc <- country_weights("custom", w = M / ifelse(rs == 0, 1, rs))
+    go <- suppressWarnings(getis_ord(d, gdp_per_capita, weights = wc))
+    if (nrow(go) == nrow(d)) break
+    k <- d$iso3c %in% go$iso3c; M <- M[k, k]; d <- d[k, ]
+  }
+  rs <- rowSums(M); M <- M / ifelse(rs == 0, 1, rs)
+  wc <- country_weights("custom", w = M)
+  go <- suppressWarnings(getis_ord(d, gdp_per_capita, weights = wc))
+  expect_equal(nrow(go), nrow(d))
+  x <- as.vector(d$gdp_per_capita)
+
+  # Gi* is the share of the total that falls in i's own neighbourhood, with i
+  # counted in it. spdep::localG() is deliberately NOT the reference here: on a
+  # row-standardised W it re-standardises after adding the focal unit, which is
+  # a different weighting, so the two legitimately disagree.
+  ms <- M + diag(nrow(M))
+  expect_equal(go$gi_star, as.numeric(ms %*% x) / sum(x))
+
+  n <- nrow(M); xb <- mean(x)
+  s <- sqrt(sum((x - xb)^2) / n)
+  wi <- rowSums(ms); s1 <- rowSums(ms^2)
+  z <- (as.numeric(ms %*% x) - xb * wi) / (s * sqrt((n * s1 - wi^2) / (n - 1)))
+  expect_equal(go$z_score, z)
+  expect_equal(go$p_value, 2 * stats::pnorm(-abs(z)))
+})
+
+test_that("the log-t statistic does not depend on first-period dispersion", {
+  f <- countryatlas:::log_t_stat
+  set.seed(11); n <- 20; ti <- 40
+  base <- exp(seq(log(1e3), log(6e4), length.out = n))
+  conv <- outer(base, seq_len(ti), function(b, t) {
+    m <- mean(base); (b + (m - b) * (1 - 1 / (1 + 0.25 * t))) * (1.02^t)
+  })
+  div <- outer(base, seq_len(ti), function(b, t) b^(1 + 0.02 * t))
+
+  # The defining behaviour: above -1.65 is converging.
+  expect_gt(f(conv), -1.645)
+  expect_lt(f(div), -1.645)
+  # h_it is a ratio, so a scale change must not move the statistic at all.
+  expect_equal(f(conv), f(conv * 1e3))
+  expect_equal(f(conv), f(conv * 1e-3))
+
+  # The bug: H_1 = 0 made it refuse outright, though log(H_1) is a constant
+  # absorbed by the intercept and cannot move the t on the slope. Rebasing
+  # every unit to the same first-period value is exactly that case.
+  rebased <- conv / conv[, 1] * 100
+  expect_equal(mean((rebased[, 1] / mean(rebased[, 1]) - 1)^2), 0)
+  expect_false(is.na(f(rebased)))
+
+  # Zero dispersion inside the regression window is still NA: no decay rate.
+  expect_true(is.na(f(outer(rep(5, 4), seq_len(20), function(a, b) a * 1.02^b))))
+  # And the documented minimum shapes.
+  expect_true(is.na(f(conv[1, , drop = FALSE])))
+  expect_true(is.na(f(conv[, 1:4])))
+})
+
+test_that("convergence_club() places countries on an indexed panel", {
+  set.seed(7)
+  iso <- sprintf("C%02d", 1:20)
+  d <- expand.grid(iso3c = iso, year = 2000:2039, stringsAsFactors = FALSE)
+  base <- stats::setNames(exp(seq(log(1e3), log(6e4), length.out = 20)), iso)
+  gap <- (max(log(base)) - log(base[d$iso3c])) / diff(range(log(base)))
+  d$v <- base[d$iso3c] * (1 + 0.02 + 0.03 * gap)^(d$year - 2000) *
+    exp(stats::rnorm(nrow(d), 0, 0.02))
+
+  levels_out <- suppressWarnings(convergence_club(d, v))
+  expect_gt(sum(!is.na(levels_out$club)), 0L)
+
+  # The bug: index_to() sets every country to exactly 100 in the base year, so
+  # H_1 was 0 and nobody was placed at all.
+  ix <- suppressWarnings(index_to(d, v, base_year = 2000))
+  expect_equal(unique(ix$v_index[ix$year == 2000]), 100)
+  indexed_out <- suppressWarnings(convergence_club(ix, v_index))
+  expect_gt(sum(!is.na(indexed_out$club)), 0L)
+  expect_equal(nrow(indexed_out), length(iso))
+})
+
+test_that("smooth_rates() matches the Marshall (1991) closed form", {
+  set.seed(5); n <- 40
+  d <- data.frame(iso3c = sprintf("C%02d", seq_len(n)),
+                  den = round(10^stats::runif(n, 2, 6)), stringsAsFactors = FALSE)
+  d$num <- stats::rpois(n, d$den * 0.002 * exp(stats::rnorm(n, 0, 0.4)))
+  out <- suppressWarnings(smooth_rates(d, num, den))
+  w <- out$num_shrinkage; raw <- out$num_rate; sm <- out$num_smoothed
+  rbar <- sum(d$num) / sum(d$den)
+
+  # The published estimator, computed here independently of the package.
+  s2 <- sum(d$den * (raw - rbar)^2) / sum(d$den)
+  phi <- s2 - rbar / mean(d$den)
+  expect_gt(phi, 0)                                    # this fixture has excess variance
+  expect_equal(w, unname(phi / (phi + rbar / d$den)))  # Marshall's C_i
+  expect_equal(w, unname(d$den / (d$den + rbar / phi)))# the algebraically equal form used
+  expect_equal(sm, w * raw + (1 - w) * rbar)
+
+  # Shrinkage: bounded, monotone in the denominator, and never overshooting.
+  expect_true(all(w >= 0 & w <= 1))
+  expect_gt(stats::cor(d$den, w, method = "spearman"), 0.99)
+  expect_true(all(sm >= pmin(raw, rbar) - 1e-12 & sm <= pmax(raw, rbar) + 1e-12))
+  expect_lt(stats::sd(sm), stats::sd(raw))
+
+  # No excess variance over Poisson: phi <= 0, so everything collapses to the
+  # global rate rather than pretending to distinguish the areas.
+  p <- data.frame(iso3c = sprintf("C%02d", seq_len(n)), den = rep(1000, n))
+  p$num <- stats::rpois(n, 2)
+  rp <- suppressWarnings(smooth_rates(p, num, den))
+  expect_true(all(rp$num_shrinkage == 0))
+  expect_equal(rp$num_smoothed, rep(sum(p$num) / sum(p$den), n))
+})

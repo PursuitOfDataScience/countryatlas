@@ -100,6 +100,7 @@ WKB
 Weidmann
 Winkel
 Yetman
+aland
 alt
 antimeridian
 backend's
@@ -115,6 +116,7 @@ choropleth
 choropleth's
 choropleths
 cli
+cli's
 codelist
 coldspot
 colourbar
@@ -148,6 +150,7 @@ fetch's
 footgun
 geo
 geocoded
+geocoding
 ggiraph
 ggplot
 ggsql
@@ -165,6 +168,7 @@ jure
 lat
 lifecycles
 lon
+mapgl
 memoisation
 memoise
 memoise's
@@ -210,6 +214,8 @@ tm
 tmap
 tmap's
 tripel
+unclassed
+unfactored
 unfoldable
 ungated
 unparseable
@@ -222,4 +228,5 @@ viridis
 weightable
 wordmark
 writable
+Åland
 Šavrič

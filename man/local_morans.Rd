@@ -24,6 +24,15 @@ skip the test, which leaves \code{p_value} as \code{NA}).}
 A tibble, one row per country: \code{iso3c}, \code{value}, \code{lag} (the
 neighbour average), \code{ii} (the local statistic), \code{p_value} and \code{cluster}
 (\code{"High-High"}, \code{"Low-Low"}, \code{"High-Low"}, \code{"Low-High"} or \code{"Not significant"}).
+
+\code{p_value} is a \strong{two-sided} pseudo-p from conditional permutation:
+\eqn{(1 + \#\{|I_i^{*}| \ge |I_i|\}) / (n_{perm} + 1)}, so it is never
+exactly zero and its floor is \eqn{1/(n_{perm}+1)} -- with the default 999
+permutations, 0.001. Two-sided because a local statistic is interesting at
+both ends: a country surrounded by unlike neighbours is as much a finding
+as one surrounded by like ones. \code{cluster} is \code{"Not significant"} wherever
+\code{p_value > alpha}, and everywhere when \code{n_perm = 0} leaves it \code{NA}. Set a
+seed beforehand for a reproducible \code{p_value}.
 }
 \description{
 Local Indicators of Spatial Association (Anselin 1995): one Moran statistic

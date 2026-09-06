@@ -314,11 +314,25 @@ rank_countries <- function(data, value, within = NULL, desc = TRUE) {
     why = "A repeated country-year is ranked twice, so one country holds two
            different ranks.")
   warn_overwrite(data, c("rank", "percentile", "z_score"))
+  # scale() drops NA (colMeans(na.rm = TRUE)) but not an infinity, which runs
+  # straight through the mean and the SD -- so ONE Inf turned every z_score to
+  # NaN while `rank` and `percentile`, both rank-based and both untroubled by
+  # an infinity, still looked correct. A silent all-NaN column beside two
+  # plausible ones is the easiest kind of corruption to miss.
+  n_inf <- sum(is.infinite(data[[val_name]]))
+  if (n_inf) {
+    wdj_warn(c(
+      "{n_inf} value{?s} in {.field {val_name}} {?is/are} infinite, so
+       {.field z_score} is undefined.",
+      "i" = "{.field rank} and {.field percentile} are rank-based and are
+             unaffected. Returning {.code NA} for {.field z_score}."
+    ), class = "countryatlas_undefined_index")
+  }
   out <- dplyr::mutate(
     data,
     rank = dplyr::min_rank(ord(.data[[val_name]])),
     percentile = dplyr::percent_rank(.data[[val_name]]),
-    z_score = as.numeric(scale(.data[[val_name]]))
+    z_score = zscore_finite(.data[[val_name]])
   )
   # ungroup() alone only strips the grouping: with no `within`, the frame is
   # ungrouped above, so mutate() left a data.frame a data.frame and this verb
@@ -383,6 +397,16 @@ complete_years <- function(data, years = NULL, value = NULL,
   # introduced by coercion" warning, and a zero-length one silently completed
   # nothing. Anything the caller passed is still checked, 0 rows or not.
   if (!is.null(years)) {
+    # Function or environment first: anyNA() below errors outright on an
+    # environment ("environments cannot be coerced to other types"), inside
+    # the condition, and {.val } in the message would die on a closure -- so
+    # neither reached the intended error. Same guard as check_string().
+    if (is.function(years) || is.environment(years)) {
+      wdj_abort(c(
+        "{.arg years} must be a non-empty numeric vector without {.code NA}.",
+        "x" = "Got {.cls {class(years)[1]}}."
+      ))
+    }
     if (!is.numeric(years) || !length(years) || anyNA(years)) {
       wdj_abort(c(
         "{.arg years} must be a non-empty numeric vector without {.code NA}.",
@@ -509,6 +533,14 @@ growth_rate <- function(data, value, type = c("yoy", "cagr"),
   check_numeric_col(data, val_name)
   check_string(suffix, "suffix")
   new_col <- paste0(val_name, suffix)
+  # Only "yoy" needs this: "cagr" divides by the actual year span, so a gap
+  # is already handled there.
+  if (identical(type, "yoy")) warn_irregular_years(data, "the growth rate")
+  # ... and only "cagr" needs a numeric year, because only it does arithmetic
+  # on one. A character year reached `.data$year - y0` and surfaced as a dplyr
+  # mutate error quoting an internal expression rather than naming the column.
+  # Guarding both branches would reject input that "yoy" handles correctly.
+  if (identical(type, "cagr")) check_numeric_col(data, "year")
   warn_overwrite(data, new_col)
   out <- data %>%
     dplyr::group_by(.data$iso3c) %>%
@@ -624,7 +656,13 @@ index_to <- function(data, value, base_year, to = 100, suffix = "_index") {
         # 100/150/50 with the missing year last and NA/NA/NA with it first.
         base <- .data[[val_name]][
           !is.na(.data$year) & .data$year == base_year][1]
-        if (length(base) == 0L || is.na(base) || base == 0) NA_real_
+        # !is.finite() rather than is.na(): it covers NA and NaN exactly as
+        # before and adds the infinite base this missed. An Inf base made
+        # every other year of that country `finite / Inf` -- a plain, entirely
+        # plausible 0 -- so a country read as having collapsed to nothing
+        # while its neighbours indexed correctly. The three unusable bases
+        # already here return NA; an infinite one is the fourth.
+        if (length(base) == 0L || !is.finite(base) || base == 0) NA_real_
         else .data[[val_name]] / base * to
       }
     )
@@ -679,7 +717,7 @@ correlate_indicators <- function(data, ..., method = c("pearson", "spearman"),
   }
   bad <- names(vals)[!vapply(vals, is.numeric, logical(1))]
   if (length(bad)) {
-    wdj_abort("Column{?s} {.val {bad}} {?is/are} not numeric.")
+    wdj_abort("Column{cli::qty(length(bad))}{?s} {.val {bad}} {?is/are} not numeric.")
   }
   if (ncol(vals) < 2L) {
     wdj_abort("Need at least two numeric indicator columns to correlate.")
@@ -730,6 +768,7 @@ lag_by_country <- function(data, value, n = 1, suffix = NULL) {
   n <- as.integer(n)
   if (!is.null(suffix)) check_string(suffix, "suffix")
   new_col <- paste0(val_name, suffix %||% paste0("_lag", if (n > 1L) n else ""))
+  warn_irregular_years(data, "the lag")
   warn_overwrite(data, new_col)
   out <- data %>%
     dplyr::group_by(.data$iso3c) %>%
@@ -751,6 +790,7 @@ diff_by_country <- function(data, value, n = 1, suffix = NULL) {
   n <- as.integer(n)
   if (!is.null(suffix)) check_string(suffix, "suffix")
   new_col <- paste0(val_name, suffix %||% paste0("_diff", if (n > 1L) n else ""))
+  warn_irregular_years(data, "the difference")
   warn_overwrite(data, new_col)
   out <- data %>%
     dplyr::group_by(.data$iso3c) %>%
@@ -832,6 +872,52 @@ check_panel_unique <- function(data, call = rlang::caller_env(),
   invisible(NULL)
 }
 
+# NA is already handled by scale() itself; an infinity is not, and it poisons
+# the mean and the SD for the whole vector. NA rather than NaN, and per group,
+# so `within = ` still scores the groups that are fine.
+zscore_finite <- function(x) {
+  if (any(is.infinite(x))) return(rep(NA_real_, length(x)))
+  as.numeric(scale(x))
+}
+
+# The sibling of check_panel_unique(): that one catches "the same year twice",
+# this one catches "the years are not one apart". Both make a row-based lag
+# mean something other than what the column name says. On a panel of 2000,
+# 2002, 2005, growth_rate(type = "yoy") reported 27.3% for 2005 -- the change
+# since 2002, three years earlier, in a column the docs call year-on-year and
+# the argument calls "yoy". The number is right for the rows it read; the label
+# is what misleads. Warn rather than change the arithmetic: a quinquennial
+# panel is a legitimate design, and silently switching to a year-keyed lag
+# would alter results for everyone already relying on the row-based one.
+warn_irregular_years <- function(data, what, call = rlang::caller_env()) {
+  if (!all(c("iso3c", "year") %in% names(data))) return(invisible(NULL))
+  yr <- suppressWarnings(as.numeric(data$year))
+  ok <- !is.na(data$iso3c) & !is.na(yr)
+  if (sum(ok) < 2L) return(invisible(NULL))
+  iso <- as.character(data$iso3c)[ok]
+  yr <- yr[ok]
+  o <- order(iso, yr)
+  iso <- iso[o]; yr <- yr[o]
+  # Within a country only: the first row of each country has no predecessor.
+  step <- diff(yr)
+  same <- iso[-1] == iso[-length(iso)]
+  # step > 1, not step != 1: after sorting, a step of 0 is a repeated
+  # country-year, not a gap, and check_panel_unique() already reports it by
+  # name. Testing for != 1 made every duplicate warn twice, once accurately
+  # and once claiming a gap that is not there.
+  bad <- same & step > 1
+  if (!any(bad)) return(invisible(NULL))
+  who <- unique(iso[-1][bad])
+  wdj_warn(c(
+    "{length(who)} countr{?y/ies} ha{?s/ve} gaps in {.field year}, so {what}
+     spans more than one year there:",
+    "*" = "{.val {utils::head(who, 8)}}",
+    "i" = "Each value is compared with the previous row, not the previous year.
+           {.fn complete_years} inserts the missing years."
+  ), call = call)
+  invisible(NULL)
+}
+
 #' Beta convergence (growth regression)
 #'
 #' Do poor countries grow faster than rich ones? The classic unconditional
@@ -864,8 +950,19 @@ beta_convergence <- function(data, value) {
   check_panel_cols(data, val_name)
   check_numeric_col(data, val_name)
 
+  # A character year -- what read.csv() hands back for "2000" -- reached the
+  # span arithmetic below as a string and died with base R's "non-numeric
+  # argument to binary operator". complete_years() already states the
+  # package's position on this shape; use the same guard so the message is the
+  # same wherever a year has to be a number rather than a label.
+  check_numeric_col(data, "year")
+  # is.finite(), not !is.na(): Inf passes both the NA test and `> 0`, so an
+  # infinite value survived into log() and lm() died with base R's "NA/NaN/Inf
+  # in 'x'" -- an unclassed error naming nothing. gini() and theil() already
+  # treat an infinity as unusable; this filter is where that belongs here,
+  # alongside the NA and non-positive values it already drops.
   per_country <- data %>%
-    dplyr::filter(!is.na(.data[[val_name]]), .data[[val_name]] > 0) %>%
+    dplyr::filter(is.finite(.data[[val_name]]), .data[[val_name]] > 0) %>%
     dplyr::group_by(.data$iso3c) %>%
     dplyr::arrange(.data$year, .by_group = TRUE) %>%
     dplyr::summarise(
@@ -953,8 +1050,11 @@ sigma_convergence <- function(data, value, measure = c("sd_log", "cv")) {
   # of its outcomes were not: an all-non-positive column came back as a 0-row
   # tibble, and a year with one country got sigma = NA from sd() -- both in
   # silence, so an empty or blank convergence series looked like a result.
+  # is.finite(), not !is.na(): Inf satisfies both the NA test and `> 0`, so an
+  # infinity survived into sd(log(x)) and that year's sigma came back NaN in
+  # silence, next to perfectly good years. Same hole beta_convergence() had.
   keep <- data %>%
-    dplyr::filter(!is.na(.data[[val_name]]), .data[[val_name]] > 0)
+    dplyr::filter(is.finite(.data[[val_name]]), .data[[val_name]] > 0)
   if (!nrow(keep)) {
     wdj_warn(c(
       "No positive {.field {val_name}} values, so there is no dispersion to
@@ -1161,7 +1261,17 @@ theil <- function(x, weights = NULL, groups = NULL, na.rm = TRUE) {
   if (is.null(g)) return(total)
 
   parts <- lapply(split(seq_along(x), g), function(i) {
-    swg <- sum(w[i]); mug <- sum(w[i] * x[i]) / swg
+    swg <- sum(w[i])
+    # A group whose weights sum to zero has no share of the population, so its
+    # contribution to both components is exactly zero -- and its observations
+    # already contribute nothing to `total`, so the decomposition identity
+    # stays exact. The sw == 0 guard above does not cover this: there the whole
+    # index is undefined, here only one group is empty and the answer is well
+    # defined. Without this, mug was 0/0 = NaN and poisoned `between` AND
+    # `within`, so a perfectly good `total` came back beside two NaNs, with no
+    # warning to say which group did it.
+    if (swg == 0) return(tibble::tibble(between = 0, within = 0))
+    mug <- sum(w[i] * x[i]) / swg
     tibble::tibble(
       between = (swg / sw) * (mug / mu) * log(mug / mu),
       within = (swg / sw) * (mug / mu) * theil_t(x[i], w[i], swg, mug)

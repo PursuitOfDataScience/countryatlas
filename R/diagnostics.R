@@ -195,10 +195,21 @@ audit_coverage <- function(data,
 #' @param threshold Maximum string distance to accept a repair (0 = identical,
 #'   1 = unrelated). Lower is stricter; default `0.2`. Uses Jaro-Winkler when
 #'   `stringdist` is installed, otherwise a length-normalised edit distance.
-#'   The fallback is the more conservative of the two -- it repairs a subset of
-#'   what Jaro-Winkler would, mainly missing transposed letters ("Frnace"), and
-#'   never picks a different country -- so results can differ between machines
-#'   depending on whether `stringdist` is available.
+#'   The fallback repairs a subset of what Jaro-Winkler would: it charges two
+#'   edits for a transposition, so at the default threshold `"Germny"` is
+#'   repaired (one edit out of seven characters, 0.14) but `"Frnace"` is *not*
+#'   (two out of six, 0.33). Jaro-Winkler scores that transposition 0.06 and
+#'   repairs it.
+#'
+#'   **Install `stringdist` if the repairs matter.** The two metrics choose the
+#'   nearest known name independently, so they can land on *different
+#'   countries*, not merely on fewer of them: `"Libia"` is repaired to Liberia
+#'   with `stringdist` and to Libya without it, and both are accepted at the
+#'   default threshold. Neither metric is uniformly better -- Jaro-Winkler also
+#'   repairs `"Maroco"` to Monaco rather than Morocco -- which is the real
+#'   reason to check the reported substitutions rather than to trust either.
+#'   `verbose = TRUE` (the default) prints them, and they are attached as the
+#'   `"repairs"` attribute for programmatic checking.
 #' @param origin countrycode origin scheme (default `"country.name"`).
 #' @param verbose Whether to message the substitutions made (default `TRUE`).
 #'

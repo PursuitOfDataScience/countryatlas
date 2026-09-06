@@ -147,7 +147,7 @@ country_network <- function(data, from, to, weight = NULL,
   # was the one verb here that did its whole job and *then* rejected an
   # argument it could have rejected immediately. `top_n` only trims the result,
   # so nothing about the check needs the computation.
-  check_top_n(top_n)
+  top_n <- check_top_n(top_n)
   m <- flow_matrix(data, {{ from }}, {{ to }}, {{ weight }}, origin = origin)
   iso <- rownames(m)
   total <- sum(m)

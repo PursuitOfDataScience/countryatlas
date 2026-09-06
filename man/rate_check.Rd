@@ -22,7 +22,10 @@ Otherwise the rate is \code{numerator / denominator}.}
 \value{
 A tibble of \code{iso3c}, \code{numerator}, \code{denominator}, \code{rate},
 \code{expected_se} (the Poisson standard error of the rate, \eqn{\sqrt{r/d}}) and
-\code{flagged}, sorted with the least reliable first.
+\code{flagged}, sorted with the least reliable first. \code{flagged} is \code{TRUE} for a
+denominator below the threshold, \code{FALSE} above it or missing, and \code{NA} for
+every row when no threshold could be computed at all -- which is warned
+about, and means \code{sum(flagged)} is \code{NA} rather than a misleading \code{0}.
 }
 \description{
 The small-number problem, named: a rate over a very small population is mostly
