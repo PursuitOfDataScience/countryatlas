@@ -13,8 +13,15 @@ beta_convergence(data, value)
 }
 \value{
 A one-row tibble: \code{beta}, \code{se}, \code{t_value}, \code{p_value}, \code{r_squared},
-\code{n} (countries), \code{speed} (annual convergence rate, \code{NA} when \code{beta >= 0})
-and \code{half_life} (years). The fitted \link{lm} object is attached as the
+\code{n} (countries), \code{speed} (annual convergence rate) and \code{half_life}
+(years).
+
+\code{speed} and \code{half_life} are \code{NA} in two cases: when \code{beta >= 0}, because
+there is no convergence to put a rate on; and when the panel's per-country
+spans are too heterogeneous for any single span to reconcile with the
+fitted slope, which is warned about. \code{beta} and its inference are
+unaffected in both -- only the annualised figures need one common span, so
+restrict the panel to a shared window if you need them. The fitted \link{lm} object is attached as the
 \code{"model"} attribute.
 }
 \description{

@@ -23,6 +23,24 @@ A list of class \code{countryatlas_coverage}, with elements \code{unmatched},
 \code{na_rates} and \code{by_group}. It has a \code{print()} method, so at the console you
 see a formatted report rather than the raw list; reach into the elements by
 name to use the numbers programmatically.
+\itemize{
+\item \code{unmatched} -- one row per input value that did not resolve to an ISO
+code. Empty is the good case.
+\item \code{na_rates} -- one row per indicator: \code{n} is the number of countries
+\emph{considered}, \code{n_missing} how many of them lack a value, and \code{na_rate}
+is \code{n_missing / n}.
+\item \code{by_group} -- one row per group: \code{n_countries} is how many countries are
+\emph{in that group}, and \code{na_rate} is the share of those lacking a value.
+The counts sum to \code{n}.
+}
+
+Both \code{n} and \code{by_group}'s \code{n_countries} are \strong{denominators} -- everything
+counted, not everything present. That is the opposite orientation from
+\code{\link[=map_provenance]{map_provenance()}}, whose \code{n_countries} is the numerator (countries drawn
+\emph{with} a value) and whose \code{n_total} is the denominator. The two verbs
+report the same coverage from opposite ends, so on 215 countries with 24
+missing this gives \code{n = 215} where \code{map_provenance()} gives
+\code{n_countries = 191}.
 }
 \description{
 What is missing, before you trust the map: which countries are unmatched,

@@ -24,7 +24,18 @@
 #'
 #' @return A tibble of `iso3c`, `numerator`, `denominator`, `rate`,
 #'   `expected_se` (the Poisson standard error of the rate, \eqn{\sqrt{r/d}}) and
-#'   `flagged`, sorted with the least reliable first. `flagged` is `TRUE` for a
+#'   `flagged`, sorted with the least reliable first.
+#'
+#'   "Least reliable" is ordered on the standard error a *single* event would
+#'   imply, \eqn{\sqrt{\max(y, 1)}/d}, which is identical to `expected_se` for
+#'   every row with at least one event. Ordering on `expected_se` directly put
+#'   zero-count rows last, at the reliable end: it is \eqn{\sqrt{y}/d}, which
+#'   is exactly `0` when the count is `0`, so one country with no events out of
+#'   251 people outranked another with one event out of the same 251. Observing
+#'   nothing is not evidence of precision. `expected_se` itself is still the
+#'   plain Poisson standard error, `0` and all.
+#'
+#'   `flagged` is `TRUE` for a
 #'   denominator below the threshold, `FALSE` above it or missing, and `NA` for
 #'   every row when no threshold could be computed at all -- which is warned
 #'   about, and means `sum(flagged)` is `NA` rather than a misleading `0`.
@@ -108,7 +119,19 @@ rate_check <- function(data, numerator, denominator, min_denominator = NULL,
     }
   )
   attr(out, "min_denominator") <- thr
-  dplyr::arrange(out, dplyr::desc(.data$expected_se))
+  # Order on the SE a *single* event would imply, not on expected_se itself.
+  # expected_se is sqrt(y)/d, which collapses to exactly 0 when the count is
+  # 0 -- so in a table documented as "least reliable first", a country with 0
+  # events out of 251 sorted last, presented as the most reliable row on the
+  # page, while another country with 1 event out of the same 251 sorted first
+  # as the least. Zero events is not evidence of precision; it is the
+  # small-number problem this verb exists to name. pmax(num, 1) is identical
+  # to expected_se for every row with at least one event, so nothing else in
+  # the table moves, and expected_se itself stays exactly the documented
+  # Poisson SE.
+  ord <- ifelse(is.finite(num) & is.finite(den) & den > 0,
+                sqrt(pmax(num, 1)) / den, NA_real_)
+  dplyr::arrange(out, dplyr::desc(ord))
 }
 
 #' Shrink unreliable rates toward the global rate
@@ -327,7 +350,7 @@ deflate <- function(data, value, base_year, deflator = NULL,
   # between countries, so only the ratio to that country's base-year value is
   # meaningful.
   out <- data %>%
-    dplyr::group_by(.data$iso3c) %>%
+    group_by_unit() %>%
     dplyr::mutate(
       .wdj_base = .data[[defl_name]][match(base_year, .data$year)],
       # A zero (or non-finite) index divides to Inf, which then propagates
@@ -341,6 +364,12 @@ deflate <- function(data, value, base_year, deflator = NULL,
     ) %>%
     dplyr::ungroup()
   out$.wdj_base <- NULL
+  # group_by_unit() rather than iso3c: the base-year deflator is read from
+  # within the group, so two rows whose iso3c did not resolve were rebased
+  # against each other. deflate() does not route through wdj_return_frame(),
+  # so the key is dropped here. The base_ok warning above still groups on
+  # iso3c, because its job is to name the countries it found.
+  out$.wdj_unit <- NULL
   if (rlang::quo_is_null(defl_q)) out$.wdj_defl <- NULL
   out
 }

@@ -103,6 +103,7 @@ Yetman
 aland
 alt
 antimeridian
+arity
 backend's
 backends
 basemap
@@ -176,6 +177,7 @@ memoised
 mis
 modeling
 nanoarrow
+oob
 overplot
 passthrough
 pearson
@@ -209,6 +211,7 @@ th
 tibble
 tibbles
 tidyr's
+tidyselect
 tld
 tm
 tmap

@@ -41,6 +41,24 @@ table reports each country's exact share alongside its integer allocation so
 the rounding is inspectable rather than hidden.
 }
 
+\section{Crowded neighbours overlap}{
+
+Each country's block is centred on its own centroid, with no collision
+avoidance between countries. That is deliberate -- a global packing solve
+would push countries away from where they belong -- but it means blocks in
+crowded regions are drawn on top of one another, and a partly hidden block
+cannot be counted or compared. The effect is not marginal: at the defaults
+(\code{cells = 1000}, \code{cell_size = 2.5}) about a third of the cells overlap a
+cell of a different country, across some sixty countries, and it grows with
+\code{cells} -- at \code{cells = 2500} it is roughly two thirds.
+
+\code{cell_size} is the lever, because it scales the tiles without moving the
+centroids: dropping it to \code{1.5} cuts the overlap at \code{cells = 1000} to about
+a tenth of the cells. Fewer \code{cells} also helps. Where exact areas matter
+more than geographic position, \code{\link[=dorling_map]{dorling_map()}} resolves collisions by
+displacing circles instead.
+}
+
 \examples{
 \donttest{
 snap <- countryatlas::world_snapshot$countries

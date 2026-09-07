@@ -255,10 +255,35 @@ weights_custom <- function(w, countries) {
         "i" = "Use {.val {0}} for {.emph not a neighbour}."
       ))
     }
+    # The type message just above promises "any non-negative number", and
+    # nothing enforced it. Row standardisation divides by the row sum, so a
+    # single negative weight silently moved Moran's I from 0.714 to 0.497 --
+    # and an all-negative matrix cancelled to exactly the all-positive answer,
+    # discarding the caller's signs without a word. gini(), theil() and the
+    # global G all refuse a negative input for the same reason; a negative
+    # link strength is not a weaker link, it is not a link at all.
+    #
+    # Infinity was worse than silent: it normalised to NaN and the verb then
+    # reported "not enough connected countries with data", diagnosing
+    # connectivity when the cause was the weight.
+    if (any(!is.finite(w))) {
+      wdj_abort(c(
+        "A custom weights matrix must be finite.",
+        "x" = "{sum(!is.finite(w))} entr{?y/ies} {?is/are} infinite.",
+        "i" = "Use a large finite number if one link really should dominate."
+      ))
+    }
+    if (any(w < 0)) {
+      wdj_abort(c(
+        "A custom weights matrix must be non-negative.",
+        "x" = "{sum(w < 0)} entr{?y/ies} {?is/are} negative.",
+        "i" = "Use {.val {0}} for {.emph not a neighbour}."
+      ))
+    }
     m <- w
     storage.mode(m) <- "double"
   } else if (is.data.frame(w)) {
-    check_cols(w, c("iso3c", "neighbor"))
+    check_cols(w, c("iso3c", "neighbor"), arg = "w")
     val <- if ("weight" %in% names(w)) w$weight else rep(1, nrow(w))
     if (!is.numeric(val)) wdj_abort("{.field weight} must be numeric.")
     # An NA endpoint reached the matrix assignment below as base R's "NAs are
@@ -276,6 +301,21 @@ weights_custom <- function(w, countries) {
       wdj_abort(c(
         "{.field weight} must not contain {.val NA}.",
         "x" = "{sum(is.na(val))} weight{?s} {?is/are} missing.",
+        "i" = "Use {.val {0}} for {.emph not a neighbour}, or drop the row."
+      ))
+    }
+    # The same two checks as the matrix branch above, for the same reasons.
+    if (any(!is.finite(val))) {
+      wdj_abort(c(
+        "{.field weight} must be finite.",
+        "x" = "{sum(!is.finite(val))} weight{?s} {?is/are} infinite.",
+        "i" = "Use a large finite number if one link really should dominate."
+      ))
+    }
+    if (any(val < 0)) {
+      wdj_abort(c(
+        "{.field weight} must be non-negative.",
+        "x" = "{sum(val < 0)} weight{?s} {?is/are} negative.",
         "i" = "Use {.val {0}} for {.emph not a neighbour}, or drop the row."
       ))
     }
@@ -434,8 +474,17 @@ local_morans <- function(data, value, weights = NULL, n_perm = 999,
   flat <- zero_variance(x, val_name)
   z <- x - mean(x)
   m2 <- sum(z^2) / n
-  lag <- as.numeric(m %*% z)
-  ii <- if (flat) rep(NA_real_, n) else (z / m2) * lag
+  # The statistic and the quadrants need the lag of the *centred* value: "high
+  # neighbourhood" means neighbours above the mean, which is what Anselin
+  # (1995) defines the four quadrants on. The reported column is the plain
+  # neighbour average, because that is what it is documented as and what
+  # spatial_lag() returns under the same name. Reporting the centred lag beside
+  # a raw `value` broke the Moran scatterplot these two columns exist for: the
+  # quadrant boundaries landed at x = mean(value) and y = 0, so the usual
+  # reference lines disagreed with the `cluster` column.
+  lag_z <- as.numeric(m %*% z)
+  lag_raw <- as.numeric(m %*% x)
+  ii <- if (flat) rep(NA_real_, n) else (z / m2) * lag_z
 
   p <- rep(NA_real_, n)
   n_perm <- as.integer(n_perm)
@@ -452,13 +501,13 @@ local_morans <- function(data, value, weights = NULL, n_perm = 999,
   }
 
   hi <- z > 0
-  hi_lag <- lag > 0
+  hi_lag <- lag_z > 0
   cluster <- ifelse(hi & hi_lag, "High-High",
              ifelse(!hi & !hi_lag, "Low-Low",
              ifelse(hi & !hi_lag, "High-Low", "Low-High")))
   cluster[is.na(p) | p > alpha] <- "Not significant"
   tibble::tibble(
-    iso3c = al$iso3c, value = x, lag = as.numeric(lag), ii = as.numeric(ii),
+    iso3c = al$iso3c, value = x, lag = lag_raw, ii = as.numeric(ii),
     p_value = p,
     cluster = factor(cluster, levels = c("High-High", "Low-Low", "High-Low",
                                          "Low-High", "Not significant"))
@@ -528,8 +577,12 @@ lisa_map <- function(data, value, weights = NULL, n_perm = 999, alpha = 0.05,
 #' @param n_perm Permutations for the pseudo-p-value (default `999`; use `0` to
 #'   skip the test, which leaves `p_value` as `NA`).
 #'
-#' @return A one-row tibble: `c` (observed), `expected` (always 1), `n`,
-#'   `n_excluded`, `n_links`, `p_value` and an `excluded` list-column.
+#' @return A one-row tibble: `c` (observed), `expected` (always 1), `n`
+#'   (countries used), `n_excluded` (countries with data that the weights could
+#'   not reach), `n_links` (non-zero weights), `p_value` and an `excluded`
+#'   list-column of the excluded `iso3c` codes. `n` and `n_excluded` sum to the
+#'   countries supplied with a value, and mean the same here as in
+#'   [morans_i()].
 #'
 #'   `p_value` is **one-sided on the lower tail**:
 #'   \eqn{(1 + \#\{C^{*} \le C_{obs}\}) / (n_{perm} + 1)}. The lower tail is
@@ -592,8 +645,10 @@ gearys_c <- function(data, value, weights = NULL, n_perm = 999) {
 #'   defined for signed data.
 #'
 #' @return With `local = TRUE`, a tibble of `iso3c`, `gi_star`, `z_score` and
-#'   `p_value` (two-sided, from the normal approximation). With `local = FALSE`,
-#'   a one-row tibble of `g`, `expected`, `n` and `n_links`.
+#'   `p_value` (two-sided, from the normal approximation), one row per country
+#'   used. With `local = FALSE`, a one-row tibble of `g`, `expected`, `n`
+#'   (countries used -- the same count, so the local form returns `n` rows) and
+#'   `n_links` (non-zero weights).
 #' @references
 #' Getis, A. & Ord, J. K. (1992). The analysis of spatial association by use of
 #' distance statistics. *Geographical Analysis* 24(3), 189-206.

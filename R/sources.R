@@ -93,6 +93,11 @@ register_country_source <- function(name, fetch, meta = NULL, citation = NULL,
                                     key_col = "iso3c", key_type = "iso3c",
                                     cache = TRUE) {
   check_string(name, "name")
+  # See abort_bare_column(): `key_col` takes a column name as a string.
+  key_col_expr <- substitute(key_col)
+  key_col <- tryCatch(force(key_col), error = function(e) {
+    abort_bare_column(key_col_expr, "key_col", e)
+  })
   check_string(key_col, "key_col")
   check_string(key_type, "key_type")
   check_bool(cache, "cache")
@@ -222,7 +227,38 @@ fetch_indicator <- function(source, indicator, countries = NULL, years = NULL,
   } else NULL
   hit <- if (is.null(key)) NULL else .wdj_state$source_memo[[key]]
   out <- if (!is.null(hit)) hit else {
-    s$fetch(indicator = indicator, countries = countries, years = years, ...)
+    # The return value is checked thoroughly below, but the call itself was
+    # not. An adapter that failed re-raised its own bare error -- "provider is
+    # down" with nothing to say which source produced it -- and one written
+    # with the wrong signature surfaced R's "unused arguments (countries =
+    # countries, years = years)", naming neither the source nor the documented
+    # arity. Both are exactly what someone developing an adapter hits, and
+    # both are the one place the package knows which source it just called.
+    tryCatch(
+      s$fetch(indicator = indicator, countries = countries, years = years, ...),
+      error = function(e) {
+        msg <- conditionMessage(e)
+        if (grepl("unused argument", msg, fixed = TRUE)) {
+          wdj_abort(c(
+            "Source {.val {source}} does not take the arguments it is called with.",
+            "x" = "{msg}",
+            "i" = "A {.arg fetch} function must accept
+                   {.code indicator}, {.code countries} and {.code years}. See
+                   the {.strong fetch contract} in
+                   {.help countryatlas::register_country_source}."
+          ))
+        }
+        # "{msg}", not msg: a bullet is a cli template, so a brace in the
+        # provider's own message would be interpolated (the same trap
+        # wdj_lapply() documents for worker errors).
+        wdj_abort(c(
+          "Source {.val {source}} failed while fetching {.val {indicator}}.",
+          "x" = "{msg}",
+          "i" = "The failure is the source's own, not
+                 {.pkg countryatlas}'s. {.fn country_sources} lists what is
+                 registered."
+        ))
+      })
   }
   if (!is.data.frame(out)) {
     wdj_abort(c(
@@ -722,6 +758,17 @@ adapter_reshape <- function(raw, out_name, entity_col, year_col,
     wdj_abort(c("Expected an entity column {.field {entity_col}}.",
                 "i" = "Columns were {.val {names(raw)}}."))
   }
+  # Checked like the entity and value columns beside it, and before the value
+  # auto-detection below, which excludes the year BY NAME: with year_col absent
+  # the setdiff removed nothing, so num[1] picked the provider's real time
+  # column and the mapped "indicator" became 2000, 2001, 2002 while `year` came
+  # back entirely NA. All four adapters normalise their provider's time column
+  # into raw$year before calling, so an absent one means the response changed
+  # shape -- the same thing the value-column check below reports.
+  if (!year_col %in% names(raw)) {
+    wdj_abort(c("Expected a year column {.field {year_col}}.",
+                "i" = "Columns were {.val {names(raw)}}."))
+  }
   value_col <- value_col %||% {
     num <- names(raw)[vapply(raw, is.numeric, logical(1))]
     num <- setdiff(num, year_col)
@@ -747,9 +794,7 @@ adapter_reshape <- function(raw, out_name, entity_col, year_col,
   # when none do. That case is caught below.
   iso <- suppressWarnings(wdj_to_iso3c(raw[[entity_col]], origin = origin))
   out <- tibble::tibble(iso3c = iso,
-                        year = if (year_col %in% names(raw)) {
-                          read_year(raw[[year_col]], "The provider")
-                        } else NA_integer_)
+                        year = read_year(raw[[year_col]], "The provider"))
   # as.character() first for a factor: as.numeric() on one returns its *level
   # indices*, so a value column of factor("10", "20") became 1, 2 -- silently
   # wrong numbers from the provider. check_numeric_col() rejects a factor

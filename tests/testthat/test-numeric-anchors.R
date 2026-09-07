@@ -326,7 +326,7 @@ test_that("quantile breaks are computed per country, not per polygon vertex", {
 
   # The helper must de-duplicate on the key, never break on the raw column.
   got <- countryatlas:::apply_binned_fill(
-    mapdf, rlang::quo(gdp_per_capita), "gdp_per_capita", "quantile", 5)
+    mapdf, "gdp_per_capita", "quantile", 5)
   expect_equal(levels(got$data$.wdj_bin),
                levels(cut(vals, breaks = right, include.lowest = TRUE,
                           dig.lab = 4)))
@@ -376,7 +376,7 @@ test_that("the sf backend de-duplicates divided countries before breaking", {
   naive <- countryatlas:::compute_breaks(vals, "quantile", 5)
   expect_false(isTRUE(all.equal(right, naive)))        # and they matter
   got <- countryatlas:::apply_binned_fill(
-    sfd, rlang::quo(gdp_per_capita), "gdp_per_capita", "quantile", 5)
+    sfd, "gdp_per_capita", "quantile", 5)
   expect_equal(levels(got$data$.wdj_bin),
                levels(cut(vals, breaks = right, include.lowest = TRUE,
                           dig.lab = 4)))
@@ -1068,4 +1068,387 @@ test_that("smooth_rates() matches the Marshall (1991) closed form", {
   rp <- suppressWarnings(smooth_rates(p, num, den))
   expect_true(all(rp$num_shrinkage == 0))
   expect_equal(rp$num_smoothed, rep(sum(p$num) / sum(p$den), n))
+})
+
+test_that("rate_check() does not rank a zero count as the most reliable", {
+  # Two countries, the same denominator of 251: one saw an event, one did not.
+  # The bug sorted them to opposite ends, because expected_se is sqrt(y)/d and
+  # collapses to exactly 0 at y = 0.
+  d <- data.frame(iso3c = c("BIG", "MID", "TINY", "ZERO"),
+                  den = c(1e6, 1e4, 251, 251), num = c(3000, 30, 1, 0))
+  out <- suppressWarnings(rate_check(d, num, den))
+  pos <- stats::setNames(seq_len(nrow(out)), out$iso3c)
+  expect_lt(pos[["ZERO"]], pos[["MID"]])
+  expect_lt(pos[["ZERO"]], pos[["BIG"]])
+  expect_equal(unname(pos[["TINY"]]), 1L)
+
+  # expected_se stays exactly the documented Poisson SE, zero included.
+  expect_equal(out$expected_se, sqrt(out$rate / out$denominator))
+  expect_equal(out$expected_se[out$iso3c == "ZERO"], 0)
+
+  # Nothing else moves: with an event in every row the order is still strictly
+  # descending expected_se.
+  set.seed(4); n <- 30
+  e <- data.frame(iso3c = sprintf("C%02d", seq_len(n)),
+                  den = round(10^stats::runif(n, 2, 6)))
+  e$num <- pmax(1L, stats::rpois(n, e$den * 0.003))
+  r <- suppressWarnings(rate_check(e, num, den))
+  expect_equal(order(-r$expected_se), seq_len(nrow(r)))
+
+  # A zero count on the smallest denominator becomes the least reliable row.
+  f <- e; f$num[which.min(f$den)] <- 0L
+  rf <- suppressWarnings(rate_check(f, num, den))
+  expect_equal(which(rf$numerator == 0), 1L)
+
+  # Unusable denominators still sort last rather than first.
+  g <- data.frame(iso3c = c("A", "B", "C"), den = c(1000, NA, 0), num = c(5, 5, 5))
+  rg <- suppressWarnings(rate_check(g, num, den))
+  expect_equal(rg$iso3c[1], "A")
+  expect_true(all(is.na(rg$expected_se[-1])))
+})
+
+test_that("the VSUP contracts the value range as uncertainty rises", {
+  f <- countryatlas:::vsup_fill
+  ramp <- grDevices::hcl.colors(256, palette = "viridis")
+  set.seed(2); n <- 200
+  r <- f(stats::rlnorm(n, 5, 1), stats::runif(n), n_bins = 4, n_uncertainty = 3)
+  pos <- (match(r$fill, ramp) - 1) / 255
+
+  # The defining property (Correll, Moritz & Heer 2018): an uncertain estimate
+  # cannot claim an extreme colour, so each uncertainty band spans a narrower
+  # slice of the value ramp than the one below it.
+  w <- vapply(1:3, function(b) diff(range(pos[r$u_bin == b])), numeric(1))
+  expect_true(all(diff(w) < 0))
+  # suppress = 0.85 leaves 0.15 of the range at the top uncertainty band.
+  expect_equal(w[3] / w[1], 0.15, tolerance = 0.02)
+  # ... and the contraction is toward the middle, not toward an end.
+  expect_equal(mean(range(pos[r$u_bin == 3])), 0.5, tolerance = 0.01)
+  expect_false(anyNA(r$fill))
+
+  # The bug: percent_rank() is NaN for a single usable row, so the row got no
+  # colour at all -- and one usable country among many missing uncertainties
+  # blanked the whole layer.
+  one <- f(c(10, 20, 30, 40, 50), c(NA, NA, 0.5, NA, NA))
+  expect_false(is.na(one$fill[3]))
+  expect_true(all(is.na(one$fill[-3])))
+  # A lone observation sits mid-ramp: it claims neither extreme.
+  expect_equal(one$v_bin[3], 2L)
+  expect_false(is.na(f(5, 0.5)$fill))
+
+  # Genuinely missing rows still get nothing.
+  expect_true(all(is.na(f(rep(NA_real_, 5), rep(NA_real_, 5))$fill)))
+  expect_true(is.na(f(c(1, 2, NA, 4), c(.1, .2, .3, .4))$fill[3]))
+  # n_uncertainty = 1 must not divide by zero when scaling the suppression.
+  expect_false(anyNA(f(stats::rlnorm(20), stats::runif(20), n_uncertainty = 1)$fill))
+})
+
+test_that("local_morans()'s lag column is the neighbour average it documents", {
+  snap <- countryatlas::world_snapshot$countries
+  W <- suppressWarnings(country_weights("knn", k = 4))
+  d0 <- snap[match(rownames(as.matrix(W)), snap$iso3c), c("iso3c", "gdp_per_capita")]
+  d0 <- d0[!is.na(d0$gdp_per_capita), ]
+  # Work on the graph the verbs align to, so nothing here is compared across
+  # different unit sets.
+  al <- countryatlas:::align_weights(d0, "gdp_per_capita", W)
+  m <- al$m; x <- al$x
+  d <- data.frame(iso3c = al$iso3c, gdp_per_capita = x, stringsAsFactors = FALSE)
+  wc <- suppressWarnings(country_weights("custom", w = m))
+
+  lm_ <- suppressWarnings(local_morans(d, gdp_per_capita, weights = wc, n_perm = 0))
+  sl <- suppressWarnings(spatial_lag(d, gdp_per_capita, weights = wc))
+  pick <- match(lm_$iso3c, al$iso3c)
+
+  # The bug: it reported the lag of the centred value, so `lag` sat on a
+  # different scale from the raw `value` beside it and disagreed with
+  # spatial_lag()'s column of the same name.
+  expect_equal(lm_$lag, as.numeric(m %*% x)[pick])
+  expect_equal(lm_$lag, sl$gdp_per_capita_lag[match(lm_$iso3c, sl$iso3c)])
+  # Both columns now on the same scale, which is what makes the pair plottable.
+  expect_gt(mean(lm_$lag), 0)
+  expect_lt(abs(mean(lm_$lag) - mean(lm_$value)) / mean(lm_$value), 0.2)
+
+  # The quadrants still key off the centred lag, per Anselin (1995): a
+  # High-High country is above the mean and so is its neighbourhood.
+  set.seed(1)
+  p <- suppressWarnings(local_morans(d, gdp_per_capita, weights = wc, n_perm = 49))
+  hh <- p$cluster == "High-High"
+  expect_true(all(p$value[hh] > mean(p$value)))
+  expect_true(all(p$lag[hh] > mean(p$value)))
+  ll <- p$cluster == "Low-Low"
+  expect_true(all(p$value[ll] < mean(p$value)))
+})
+
+test_that("beta_convergence() recovers a known convergence rate", {
+  # Barro & Sala-i-Martin: log y_T = log y_0 + (1 - exp(-lambda T))(log y* - log y_0),
+  # so regressing annualised growth on log y_0 has slope -(1 - exp(-lambda T))/T.
+  sim <- function(lambda, span, n = 25, ystar = 4e4) {
+    y0 <- exp(seq(log(1e3), log(6e4), length.out = n))
+    conv <- 1 - exp(-lambda * span)
+    yT <- exp(log(y0) + conv * (log(ystar) - log(y0)))
+    iso <- sprintf("C%02d", seq_len(n))
+    rbind(data.frame(iso3c = iso, year = 2000, v = y0, stringsAsFactors = FALSE),
+          data.frame(iso3c = iso, year = 2000 + span, v = yT, stringsAsFactors = FALSE))
+  }
+  for (lambda in c(0.01, 0.05)) for (span in c(20, 40)) {
+    r <- suppressWarnings(beta_convergence(sim(lambda, span), v))
+    # beta itself depends on the span; the recovered speed must not.
+    expect_equal(r$beta, -(1 - exp(-lambda * span)) / span)
+    expect_equal(r$speed, lambda)
+    expect_equal(r$half_life, log(2) / lambda)
+  }
+  # Noiseless data fits exactly.
+  expect_equal(suppressWarnings(beta_convergence(sim(0.02, 40), v))$r_squared, 1)
+
+  # Divergence has no rate to report, and says so by documented convention.
+  dv <- sim(0.02, 40)
+  dv$v[dv$year == 2040] <- exp(log(dv$v[dv$year == 2000]) * 1.1)
+  rd <- suppressWarnings(beta_convergence(dv, v))
+  expect_gt(rd$beta, 0)
+  expect_true(is.na(rd$speed))
+  expect_true(is.na(rd$half_life))
+})
+
+test_that("beta_convergence() explains an unrecoverable speed on mixed spans", {
+  mk <- function(lambda, spans, ystar = 4e4) {
+    n <- length(spans)
+    y0 <- exp(seq(log(1e3), log(6e4), length.out = n))
+    iso <- sprintf("C%02d", seq_len(n))
+    do.call(rbind, lapply(seq_len(n), function(i) {
+      conv <- 1 - exp(-lambda * spans[i])
+      data.frame(iso3c = iso[i], year = c(2000, 2000 + spans[i]),
+                 v = c(y0[i], exp(log(y0[i]) + conv * (log(ystar) - log(y0[i])))),
+                 stringsAsFactors = FALSE)
+    }))
+  }
+  mixed <- mk(0.05, rep(c(10, 50), each = 10))
+
+  # The bug: silent NA, with the documented reason (beta >= 0) not applying.
+  expect_warning(beta_convergence(mixed, v), class = "countryatlas_no_speed")
+  expect_warning(beta_convergence(mixed, v), "10 to 50 years")
+  r <- suppressWarnings(beta_convergence(mixed, v))
+  expect_lt(r$beta, 0)                 # convergence is present ...
+  expect_lt(r$p_value, 1e-6)           # ... and highly significant ...
+  expect_true(is.na(r$speed))          # ... but not annualisable.
+  expect_true(is.na(r$half_life))
+
+  # A common span is unaffected and must stay silent about this.
+  balanced <- mk(0.05, rep(40, 20))
+  expect_no_condition(suppressWarnings(
+    beta_convergence(balanced, v)), class = "countryatlas_no_speed")
+  expect_equal(suppressWarnings(beta_convergence(balanced, v))$speed, 0.05)
+})
+
+test_that("gridded_cartogram() allocates cells exactly and reports the overlap honestly", {
+  skip_if_not_installed("sf")
+  snap <- countryatlas::world_snapshot$countries
+
+  # The documented largest-remainder guarantees.
+  for (cells in c(97, 500, 1000)) {
+    p <- suppressWarnings(suppressMessages(
+      gridded_cartogram(snap, population, cells = cells)))
+    tbl <- attr(p, "countryatlas_cells")
+    dat <- suppressWarnings(suppressMessages(p$data))
+    expect_equal(sum(tbl$cells), cells)          # exact total
+    expect_equal(nrow(dat), cells)               # every cell drawn once
+    expect_equal(sum(duplicated(dat[, c("x", "y")])), 0L)
+    # No country with a positive value gets zero cells while a smaller one
+    # gets one.
+    if (any(tbl$cells == 0) && any(tbl$cells > 0)) {
+      expect_lt(max(tbl$value[tbl$cells == 0]), min(tbl$value[tbl$cells > 0]))
+    }
+    # Larger value never means fewer cells.
+    o <- order(tbl$value)
+    expect_true(all(diff(tbl$cells[o]) >= 0))
+  }
+
+  # The documented overlap: blocks are centred on centroids with no collision
+  # avoidance, so crowded neighbours are drawn on top of one another. Counted
+  # by binning at the tile pitch, since only same-or-adjacent bins can overlap.
+  overlap_cells <- function(cells, cell_size) {
+    d <- suppressWarnings(suppressMessages(
+      gridded_cartogram(snap, population, cells = cells, cell_size = cell_size)$data))
+    tile <- cell_size * 0.9
+    bx <- floor(d$x / tile); by <- floor(d$y / tile)
+    hit <- rep(FALSE, nrow(d))
+    idx <- split(seq_len(nrow(d)), paste(bx, by))
+    for (kb in names(idx)) {
+      b <- as.numeric(strsplit(kb, " ")[[1]])
+      near <- unlist(idx[paste(rep(b[1] + -1:1, each = 3), b[2] + -1:1)], use.names = FALSE)
+      near <- near[!is.na(near)]
+      for (i in idx[[kb]]) {
+        j <- near[near != i]
+        o <- abs(d$x[j] - d$x[i]) < tile - 1e-9 & abs(d$y[j] - d$y[i]) < tile - 1e-9 &
+          d$iso3c[j] != d$iso3c[i]
+        if (any(o)) hit[i] <- TRUE
+      }
+    }
+    sum(hit) / nrow(d)
+  }
+  at_default <- overlap_cells(1000, 2.5)
+  expect_gt(at_default, 0)                       # it happens, and is documented
+  # cell_size is the documented lever, and more cells makes it worse.
+  expect_lt(overlap_cells(1000, 1.5), at_default)
+  expect_gt(overlap_cells(2500, 2.5), at_default)
+})
+
+test_that("great_circle() stays fine-grained where the arc turns fastest", {
+  gc <- countryatlas:::great_circle
+  # The step the short way round: a genuine antimeridian crossing (179 to -179)
+  # reads as 2 degrees, which is split_antimeridian()'s job, not a coarseness
+  # problem.
+  step <- function(g) { d <- abs(diff(g$lon)); max(pmin(d, 360 - d)) }
+  m <- countryatlas::country_meta
+  at <- function(iso) c(m$centroid_lon[m$iso3c == iso], m$centroid_lat[m$iso3c == iso])
+
+  # The bug: these near-antipodal pairs pass within half a degree of a pole and
+  # stepped 121-136 degrees of longitude at the fixed n = 50, which
+  # split_antimeridian() does not cut (it only cuts steps wider than 180), so
+  # geom_path() drew a streak across the top of the map.
+  for (pair in list(c("BEL", "TON"), c("GRL", "JPN"), c("TON", "NLD"), c("COK", "POL"))) {
+    a <- at(pair[1]); b <- at(pair[2])
+    g <- gc(a[1], a[2], b[1], b[2])
+    expect_lt(step(g), 20)
+    # the arc still starts and ends exactly where it was asked to
+    expect_equal(c(g$lon[1], g$lat[1]), a)
+    expect_equal(c(g$lon[nrow(g)], g$lat[nrow(g)]), b)
+    expect_lt(nrow(g), 200)                    # refinement stays bounded
+  }
+
+  # Ordinary arcs must be untouched: exactly n points, no refinement.
+  for (arc in list(c(2.35, 48.86, 13.4, 52.52), c(139.7, 35.7, -118.2, 34.05),
+                   c(151.2, -33.9, -70.7, -33.4))) {
+    g <- gc(arc[1], arc[2], arc[3], arc[4], n = 50)
+    expect_equal(nrow(g), 50L)
+    expect_lt(step(g), 20)
+  }
+
+  # Degenerate endpoints still behave.
+  expect_equal(nrow(gc(10, 20, 10, 20)), 50L)            # identical
+  expect_equal(step(gc(10, 20, 10, 20)), 0)
+  expect_equal(nrow(gc(0, 90, 100, 90)), 50L)            # both at the pole
+  expect_false(anyNA(gc(0, 0, 180, 0)$lon))              # exactly antipodal
+  expect_false(anyNA(gc(0, 90, 0, -90)$lat))
+})
+
+test_that("no real country pair produces an uncut longitude jump", {
+  gc <- countryatlas:::great_circle
+  step <- function(g) { d <- abs(diff(g$lon)); max(pmin(d, 360 - d)) }
+  m <- countryatlas::country_meta
+  m <- m[is.finite(m$centroid_lon) & is.finite(m$centroid_lat), ]
+  set.seed(1)
+  idx <- sample(seq_len(nrow(m)), 40)
+  worst <- 0
+  for (i in idx) for (j in idx) {
+    if (i == j) next
+    worst <- max(worst, step(gc(m$centroid_lon[i], m$centroid_lat[i],
+                                m$centroid_lon[j], m$centroid_lat[j])))
+  }
+  expect_lt(worst, 20)
+})
+
+test_that("audit_coverage()'s counts are denominators, and correct", {
+  d <- countryatlas::world_snapshot$countries
+  cv <- suppressWarnings(suppressMessages(
+    audit_coverage(d, "gdp_per_capita", by = "region")))
+  nr <- cv$na_rates; bg <- cv$by_group
+  n_missing <- sum(is.na(d$gdp_per_capita))
+
+  # n is the denominator: everything counted, not everything present.
+  expect_equal(nr$n[1], nrow(d))
+  expect_equal(nr$n_missing[1], n_missing)
+  expect_equal(nr$na_rate, nr$n_missing / nr$n)
+  expect_equal(nrow(cv$unmatched), 0L)
+
+  # by_group's n_countries is also a denominator, and the groups partition the
+  # data.
+  expect_equal(sum(bg$n_countries), nrow(d))
+  reg <- countryatlas::country_meta$region[match(d$iso3c, countryatlas::country_meta$iso3c)]
+  for (i in seq_len(nrow(bg))) {
+    g <- bg$region[i]
+    k <- if (is.na(g)) is.na(reg) else !is.na(reg) & reg == g
+    expect_equal(bg$n_countries[i], sum(k))
+    expect_equal(bg$na_rate[i], mean(is.na(d$gdp_per_capita[k])))
+  }
+
+  # The documented contrast: map_provenance() counts from the other end, so the
+  # two must be complements of each other on the same data.
+  pr <- suppressWarnings(suppressMessages(map_provenance(d, gdp_per_capita)))
+  expect_equal(pr$n_total, nr$n[1])
+  expect_equal(pr$n_missing, nr$n_missing[1])
+  expect_equal(pr$n_countries, nr$n[1] - nr$n_missing[1])
+  expect_lt(pr$n_countries, nr$n[1])
+})
+
+test_that("the spatial verbs' counts mean the same thing", {
+  snap <- countryatlas::world_snapshot$countries
+  W <- suppressWarnings(country_weights("knn", k = 4))
+  d <- snap[match(rownames(as.matrix(W)), snap$iso3c), c("iso3c", "gdp_per_capita")]
+  d <- d[!is.na(d$gdp_per_capita), ]
+  supplied <- nrow(d)
+  g <- function(f, ...) suppressWarnings(suppressMessages(f(d, gdp_per_capita, weights = W, ...)))
+
+  mi <- g(morans_i, n_perm = 0)
+  gc_ <- g(gearys_c, n_perm = 0)
+  go <- g(getis_ord, local = FALSE)
+
+  # n and n_excluded are documented identically across the three, so they must
+  # agree, and together account for every country supplied with a value.
+  expect_equal(gc_$n, mi$n)
+  expect_equal(go$n, mi$n)
+  expect_equal(gc_$n_excluded, mi$n_excluded)
+  expect_equal(mi$n + mi$n_excluded, supplied)
+  expect_equal(gc_$n_links, mi$n_links)
+  expect_equal(go$n_links, mi$n_links)
+  expect_length(mi$excluded[[1]], mi$n_excluded)
+
+  # The local forms return exactly n rows, which is what makes "countries used"
+  # the same count in both forms.
+  expect_equal(nrow(g(local_morans, n_perm = 0)), mi$n)
+  expect_equal(nrow(g(getis_ord)), mi$n)
+  # spatial_lag is the exception by design: it adds a column, so it keeps every
+  # supplied row and leaves the unreachable ones NA.
+  sl <- g(spatial_lag)
+  expect_equal(nrow(sl), supplied)
+  expect_equal(sum(is.na(sl$gdp_per_capita_lag)), mi$n_excluded)
+})
+
+# compare_sources()'s comparison arithmetic had no coverage at all: the body
+# needs a fetch from two providers. Two locally registered adapters exercise it
+# offline, against values whose relative difference is computable by hand.
+test_that("compare_sources computes rel_diff and the pair summary correctly", {
+  mk <- function(vals) function(indicator, countries, years, ...) {
+    data.frame(iso3c = names(vals), year = 2000L, value = unname(vals),
+               stringsAsFactors = FALSE)
+  }
+  A <- c(FRA = 100, DEU = 100, ITA = -100, ESP = 0, POL = -10, NLD = 50)
+  B <- c(FRA = 110, DEU = 100, ITA =  100, ESP = 0, POL =   5, BEL = 70)
+  suppressMessages(register_country_source("anchorA", mk(A), cache = FALSE))
+  suppressMessages(register_country_source("anchorB", mk(B), cache = FALSE))
+  out <- suppressWarnings(suppressMessages(
+    compare_sources("x", sources = c("anchorA", "anchorB"), year = 2000)))
+  d <- as.data.frame(out)
+  rd <- stats::setNames(d$rel_diff, d$iso3c)
+
+  # (max - min) / max(|min|, |max|), so mixed signs are well defined.
+  expect_equal(rd[["FRA"]], 10 / 110)
+  expect_equal(rd[["ITA"]], 200 / 100)   # -100 vs 100
+  expect_equal(rd[["POL"]], 15 / 10)     # -10 vs 5
+  expect_equal(rd[["DEU"]], 0)
+  # Both zero must be 0, not NaN from a zero denominator.
+  expect_equal(rd[["ESP"]], 0)
+  # One source only: no comparison to make.
+  expect_true(is.na(rd[["NLD"]]))
+  expect_true(is.na(rd[["BEL"]]))
+  expect_equal(d$n_sources[d$iso3c == "NLD"], 1L)
+
+  # Most-disagreeing first.
+  expect_identical(order(-d$rel_diff, na.last = TRUE), seq_len(nrow(d)))
+
+  s <- as.data.frame(attr(out, "countryatlas_source_summary"))
+  expect_equal(s$n_both, 5L)
+  expect_equal(s$only_x, 1L)
+  expect_equal(s$only_y, 1L)
+  # FRA, ITA and POL exceed the default 0.05 tolerance.
+  expect_equal(s$n_disagree, 3L)
+  expect_equal(sum(d$disagrees), 3L)
 })

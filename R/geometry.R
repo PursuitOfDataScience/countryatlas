@@ -758,6 +758,11 @@ attach_geometry <- function(data,
                             overrides = country_overrides(),
                             year = NULL) {
   geometry <- rlang::arg_match(geometry)
+  # See abort_bare_column(): `by` takes a column name as a string.
+  by_expr <- substitute(by)
+  by <- tryCatch(force(by), error = function(e) {
+    abort_bare_column(by_expr, "by", e)
+  })
   check_string(by, "by")
   if (!is.null(year)) {
     geom <- historical_geometry(year, projection = projection)
@@ -775,14 +780,29 @@ attach_geometry <- function(data,
                see {.help countryatlas::historical_geometry}."
       ))
     }
-    matched <- sum(!is.na(geom[[by]]) & geom[[by]] %in% data[[by]])
-    if (matched < nrow(geom) * 0.5) {
+    # Keyed on the geometry, not on how much of it the caller asked for. The
+    # threshold was `matched < nrow(geom) * 0.5`, so an ordinary three-country
+    # frame -- 3 of 97 entities in 1960 -- warned that "only 3 matched" and
+    # advised joining on gwcode "for full historical coverage", which is not
+    # what a caller asking for three countries wants. What the message actually
+    # claims is a property of CShapes: a few entities never had an ISO code
+    # (6 of 97 in 1960, 3 of 174 in 2019) and no iso3c join can reach them.
+    # Report that instead, and leave the nothing-matched case to
+    # warn_no_geometry_match(), as every other geometry verb does.
+    #
+    # No second numeric between the count and the {?...} agreements: cli keys
+    # them to the most recent numeric interpolation, so a total in between
+    # would re-key both to it. The total goes in the hint.
+    unreachable <- sum(is.na(geom[[by]]))
+    if (unreachable > 0L) {
       wdj_warn(c(
-        "Only {matched} of {nrow(geom)} historical entities matched on {.val {by}}.",
-        "i" = "Entities that never had an ISO code cannot match. Join on
+        "{unreachable} historical entit{?y/ies} ha{?s/ve} no {.field {by}} and
+         cannot match.",
+        "i" = "{nrow(geom)} entities exist for this year; join on
                {.field gwcode} for full historical coverage."
-      ))
+      ), class = "countryatlas_unreachable_entities")
     }
+    warn_no_geometry_match(data[[by]], geom[[by]], by)
     drop <- setdiff(intersect(names(geom), names(data)), by)
     geom <- geom[, setdiff(names(geom), drop), drop = FALSE]
     return(dplyr::left_join(geom, data, by = by, na_matches = "never",
@@ -937,6 +957,18 @@ locate_country <- function(lon = NULL, lat = NULL, points = NULL,
           'Convert it first with {.code sf::st_as_sf(points, coords = c("lon", "lat"), crs = 4326)},
            or pass the columns as {.arg lon} and {.arg lat}.'
         else 'Pass coordinates as the {.arg lon} and {.arg lat} vectors instead.'
+      ))
+    }
+    # The same failure one step further in: an sf object carrying no CRS reaches
+    # st_transform() and comes back with sf's "cannot transform sfc object with
+    # missing crs", which again names neither the argument nor the fix. That is
+    # exactly what st_as_sf(df, coords = c("lon", "lat")) leaves behind when
+    # `crs` is forgotten, so it is at least as common as the non-sf case above.
+    if (is.na(sf::st_crs(points))) {
+      wdj_abort(c(
+        "{.arg points} has no coordinate reference system.",
+        "i" = 'Set one with {.code sf::st_set_crs(points, 4326)} if the
+               coordinates are longitude and latitude in degrees.'
       ))
     }
     points <- sf::st_transform(points, 4326L)

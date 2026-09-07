@@ -68,6 +68,15 @@ world_query <- function(fill, source = "countryatlas_world",
   layer <- rlang::arg_match(layer)
   check_string(source, "source")
   check_string(draw, "draw")
+  # Guarded before the is.null() tests below, which force the promise.
+  facet_expr <- substitute(facet)
+  facet <- tryCatch(force(facet), error = function(e) {
+    abort_bare_column(facet_expr, "facet", e)
+  })
+  size_expr <- substitute(size)
+  size <- tryCatch(force(size), error = function(e) {
+    abort_bare_column(size_expr, "size", e)
+  })
   if (!is.null(facet)) check_string(facet, "facet")
   if (!is.null(size)) check_string(size, "size")
   if (!is.null(n_bins)) {
@@ -199,8 +208,27 @@ as_ggsql_source <- function(data, name = "countryatlas_world",
                             con = NULL, path = NULL, geometry_col = "geometry") {
   format <- rlang::arg_match(format)
   check_string(name, "name")
+  # Same bare-column guard as the verbs in analysis.R: this argument takes a
+  # column name as a string, and writing it unquoted -- as the tidy-eval verbs
+  # next door allow -- otherwise reached the user as base R's "object not
+  # found", naming neither the argument nor the string it wanted.
+  geometry_col_expr <- substitute(geometry_col)
+  geometry_col <- tryCatch(force(geometry_col), error = function(e) {
+    abort_bare_column(geometry_col_expr, "geometry_col", e)
+  })
   check_string(geometry_col, "geometry_col")
   if (!is.null(path)) check_string(path, "path")
+  # `data` is documented as a map-ready frame, and nothing checked it:
+  # as_ggsql_source(1:5) wrote an integer vector out as a table and handed back
+  # a connection, so a "world source" could contain no countries at all.
+  if (!is.data.frame(data)) {
+    wdj_abort(c(
+      "{.arg data} must be a data frame.",
+      "x" = "Got {.cls {class(data)[1]}}.",
+      "i" = "Pass a map-ready frame -- ideally {.pkg sf}, so
+             {.code DRAW spatial} has geometry to work with."
+    ))
+  }
   df <- ggsql_wkb_frame(data, geometry_col)
 
   if (format == "arrow") {
@@ -209,6 +237,27 @@ as_ggsql_source <- function(data, name = "countryatlas_world",
   }
 
   need_pkg(c("DBI", "duckdb"), sprintf("for as_ggsql_source(format = \"%s\")", format))
+  # A connection the caller already closed reached dbWriteTable() as base R's
+  # bare "Invalid connection", naming neither the argument nor the state it was
+  # in. Checked here rather than left to the write, for the same reason the
+  # own_con bookkeeping below exists: this is the one place that knows whose
+  # connection it is.
+  if (!is.null(con)) {
+    if (!inherits(con, "DBIConnection")) {
+      wdj_abort(c(
+        "{.arg con} must be a {.cls DBIConnection}.",
+        "x" = "Got {.cls {class(con)[1]}}.",
+        "i" = "Leave it {.code NULL} for a fresh in-memory DuckDB."
+      ))
+    }
+    if (!isTRUE(DBI::dbIsValid(con))) {
+      wdj_abort(c(
+        "{.arg con} is closed.",
+        "i" = "Open a new connection, or leave it {.code NULL} for a fresh
+               in-memory DuckDB."
+      ))
+    }
+  }
   own_con <- is.null(con)
   con <- con %||% DBI::dbConnect(wdj_duckdb())
   if (own_con) {

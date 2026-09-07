@@ -282,7 +282,7 @@ country_data <- function(year,
     val_cols <- setdiff(names(wdi), c("iso2c", "iso3c", "country", "year"))
     wdi <- wdi %>%
       dplyr::group_by(.data$iso3c) %>%
-      dplyr::arrange(.data$year, .by_group = TRUE) %>%
+      dplyr::arrange(year_sort_key(.data$year), .by_group = TRUE) %>%
       dplyr::summarise(
         dplyr::across(dplyr::all_of(c("iso2c", "country")), dplyr::last),
         dplyr::across(dplyr::all_of(val_cols),

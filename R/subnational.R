@@ -264,15 +264,25 @@ subnational_map <- function(data, fill, by = "nuts_id", level = 2, year = 2021,
                             countries = NULL, resolution = "60", ...) {
   fill_q <- rlang::enquo(fill)
   fill_name <- quo_arg_name(fill_q, "fill")
+  # See abort_bare_column(): `by` takes a column name as a string.
+  by_expr <- substitute(by)
+  by <- tryCatch(force(by), error = function(e) {
+    abort_bare_column(by_expr, "by", e)
+  })
   check_string(by, "by")
   check_cols(data, c(by, fill_name))
 
   geom <- nuts_geometry(level = level, year = year, countries = countries,
                         resolution = resolution, projection = NULL)
-  if (!by %in% names(geom)) {
-    # Join on nuts_id whatever the caller's column is called.
-    geom[[by]] <- geom$nuts_id
-  }
+  # Join on nuts_id whatever the caller's column is called -- unconditionally,
+  # because the guard here used to be `if (!by %in% names(geom))`, which is
+  # false exactly when the caller's column name collides with one of the
+  # geometry's own (`name`, `iso3c`, `level`). `by = "name"` then joined the
+  # caller's NUTS codes against the geometry's region *names* and matched
+  # nothing, and `by = "iso3c"` silently joined at country granularity. `by` is
+  # documented as "the code column in `data`", so the geometry side is always
+  # nuts_id.
+  geom[[by]] <- geom$nuts_id
   lost <- unmatched_keys(data[[by]], geom[[by]])
   if (length(lost)) {
     wdj_warn(c(
@@ -291,7 +301,12 @@ subnational_map <- function(data, fill, by = "nuts_id", level = 2, year = 2021,
   geom <- geom[, setdiff(names(geom), drop), drop = FALSE]
   joined <- dplyr::left_join(geom, tibble::as_tibble(sf_drop(data)), by = by,
                              na_matches = "never")
-  matched <- sum(!is.na(joined[[fill_name]]))
+  # Counted on the join KEY, not on the fill value: sum(!is.na(fill)) called a
+  # panel whose indicator is entirely NA -- a real thing to map, and one this
+  # package draws with an na.value and says so in the caption -- "no rows
+  # matched the geometry", sending the reader off to check NUTS vintages for a
+  # mismatch that never happened.
+  matched <- sum(!is.na(data[[by]]) & data[[by]] %in% geom[[by]])
   if (!matched) {
     wdj_abort(c(
       "No rows of {.arg data} matched the geometry on {.val {by}}.",

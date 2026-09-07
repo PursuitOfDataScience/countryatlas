@@ -1290,3 +1290,498 @@ test_that("repair_country_names() reports exactly what it changed", {
   odd <- suppressMessages(repair_country_names("Qwertyuiop"))
   expect_equal(as.character(odd), "Qwertyuiop")
 })
+
+test_that("a misbehaving custom source is reported as the source's fault", {
+  env <- countryatlas:::the_sources
+  on.exit(suppressWarnings(rm(list = intersect("zz_probe", ls(env)), envir = env)),
+          add = TRUE)
+  reg <- function(f) suppressWarnings(suppressMessages(
+    register_country_source("zz_probe", f, cache = FALSE)))
+  go <- function() fetch_indicator("zz_probe", "gdp", countries = "FRA")
+
+  # A well-behaved adapter is unaffected.
+  reg(function(indicator, countries, years) data.frame(iso3c = "FRA", gdp = 1))
+  expect_equal(suppressWarnings(suppressMessages(go()))$gdp, 1)
+
+  # The bug: the adapter's own error came back bare, naming no source. The
+  # provider's message is preserved verbatim, braces and all -- a cli template
+  # would have tried to interpolate them.
+  reg(function(indicator, countries, years) stop("provider is down {oops}"))
+  err <- tryCatch(go(), error = function(e) e)
+  expect_s3_class(err, "countryatlas_error")
+  expect_match(conditionMessage(err), "zz_probe")
+  expect_match(conditionMessage(err), "provider is down {oops}", fixed = TRUE)
+
+  # The bug: a wrong signature surfaced R's "unused arguments".
+  reg(function(indicator) data.frame(iso3c = "FRA", gdp = 1))
+  err2 <- tryCatch(go(), error = function(e) e)
+  expect_s3_class(err2, "countryatlas_error")
+  expect_match(conditionMessage(err2), "does not take the arguments")
+  expect_match(conditionMessage(err2), "indicator")
+
+  # The return-value checks that already worked must keep working.
+  for (bad in list(NULL, c(1, 2, 3), matrix(1:4, 2), list(a = 1))) {
+    reg(function(indicator, countries, years) bad)
+    e <- tryCatch(go(), error = function(x) x)
+    expect_s3_class(e, "countryatlas_error")
+    expect_match(conditionMessage(e), "not a data frame")
+  }
+  reg(function(indicator, countries, years) data.frame(country = "FRA", gdp = 1))
+  expect_error(go(), "no iso3c column", class = "countryatlas_error")
+
+  # A duplicate key is reported by add_indicator(), as the contract promises.
+  reg(function(indicator, countries, years)
+    data.frame(iso3c = c("FRA", "FRA", "DEU"), gdp = c(1, 2, 3)))
+  expect_warning(
+    add_indicator(data.frame(iso3c = c("FRA", "DEU"), v = 1:2), "zz_probe", "gdp"),
+    "duplicate key")
+})
+
+test_that("max_gap is measured in years, not rows", {
+  fill <- function(yr, v, max_gap = 3, method = "linear") {
+    d <- data.frame(iso3c = rep("FRA", length(yr)), year = yr, value = v,
+                    stringsAsFactors = FALSE)
+    r <- suppressWarnings(suppressMessages(
+      interpolate_missing(d, "value", max_gap = max_gap, method = method)))
+    sum(is.na(d$value) & !is.na(r$value))
+  }
+  # Annual panels are unchanged: the span between the bracketing observations
+  # equals the number of missing rows exactly.
+  expect_equal(fill(2000:2004, c(1, 2, NA, 4, 5)), 1L)
+  expect_equal(fill(2000:2005, c(1, NA, NA, NA, 5, 6)), 3L)   # exactly max_gap
+  expect_equal(fill(2000:2006, c(1, NA, NA, NA, NA, 6, 7)), 0L)
+
+  # The bug: one missing *row* spanning a decade passed a max_gap of 3, so the
+  # default invented a value ten years from either anchor.
+  expect_equal(fill(c(2000, 2010, 2020), c(1, NA, 3)), 0L)
+  expect_equal(fill(c(2000, 2005, 2010, 2015, 2020), c(1, NA, NA, 4, 5)), 0L)
+  # But a filled point close to an anchor is fine even when the *other* anchor
+  # is distant: 2001 sits one year from 2000, so it fills. Measuring the
+  # bracketing span instead would wrongly refuse this.
+  expect_equal(fill(c(2000, 2001, 2020), c(1, NA, 3)), 1L)
+  expect_equal(fill(c(2000, 2019, 2020), c(1, NA, 3)), 1L)
+  # Raising max_gap to cover the span makes it explicit and allowed again.
+  expect_equal(fill(c(2000, 2010, 2020), c(1, NA, 3), max_gap = 20), 1L)
+  # An irregular gap genuinely within max_gap still fills.
+  expect_equal(fill(c(2000, 2002, 2003), c(1, NA, 3)), 1L)
+  # Same for locf, and character years get the year measure too.
+  expect_equal(fill(c(2000, 2010, 2020), c(1, NA, 3), method = "locf"), 0L)
+  expect_equal(fill(as.character(c(2000, 2010, 2020)), c(1, NA, 3)), 0L)
+  expect_equal(fill(as.character(2000:2004), c(1, 2, NA, 4, 5)), 1L)
+})
+
+test_that("linear interpolation refuses a year it cannot read", {
+  lab <- data.frame(iso3c = rep("FRA", 3), year = c("early", "mid", "late"),
+                    value = c(1, NA, 3), stringsAsFactors = FALSE)
+  # The bug: approx() got NA and its message surfaced through dplyr's across().
+  expect_error(interpolate_missing(lab, "value", method = "linear"),
+               "readable as a number", class = "countryatlas_error")
+  expect_error(interpolate_missing(lab, "value", method = "linear"), "early")
+  # locf needs no arithmetic, so it must keep working.
+  expect_equal(sum(!is.na(suppressWarnings(suppressMessages(
+    interpolate_missing(lab, "value", method = "locf"))$value)), na.rm = TRUE), 3L)
+
+  # Coercibility, not is.numeric(): a character year still works, which is what
+  # approx() has always accepted.
+  chr <- data.frame(iso3c = rep("FRA", 5), year = as.character(2000:2004),
+                    value = c(1, 2, NA, 4, 5), stringsAsFactors = FALSE)
+  expect_no_error(interpolate_missing(chr, "value", method = "linear"))
+  expect_no_error(interpolate_missing(chr, "value", method = "locf"))
+})
+
+# dplyr::arrange() and order() on a factor sort by LEVEL INDEX, not the label,
+# and approx() coerces a factor x to level indices too. A year column arrives
+# as a factor more often than it looks (read.csv(stringsAsFactors = TRUE), some
+# importers, any deliberate factor(year) for plotting), and every verb that
+# reads a *neighbouring* row then read the wrong neighbour -- silently.
+test_that("a factor or character year gives the same answers as a numeric one", {
+  base <- data.frame(
+    iso3c = rep(c("FRA", "DEU"), each = 4), year = rep(2000:2003, 2),
+    value = c(10, 20, 40, 80, 5, 10, 20, 40), stringsAsFactors = FALSE)
+  # Levels deliberately out of chronological order: sorting by level index
+  # would give 2003, 2001, 2000, 2002.
+  as_factor_year <- function(d) {
+    d$year <- factor(as.character(d$year),
+                     levels = c("2003", "2001", "2000", "2002"))
+    d
+  }
+  as_chr_year <- function(d) { d$year <- as.character(d$year); d }
+  gapped <- base
+  gapped$value[3] <- NA
+
+  for (mk in list(as_factor_year, as_chr_year)) {
+    expect_equal(lag_by_country(mk(base), "value")$value_lag,
+                 lag_by_country(base, "value")$value_lag)
+    expect_equal(diff_by_country(mk(base), "value")$value_diff,
+                 diff_by_country(base, "value")$value_diff)
+    expect_equal(growth_rate(mk(base), "value")$value_growth,
+                 growth_rate(base, "value")$value_growth)
+    # The gap must actually be filled, not left NA by interpolating against
+    # level indices and falling outside approx()'s anchors.
+    got <- interpolate_missing(mk(gapped), "value")$value
+    expect_equal(got, interpolate_missing(gapped, "value")$value)
+    expect_false(anyNA(got))
+  }
+})
+
+test_that("year_sort_key leaves a genuinely non-numeric period label alone", {
+  expect_identical(countryatlas:::year_sort_key(1:3), 1:3)
+  expect_identical(countryatlas:::year_sort_key(c("2000", "2001")), c(2000, 2001))
+  expect_identical(countryatlas:::year_sort_key(factor(c("2001", "2000"))),
+                   c(2001, 2000))
+  # Not numbers at all: handed back untouched, so it still sorts by whatever
+  # order its own type defines rather than collapsing to NA.
+  lab <- factor(c("pre-war", "post-war"), levels = c("pre-war", "post-war"))
+  expect_identical(countryatlas:::year_sort_key(lab), lab)
+  d <- as.Date(c("2000-01-01", "2001-01-01"))
+  expect_identical(countryatlas:::year_sort_key(d), d)
+})
+
+test_that("the irregular-year warning reads a factor year by label, not level", {
+  mk <- function(years, fac) {
+    d <- data.frame(iso3c = rep("FRA", length(years)), year = years,
+                    value = seq_along(years), stringsAsFactors = FALSE)
+    if (fac) {
+      # Levels reversed, so level index and year disagree.
+      d$year <- factor(as.character(d$year),
+                       levels = rev(as.character(sort(unique(years)))))
+    }
+    d
+  }
+  irregular <- function(d) {
+    hit <- FALSE
+    withCallingHandlers(
+      suppressMessages(lag_by_country(d, "value")),
+      warning = function(w) {
+        if (inherits(w, "countryatlas_irregular_years")) hit <<- TRUE
+        invokeRestart("muffleWarning")
+      })
+    hit
+  }
+  # as.numeric() on a factor returns level indices, which made a regular annual
+  # panel look irregular and vice versa.
+  expect_false(irregular(mk(2000:2004, FALSE)))
+  expect_false(irregular(mk(2000:2004, TRUE)))
+  expect_true(irregular(mk(c(2000, 2001, 2010), FALSE)))
+  expect_true(irregular(mk(c(2000, 2001, 2010), TRUE)))
+})
+
+# Indexing a NAMED vector with a factor selects by the factor's integer codes,
+# not its labels. audit_time_coverage() looked up historical_codes that way, so
+# a frame from read.csv(stringsAsFactors = TRUE) matched whichever rows happened
+# to sit at those positions -- from the one verb whose job is catching exactly
+# that kind of mistake. The year key had already been hardened (read_year());
+# the iso3c key had not.
+test_that("audit_time_coverage does not invent history for a factor iso3c", {
+  iso <- c("FRA", "DEU", "ITA", "ESP")
+  d <- data.frame(iso3c = rep(iso, each = 2), year = rep(2000:2001, 4),
+                  value = 1:8, stringsAsFactors = FALSE)
+  fac <- d
+  # Levels reversed, so each code's integer position points at another country.
+  fac$iso3c <- factor(fac$iso3c, levels = rev(iso))
+
+  chr_out <- audit_time_coverage(d)
+  fac_out <- audit_time_coverage(fac)
+  # None of these four countries dissolved or post-dates its predecessor.
+  expect_equal(nrow(chr_out), 0L)
+  expect_equal(nrow(fac_out), 0L)
+
+  # And where there IS something to report, both agree. SUN carries data after
+  # it dissolved; RUS carries data before it existed.
+  hist <- data.frame(
+    iso3c = c("SUN", "RUS"), year = c(1995L, 1985L), value = 1:2,
+    stringsAsFactors = FALSE)
+  hist_fac <- hist
+  hist_fac$iso3c <- factor(hist_fac$iso3c, levels = c("RUS", "SUN"))
+  a <- audit_time_coverage(hist)
+  b <- audit_time_coverage(hist_fac)
+  expect_equal(as.data.frame(a), as.data.frame(b))
+  expect_true(nrow(a) > 0)
+  expect_setequal(a$issue, c("after_dissolution", "before_existence"))
+})
+
+test_that("a factor iso3c gives the same answers as a character one", {
+  iso <- c("FRA", "DEU", "ITA", "ESP")
+  d <- data.frame(iso3c = rep(iso, each = 3), year = rep(2000:2002, 4),
+                  value = c(100, 104, 108, 10, 13, 17, 50, 56, 63, 200, 205, 210),
+                  stringsAsFactors = FALSE)
+  fac <- d
+  fac$iso3c <- factor(fac$iso3c, levels = rev(iso))
+  flat <- function(x) {
+    x <- as.data.frame(x)
+    x$iso3c <- as.character(x$iso3c)
+    x[order(x$iso3c, x$year), setdiff(names(x), character(0))]
+  }
+  expect_equal(flat(lag_by_country(fac, "value")), flat(lag_by_country(d, "value")),
+               ignore_attr = TRUE)
+  expect_equal(flat(growth_rate(fac, "value")), flat(growth_rate(d, "value")),
+               ignore_attr = TRUE)
+  expect_equal(flat(index_to(fac, "value", base_year = 2000)),
+               flat(index_to(d, "value", base_year = 2000)), ignore_attr = TRUE)
+  expect_equal(sigma_convergence(fac, "value")$sigma,
+               sigma_convergence(d, "value")$sigma)
+})
+
+# dplyr::group_by() puts every NA in ONE group, so a panel carrying two rows
+# whose iso3c did not resolve was treated as one country -- and these verbs read
+# a neighbouring row within the group.
+test_that("verbs do not read across two unidentified countries", {
+  d <- data.frame(iso3c = c("FRA", "FRA", NA, NA),
+                  year = c(2000, 2001, 2000, 2001),
+                  value = c(10, 20, 100, 999), stringsAsFactors = FALSE)
+  na_of <- function(out, col) out[[col]][is.na(out$iso3c)]
+
+  # 999 - 100 = 899 between two unrelated rows was reported as a real change.
+  expect_true(all(is.na(na_of(lag_by_country(d, "value"), "value_lag"))))
+  expect_true(all(is.na(na_of(diff_by_country(d, "value"), "value_diff"))))
+  expect_true(all(is.na(na_of(growth_rate(d, "value"), "value_growth"))))
+  # The identified rows are untouched.
+  out <- lag_by_country(d, "value")
+  expect_equal(out$value_lag[!is.na(out$iso3c) & out$year == 2001], 10)
+
+  # interpolate_missing() must not fill a gap from another unknown country.
+  gap <- data.frame(iso3c = c(NA, NA, NA), year = 2000:2002,
+                    value = c(10, NA, 30), stringsAsFactors = FALSE)
+  expect_true(is.na(interpolate_missing(gap, "value")$value[2]))
+  # And no internal key leaks into the result.
+  expect_false(".wdj_unit" %in% names(interpolate_missing(gap, "value")))
+  expect_false(".wdj_unit" %in% names(lag_by_country(d, "value")))
+})
+
+test_that("a row identified by country instead of iso3c still groups as one series", {
+  # An appended aggregate row -- no iso3c, but `country` names it -- is a
+  # deliberate series and must keep behaving like one.
+  d <- data.frame(
+    iso3c = c("FRA", "FRA", NA, NA),
+    country = c("France", "France", "World", "World"),
+    year = c(2000, 2001, 2000, 2001),
+    value = c(10, 20, 100, 999), stringsAsFactors = FALSE)
+  out <- lag_by_country(d, "value")
+  expect_equal(out$value_lag[out$country == "World" & out$year == 2001], 100)
+  expect_true(is.na(out$value_lag[out$country == "World" & out$year == 2000]))
+
+  # Two *different* unmatched names must stay apart.
+  d2 <- d
+  d2$country <- c("France", "France", "Atlantis", "Ruritania")
+  out2 <- lag_by_country(d2, "value")
+  expect_true(all(is.na(out2$value_lag[is.na(out2$iso3c)])))
+})
+
+test_that("complete_years does not copy one unidentified country's geometry to another", {
+  skip_if_not_installed("sf")
+  sq <- function(x) sf::st_polygon(list(cbind(c(x, x + 1, x + 1, x, x),
+                                              c(0, 0, 1, 1, 0))))
+  # Two rows nothing identifies, with different shapes. The geometry carry
+  # matched on iso3c, and match() treats NA as equal to NA, so the invented
+  # rows took whichever unresolved row happened to have a shape.
+  d <- sf::st_sf(iso3c = c(NA_character_, NA_character_), year = c(2000, 2002),
+                 value = c(1, 2), geometry = sf::st_sfc(sq(0), sq(10)))
+  out <- complete_years(d, years = 2000:2002)
+  # Each unresolved row is its own unit: its own grid, carrying its own shape.
+  wkt <- sf::st_as_text(sf::st_geometry(out))
+  expect_equal(length(unique(wkt)), 2L)
+  expect_equal(sum(sf::st_is_empty(sf::st_geometry(out))), 0L)
+  expect_equal(nrow(out), 6L)
+
+  # A real panel is unaffected: each country keeps its own shape across the
+  # years invented for it.
+  d2 <- sf::st_sf(iso3c = c("FRA", "FRA", "DEU"), year = c(2000, 2002, 2000),
+                  value = c(1, 2, 3), geometry = sf::st_sfc(sq(0), sq(0), sq(10)))
+  o2 <- complete_years(d2, years = 2000:2002)
+  expect_true(inherits(o2, "sf"))
+  expect_equal(sum(sf::st_is_empty(sf::st_geometry(o2))), 0L)
+  fr <- sf::st_as_text(sf::st_geometry(o2[o2$iso3c == "FRA", ]))
+  de <- sf::st_as_text(sf::st_geometry(o2[o2$iso3c == "DEU", ]))
+  expect_equal(length(unique(fr)), 1L)
+  expect_equal(length(unique(de)), 1L)
+  expect_false(identical(unique(fr), unique(de)))
+  expect_false(".wdj_unit" %in% names(o2))
+})
+
+# `""` is not NA, so every is.na() guard missed it -- but read.csv() without
+# na.strings = "" gives a blank for every empty cell, and standardize_country("")
+# already resolves to iso3c = NA. A blank code identifies no country.
+test_that("a blank iso3c is treated as unidentified, not as a country", {
+  for (blank in c("", " ", "   ", "\t")) {
+    d <- data.frame(iso3c = c("FRA", "FRA", blank, blank),
+                    year = c(2000, 2001, 2000, 2001),
+                    value = c(10, 20, 100, 999), stringsAsFactors = FALSE)
+    out <- diff_by_country(d, "value")
+    # 999 - 100 = 899 between two unrelated blank-coded rows.
+    expect_true(all(is.na(out$value_diff[out$iso3c == blank])),
+                info = paste0("blank = ", encodeString(blank)))
+    # The identified rows are untouched.
+    expect_equal(out$value_diff[out$iso3c == "FRA" & out$year == 2001], 10)
+  }
+
+  # A blank code that `country` does identify is still one series.
+  d2 <- data.frame(iso3c = c("", "", ""), country = rep("World", 3),
+                   year = 2000:2002, value = c(1, 2, 3), stringsAsFactors = FALSE)
+  expect_equal(lag_by_country(d2, "value")$value_lag, c(NA, 1, 2))
+})
+
+test_that("blank_key treats missing, empty and whitespace-only alike", {
+  bk <- countryatlas:::blank_key
+  expect_equal(bk(c("FRA", NA, "", " ", "\t", "\n", "  x  ")),
+               c(FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE))
+  # Unicode spaces too: trimws()'s default class is ASCII-only, which is why
+  # standardize_country() uses [\h\v] as well.
+  expect_true(bk(intToUtf8(0x00A0)))   # no-break space
+  expect_true(bk(intToUtf8(0x2003)))   # em space
+  expect_false(bk("0"))                # a real, if odd, code
+})
+
+test_that("the internal unit key never reaches the caller", {
+  d <- data.frame(iso3c = rep(c("FRA", "DEU", "ITA", "ESP"), each = 3),
+                  year = rep(2000:2002, 4),
+                  value = c(100, 104, 108, 10, 13, 17, 50, 56, 63, 200, 205, 210),
+                  defl = rep(c(100, 102, 104), 4), stringsAsFactors = FALSE)
+  gapped <- d
+  gapped$value[2] <- NA
+  outs <- list(
+    lag_by_country(d, "value"), diff_by_country(d, "value"),
+    growth_rate(d, "value"), index_to(d, "value", base_year = 2000),
+    interpolate_missing(gapped, "value"), complete_years(d[-2, ], years = 2000:2002),
+    beta_convergence(d, "value"),
+    deflate(d, "value", deflator = defl, base_year = 2000))
+  for (o in outs) expect_false(".wdj_unit" %in% names(o))
+
+  # And a caller who happens to have a column of that name does not lose it to
+  # a verb that never grouped by unit.
+  mine <- d[d$year == 2000, ]
+  mine$.wdj_unit <- "mine"
+  expect_true(".wdj_unit" %in% names(share_of_world(mine, "value")))
+  expect_equal(share_of_world(mine, "value")$.wdj_unit, rep("mine", 4))
+})
+
+# The panel guards have to judge the panel on the same key the verb groups by.
+# Keying them on iso3c while the verb grouped by unit meant blank-coded rows
+# were reported as duplicates of each other, and as one country with gaps.
+test_that("the panel guards key on the unit, not on iso3c alone", {
+  warns <- function(d) {
+    seen <- character(0)
+    withCallingHandlers(
+      suppressMessages(lag_by_country(d, "value")),
+      warning = function(w) { seen <<- c(seen, class(w)[1]); invokeRestart("muffleWarning") })
+    unique(seen)
+  }
+  mk <- function(iso, yr) data.frame(iso3c = iso, year = yr,
+                                     value = seq_along(iso), stringsAsFactors = FALSE)
+
+  # Four single-year unidentified rows are four units with no gaps at all.
+  expect_length(warns(mk(c("FRA", "FRA", "", "", "", ""),
+                         c(2000, 2001, 2000, 2005, 2010, 2015))), 0)
+  # Two unidentified rows in one year are different countries, not a duplicate.
+  expect_length(warns(mk(c("FRA", "FRA", "", ""), c(2000, 2001, 2000, 2000))), 0)
+
+  # Both guards must still fire on the real thing.
+  expect_true(length(warns(mk(c("FRA", "FRA", "FRA"), c(2000, 2001, 2001)))) > 0)
+  expect_true("countryatlas_irregular_years" %in%
+                warns(mk(c("FRA", "FRA", "FRA"), c(2000, 2001, 2010))))
+})
+
+# subnational_map()'s body past validation needs a GISCO download, so none of
+# it ran in an offline check -- covr put R/subnational.R at 66% while every
+# other file was above 90%. Mocked here so the join logic is actually exercised.
+test_that("subnational_map joins on nuts_id whatever the caller's column is called", {
+  skip_if_not_installed("sf")
+  skip_if_not_installed("ggplot2")
+  sq <- function(x) sf::st_polygon(list(cbind(c(x, x+1, x+1, x, x), c(0, 0, 1, 1, 0))))
+  fake <- sf::st_sf(
+    nuts_id = c("DE-BY", "FR-ARA", "IT-LOM"), iso3c = c("DEU", "FRA", "ITA"),
+    name = c("Bayern", "Auvergne", "Lombardia"), level = c(2L, 2L, 2L),
+    geometry = sf::st_sfc(sq(0), sq(2), sq(4)), crs = 4326)
+  local_mocked_bindings(nuts_geometry = function(...) fake)
+  fills <- function(p) ggplot2::ggplot_build(p)$data[[1]]$fill
+
+  ref <- fills(subnational_map(
+    data.frame(nuts_id = c("DE-BY","FR-ARA","IT-LOM"), value = c(10, 20, 30),
+               stringsAsFactors = FALSE), value))
+  # `by` is documented as "the code column in `data`". The guard used to be
+  # `if (!by %in% names(geom))`, which is false exactly when the caller's
+  # column collides with one of the geometry's own -- so `by = "name"` joined
+  # NUTS codes against region names and matched nothing.
+  got <- fills(subnational_map(
+    data.frame(name = c("DE-BY","FR-ARA","IT-LOM"), value = c(10, 20, 30),
+               stringsAsFactors = FALSE), value, by = "name"))
+  expect_equal(got, ref)
+  expect_equal(length(unique(ref)), 3L)
+
+  # A code that does not exist is reported and dropped, not silently lost.
+  expect_warning(subnational_map(
+    data.frame(nuts_id = c("DE-BY","XX-ZZ"), value = c(1, 2),
+               stringsAsFactors = FALSE), value), class = "countryatlas_warning")
+  # Nothing matching at all is still an error.
+  expect_error(suppressWarnings(subnational_map(
+    data.frame(nuts_id = c("XX-ZZ","YY-QQ"), value = c(1, 2),
+               stringsAsFactors = FALSE), value)), class = "countryatlas_error")
+})
+
+test_that("subnational_map draws an all-NA indicator instead of blaming the codes", {
+  skip_if_not_installed("sf")
+  skip_if_not_installed("ggplot2")
+  sq <- function(x) sf::st_polygon(list(cbind(c(x, x+1, x+1, x, x), c(0, 0, 1, 1, 0))))
+  fake <- sf::st_sf(nuts_id = c("DE-BY", "FR-ARA"), iso3c = c("DEU", "FRA"),
+                    name = c("Bayern", "Auvergne"), level = c(2L, 2L),
+                    geometry = sf::st_sfc(sq(0), sq(2)), crs = 4326)
+  local_mocked_bindings(nuts_geometry = function(...) fake)
+  # The match count was sum(!is.na(fill)), so a genuinely all-NA indicator --
+  # which this package draws with an na.value and reports in the caption -- was
+  # reported as "no rows matched the geometry", sending the reader to check
+  # NUTS vintages for a mismatch that never happened.
+  d <- data.frame(nuts_id = c("DE-BY", "FR-ARA"), value = c(NA_real_, NA_real_),
+                  stringsAsFactors = FALSE)
+  expect_no_error(p <- subnational_map(d, value))
+  cols <- ggplot2::ggplot_build(p)$data[[1]]$fill
+  expect_equal(length(unique(cols)), 1L)
+})
+
+# attach_geometry(year = ) had no coverage at all -- the whole historical branch
+# was dark -- and its match warning was keyed on how much of the geometry the
+# caller had asked for rather than on the geometry itself.
+test_that("the historical join reports unreachable entities, not the caller's frame size", {
+  skip_if_not_installed("cshapes")
+  skip_if_not_installed("sf")
+  d3 <- data.frame(iso3c = c("FRA", "DEU", "ITA"), value = c(1, 2, 3),
+                   stringsAsFactors = FALSE)
+  d1 <- data.frame(iso3c = "FRA", value = 1, stringsAsFactors = FALSE)
+
+  count_of <- function(d, year) {
+    msg <- NULL
+    withCallingHandlers(
+      suppressMessages(attach_geometry(d, year = year)),
+      warning = function(w) {
+        if (inherits(w, "countryatlas_unreachable_entities")) msg <<- conditionMessage(w)
+        invokeRestart("muffleWarning")
+      })
+    msg
+  }
+  # The number reported must not depend on how many countries were supplied:
+  # the old threshold (matched < nrow(geom) * 0.5) said "only 3 of 97 matched"
+  # for a perfectly ordinary three-country frame.
+  expect_identical(count_of(d3, 1960), count_of(d1, 1960))
+  expect_match(count_of(d3, 1960), "no iso3c", fixed = TRUE)
+  # And it is a property of the year's geometry, so different years differ.
+  expect_false(identical(count_of(d3, 1960), count_of(d3, 2019)))
+
+  # Nothing matching at all is reported separately, by the same helper every
+  # other geometry verb uses.
+  classes <- character(0)
+  withCallingHandlers(
+    suppressMessages(attach_geometry(
+      data.frame(iso3c = c("ZZZ", "YYY"), value = c(1, 2), stringsAsFactors = FALSE),
+      year = 1960)),
+    warning = function(w) { classes <<- c(classes, class(w)[1]); invokeRestart("muffleWarning") })
+  expect_true("countryatlas_unreachable_entities" %in% classes)
+  expect_true(length(classes) > 1)
+
+  # The branch's own guards.
+  expect_error(attach_geometry(data.frame(x = 1, value = 1), year = 1960),
+               class = "countryatlas_error")
+  expect_error(attach_geometry(
+    data.frame(iso2c = c("FR", "DE"), value = c(1, 2), stringsAsFactors = FALSE),
+    year = 1960, by = "iso2c"), class = "countryatlas_error")
+  expect_error(attach_geometry(d3, year = 2030), class = "countryatlas_error")
+  # The modern path raises none of this.
+  expect_silent(suppressMessages(attach_geometry(d3, geometry = "polygon")))
+})

@@ -19,8 +19,12 @@ global work.}
 skip the test, which leaves \code{p_value} as \code{NA}).}
 }
 \value{
-A one-row tibble: \code{c} (observed), \code{expected} (always 1), \code{n},
-\code{n_excluded}, \code{n_links}, \code{p_value} and an \code{excluded} list-column.
+A one-row tibble: \code{c} (observed), \code{expected} (always 1), \code{n}
+(countries used), \code{n_excluded} (countries with data that the weights could
+not reach), \code{n_links} (non-zero weights), \code{p_value} and an \code{excluded}
+list-column of the excluded \code{iso3c} codes. \code{n} and \code{n_excluded} sum to the
+countries supplied with a value, and mean the same here as in
+\code{\link[=morans_i]{morans_i()}}.
 
 \code{p_value} is \strong{one-sided on the lower tail}:
 \eqn{(1 + \#\{C^{*} \le C_{obs}\}) / (n_{perm} + 1)}. The lower tail is

@@ -11,14 +11,27 @@ wdj_to_iso3c <- function(x, origin = "country.name", custom_match = country_over
   # values as valid by construction, so nothing downstream rejects them either.
   # custom_match = c(Freedonia = 1) therefore put "1" in iso3c and every join
   # after it keyed on that. The table is a name -> iso3c map; require the shape.
-  if (length(custom_match) &&
-      (!is.character(custom_match) || is.null(names(custom_match)))) {
+  # is.null(names()) catches a wholly unnamed vector but not a partly named
+  # one: c(Freedonia = "FRA", "DEU") has names c("Freedonia", ""), and an entry
+  # whose name is "" or NA can never match a spelling, so it sat there doing
+  # nothing while the caller believed it was overriding something. That is the
+  # same silent-but-useless entry the comment above describes, so require the
+  # shape of every element, not just of the vector.
+  unnamed <- if (is.null(names(custom_match))) {
+    length(custom_match) > 0L
+  } else {
+    any(is.na(names(custom_match)) | !nzchar(names(custom_match)))
+  }
+  if (length(custom_match) && (!is.character(custom_match) || unnamed)) {
     wdj_abort(c(
       "{.arg custom_match} must be a named character vector.",
       "x" = if (!is.character(custom_match)) {
         "Got {.cls {class(custom_match)[1]}}."
-      } else {
+      } else if (is.null(names(custom_match))) {
         "Got a character vector with no names."
+      } else {
+        "{sum(is.na(names(custom_match)) | !nzchar(names(custom_match)))} of
+         {length(custom_match)} entries have no name, so they can never match."
       },
       "i" = "Names are the spellings to override, values are {.field iso3c}
              codes -- the shape {.fn country_overrides} returns."

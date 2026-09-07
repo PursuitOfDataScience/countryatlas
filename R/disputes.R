@@ -240,6 +240,32 @@ interpolate_missing <- function(data, value = NULL,
   # methods: a bare `data` here leaked an incoming grouping and gave back a
   # data.frame where `method = "linear"` gives a tibble.
   if (identical(method, "none")) return(wdj_return_frame(data))
+  # Only "linear" cares about the year's type: it interpolates *on* the year
+  # via approx(), so a labelled year column reached approx() as NA and surfaced
+  # its "need at least two non-NA values to interpolate" wrapped in a dplyr
+  # across() error, naming neither the column nor its type. "locf" carries the
+  # last value forward in row order and needs no arithmetic, so guarding it
+  # would reject input it handles correctly.
+  #
+  # Coercibility, not check_numeric_col(): approx() reads "2000" happily, so a
+  # character year works here and demanding is.numeric() would refuse input
+  # this verb has always handled. That is the difference from deflate() and
+  # beta_convergence(), which do the arithmetic themselves.
+  if (identical(method, "linear")) {
+    yr <- suppressWarnings(as.numeric(as.character(data$year)))
+    unreadable <- unique(as.character(data$year)[!is.na(data$year) & is.na(yr)])
+    if (length(unreadable)) {
+      wdj_abort(c(
+        "{.field year} must be readable as a number for
+         {.code method = \"linear\"}.",
+        "x" = "{length(unreadable)} value{?s} {?is/are} not:
+               {.val {utils::head(unreadable, 5)}}.",
+        "i" = "Linear interpolation places the filled value *along* the year
+               axis. {.code method = \"locf\"} carries the last value forward
+               and needs no arithmetic."
+      ))
+    }
+  }
 
   flags <- paste0(value, "_imputed")
   # Warn only about a flag column we cannot carry forward. A logical one is
@@ -272,8 +298,8 @@ interpolate_missing <- function(data, value = NULL,
   for (i in seq_along(value)) data[[flags[i]]] <- is.na(data[[value[i]]])
 
   out <- data %>%
-    dplyr::group_by(.data$iso3c) %>%
-    dplyr::arrange(.data$year, .by_group = TRUE) %>%
+    group_by_unit() %>%
+    dplyr::arrange(year_sort_key(.data$year), .by_group = TRUE) %>%
     dplyr::mutate(dplyr::across(
       dplyr::all_of(value),
       ~ fill_capped(.data$year, .x, method, max_gap)
@@ -286,7 +312,10 @@ interpolate_missing <- function(data, value = NULL,
   for (i in seq_along(value)) {
     out[[flags[i]]] <- (out[[flags[i]]] & !is.na(out[[value[i]]])) | out[[prior[i]]]
   }
-  out <- out[, setdiff(names(out), prior), drop = FALSE]
+  # ".wdj_unit" alongside the prior-flag columns: this verb returns the result
+  # of its own column surgery rather than wdj_return_frame(), which is where
+  # the key is normally dropped.
+  out <- out[, setdiff(names(out), c(prior, ".wdj_unit")), drop = FALSE]
   attr(out, "countryatlas_imputed") <- flags
   out
 }
@@ -295,13 +324,56 @@ interpolate_missing <- function(data, value = NULL,
 fill_capped <- function(x, y, method, max_gap) {
   na <- is.na(y)
   if (!any(na) || sum(!na) < 1L) return(y)
-  # Identify runs of NA and their lengths, so an over-long gap stays empty.
+  # Identify runs of NA, so an over-long gap stays empty. Measured in *years*,
+  # not in rows: max_gap is documented as "the longest run of consecutive
+  # missing years ... because interpolating across a decade is not
+  # interpolation", and counting rows defeats that on any panel that is not
+  # annual. A decadal panel of 2000, 2010, 2020 with 2010 missing is one
+  # missing row, so the default max_gap = 3 filled it -- inventing a value 10
+  # years from either anchor, which is the exact thing the parameter exists to
+  # refuse. Five-yearly data spanned 15 years the same way.
+  #
+  # The span is the distance between the observations that bracket the run,
+  # which on an annual panel equals the number of missing rows exactly, so
+  # annual behaviour is unchanged. A run with an observation on only one side
+  # is measured from that side, which is what LOCF carrying forward cares
+  # about. A non-numeric year (read.csv gives "2000", and this verb otherwise
+  # tolerates it) falls back to the row count rather than erroring.
   r <- rle(na)
   keep <- rep(TRUE, length(y))
+  xn <- suppressWarnings(as.numeric(as.character(x)))
+  if (anyNA(xn)) xn <- NULL
   pos <- 1L
   for (i in seq_along(r$lengths)) {
-    if (r$values[i] && r$lengths[i] > max_gap) {
-      keep[pos:(pos + r$lengths[i] - 1L)] <- FALSE
+    if (r$values[i]) {
+      lo <- pos
+      hi <- pos + r$lengths[i] - 1L
+      # Two conditions, because one alone gets a case wrong.
+      #
+      # The run length in rows is what an annual panel means by "consecutive
+      # missing years", and keeping it preserves annual behaviour exactly.
+      #
+      # The years condition is how far the invented value actually sits from
+      # real data: the distance from each filled year to its *nearest*
+      # observation. Measuring the bracketing span instead punishes a point
+      # that is close to one anchor merely because the other is distant --
+      # 2000, 2001, 2005 with 2001 missing spans five years, but the filled
+      # point is one year from 2000 and interpolating it is perfectly sound.
+      # The nearest-anchor distance catches what matters: 2000, 2010, 2020
+      # with 2010 missing puts the invented value ten years from anything
+      # observed, which is the "interpolating across a decade" the parameter
+      # exists to refuse.
+      too_long <- r$lengths[i] > max_gap
+      if (!too_long && !is.null(xn)) {
+        prev_obs <- if (lo > 1L) xn[lo - 1L] else NA_real_
+        next_obs <- if (hi < length(xn)) xn[hi + 1L] else NA_real_
+        gap_yrs <- vapply(lo:hi, function(j) {
+          min(c(if (!is.na(prev_obs)) xn[j] - prev_obs,
+                if (!is.na(next_obs)) next_obs - xn[j]), Inf)
+        }, numeric(1))
+        too_long <- anyNA(gap_yrs) || max(gap_yrs) > max_gap
+      }
+      if (too_long) keep[lo:hi] <- FALSE
     }
     pos <- pos + r$lengths[i]
   }
@@ -351,6 +423,16 @@ vsup_fill <- function(value, uncertainty, n_bins = 4, n_uncertainty = 3,
     # quantile default the rest of the package uses for choropleths.
     v_rank[ok] <- dplyr::percent_rank(value[ok])
     u_rank[ok] <- dplyr::percent_rank(uncertainty[ok])
+    # percent_rank() is (rank - 1)/(n - 1), so it is NaN when exactly one row
+    # is usable -- and cut() then gave NA, the row got no colour, and the map
+    # drew a country whose value and uncertainty were both present as though
+    # neither were. That is not a one-row-input curiosity: a mostly-missing
+    # uncertainty column with a single usable country blanked the whole VSUP
+    # layer. A lone observation has no rank position relative to others, so
+    # the honest place for it is the middle of each ramp, claiming neither
+    # extreme -- which is also where a maximally uncertain value lands.
+    v_rank[ok & !is.finite(v_rank)] <- 0.5
+    u_rank[ok & !is.finite(u_rank)] <- 0.5
   }
   v_bin <- cut(v_rank, breaks = seq(0, 1, length.out = n_bins + 1L),
                include.lowest = TRUE, labels = FALSE)

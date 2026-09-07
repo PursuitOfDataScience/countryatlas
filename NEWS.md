@@ -158,6 +158,401 @@ existing code: `world_map(projection = "mercator")` now produces a different
 
 ## Bug fixes
 
+* **`attach_geometry(year = )` warned about the caller's frame size, not the
+  geometry.** Its threshold was `matched < nrow(geom) * 0.5`, so an ordinary
+  three-country frame -- 3 of the 97 entities CShapes has for 1960 -- was told
+  "only 3 of 97 historical entities matched" and advised to join on `gwcode`
+  "for full historical coverage", which is not what someone asking for three
+  countries wants. What the message claimed is a property of CShapes rather
+  than of the request: a few entities never had an ISO code (6 of 97 in 1960,
+  3 of 174 in 2019) and no `iso3c` join can reach them. That is what it now
+  reports, independently of the frame, and the nothing-matched case is left to
+  the same helper every other geometry verb uses. The whole historical branch
+  had no test coverage.
+
+* **A missing-column error named an argument the function does not have.**
+  `check_cols()` wrote `` `data` `` into its message unconditionally, which is
+  right for the twenty-odd verbs whose frame argument is called that and wrong
+  for the three whose is not: `country_weights(w = )` reported ``Columns
+  "iso3c" and "neighbor" not found in `data``` and
+  `cartogram_diagnostics(x = )` reported ``Column "nope" not found in
+  `data```. The helper now takes the name to use, and the duplicated-column
+  error beside it does too.
+
+* **A provider renaming its time column turned the years into the values.**
+  `adapter_reshape()` -- the shared step that puts a provider's response into
+  the package's shape, behind `fetch_owid()`, `fetch_eurostat()`,
+  `fetch_oecd()` and `fetch_comtrade()` -- checked that the entity and value
+  columns exist but not the year column. The value column is auto-detected as
+  the first numeric column *other than the year*, excluded by name, so with the
+  year column missing the exclusion removed nothing and the provider's own time
+  column was picked as the indicator: the mapped values came back as 2000,
+  2001, 2002 while `year` was entirely `NA`, with nothing said. A missing year
+  column is now reported like the missing value column beside it.
+
+* **`locate_country()` gave a raw sf error for a points object with no CRS.**
+  `sf::st_as_sf(df, coords = c("lon", "lat"))` leaves the CRS missing whenever
+  `crs` is forgotten, and the object then reached `st_transform()` and came
+  back with sf's "cannot transform sfc object with missing crs" -- naming
+  neither the argument nor the fix. The non-sf case one line above had already
+  been given a proper message; this is the same failure one step further in.
+  It now says which argument is at fault and how to set the CRS.
+
+* **`subnational_map()` joined against the wrong column when the caller's code
+  column collided with the geometry's.** The geometry side is meant to be
+  `nuts_id` "whatever the caller's column is called", but the guard was
+  `if (!by %in% names(geom))` -- false exactly when `by` names one of the
+  geometry's own columns. `by = "name"` therefore joined the caller's NUTS
+  codes against the geometry's region *names* and matched nothing, and
+  `by = "iso3c"` silently joined at country granularity instead of regional.
+  `by` is documented as "the code column in `data`", so the geometry side is
+  now always `nuts_id`.
+
+* **`subnational_map()` blamed the codes for an all-`NA` indicator.** It counted
+  matches as `sum(!is.na(fill))`, so a panel whose indicator is entirely `NA`
+  -- a real thing to map, and one this package draws with an `na.value` and
+  reports in the caption -- was refused with "no rows matched the geometry",
+  sending the reader to check NUTS vintages for a mismatch that never happened.
+  The count is now taken on the join key. Both of these sat in code that no
+  test reached, because the path needs a GISCO download: `R/subnational.R` was
+  at 66% coverage where every other file was above 90%. It is now exercised
+  with a mocked `nuts_geometry()`.
+
+* **`correlate_indicators()` let a tidyselect error through for a missing
+  column.** Every other verb reports one as ``Column "x" not found in `data```;
+  this one selected through `dplyr::select()` and surfaced the
+  `vctrs_error_subscript_oob` raised by tidyselect -- "Can't select columns
+  that don't exist" -- which was the last error at this boundary not carrying
+  the package's class.
+  The selection is a full tidyselect expression, so it cannot be checked by
+  name up front; the failure is caught and re-worded instead, and
+  `starts_with()`, `where()`, ranges, bare columns and the no-argument form all
+  still work.
+
+* **Rows whose `iso3c` did not resolve were treated as one country.**
+  `dplyr::group_by()` puts every `NA` in a single group, so a panel carrying
+  two unmatched names was one country to every verb that reads a neighbouring
+  row within it: `growth_rate()` reported the change from one unmatched row to
+  the next -- 899% between two unrelated countries -- and `lag_by_country()`,
+  `diff_by_country()`, `index_to()`, `interpolate_missing()`, `deflate()` and
+  `beta_convergence()` read across them the same way, silently. That frame is
+  exactly the one a user is most likely to hold, because
+  `standardize_country()` has already warned that those names did not match
+  and left their `iso3c` as `NA`. The grouping now falls back to whatever does
+  identify the row -- the same `country`, then `group` order
+  `distinct_countries()` uses for its uncoded branch -- so an appended
+  aggregate row (no `iso3c`, `country = "World"`) still groups as one series,
+  while rows nothing identifies each get a key of their own and are no longer
+  read across. `complete_years()` had the same conflation twice over: the two
+  unresolved rows shared one completed year grid, and the geometry carry that
+  gives invented rows their country's shape matched on `iso3c` -- where
+  `match()` treats `NA` as equal to `NA` -- so it copied one unidentified
+  country's polygon onto the other's invented rows. Both are keyed on the unit
+  now, and each unresolved row gets its own grid and its own shape.
+
+  A blank code is treated the same way. `""` is not `NA`, so every `is.na()`
+  guard missed it -- but `read.csv()` without `na.strings = ""` gives a blank
+  for every empty cell, and `standardize_country("")` already resolves to
+  `iso3c = NA`, so a blank identifies no country anywhere else in the package.
+  Two blank-coded rows produced the same fabricated 899%. Whitespace-only codes
+  count as blank too, using the same Unicode `[\h\v]` class
+  `standardize_country()` uses rather than `trimws()`'s ASCII-only default.
+
+  The two panel guards were keyed on `iso3c` while the verbs grouped by the
+  unit, which made them disagree: four single-year unidentified rows were
+  reported as one country with gaps between them, and two unidentified rows in
+  the same year as a duplicated country-year. Both now key on the unit, so
+  they describe what the verb actually did; a genuinely duplicated
+  country-year and a genuinely irregular panel are still reported.
+
+* **The unparseable-year warning printed its own markup and padded its list
+  with `NA`s.** Two defects in one message. cli does not re-interpolate a
+  substituted value, so `{source_label}` emitted the label verbatim: three of
+  the six call sites showed users `` `{.arg data}`: 2 time values are not a
+  year `` and, from the public source extension point, `Source {.val
+  {source}}:` -- where the braces also referenced a variable that exists only
+  in the caller's frame. Separately, the list of offending values was sliced to
+  `min(4, sum(bad))`, sizing it by the number of bad *rows* while the values
+  themselves were de-duplicated, so a column of one repeated placeholder --
+  `"N/A"`, `".."`, `"-"`, the common case -- read `"N/A", NA, NA, and NA`. The
+  label is now pre-rendered in the caller's environment and the list is taken
+  with `head()`, so the warning names its source and shows only values that
+  are really there.
+
+* **`audit_time_coverage()` invented history for a factor `iso3c`.** It looked
+  the dissolution and succession dates up by indexing a *named* vector with the
+  frame's `iso3c` column -- and indexing a named vector with a **factor**
+  selects by the factor's integer codes, not its labels. A frame from
+  `read.csv(stringsAsFactors = TRUE)` therefore matched whichever rows of
+  `historical_codes` happened to sit at those positions: a clean panel of
+  France, Germany, Italy and Spain came back reporting France dissolved in
+  1993, Italy in 1992, Spain in 1991 and Germany as existing only from 2010,
+  from the one verb whose whole job is catching that kind of mistake. The
+  `year` key had already been hardened against the same class of bug (a `Date`
+  year became a day count, hence `read_year()`); the `iso3c` key had not. The
+  column is now coerced before the lookup, so a factor `iso3c` gives the same
+  answer as a character one -- verified across 27 verbs, none of which now
+  differ on a factor `iso3c` or an integer value column.
+
+* **A stray 60 KB `Rplots.pdf` shipped inside the source tarball.** Printing a
+  plot with no device open makes R open the default one, which in a
+  non-interactive session writes `Rplots.pdf` into the working directory -- for
+  the test suite, `tests/testthat`. `.Rbuildignore` carried `^Rplots\.pdf$`,
+  anchored at the package root, so it matched the root copy and not the nested
+  one, and `R CMD build` included the artefact. The pattern is now unanchored,
+  and a test setup file points the default device at the null file so the file
+  is not written in the first place -- plots still render, so a drawing error
+  still fails a test.
+
+* **A factor `year` column silently produced wrong numbers.** `dplyr::arrange()`
+  and `order()` sort a factor by its **level index**, not by the label, and
+  `stats::approx()` coerces a factor the same way. A year column arrives as a
+  factor more often than it looks -- `read.csv(stringsAsFactors = TRUE)`, some
+  importers, and any deliberate `factor(year)` for plotting -- and every verb
+  that reads a *neighbouring* row then read the wrong neighbour.
+  `lag_by_country()` and `diff_by_country()` took the value from the wrong
+  year, `growth_rate()` reported `-0.75` on a series that had doubled, and
+  `interpolate_missing()` left the gap `NA` because the targets fell outside
+  the anchors it had mis-placed. Nothing warned: the panel came back the right
+  shape with the wrong values. `warn_irregular_years()` had the same trap from
+  the other side -- `as.numeric()` on a factor returns level indices, so it
+  reported a perfectly regular annual panel as having gaps. The nine
+  year-ordering sites, the linear interpolation path and the gap check now go
+  through one `year_sort_key()` helper, so a factor or character year gives the
+  same answers as a numeric one, and the gap warning is now classed
+  `countryatlas_irregular_years` so a deliberately decadal panel can silence
+  just that one. `earliest_per_unit()` had carried this coercion since 2.0.0,
+  which is why the map-drawing path was
+  unaffected and this survived. A year column that is not numeric at all -- an
+  ordered factor of period labels -- still sorts by its own order, and
+  `complete_years()` still asks for a numeric year, since it has to generate
+  the grid rather than merely order it.
+
+* **A bare column name was reported as "object not found" by six arguments.**
+  A handful of arguments take a column name as a *string* while the verbs
+  around them take a bare column through tidy eval, so the package converts
+  that predictable slip into a message naming the argument and showing the
+  quoted form to write. The conversion had been applied to the `value`,
+  `indicator`, `columns`, `codes` and `by` arguments of `interpolate_missing()`,
+  `complete_years()`, `audit_coverage()`, `world_table()`, `country_codes()`
+  and `aggregate_regions()`, and not to the join-key and query arguments of
+  the same shape: `aggregate_regions(by = region)` explained
+  itself while `attach_geometry(by = iso3c)`, `subnational_map(by = nuts_id)`,
+  `register_country_source(key_col = iso3c)`, `world_query(facet = year)`,
+  `world_query(size = pop)` and `as_ggsql_source(geometry_col = geom)` all
+  reached the user as base R's "object 'iso3c' not found". All six now report
+  the argument and the fix. A genuine error inside such an argument still
+  surfaces as itself.
+
+* **The plotting verbs rejected a column passed as a string.** Every unquoted
+  column argument in the package goes through one helper, whose own error hint
+  tells the user to "pass the column unquoted (`fill = my_col`) or as a
+  string", and the column check then accepted the string form happily. But
+  `world_map()`, `tile_map()`, `bubble_map()` and `interactive_map()` spliced
+  the captured expression straight into `aes()`, which honours only the
+  unquoted form: `fill = "value"` mapped the constant string `"value"`. The failure then arrived at
+  *build* time, from ggplot2, as "Discrete value supplied to a continuous
+  scale" (or "Binned scales only support continuous data" under `style =
+  "binned"`) -- naming neither the argument, nor the column, nor the fix, which
+  is the exact failure the helper exists to prevent. `world_map(d, "value")` --
+  the package's most common call -- errored while `world_map(d, value)` drew.
+  The mapping is now built from the validated column *name*, so both forms
+  produce the same plot; `coverage_map()`, `spike_map()` and the `quantile`,
+  `jenks` and `categorical` styles were already correct, which is why this
+  survived.
+
+* **`interpolate_missing()` invented data across decades.** `max_gap` is
+  documented as "the longest run of consecutive missing *years* to fill ...
+  because interpolating across a decade is not interpolation", and it counted
+  missing **rows**. On any panel that is not annual the guard was therefore
+  defeated: a decadal panel of 2000, 2010, 2020 with 2010 missing is one
+  missing row, so the default `max_gap = 3` filled it -- placing an invented
+  value ten years from either anchor, the exact thing the parameter exists to
+  refuse. Five-yearly data was interpolated across 15 years the same way.
+  A run is now refused if it is longer than `max_gap` in rows -- which is what
+  an annual panel means by consecutive missing years, so annual behaviour is
+  unchanged -- or if any filled year sits further than `max_gap` from its
+  *nearest* observation, which is what makes the decadal case wrong. Measuring
+  the bracketing span instead would have been too blunt: on 2000, 2001, 2005
+  the filled 2001 is one year from an anchor and interpolating it is sound,
+  even though the span is five. The documentation was already right; the code
+  has caught up with it.
+
+* **`interpolate_missing(method = "linear")` leaked a dplyr internal for a
+  year it could not read.** Linear interpolation places the filled value
+  *along* the year axis via `approx()`, so a labelled year column arrived as
+  `NA` and surfaced "need at least two non-NA values to interpolate" wrapped
+  in an `across()` error, naming neither the column nor its type. It is now a
+  classed error naming the unreadable values and pointing at
+  `method = "locf"`, which carries the last value forward in row order and
+  needs no arithmetic. It tests whether the year can be *read* as a number
+  rather than whether it is numeric, deliberately: `approx()` reads `"2000"`
+  happily, so a character year still works here --
+  the difference from `deflate()` and `beta_convergence()`, which do the
+  arithmetic themselves.
+
+* **`gearys_c()` and `getis_ord()` listed their count columns without saying
+  what they count.** `morans_i()` defines all three -- `n` (countries used),
+  `n_excluded` (countries with data the weights could not reach), `n_links`
+  (non-zero weights) -- and the other two named the same columns and left them
+  undefined, so a reader had to go to a third function's page. The counts are
+  consistent: verified across all six spatial verbs on one graph, `n` is 187
+  everywhere it appears, `n_excluded` 2, `n + n_excluded` is the 189 countries
+  supplied, `n_links` matches the non-zero weights, and the local forms return
+  exactly `n` rows. All of that is now stated where the columns are listed.
+
+* **`audit_coverage()` did not say which way round its counts run.** Its
+  `@return` described the three elements but none of their columns, and both
+  `na_rates$n` and `by_group$n_countries` are *denominators* -- everything
+  counted, not everything present. That is the opposite orientation from
+  `map_provenance()`, whose `n_countries` is the numerator, and the two share
+  that column name: on 215 countries with 24 missing, `audit_coverage()` gives
+  `n = 215` where `map_provenance()` gives `n_countries = 191`. The package had
+  already spelled this out for `map_provenance()` ("the numerator, not the
+  denominator, which its name does not say on its own"); the verb whose whole
+  purpose is reporting coverage had not. Every column is now defined, with the
+  contrast stated. The numbers themselves were correct throughout -- verified
+  against the data, including that the group counts sum to `n` and each
+  `na_rate` is the within-group share.
+
+* **`as_ggsql_source()` accepted things that are not data, and gave a bare
+  error for a closed connection.** `data` is documented as a map-ready frame
+  and was never checked, so `as_ggsql_source(1:5)` wrote an integer vector out
+  as a table and returned a connection -- a "world source" containing no
+  countries at all -- while `NULL` surfaced *Data frame with at least one
+  column required*, a message from DuckDB rather than from here. A `con` the caller had already closed reached
+  `dbWriteTable()` as base R's unclassed *Invalid connection*, naming neither
+  the argument nor its state. Both are now classed errors, checked at the one
+  point that knows whose connection it is -- which is also why the existing
+  bookkeeping there closes a connection the function opened and leaves one
+  passed in alone.
+
+* **A negative or infinite custom weight was accepted and quietly changed the
+  answer.** `country_weights("custom", w = )` validated the matrix's dimnames,
+  squareness, type and `NA`s, and the type message even promises "any
+  non-negative number" -- but nothing enforced it. Row standardisation divides
+  by the row sum, so one negative weight moved Moran's I from 0.714 to 0.497
+  with no warning, and an *all*-negative matrix cancelled to exactly the
+  all-positive answer, discarding the caller's signs entirely. An infinite
+  weight normalised to `NaN`, and the verb then reported *not enough connected
+  countries with data* -- diagnosing connectivity when the cause was the
+  weight. `gini()`, `theil()` and the global G all refuse a negative input for
+  the same reason, so both are now classed errors naming how many entries are
+  at fault. The long-frame form of `w` gets the same two checks, and all three
+  built-in constructors satisfy them.
+
+* **A partly named `custom_match` silently ignored the unnamed entries.** The
+  check tested `is.null(names())`, which catches a wholly unnamed vector but
+  not `c(Freedonia = "FRA", "DEU")`, whose names are `c("Freedonia", "")`. An
+  entry named `""` or `NA` can never match a spelling, so it sat there doing
+  nothing while the caller believed it was overriding something -- the same
+  silent-but-useless entry the surrounding comment was written about, and
+  invisible in the output, unlike a mistyped code which at least shows up in
+  the `iso3c` column. Every element must now be named. Values are still not
+  checked against the ISO list, deliberately: the package's own overrides map
+  Kosovo to `XKX`, a World Bank user-assigned code that is not in
+  `countrycode::codelist$iso3c`, so validating that way would reject the very
+  case overrides exist for.
+
+* **A custom source that failed, or was written with the wrong signature,
+  reported neither.** `register_country_source()`'s boundary checks what an
+  adapter *returns* thoroughly -- a non-data-frame, a missing key column and a
+  duplicate key are all named and pointed at the fetch contract -- but not the
+  call itself. An adapter that raised its own error re-raised it bare, so
+  `"provider is down"` reached the caller with nothing to say which source
+  produced it; and one defined as `function(indicator)` surfaced R's
+  `unused arguments (countries = countries, years = years)`, naming neither the
+  source nor the documented arity. Both are what someone developing an adapter
+  hits, and both are the one moment the package knows which source it just
+  called. They are now classed errors that name the source, preserve the
+  provider's own message verbatim (braces included -- a cli template would
+  have interpolated them), and point at the contract.
+
+* **A flow between near-antipodal countries was drawn as a streak across the
+  top of the map.** `great_circle()` sampled a fixed 50 points along the arc,
+  and a near-antipodal arc passes within half a degree of a pole, where
+  longitude turns almost arbitrarily fast: Belgium to Tonga stepped 131 degrees
+  of longitude between two consecutive points, Greenland to Japan 121, Tonga to
+  the Netherlands 136. `split_antimeridian()` only cuts a step wider than 180,
+  so none of these were cut and `geom_path()` joined them literally -- the same
+  failure that function was written to fix for trans-Pacific flows, caused by
+  the pole rather than the antimeridian. 16 of 8010 real ordered country pairs
+  hit it, every one at latitude 87 to 89.
+    The path itself was right; 50 points is simply too coarse where it turns
+  fastest, and the step shrinks in proportion to the sample count. The
+  offending segments are now bisected until every step is under 20 degrees, so
+  all 8010 pairs come in under that, at a cost of at most 63 points instead of
+  50. An ordinary arc never trips the threshold and keeps its `n` points
+  exactly.
+
+* **`gridded_cartogram()` now documents that crowded neighbours overlap.**
+  Each country's block is centred on its own centroid with no collision
+  avoidance -- a deliberate choice, since a global packing solve would push
+  countries away from where they belong, and it was recorded in a code comment.
+  It was not in the documentation, though, and it is not marginal: at the
+  defaults about a third of the cells are drawn on top of a cell belonging to a
+  different country, across some sixty countries, rising to roughly two thirds
+  at `cells = 2500`. A partly hidden block cannot be counted or compared, which
+  is the one thing this verb asks the reader to do. A new section says so,
+  quantifies it, and names `cell_size` as the lever -- dropping it from `2.5` to
+  `1.5` cuts the overlap at `cells = 1000` to about a tenth -- with a pointer to
+  `dorling_map()`, which resolves collisions by displacement instead.
+
+* **`beta_convergence()` returned a silent `NA` for `speed` and `half_life`
+  on an unbalanced panel, and the documented reason did not apply.** Turning
+  `beta` into an annual rate inverts `beta = -(1 - exp(-lambda T))/T`, which
+  needs `1 + beta * T > 0`. That holds whenever every country spans the same
+  `T`, but `beta` is fitted on growth already annualised per country, so a mix
+  of spans leaves the mean span irreconcilable with the fitted slope. On a
+  panel where half the countries were observed for 10 years and half for 50 --
+  ordinary coverage for real data -- `beta` came back at -0.041 with
+  `p = 9.5e-14` and `r_squared = 0.96`, unmistakable convergence, while the two
+  most interpretable columns were blank and the documentation said `NA` meant
+  `beta >= 0`, which it plainly was not. The guard itself was right: `log()` of
+  a negative is not a speed. It now warns, naming the range of spans and saying
+  that `beta` and its inference are unaffected, and the documented `NA`
+  conditions list both cases.
+
+* **`local_morans()` returned a `lag` column that was not the neighbour
+  average it is documented as.** It reported the lag of the *centred* value,
+  which is what the statistic and the quadrants are built on, beside a `value`
+  column that is raw -- so the two columns in the same tibble were on
+  different scales, and neither matched `spatial_lag()`'s column of the same
+  name. That breaks the Moran scatterplot the pair exists for: with `value`
+  centred on 17384 and `lag` on 0, the quadrant boundaries fall in different
+  places on the two axes, so the usual reference lines disagree with the
+  `cluster` column beside them. The reported `lag` is now the plain neighbour
+  average, identical to `spatial_lag()`. The centred lag is still what `ii`
+  and the four quadrants use internally, which is what Anselin (1995) defines
+  them on, so no statistic, p-value or cluster label changes.
+
+* **A value-suppressing uncertainty palette drew nothing when only one
+  country was usable.** The two axes are ranked with `percent_rank()`, which
+  is `(rank - 1)/(n - 1)` and therefore `NaN` for a single observation, so
+  `cut()` returned `NA` and the row got no colour -- a country whose value and
+  uncertainty were both present, drawn as though neither were. This is not a
+  one-row-input curiosity: a mostly-missing uncertainty column with a single
+  usable country blanked the entire VSUP layer. A lone observation has no rank
+  position relative to others, so it now lands in the middle of each ramp,
+  claiming neither extreme, which is also where a maximally uncertain value
+  sits. Rows that are genuinely missing still get no colour, and a palette
+  with more than one usable row is unchanged.
+
+* **`rate_check()` ranked a zero-count row as the most reliable in the
+  table.** The output is documented as "sorted with the least reliable first",
+  and it sorted on `expected_se`, which is the Poisson standard error
+  `sqrt(y)/d` -- exactly `0` when the count is `0`. So a country with no
+  events out of 251 people sorted *last*, presented as the most trustworthy
+  row on the page, while another with one event out of the same 251 sorted
+  first as the least trustworthy. Observing nothing is not evidence of
+  precision; it is the small-number problem this verb exists to name, and
+  nothing else in the output caught it either, because the default threshold
+  is a quantile of the denominators. The ordering now uses the standard error
+  a single event would imply, `sqrt(max(y, 1))/d`, which is identical to
+  `expected_se` for every row with at least one event -- so no other row
+  moves -- and `expected_se` itself is unchanged, still the plain Poisson
+  standard error.
+
 * **`convergence_club()` found no clubs at all on an indexed panel.** The
   log-t statistic refused to compute whenever `H_1`, the cross-sectional
   dispersion in the *first* period, was zero -- and it is exactly zero

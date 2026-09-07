@@ -321,7 +321,7 @@ value_by_alpha_map <- function(data, value, equalize,
   }
   data[[".wdj_alpha"]] <- a
 
-  binned <- apply_binned_fill(data, value_q, value_name, style, n_bins)
+  binned <- apply_binned_fill(data, value_name, style, n_bins)
   data <- binned$data
   fill_mapped <- binned$fill
   sf_mode <- is_sf(data)

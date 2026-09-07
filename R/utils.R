@@ -83,6 +83,12 @@ abort_bare_column <- function(expr, arg, cnd, call = rlang::caller_env()) {
 # one class worth carrying through, since the map verbs require it; everything
 # else becomes a tibble, as standardize_country()'s test has always required.
 wdj_return_frame <- function(data) {
+  # group_by_unit() adds this; drop it here, which is where every verb that
+  # groups by unit already routes its result. Conditional on the frame still
+  # being GROUPED by it, so a caller who happens to have a column of that name
+  # does not lose it to a verb that never grouped by unit at all -- the other
+  # .wdj_ columns are only ever touched by the one verb that creates them.
+  if (".wdj_unit" %in% dplyr::group_vars(data)) data[[".wdj_unit"]] <- NULL
   if (inherits(data, "sf")) dplyr::ungroup(data) else tibble::as_tibble(data)
 }
 
@@ -202,12 +208,12 @@ wdj_known_iso3c <- function() {
 # data, and two -- per_capita() and to_ppp() -- silently computed from
 # whichever column `[[` reached first and dropped the other without a word.
 # Checked here, where every verb already validates the columns it reads.
-check_dup_cols <- function(data, call = rlang::caller_env()) {
+check_dup_cols <- function(data, arg = "data", call = rlang::caller_env()) {
   if (!is.data.frame(data)) return(invisible(TRUE))
   dup <- unique(names(data)[duplicated(names(data))])
   if (length(dup)) {
     wdj_abort(c(
-      "{.arg data} has {length(dup)} duplicated column name{?s}:",
+      "{.arg {arg}} has {length(dup)} duplicated column name{?s}:",
       "*" = "{.val {dup}}",
       "i" = "Which one to read is ambiguous. Rename or drop the duplicate."
     ), call = call, class = "countryatlas_duplicate_columns")
@@ -215,7 +221,12 @@ check_dup_cols <- function(data, call = rlang::caller_env()) {
   invisible(TRUE)
 }
 
-check_cols <- function(data, cols, call = rlang::caller_env()) {
+# `arg` names the frame in the message. It was hardcoded to "data", which is
+# right for the twenty-odd verbs whose frame argument is called that and wrong
+# for the three whose is not: country_weights(w = ) reported `Columns "iso3c"
+# and "neighbor" not found in `data`` and cartogram_diagnostics(x = ) reported
+# `Column "nope" not found in `data``, naming an argument neither function has.
+check_cols <- function(data, cols, arg = "data", call = rlang::caller_env()) {
   missing <- setdiff(cols, names(data))
   if (length(missing)) {
     # cli::qty(): with {?s} ahead of the value, cli reaches for the most
@@ -226,10 +237,10 @@ check_cols <- function(data, cols, call = rlang::caller_env()) {
   # showed up for numeric arguments. qty(length(x)) states the count outright -- qty(x) on a
 # numeric hits the same trap, since cli reads a numeric as the count itself.
 
-    wdj_abort("Column{cli::qty(length(missing))}{?s} {.val {missing}} not found in {.arg data}.",
+    wdj_abort("Column{cli::qty(length(missing))}{?s} {.val {missing}} not found in {.arg {arg}}.",
               call = call)
   }
-  check_dup_cols(data, call = call)
+  check_dup_cols(data, arg = arg, call = call)
   invisible(TRUE)
 }
 
@@ -525,17 +536,96 @@ check_top_n <- function(x, arg = "top_n", call = rlang::caller_env()) {
 # levels 2002 < 2001 < 2000 would hand back the *latest* year while the caller
 # was promised the earliest. Compare years as numbers where they are numbers,
 # and fall back to the labels where they are not.
+# The sortable form of a `year` column. dplyr::arrange() and order() on a
+# factor sort by LEVEL INDEX, not by the label, and a year column arrives as a
+# factor more often than it looks: read.csv(stringsAsFactors = TRUE), several
+# importers, and any deliberate factor(year) for plotting. A panel whose levels
+# were c("2003", "2001", "2000", "2002") was therefore ordered 2003, 2001,
+# 2000, 2002, and every verb that reads a *neighbouring* row read the wrong
+# neighbour: lag_by_country() took the value from the wrong year and
+# growth_rate() reported -0.75 where the series had doubled, with nothing said.
+# Characters are coerced too, so a panel of "1999", "2000" sorts numerically
+# rather than lexicographically. A column that is not numeric at all is handed
+# back untouched, so a genuinely categorical period label still sorts by the
+# order its own type defines. earliest_per_unit() below carried this coercion
+# already; the seven arrange() sites that read neighbouring rows did not.
+# The grouping key for a per-country verb, and why iso3c alone is not it.
+#
+# `dplyr::group_by()` puts every NA in ONE group, so a panel carrying two rows
+# whose iso3c did not resolve was treated as one country: growth_rate() reported
+# the change from one unmatched row to the next -- 899% between two unrelated
+# countries -- and lag_by_country(), diff_by_country(), index_to() and
+# interpolate_missing() read across them the same way. Silently, and after
+# standardize_country() had already warned that those names did not match, so
+# the frame reaching these verbs is exactly the one a user is most likely to
+# have.
+#
+# Fall back to whatever does identify the row, in the same c("country",
+# "group") order distinct_countries() uses for its uncoded branch -- so an
+# appended aggregate row (no iso3c, `country = "World"`) still groups as one
+# series, which is what its owner meant. Where nothing identifies a row, give
+# it a key of its own: a verb that reads a neighbouring row must not read
+# across two unknown countries. Fallback keys carry the column they came from,
+# so a label can never collide with a real iso3c or with another column's.
+# A key that identifies nothing. `""` is not NA and every is.na() guard misses
+# it, but read.csv() without na.strings = "" gives a blank for every empty cell
+# and standardize_country("") already resolves to iso3c = NA -- so a blank code
+# means the same thing as a missing one everywhere else in the package, and
+# unit_key() was alone in accepting it as an identifier. Two blank-coded rows
+# were therefore still one country: growth_rate() reported the same fabricated
+# 899% it did for NA. Whitespace-only counts as blank too, with the [\h\v]
+# class rather than trimws()'s ASCII-only default, for the same reason
+# standardize_country() uses it.
+blank_key <- function(x) {
+  x <- as.character(x)
+  is.na(x) | !nzchar(trimws(x, whitespace = "[\\h\\v]"))
+}
+
+unit_key <- function(df) {
+  key <- as.character(df$iso3c)
+  miss <- blank_key(key)
+  if (!any(miss)) return(key)
+  key[miss] <- NA_character_
+  for (nm in intersect(c("country", "group"), names(df))) {
+    alt <- as.character(df[[nm]])
+    take <- miss & !blank_key(alt)
+    if (any(take)) key[take] <- paste0(nm, "\r", alt[take])
+    miss <- is.na(key)
+    if (!any(miss)) break
+  }
+  if (any(miss)) key[miss] <- paste0("\runidentified\r", which(miss))
+  key
+}
+
+# Group a panel by unit_key() under a reserved name, so the verbs that read a
+# neighbouring row group on something that actually identifies the row.
+# wdj_return_frame() drops the column again, which is where every one of these
+# verbs already routes its result.
+group_by_unit <- function(df) {
+  df[[".wdj_unit"]] <- unit_key(df)
+  dplyr::group_by(df, .data$.wdj_unit)
+}
+
+year_sort_key <- function(x) {
+  chr <- if (is.factor(x)) as.character(x) else x
+  if (is.character(chr)) {
+    num <- suppressWarnings(as.numeric(chr))
+    if (!all(is.na(num))) return(num)
+  }
+  # Deliberately the original `x` and not `chr`: a factor whose labels are not
+  # years at all -- factor(c("pre-war", "post-war")) -- must keep sorting by
+  # its own level order. Returning the character vector instead would have
+  # silently re-sorted it alphabetically, which is the same class of bug in the
+  # other direction.
+  x
+}
+
 earliest_per_unit <- function(df, unit) {
   if (!nrow(df)) return(df)
   if (!"year" %in% names(df)) {
     return(df[!duplicated(df[[unit]]), , drop = FALSE])
   }
-  yr <- df$year
-  if (is.factor(yr)) yr <- as.character(yr)
-  if (is.character(yr)) {
-    num <- suppressWarnings(as.numeric(yr))
-    if (!all(is.na(num))) yr <- num
-  }
+  yr <- year_sort_key(df$year)
   ord <- order(df[[unit]], yr, na.last = TRUE)
   keep <- ord[!duplicated(df[[unit]][ord])]
   df[sort(keep), , drop = FALSE]
@@ -559,7 +649,10 @@ distinct_countries <- function(df, arg = "data") {
       ), class = "countryatlas_panel")
     }
   }
-  na_rows <- is.na(df$iso3c)
+  # blank_key(), not is.na(): a blank code identifies no country either, and
+  # sending it down the coded branch made several distinct unresolved rows one
+  # "country" whose arbitrary row was then reported as the answer.
+  na_rows <- blank_key(df$iso3c)
   coded <- df[!na_rows, , drop = FALSE]
   # The warning above promises "only the earliest year of each country is
   # used", but distinct(.keep_all = TRUE) keeps whichever row comes *first in
@@ -675,6 +768,24 @@ quo_arg_name <- function(quo, arg, call = rlang::caller_env()) {
   }
   rlang::as_name(quo)
 }
+
+# Companion to quo_arg_name(): the mapping to splice into aes(). quo_arg_name()
+# deliberately accepts a column passed unquoted *or as a string* -- its own
+# error hint says so, from all ~66 unquoted-column arguments in the package --
+# and check_cols() then validates the string happily. But splicing the raw
+# quosure into aes() honours only the unquoted form: `aes(fill = !!fill_q)`
+# with `fill = "value"` maps the constant string "value", and ggplot2 reports
+# it at *build* time as "Discrete value supplied to a continuous scale" (or,
+# for style = "binned", "Binned scales only support continuous data") --
+# naming neither the argument, nor the column, nor the fix. That is the exact
+# failure quo_arg_name() exists to prevent, and it reached the package's most
+# common call: world_map(d, "value") errored while world_map(d, value) drew.
+# Build the mapping from the validated *name* instead -- identical to the
+# symbol for the unquoted form, correct for the string, and ggplot2 unwraps
+# `.data[["x"]]` to `x` for the legend title either way. The name is inlined
+# with !! so the quosure does not depend on the caller's frame still being
+# alive when the plot is built.
+quo_col_mapping <- function(name) rlang::quo(.data[[!!name]])
 
 # A number destined for a machine-readable string must not depend on the user's
 # options(). options(OutDec = ",") -- normal in comma-decimal locales -- turned a
@@ -964,7 +1075,14 @@ countries_noun <- function(n) if (isTRUE(n == 1L)) "country" else "countries"
 # as.integer() on a Date returned 18262, the day count, as the year. The
 # same assumption sat in audit_time_coverage(), where a Date year column
 # turned the whole existence audit into nonsense.
-read_year <- function(x, source_label) {
+read_year <- function(x, source_label, .envir = rlang::caller_env()) {
+  # Pre-rendered with format_inline(), because cli does not re-interpolate a
+  # substituted value: `{source_label}` in the warning below printed the label
+  # verbatim, so three of the six call sites emitted raw markup at the user --
+  # "{.arg data}: 2 time values are not a year", and "Source {.val {source}}:"
+  # from the public extension point, where the braces also referenced a
+  # variable that only exists in the caller. Hence .envir.
+  source_label <- cli::format_inline(source_label, .envir = .envir)
   yr <- if (inherits(x, "Date") || inherits(x, "POSIXt")) {
     as.integer(format(x, "%Y"))
   } else {
@@ -981,7 +1099,11 @@ read_year <- function(x, source_label) {
     wdj_warn(c(
       "{source_label}: {sum(bad)} time value{?s} {?is/are} not a year and
        {?is/are} dropped.",
-      "*" = "{.val {unique(as.character(x)[bad])[1:min(4L, sum(bad))]}}",
+      # head(), not [1:min(4L, sum(bad))]: sum(bad) counts bad *rows* while
+      # unique() returns distinct *values*, so a column of one repeated
+      # placeholder -- "N/A", "..", "-", the common case -- padded the list
+      # with phantom NAs: `"N/A", NA, NA, and NA`.
+      "*" = "{.val {utils::head(unique(as.character(x)[bad]), 4L)}}",
       "i" = "Expected a year, a date, or a string starting with one."
     ), class = "countryatlas_bad_year")
     yr[bad] <- NA_integer_

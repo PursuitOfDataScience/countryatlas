@@ -441,17 +441,23 @@ complete_years <- function(data, years = NULL, value = NULL,
   # named or not; an unnamed one stays NA in the new rows.
   static <- setdiff(names(data), c("year", measures, value))
 
+  # Keyed on unit_key(), not iso3c: two rows whose iso3c did not resolve were
+  # one country to group_by(), so they shared a single completed year grid and
+  # the geometry carry below -- which matched on iso3c, where NA matches NA --
+  # copied one unidentified country's polygon onto the other's invented rows.
+  # iso3c is filled downup like the other static columns now that it is no
+  # longer the grouping column; it is constant within a unit either way.
   out <- data %>%
-    dplyr::group_by(.data$iso3c) %>%
+    group_by_unit() %>%
     tidyr::complete(year = years) %>%
-    tidyr::fill(dplyr::all_of(setdiff(static, "iso3c")),
+    tidyr::fill(dplyr::all_of(setdiff(static, ".wdj_unit")),
                 .direction = "downup")
 
   if (method == "locf") {
     out <- tidyr::fill(out, dplyr::all_of(value), .direction = "down")
   } else if (method == "linear") {
     out <- out %>%
-      dplyr::arrange(.data$year, .by_group = TRUE) %>%
+      dplyr::arrange(year_sort_key(.data$year), .by_group = TRUE) %>%
       dplyr::mutate(dplyr::across(
         dplyr::all_of(value),
         ~ wdj_interp_linear(.data$year, .x)
@@ -470,7 +476,10 @@ complete_years <- function(data, years = NULL, value = NULL,
       g <- out[[gcol]]
       gone <- sf::st_is_empty(g)
       if (any(gone) && any(!gone)) {
-        src <- which(!gone)[match(out$iso3c[gone], out$iso3c[!gone])]
+        # On the unit key, which unit_key() never leaves NA -- matching on iso3c
+        # paired an invented row with whatever other unresolved row had a
+        # shape, because match() treats NA as equal to NA.
+        src <- which(!gone)[match(out$.wdj_unit[gone], out$.wdj_unit[!gone])]
         have <- !is.na(src)
         g[which(gone)[have]] <- g[src[have]]
         out[[gcol]] <- g
@@ -484,6 +493,13 @@ complete_years <- function(data, years = NULL, value = NULL,
 
 # Linear interpolation of interior NAs (no extrapolation beyond observed range).
 wdj_interp_linear <- function(x, y) {
+  # approx() coerces a factor x with as.numeric(), which yields LEVEL INDICES:
+  # a factor year interpolated against 1, 2, 3, 4 in level order instead of
+  # against the years themselves, so with rule = 1 the targets fell outside the
+  # anchors and came back NA -- an unfilled gap where the numeric-year panel
+  # filled it, and no warning. See year_sort_key(); a Date x is left alone and
+  # still goes through approx() numerically, as before.
+  x <- year_sort_key(x)
   ok <- !is.na(y)
   if (sum(ok) < 2L) return(y)
   # approx() collapses tied x-values to their mean, and says so with a warning
@@ -543,8 +559,8 @@ growth_rate <- function(data, value, type = c("yoy", "cagr"),
   if (identical(type, "cagr")) check_numeric_col(data, "year")
   warn_overwrite(data, new_col)
   out <- data %>%
-    dplyr::group_by(.data$iso3c) %>%
-    dplyr::arrange(.data$year, .by_group = TRUE)
+    group_by_unit() %>%
+    dplyr::arrange(year_sort_key(.data$year), .by_group = TRUE)
   out <- if (type == "yoy") {
     dplyr::mutate(
       out,
@@ -646,7 +662,7 @@ index_to <- function(data, value, base_year, to = 100, suffix = "_index") {
   new_col <- paste0(val_name, suffix)
   warn_overwrite(data, new_col)
   out <- data %>%
-    dplyr::group_by(.data$iso3c) %>%
+    group_by_unit() %>%
     dplyr::mutate(
       "{new_col}" := {
         # !is.na() first: `year == base_year` is NA for a missing year, and
@@ -708,7 +724,25 @@ correlate_indicators <- function(data, ..., method = c("pearson", "spearman"),
   data <- distinct_countries(data)
   sel <- rlang::enquos(...)
   if (length(sel)) {
-    vals <- dplyr::select(data, !!!sel)
+    # tidyselect raises its own vctrs_error_subscript_oob for a column that
+    # does not exist -- "Can't select columns that don't exist" -- which was the
+    # last unclassed error at this boundary: every sibling verb goes through
+    # check_cols() and says `Column "x" not found in `data``. The selection
+    # here is a full tidyselect expression (starts_with(), where(), ranges), so
+    # it cannot be pre-checked by name; catch the failure and word it the same
+    # way, keeping tidyselect's own text for anything that is not a plain
+    # missing name.
+    vals <- tryCatch(dplyr::select(data, !!!sel), error = function(e) {
+      miss <- tryCatch(as.character(e$i), error = function(z) character(0))
+      miss <- miss[!is.na(miss) & nzchar(miss)]
+      if (length(miss)) {
+        wdj_abort(
+          "Column{cli::qty(length(miss))}{?s} {.val {miss}} not found in {.arg data}.",
+          call = rlang::caller_env(5))
+      }
+      wdj_abort(c("Could not select the indicator columns from {.arg data}.",
+                  "x" = "{conditionMessage(e)}"), call = rlang::caller_env(5))
+    })
   } else {
     num <- names(data)[vapply(data, is.numeric, logical(1))]
     keep <- setdiff(num, c("year", "long", "lat", "group", "order",
@@ -771,8 +805,8 @@ lag_by_country <- function(data, value, n = 1, suffix = NULL) {
   warn_irregular_years(data, "the lag")
   warn_overwrite(data, new_col)
   out <- data %>%
-    dplyr::group_by(.data$iso3c) %>%
-    dplyr::arrange(.data$year, .by_group = TRUE) %>%
+    group_by_unit() %>%
+    dplyr::arrange(year_sort_key(.data$year), .by_group = TRUE) %>%
     dplyr::mutate("{new_col}" := dplyr::lag(.data[[val_name]], n = n))
   out <- wdj_return_frame(out)
   warn_all_na_result(out, val_name, new_col,
@@ -793,8 +827,8 @@ diff_by_country <- function(data, value, n = 1, suffix = NULL) {
   warn_irregular_years(data, "the difference")
   warn_overwrite(data, new_col)
   out <- data %>%
-    dplyr::group_by(.data$iso3c) %>%
-    dplyr::arrange(.data$year, .by_group = TRUE) %>%
+    group_by_unit() %>%
+    dplyr::arrange(year_sort_key(.data$year), .by_group = TRUE) %>%
     dplyr::mutate(
       "{new_col}" := .data[[val_name]] - dplyr::lag(.data[[val_name]], n = n)
     )
@@ -854,9 +888,14 @@ check_panel_unique <- function(data, call = rlang::caller_env(),
   # called two years of one country a repeat.
   if (!"iso3c" %in% names(data)) return(invisible(NULL))
   panel <- "year" %in% names(data)
-  ok <- !is.na(data$iso3c) & if (panel) !is.na(data$year) else TRUE
-  key <- (if (panel) paste(data$iso3c, data$year)
-          else as.character(data$iso3c))[ok]
+  # unit_key(), not iso3c: the verbs that call this group by the unit key, so
+  # uniqueness has to be judged on the same key. Keying on iso3c reported two
+  # *different* blank-coded rows in one year as a duplicated country-year.
+  # Unidentifiable rows get a key of their own, so they can never collide --
+  # which is right, because nothing says they are the same country.
+  uk <- unit_key(data)
+  ok <- if (panel) !is.na(data$year) else rep(TRUE, length(uk))
+  key <- (if (panel) paste(uk, data$year) else uk)[ok]
   dupes <- unique(key[duplicated(key)])
   if (length(dupes)) {
     wdj_warn(c(
@@ -891,10 +930,18 @@ zscore_finite <- function(x) {
 # would alter results for everyone already relying on the row-based one.
 warn_irregular_years <- function(data, what, call = rlang::caller_env()) {
   if (!all(c("iso3c", "year") %in% names(data))) return(invisible(NULL))
-  yr <- suppressWarnings(as.numeric(data$year))
-  ok <- !is.na(data$iso3c) & !is.na(yr)
+  # year_sort_key(), not as.numeric(): as.numeric() on a FACTOR year returns
+  # level indices, so this read gaps between level positions and would report a
+  # perfectly regular annual panel as irregular.
+  yr <- suppressWarnings(as.numeric(year_sort_key(data$year)))
+  # unit_key() for the same reason as check_panel_unique() above: keying on
+  # iso3c called four single-year unidentified rows one country and reported
+  # the gaps between them, though the verb groups them as four units with no
+  # gaps at all.
+  uk <- unit_key(data)
+  ok <- !is.na(yr)
   if (sum(ok) < 2L) return(invisible(NULL))
-  iso <- as.character(data$iso3c)[ok]
+  iso <- uk[ok]
   yr <- yr[ok]
   o <- order(iso, yr)
   iso <- iso[o]; yr <- yr[o]
@@ -914,7 +961,11 @@ warn_irregular_years <- function(data, what, call = rlang::caller_env()) {
     "*" = "{.val {utils::head(who, 8)}}",
     "i" = "Each value is compared with the previous row, not the previous year.
            {.fn complete_years} inserts the missing years."
-  ), call = call)
+    # Classed so a caller who means to hand this verb a decadal or five-yearly
+    # panel can suppress exactly this warning, as with the other conditions a
+    # legitimate input can raise, rather than muffling every countryatlas
+    # warning to silence it.
+  ), call = call, class = "countryatlas_irregular_years")
   invisible(NULL)
 }
 
@@ -930,8 +981,15 @@ warn_irregular_years <- function(data, what, call = rlang::caller_env()) {
 #' @param value The value column (unquoted); must be positive (log scale).
 #'
 #' @return A one-row tibble: `beta`, `se`, `t_value`, `p_value`, `r_squared`,
-#'   `n` (countries), `speed` (annual convergence rate, `NA` when `beta >= 0`)
-#'   and `half_life` (years). The fitted [lm] object is attached as the
+#'   `n` (countries), `speed` (annual convergence rate) and `half_life`
+#'   (years).
+#'
+#'   `speed` and `half_life` are `NA` in two cases: when `beta >= 0`, because
+#'   there is no convergence to put a rate on; and when the panel's per-country
+#'   spans are too heterogeneous for any single span to reconcile with the
+#'   fitted slope, which is warned about. `beta` and its inference are
+#'   unaffected in both -- only the annualised figures need one common span, so
+#'   restrict the panel to a shared window if you need them. The fitted [lm] object is attached as the
 #'   `"model"` attribute.
 #' @export
 #' @seealso [sigma_convergence()] for the dispersion-over-time counterpart.
@@ -963,8 +1021,8 @@ beta_convergence <- function(data, value) {
   # alongside the NA and non-positive values it already drops.
   per_country <- data %>%
     dplyr::filter(is.finite(.data[[val_name]]), .data[[val_name]] > 0) %>%
-    dplyr::group_by(.data$iso3c) %>%
-    dplyr::arrange(.data$year, .by_group = TRUE) %>%
+    group_by_unit() %>%
+    dplyr::arrange(year_sort_key(.data$year), .by_group = TRUE) %>%
     dplyr::summarise(
       y0 = dplyr::first(.data$year),
       y1 = dplyr::last(.data$year),
@@ -997,10 +1055,31 @@ beta_convergence <- function(data, value) {
   }
   beta <- co["log_v0", "Estimate"]
   span <- mean(per_country$y1 - per_country$y0)
-  # Implied annual convergence speed: beta = -(1 - exp(-lambda * T)) / T.
+  # Implied annual convergence speed: beta = -(1 - exp(-lambda * T)) / T,
+  # which inverts to lambda = -log(1 + beta * T) / T and so needs
+  # 1 + beta * T > 0. That holds automatically when every country spans the
+  # same T. It need not hold on an unbalanced panel: beta is fitted on growth
+  # already annualised per country, so a mix of spans leaves the mean span
+  # irreconcilable with the fitted slope, and log() of a negative is not a
+  # speed. The guard was right; the silence was not. A panel with unmistakable
+  # convergence -- beta -0.04, p ~ 1e-13, R2 0.96 -- handed back NA for the two
+  # most interpretable columns while the documentation said NA meant
+  # beta >= 0, which it plainly was not.
   speed <- if (beta < 0 && (1 + beta * span) > 0) {
     -log(1 + beta * span) / span
   } else {
+    if (beta < 0) {
+      spans <- per_country$y1 - per_country$y0
+      wdj_warn(c(
+        "Cannot convert {.field beta} into an annual {.field speed}.",
+        "x" = "The countries span {min(spans)} to {max(spans)} years, and no
+               single span reconciles with the fitted slope.",
+        "i" = "{.field beta}, its {.field p_value} and {.field r_squared} are
+               unaffected -- only the annualised {.field speed} and
+               {.field half_life} need one span. Restrict the panel to a
+               common window for those."
+      ), class = "countryatlas_no_speed")
+    }
     NA_real_
   }
   out <- tibble::tibble(
@@ -1074,7 +1153,7 @@ sigma_convergence <- function(data, value, measure = c("sd_log", "cv")) {
       },
       .groups = "drop"
     ) %>%
-    dplyr::arrange(.data$year)
+    dplyr::arrange(year_sort_key(.data$year))
   thin <- out$year[out$n < 2L]
   if (length(thin)) {
     wdj_warn(c(

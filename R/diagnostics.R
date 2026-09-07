@@ -97,6 +97,23 @@ check_country_match <- function(x,
 #'   `na_rates` and `by_group`. It has a `print()` method, so at the console you
 #'   see a formatted report rather than the raw list; reach into the elements by
 #'   name to use the numbers programmatically.
+#'
+#'   * `unmatched` -- one row per input value that did not resolve to an ISO
+#'     code. Empty is the good case.
+#'   * `na_rates` -- one row per indicator: `n` is the number of countries
+#'     *considered*, `n_missing` how many of them lack a value, and `na_rate`
+#'     is `n_missing / n`.
+#'   * `by_group` -- one row per group: `n_countries` is how many countries are
+#'     *in that group*, and `na_rate` is the share of those lacking a value.
+#'     The counts sum to `n`.
+#'
+#'   Both `n` and `by_group`'s `n_countries` are **denominators** -- everything
+#'   counted, not everything present. That is the opposite orientation from
+#'   [map_provenance()], whose `n_countries` is the numerator (countries drawn
+#'   *with* a value) and whose `n_total` is the denominator. The two verbs
+#'   report the same coverage from opposite ends, so on 215 countries with 24
+#'   missing this gives `n = 215` where `map_provenance()` gives
+#'   `n_countries = 191`.
 #' @export
 #' @examples
 #' audit_coverage(countryatlas::world_snapshot$countries)

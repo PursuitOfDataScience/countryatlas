@@ -74,7 +74,7 @@ map_provenance <- function(x, value = NULL) {
       ))
     }
     value_name <- quo_arg_name(value_q, "value")
-    check_cols(x, value_name)
+    check_cols(x, value_name, arg = "x")
     # n_imputed belongs here, not to the `%||% 0L` fallback below. The other
     # unset fields are drawing-side and default to NA, which claims nothing;
     # n_imputed defaults to 0, which claims that nothing was imputed -- so a

@@ -16,4 +16,4 @@
 ^cran-comments\.md$
 ^\.git$
 ^\.claude$
-^Rplots\.pdf$
+Rplots\.pdf$

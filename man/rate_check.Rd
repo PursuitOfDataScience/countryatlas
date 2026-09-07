@@ -22,7 +22,18 @@ Otherwise the rate is \code{numerator / denominator}.}
 \value{
 A tibble of \code{iso3c}, \code{numerator}, \code{denominator}, \code{rate},
 \code{expected_se} (the Poisson standard error of the rate, \eqn{\sqrt{r/d}}) and
-\code{flagged}, sorted with the least reliable first. \code{flagged} is \code{TRUE} for a
+\code{flagged}, sorted with the least reliable first.
+
+"Least reliable" is ordered on the standard error a \emph{single} event would
+imply, \eqn{\sqrt{\max(y, 1)}/d}, which is identical to \code{expected_se} for
+every row with at least one event. Ordering on \code{expected_se} directly put
+zero-count rows last, at the reliable end: it is \eqn{\sqrt{y}/d}, which
+is exactly \code{0} when the count is \code{0}, so one country with no events out of
+251 people outranked another with one event out of the same 251. Observing
+nothing is not evidence of precision. \code{expected_se} itself is still the
+plain Poisson standard error, \code{0} and all.
+
+\code{flagged} is \code{TRUE} for a
 denominator below the threshold, \code{FALSE} above it or missing, and \code{NA} for
 every row when no threshold could be computed at all -- which is warned
 about, and means \code{sum(flagged)} is \code{NA} rather than a misleading \code{0}.

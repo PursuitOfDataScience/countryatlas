@@ -2413,6 +2413,19 @@ test_that("world_data validates classify and language before fetching", {
 
   # Asking for no classification at all stays valid -- that is what
   # character(0) means -- and so does any subset.
+  #
+  # Mocked, because expect_error(expr, NA) *evaluates* the call: these two
+  # reached the live World Bank API and cost the suite two 60-second timeouts
+  # and four warnings whenever it was slow, in a test whose whole point is that
+  # validation happens BEFORE any fetch. helper-net.R exists for the tests that
+  # do need the network; this one does not.
+  testthat::local_mocked_bindings(
+    fetch_one_indicator = function(code, name, start, end, language = "en") {
+      tibble::tibble(iso2c = c("FR", "DE"), iso3c = c("FRA", "DEU"),
+                     country = c("France", "Germany"),
+                     year = as.integer(start), !!name := c(1, 2))
+    }
+  )
   expect_error(world_data(2020, classify = character(0)), NA)
   expect_error(world_data(2020, classify = c("income", "region")), NA)
 })
@@ -3028,8 +3041,7 @@ test_that("subnational frames are counted by region, not collapsed to countries"
   expect_equal(cv2$n_total, 12L)
 
   # The colour scale was derived the same way: quantiles over 3 values, not 12.
-  br <- attr(countryatlas:::apply_binned_fill(mk(1:12), rlang::quo(v), "v",
-                                              "quantile", 4), "breaks")
+  br <- attr(countryatlas:::apply_binned_fill(mk(1:12), "v", "quantile", 4), "breaks")
   expect_equal(length(br) - 1L, 4L)
   expect_equal(range(br), c(1, 12))
   # An iso_3166_2 frame (standardize_subnational's output) keys the same way.

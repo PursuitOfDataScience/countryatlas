@@ -313,7 +313,7 @@ world_map <- function(data, fill,
                        rep(seq_len(n_uncertainty), each = as.integer(n_bins))))
   }
 
-  binned <- apply_binned_fill(data, fill_q, fill_name, style, n_bins)
+  binned <- apply_binned_fill(data, fill_name, style, n_bins)
   data <- binned$data
   fill_mapped <- if (is.null(vsup)) binned$fill else rlang::quo(.data[[".wdj_vsup"]])
 
@@ -633,7 +633,7 @@ classification_table <- function(data, fill_name, style, n_bins, breaks) {
 # iso3c (Cyprus at 110m; Cyprus and India at 50m), which was enough to shift the
 # breaks and move a couple of countries into the wrong bin. So de-duplicate on
 # the key whenever there is one, on either backend.
-apply_binned_fill <- function(data, fill_q, fill_name, style, n_bins) {
+apply_binned_fill <- function(data, fill_name, style, n_bins) {
   vals <- data[[fill_name]]
   # A character fill column reaches ggplot2 unfactored, and its discrete scale
   # then derives the level order by sorting -- using the session's collation
@@ -649,7 +649,8 @@ apply_binned_fill <- function(data, fill_q, fill_name, style, n_bins) {
     data[[fill_name]] <- factor(vals, levels = lv[order(lv, method = "radix")])
   }
   if (!style %in% c("quantile", "jenks", "binned") || !is.numeric(vals)) {
-    return(structure(list(data = data, fill = fill_q), breaks = NULL))
+    return(structure(list(data = data, fill = quo_col_mapping(fill_name)),
+                     breaks = NULL))
   }
   break_vals <- vals
   key <- wdj_unit_key(names(data))
@@ -674,7 +675,8 @@ apply_binned_fill <- function(data, fill_q, fill_name, style, n_bins) {
   # is a bar rather than discrete keys -- so it takes the breaks and not the
   # cut. The other two map a factor.
   if (style == "binned") {
-    return(structure(list(data = data, fill = fill_q), breaks = br))
+    return(structure(list(data = data, fill = quo_col_mapping(fill_name)),
+                     breaks = br))
   }
   data[[".wdj_bin"]] <- cut(vals, breaks = br, include.lowest = TRUE,
                             dig.lab = 4)
@@ -845,10 +847,16 @@ bubble_map <- function(data, size, color = NULL, projection = "equal_earth",
   if (!"iso3c" %in% names(data)) {
     wdj_abort("{.arg data} must contain an {.field iso3c} column.")
   }
-  check_cols(data, c(
-    quo_arg_name(size_q, "size"),
-    if (!rlang::quo_is_null(color_q)) quo_arg_name(color_q, "color")
-  ))
+  size_name <- quo_arg_name(size_q, "size")
+  color_name <- if (!rlang::quo_is_null(color_q)) {
+    quo_arg_name(color_q, "color")
+  }
+  check_cols(data, c(size_name, color_name))
+  # Both aesthetics go through quo_col_mapping() below rather than splicing
+  # `size_q`/`color_q` raw, so `size = "population"` maps the column and not
+  # the constant string.
+  size_mapped <- quo_col_mapping(size_name)
+  color_mapped <- if (is.null(color_name)) NULL else quo_col_mapping(color_name)
   # `size` feeds scale_size_area(). A non-numeric column reached ggplot2 as its
   # bare "Discrete value supplied to a continuous scale" -- and only at *build*
   # time, so bubble_map() itself returned happily and the failure arrived when
@@ -877,12 +885,11 @@ bubble_map <- function(data, size, color = NULL, projection = "equal_earth",
     # geom_sf() drops them at draw time with a bare "Removed 7 rows". They are
     # already the grey base map underneath; the coverage numbers below account
     # for them, so drop them here rather than emit a count with no names.
-    size_nm <- quo_arg_name(size_q, "size")
-    pts_sf <- pts_sf[!is.na(pts_sf[[size_nm]]), , drop = FALSE]
+    pts_sf <- pts_sf[!is.na(pts_sf[[size_name]]), , drop = FALSE]
     aes_pt <- if (!rlang::quo_is_null(color_q)) {
-      ggplot2::aes(size = !!size_q, color = !!color_q)
+      ggplot2::aes(size = !!size_mapped, color = !!color_mapped)
     } else {
-      ggplot2::aes(size = !!size_q)
+      ggplot2::aes(size = !!size_mapped)
     }
     p_sf <- ggplot2::ggplot() +
       ggplot2::geom_sf(data = countries, fill = "grey92", color = "grey80",
@@ -905,11 +912,11 @@ bubble_map <- function(data, size, color = NULL, projection = "equal_earth",
                           by = "iso3c", na_matches = "never")
   aes_pt <- if (!rlang::quo_is_null(color_q)) {
     ggplot2::aes(.data$centroid_lon, .data$centroid_lat,
-                 size = !!size_q, color = !!color_q)
+                 size = !!size_mapped, color = !!color_mapped)
   } else {
-    ggplot2::aes(.data$centroid_lon, .data$centroid_lat, size = !!size_q)
+    ggplot2::aes(.data$centroid_lon, .data$centroid_lat, size = !!size_mapped)
   }
-  cov <- centroid_coverage(data, quo_arg_name(size_q, "size"), pts$iso3c[
+  cov <- centroid_coverage(data, size_name, pts$iso3c[
     !is.na(pts$centroid_lon) & !is.na(pts$centroid_lat)])
   # Drop them here rather than handing ggplot2 a point at (NA, NA): the warning
   # above says which countries and why, which "Removed 5 rows" does not.
@@ -1365,7 +1372,8 @@ tile_map <- function(data, fill, label = TRUE) {
                             one_per_country,
                             by = "iso3c", na_matches = "never")
   p <- ggplot2::ggplot(tiles, ggplot2::aes(.data$col, -.data$row)) +
-    ggplot2::geom_tile(ggplot2::aes(fill = !!fill_q), color = "white") +
+    ggplot2::geom_tile(ggplot2::aes(fill = !!quo_col_mapping(fill_name)),
+                       color = "white") +
     auto_fill_scale(tiles[[fill_name]], fill_name, na_value = "grey90") +
     ggplot2::coord_equal() +
     theme_world_map()
@@ -1527,18 +1535,61 @@ great_circle <- function(lon1, lat1, lon2, lat2, n = 50) {
   # angular distance
   dlt <- acos(pmin(1, pmax(-1,
     sin(phi1) * sin(phi2) + cos(phi1) * cos(phi2) * cos(lam2 - lam1))))
-  f <- seq(0, 1, length.out = n)
   if (dlt == 0) {
     return(tibble::tibble(lon = rep(lon1, n), lat = rep(lat1, n)))
   }
-  A <- sin((1 - f) * dlt) / sin(dlt)
-  B <- sin(f * dlt) / sin(dlt)
-  x <- A * cos(phi1) * cos(lam1) + B * cos(phi2) * cos(lam2)
-  y <- A * cos(phi1) * sin(lam1) + B * cos(phi2) * sin(lam2)
-  z <- A * sin(phi1) + B * sin(phi2)
-  lat <- atan2(z, sqrt(x^2 + y^2)) / d2r
-  lon <- atan2(y, x) / d2r
-  tibble::tibble(lon = lon, lat = lat)
+  at <- function(f) {
+    A <- sin((1 - f) * dlt) / sin(dlt)
+    B <- sin(f * dlt) / sin(dlt)
+    x <- A * cos(phi1) * cos(lam1) + B * cos(phi2) * cos(lam2)
+    y <- A * cos(phi1) * sin(lam1) + B * cos(phi2) * sin(lam2)
+    z <- A * sin(phi1) + B * sin(phi2)
+    list(lon = atan2(y, x) / d2r, lat = atan2(z, sqrt(x^2 + y^2)) / d2r)
+  }
+  f <- seq(0, 1, length.out = n)
+  pt <- at(f)
+  # A near-antipodal arc passes within half a degree of a pole, and longitude
+  # turns almost arbitrarily fast there: Belgium to Tonga stepped 131 degrees of
+  # longitude between two consecutive points at the default n = 50, and
+  # Greenland to Japan 121. split_antimeridian() below only cuts a step wider
+  # than 180, so those were drawn as a straight streak across the top of the map
+  # -- the same failure it was written to fix for the trans-Pacific case, caused
+  # by the pole instead of the antimeridian. The path is right; 50 points is
+  # simply too coarse where it turns fastest, and the step shrinks in proportion
+  # to n (131 -> 75 -> 21 -> 4 at n = 50, 200, 1000, 5000). So refine only the
+  # offending segments: an ordinary arc never trips the threshold and keeps its
+  # n points exactly.
+  #
+  # pmin(d, 360 - d) measures the step the short way round, so a genuine
+  # antimeridian crossing (179 to -179) reads as 2 degrees rather than 358 and
+  # is left for split_antimeridian() to cut, which is its job.
+  # No "stop when it stops improving" shortcut here: a pass halves only the
+  # offending segments, so it can cut the worst step by well under 10% and
+  # still be converging -- a guard on that basis stopped Belgium-Tonga at 119
+  # degrees instead of 15. The iteration and point caps are the bound. Exactly
+  # antipodal endpoints have no unique shortest path (sin(dlt) is 1e-16 and the
+  # slerp is meaningless), so they exhaust the eight passes without converging;
+  # that costs a few hundred points on input no pair of real centroids
+  # produces, which is cheaper than risking the cases that do converge.
+  for (i in seq_len(8L)) {
+    d <- abs(diff(pt$lon))
+    d <- pmin(d, 360 - d)
+    # Compare each longitude step with the angular distance the segment
+    # actually covers, rather than with a flat threshold. A flat one cannot
+    # tell the two apart: 45 degrees of longitude along the equator at n = 3 is
+    # honest coarseness the caller asked for, and it covers 45 degrees of arc;
+    # 131 degrees of longitude beside a pole covers less than half a degree of
+    # arc, and that is the streak. Haversine, so a densified and therefore
+    # unevenly spaced `f` is measured correctly.
+    la1 <- pt$lat[-length(pt$lat)] * d2r; la2 <- pt$lat[-1] * d2r
+    ang <- 2 * asin(pmin(1, sqrt(sin((la2 - la1) / 2)^2 +
+             cos(la1) * cos(la2) * sin(d * d2r / 2)^2))) / d2r
+    gap <- which(d > 3 * ang & d > 5)
+    if (!length(gap) || length(f) > 4000L) break
+    f <- sort(unique(c(f, (f[gap] + f[gap + 1L]) / 2)))
+    pt <- at(f)
+  }
+  tibble::tibble(lon = pt$lon, lat = pt$lat)
 }
 
 #' Animate a choropleth over time
@@ -1707,21 +1758,30 @@ interactive_map <- function(data, fill, tooltip = NULL,
     # geom_polygon_interactive() and failed at render time on `.data$long`,
     # while engine = "plotly" reported the problem properly.
     check_map_geometry(data)
-    check_cols(data, c(
-      quo_arg_name(fill_q, "fill"),
-      if (!rlang::quo_is_null(tooltip_q)) quo_arg_name(tooltip_q, "tooltip")
-    ))
-    tooltip_mapped <- if (rlang::quo_is_null(tooltip_q)) fill_q else tooltip_q
+    fill_name <- quo_arg_name(fill_q, "fill")
+    tooltip_name <- if (!rlang::quo_is_null(tooltip_q)) {
+      quo_arg_name(tooltip_q, "tooltip")
+    }
+    check_cols(data, c(fill_name, tooltip_name))
+    # Resolved through quo_col_mapping() rather than spliced raw: the mapgl and
+    # leaflet engines below already key off `fill_name`, and this branch is the
+    # one that did not.
+    fill_mapped <- quo_col_mapping(fill_name)
+    tooltip_mapped <- if (is.null(tooltip_name)) {
+      fill_mapped
+    } else {
+      quo_col_mapping(tooltip_name)
+    }
     if (is_sf(data)) {
       p <- ggplot2::ggplot(data) +
         ggiraph::geom_sf_interactive(
-          ggplot2::aes(fill = !!fill_q, tooltip = !!tooltip_mapped, data_id = .data$iso3c)
+          ggplot2::aes(fill = !!fill_mapped, tooltip = !!tooltip_mapped, data_id = .data$iso3c)
         ) + theme_world_map()
     } else {
       p <- ggplot2::ggplot(
         data, ggplot2::aes(.data$long, .data$lat, group = .data$group)) +
         ggiraph::geom_polygon_interactive(
-          ggplot2::aes(fill = !!fill_q, tooltip = !!tooltip_mapped, data_id = .data$iso3c)
+          ggplot2::aes(fill = !!fill_mapped, tooltip = !!tooltip_mapped, data_id = .data$iso3c)
         ) + ggplot2::coord_quickmap() + theme_world_map()
     }
     return(ggiraph::girafe(ggobj = p))
@@ -2111,7 +2171,7 @@ globe_map <- function(data, fill, lon = 0, lat = 20,
     }
     check_cols(data, fill_name)
     check_categorical_fill(style, data[[fill_name]], fill_name)
-    binned <- apply_binned_fill(data, fill_q, fill_name, style, n_bins)
+    binned <- apply_binned_fill(data, fill_name, style, n_bins)
     data <- binned$data
     fill_mapped <- binned$fill
     p <- ggplot2::ggplot(
@@ -2139,7 +2199,7 @@ globe_map <- function(data, fill, lon = 0, lat = 20,
   }
   check_cols(data, fill_name)
   check_categorical_fill(style, data[[fill_name]], fill_name)
-  binned <- apply_binned_fill(data, fill_q, fill_name, style, n_bins)
+  binned <- apply_binned_fill(data, fill_name, style, n_bins)
   data <- binned$data
   fill_mapped <- binned$fill
 
@@ -2356,6 +2416,22 @@ imputed_note <- function(data) {
 #' table reports each country's exact share alongside its integer allocation so
 #' the rounding is inspectable rather than hidden.
 #'
+#' @section Crowded neighbours overlap:
+#' Each country's block is centred on its own centroid, with no collision
+#' avoidance between countries. That is deliberate -- a global packing solve
+#' would push countries away from where they belong -- but it means blocks in
+#' crowded regions are drawn on top of one another, and a partly hidden block
+#' cannot be counted or compared. The effect is not marginal: at the defaults
+#' (`cells = 1000`, `cell_size = 2.5`) about a third of the cells overlap a
+#' cell of a different country, across some sixty countries, and it grows with
+#' `cells` -- at `cells = 2500` it is roughly two thirds.
+#'
+#' `cell_size` is the lever, because it scales the tiles without moving the
+#' centroids: dropping it to `1.5` cuts the overlap at `cells = 1000` to about
+#' a tenth of the cells. Fewer `cells` also helps. Where exact areas matter
+#' more than geographic position, [dorling_map()] resolves collisions by
+#' displacing circles instead.
+#'
 #' @seealso [cartogram_map()], [dorling_map()], [tile_map()]
 #' @export
 #' @examples
@@ -2446,13 +2522,18 @@ gridded_cartogram <- function(data, value, cells = 1000, fill = NULL,
   # the drawing. Which countries rounded away is exactly what the table exists
   # to show, and excluding them made `share` sum to less than 1.
   drawn <- df[df$.wdj_cells > 0, ]
+  # Not currently reachable, and kept deliberately: the largest-remainder
+  # allocation above hands out exactly `cells` cells and `cells` is validated
+  # lo = 1, so at least one country always keeps one -- a single-country frame
+  # gets all of them however small its weight. The guard stays because it is
+  # the allocation that guarantees this, and an allocation is the kind of thing
+  # that gets rewritten. (An earlier comment here claimed the single-country
+  # case lands in it; it does not.)
   if (!nrow(drawn)) {
     wdj_abort(c(
       "Every country rounded to zero cells.",
-      # "there are 1 countries to place" is reachable: a single-country frame
-      # whose only weight rounds away lands here.
-      "i" = "Raise {.arg cells}: there {?is/are} {nrow(df)} countr{?y/ies} to
-             place."
+      "i" = "Raise {.arg cells}: there {cli::qty(nrow(df))}{?is/are} {nrow(df)}
+             countr{?y/ies} to place."
     ))
   }
 
@@ -2562,7 +2643,7 @@ cartogram_diagnostics <- function(x, weight = NULL) {
   if (!is_sf(geom)) {
     wdj_abort("The plot's data is not an sf frame; this is not a cartogram.")
   }
-  check_cols(geom, w_name)
+  check_cols(geom, w_name, arg = "x")
   # An invalid ring makes s2 refuse st_area() outright, and its message --
   # "Loop 0 is not valid: Edge 0 crosses edge 2" -- names neither the country
   # nor the package, so a caller with one broken polygon had nothing to go on.

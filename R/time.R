@@ -153,6 +153,14 @@ audit_time_coverage <- function(data, quiet = FALSE) {
   hc <- countryatlas::historical_codes
   df <- tibble::as_tibble(sf_drop(data))[, c("iso3c", "year")]
   df <- dplyr::distinct(df[!is.na(df$iso3c) & !is.na(df$year), ])
+  # as.character(), because df$iso3c indexes the named lookup vectors below and
+  # a FACTOR index selects by the factor's integer CODES, not its labels. A
+  # frame from read.csv(stringsAsFactors = TRUE) therefore matched whichever
+  # rows of historical_codes happened to sit at those positions: it reported
+  # France dissolved in 1993, Italy in 1992 and Germany as existing only from
+  # 2010, from the one verb whose job is catching exactly that kind of mistake.
+  # Same class as the read_year() note below, on the other key.
+  df$iso3c <- as.character(df$iso3c)
   if (!nrow(df)) {
     return(tibble::tibble(iso3c = character(0), country = character(0),
                           year = integer(0), issue = character(0),
@@ -188,7 +196,7 @@ audit_time_coverage <- function(data, quiet = FALSE) {
     out$country <- suppressWarnings(
       convert_country(out$iso3c, from = "iso3c", to = "country", warn = FALSE))
     out <- out[, c("iso3c", "country", "year", "issue", "existed")]
-    out <- dplyr::arrange(out, .data$iso3c, .data$year)
+    out <- dplyr::arrange(out, .data$iso3c, year_sort_key(.data$year))
   } else {
     out <- tibble::tibble(iso3c = character(0), country = character(0),
                           year = integer(0), issue = character(0),

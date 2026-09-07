@@ -26,8 +26,10 @@ defined for signed data.}
 }
 \value{
 With \code{local = TRUE}, a tibble of \code{iso3c}, \code{gi_star}, \code{z_score} and
-\code{p_value} (two-sided, from the normal approximation). With \code{local = FALSE},
-a one-row tibble of \code{g}, \code{expected}, \code{n} and \code{n_links}.
+\code{p_value} (two-sided, from the normal approximation), one row per country
+used. With \code{local = FALSE}, a one-row tibble of \code{g}, \code{expected}, \code{n}
+(countries used -- the same count, so the local form returns \code{n} rows) and
+\code{n_links} (non-zero weights).
 }
 \description{
 Global \eqn{G} and local \eqn{G_i^*}: unlike Moran's I, these distinguish
