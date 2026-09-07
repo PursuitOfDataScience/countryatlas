@@ -36,8 +36,12 @@ gearys_c(data, value, weights = NULL, n_perm = 999)
 
 ## Value
 
-A one-row tibble: `c` (observed), `expected` (always 1), `n`,
-`n_excluded`, `n_links`, `p_value` and an `excluded` list-column.
+A one-row tibble: `c` (observed), `expected` (always 1), `n` (countries
+used), `n_excluded` (countries with data that the weights could not
+reach), `n_links` (non-zero weights), `p_value` and an `excluded`
+list-column of the excluded `iso3c` codes. `n` and `n_excluded` sum to
+the countries supplied with a value, and mean the same here as in
+[`morans_i()`](https://pursuitofdatascience.github.io/countryatlas/reference/morans_i.md).
 
 `p_value` is **one-sided on the lower tail**: \\(1 + \\\\C^{\*} \le
 C\_{obs}\\) / (n\_{perm} + 1)\\. The lower tail is the clustered one,

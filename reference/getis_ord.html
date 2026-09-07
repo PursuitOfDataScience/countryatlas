@@ -89,8 +89,10 @@ defined for signed data.</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>With <code>local = TRUE</code>, a tibble of <code>iso3c</code>, <code>gi_star</code>, <code>z_score</code> and
-<code>p_value</code> (two-sided, from the normal approximation). With <code>local = FALSE</code>,
-a one-row tibble of <code>g</code>, <code>expected</code>, <code>n</code> and <code>n_links</code>.</p>
+<code>p_value</code> (two-sided, from the normal approximation), one row per country
+used. With <code>local = FALSE</code>, a one-row tibble of <code>g</code>, <code>expected</code>, <code>n</code>
+(countries used – the same count, so the local form returns <code>n</code> rows) and
+<code>n_links</code> (non-zero weights).</p>
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>

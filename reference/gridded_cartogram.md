@@ -51,6 +51,24 @@ country with a positive value gets zero cells while a smaller one gets
 one. The attached table reports each country's exact share alongside its
 integer allocation so the rounding is inspectable rather than hidden.
 
+## Crowded neighbours overlap
+
+Each country's block is centred on its own centroid, with no collision
+avoidance between countries. That is deliberate – a global packing solve
+would push countries away from where they belong – but it means blocks
+in crowded regions are drawn on top of one another, and a partly hidden
+block cannot be counted or compared. The effect is not marginal: at the
+defaults (`cells = 1000`, `cell_size = 2.5`) about a third of the cells
+overlap a cell of a different country, across some sixty countries, and
+it grows with `cells` – at `cells = 2500` it is roughly two thirds.
+
+`cell_size` is the lever, because it scales the tiles without moving the
+centroids: dropping it to `1.5` cuts the overlap at `cells = 1000` to
+about a tenth of the cells. Fewer `cells` also helps. Where exact areas
+matter more than geographic position,
+[`dorling_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/dorling_map.md)
+resolves collisions by displacing circles instead.
+
 ## See also
 
 [`cartogram_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/cartogram_map.md),

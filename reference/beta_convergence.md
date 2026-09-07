@@ -25,9 +25,15 @@ beta_convergence(data, value)
 ## Value
 
 A one-row tibble: `beta`, `se`, `t_value`, `p_value`, `r_squared`, `n`
-(countries), `speed` (annual convergence rate, `NA` when `beta >= 0`)
-and `half_life` (years). The fitted
-[lm](https://rdrr.io/r/stats/lm.html) object is attached as the
+(countries), `speed` (annual convergence rate) and `half_life` (years).
+
+`speed` and `half_life` are `NA` in two cases: when `beta >= 0`, because
+there is no convergence to put a rate on; and when the panel's
+per-country spans are too heterogeneous for any single span to reconcile
+with the fitted slope, which is warned about. `beta` and its inference
+are unaffected in both – only the annualised figures need one common
+span, so restrict the panel to a shared window if you need them. The
+fitted [lm](https://rdrr.io/r/stats/lm.html) object is attached as the
 `"model"` attribute.
 
 ## See also

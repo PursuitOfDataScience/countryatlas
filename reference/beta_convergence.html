@@ -79,8 +79,14 @@ gap) are derived from it.</p>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A one-row tibble: <code>beta</code>, <code>se</code>, <code>t_value</code>, <code>p_value</code>, <code>r_squared</code>,
-<code>n</code> (countries), <code>speed</code> (annual convergence rate, <code>NA</code> when <code>beta &gt;= 0</code>)
-and <code>half_life</code> (years). The fitted <a href="https://rdrr.io/r/stats/lm.html" class="external-link">lm</a> object is attached as the
+<code>n</code> (countries), <code>speed</code> (annual convergence rate) and <code>half_life</code>
+(years).</p>
+<p><code>speed</code> and <code>half_life</code> are <code>NA</code> in two cases: when <code>beta &gt;= 0</code>, because
+there is no convergence to put a rate on; and when the panel's per-country
+spans are too heterogeneous for any single span to reconcile with the
+fitted slope, which is warned about. <code>beta</code> and its inference are
+unaffected in both – only the annualised figures need one common span, so
+restrict the panel to a shared window if you need them. The fitted <a href="https://rdrr.io/r/stats/lm.html" class="external-link">lm</a> object is attached as the
 <code>"model"</code> attribute.</p>
     </div>
     <div class="section level2">

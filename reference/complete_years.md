@@ -46,9 +46,9 @@ A completed (and optionally filled) panel tibble – or an `sf` frame, if
 df <- data.frame(iso3c = "USA", year = c(2000L, 2002L), gdp = c(1, 3))
 complete_years(df, 2000:2002, method = "linear")
 #> # A tibble: 3 × 3
-#>   iso3c  year   gdp
-#>   <chr> <int> <dbl>
-#> 1 USA    2000     1
-#> 2 USA    2001     2
-#> 3 USA    2002     3
+#>    year iso3c   gdp
+#>   <int> <chr> <dbl>
+#> 1  2000 USA       1
+#> 2  2001 USA       2
+#> 3  2002 USA       3
 ```

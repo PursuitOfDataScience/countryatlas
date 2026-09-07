@@ -108,6 +108,24 @@ table reports each country's exact share alongside its integer allocation so
 the rounding is inspectable rather than hidden.</p>
     </div>
     <div class="section level2">
+    <h2 id="crowded-neighbours-overlap">Crowded neighbours overlap<a class="anchor" aria-label="anchor" href="#crowded-neighbours-overlap"></a></h2>
+
+
+<p>Each country's block is centred on its own centroid, with no collision
+avoidance between countries. That is deliberate – a global packing solve
+would push countries away from where they belong – but it means blocks in
+crowded regions are drawn on top of one another, and a partly hidden block
+cannot be counted or compared. The effect is not marginal: at the defaults
+(<code>cells = 1000</code>, <code>cell_size = 2.5</code>) about a third of the cells overlap a
+cell of a different country, across some sixty countries, and it grows with
+<code>cells</code> – at <code>cells = 2500</code> it is roughly two thirds.</p>
+<p><code>cell_size</code> is the lever, because it scales the tiles without moving the
+centroids: dropping it to <code>1.5</code> cuts the overlap at <code>cells = 1000</code> to about
+a tenth of the cells. Fewer <code>cells</code> also helps. Where exact areas matter
+more than geographic position, <code><a href="dorling_map.html">dorling_map()</a></code> resolves collisions by
+displacing circles instead.</p>
+    </div>
+    <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
     <div class="dont-index"><p><code><a href="cartogram_map.html">cartogram_map()</a></code>, <code><a href="dorling_map.html">dorling_map()</a></code>, <code><a href="tile_map.html">tile_map()</a></code></p></div>
     </div>

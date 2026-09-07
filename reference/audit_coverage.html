@@ -84,7 +84,21 @@ for the group's overall coverage.</p></dd>
     <p>A list of class <code>countryatlas_coverage</code>, with elements <code>unmatched</code>,
 <code>na_rates</code> and <code>by_group</code>. It has a <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> method, so at the console you
 see a formatted report rather than the raw list; reach into the elements by
-name to use the numbers programmatically.</p>
+name to use the numbers programmatically.</p><ul><li><p><code>unmatched</code> – one row per input value that did not resolve to an ISO
+code. Empty is the good case.</p></li>
+<li><p><code>na_rates</code> – one row per indicator: <code>n</code> is the number of countries
+<em>considered</em>, <code>n_missing</code> how many of them lack a value, and <code>na_rate</code>
+is <code>n_missing / n</code>.</p></li>
+<li><p><code>by_group</code> – one row per group: <code>n_countries</code> is how many countries are
+<em>in that group</em>, and <code>na_rate</code> is the share of those lacking a value.
+The counts sum to <code>n</code>.</p></li>
+</ul><p>Both <code>n</code> and <code>by_group</code>'s <code>n_countries</code> are <strong>denominators</strong> – everything
+counted, not everything present. That is the opposite orientation from
+<code><a href="map_provenance.html">map_provenance()</a></code>, whose <code>n_countries</code> is the numerator (countries drawn
+<em>with</em> a value) and whose <code>n_total</code> is the denominator. The two verbs
+report the same coverage from opposite ends, so on 215 countries with 24
+missing this gives <code>n = 215</code> where <code><a href="map_provenance.html">map_provenance()</a></code> gives
+<code>n_countries = 191</code>.</p>
     </div>
 
     <div class="section level2">

@@ -36,11 +36,21 @@ rate_check(data, numerator, denominator, min_denominator = NULL, rate = NULL)
 
 A tibble of `iso3c`, `numerator`, `denominator`, `rate`, `expected_se`
 (the Poisson standard error of the rate, \\\sqrt{r/d}\\) and `flagged`,
-sorted with the least reliable first. `flagged` is `TRUE` for a
-denominator below the threshold, `FALSE` above it or missing, and `NA`
-for every row when no threshold could be computed at all – which is
-warned about, and means `sum(flagged)` is `NA` rather than a misleading
-`0`.
+sorted with the least reliable first.
+
+"Least reliable" is ordered on the standard error a *single* event would
+imply, \\\sqrt{\max(y, 1)}/d\\, which is identical to `expected_se` for
+every row with at least one event. Ordering on `expected_se` directly
+put zero-count rows last, at the reliable end: it is \\\sqrt{y}/d\\,
+which is exactly `0` when the count is `0`, so one country with no
+events out of 251 people outranked another with one event out of the
+same 251. Observing nothing is not evidence of precision. `expected_se`
+itself is still the plain Poisson standard error, `0` and all.
+
+`flagged` is `TRUE` for a denominator below the threshold, `FALSE` above
+it or missing, and `NA` for every row when no threshold could be
+computed at all – which is warned about, and means `sum(flagged)` is
+`NA` rather than a misleading `0`.
 
 ## What to do about it
 

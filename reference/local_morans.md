@@ -78,16 +78,16 @@ local_morans(snap, gdp_per_capita, weights = country_weights("knn", k = 5),
 #> # A tibble: 189 × 6
 #>    iso3c  value     lag      ii p_value cluster        
 #>    <chr>  <dbl>   <dbl>   <dbl>   <dbl> <fct>          
-#>  1 ABW   33374.  -2415. -0.0529    0.86 Not significant
-#>  2 AGO    2845. -14426.  0.286     0.13 Not significant
-#>  3 ALB    6549.  -6941.  0.102     0.54 Not significant
-#>  4 AND   41035.  84205.  2.73      0.01 High-High      
-#>  5 ARE   41605.  13493.  0.448     0.18 Not significant
-#>  6 ARG   12774.  -6530.  0.0407    0.53 Not significant
-#>  7 ARM    5378.  -9273.  0.152     0.41 Not significant
-#>  8 ATG   18350.  10930.  0.0151    0.64 Not significant
-#>  9 AUS   61481. -15496. -0.935     0.14 Not significant
-#> 10 AUT   45959.  21289.  0.833     0.05 High-High      
+#>  1 ABW   33374.  14921. -0.0529    0.86 Not significant
+#>  2 AGO    2845.   2910.  0.286     0.13 Not significant
+#>  3 ALB    6549.  10395.  0.102     0.54 Not significant
+#>  4 AND   41035. 101542.  2.73      0.01 High-High      
+#>  5 ARE   41605.  30830.  0.448     0.18 Not significant
+#>  6 ARG   12774.  10806.  0.0407    0.53 Not significant
+#>  7 ARM    5378.   8064.  0.152     0.41 Not significant
+#>  8 ATG   18350.  28266.  0.0151    0.64 Not significant
+#>  9 AUS   61481.   1840. -0.935     0.14 Not significant
+#> 10 AUT   45959.  38625.  0.833     0.05 High-High      
 #> # ℹ 179 more rows
 # }
 ```

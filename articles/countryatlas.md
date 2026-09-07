@@ -484,11 +484,11 @@ round out the panel toolkit):
 patchy <- data.frame(iso3c = "USA", year = c(2019L, 2021L), gdp = c(100, 110))
 complete_years(patchy, 2019:2021, method = "linear")
 #> # A tibble: 3 × 3
-#>   iso3c  year   gdp
-#>   <chr> <int> <dbl>
-#> 1 USA    2019   100
-#> 2 USA    2020   105
-#> 3 USA    2021   110
+#>    year iso3c   gdp
+#>   <int> <chr> <dbl>
+#> 1  2019 USA     100
+#> 2  2020 USA     105
+#> 3  2021 USA     110
 ```
 
 ### Inequality, correlation and convergence
@@ -607,7 +607,7 @@ sessionInfo()
 #> [37] fs_2.1.0           htmlwidgets_1.6.4  ragg_1.5.2         pkgconfig_2.0.3   
 #> [41] desc_1.4.3         pkgdown_2.2.1      pillar_1.11.1      bslib_0.12.0      
 #> [45] gtable_0.3.6       glue_1.8.1         systemfonts_1.3.2  xfun_0.60         
-#> [49] tibble_3.3.1       tidyselect_1.2.1   knitr_1.51         farver_2.1.2      
+#> [49] tibble_3.3.1       tidyselect_1.2.1   knitr_1.52         farver_2.1.2      
 #> [53] htmltools_0.5.9    rmarkdown_2.32     labeling_0.4.3     compiler_4.6.1    
 #> [57] WDI_2.8.0          S7_0.2.2
 ```

@@ -41,8 +41,10 @@ getis_ord(data, value, weights = NULL, local = TRUE)
 ## Value
 
 With `local = TRUE`, a tibble of `iso3c`, `gi_star`, `z_score` and
-`p_value` (two-sided, from the normal approximation). With
-`local = FALSE`, a one-row tibble of `g`, `expected`, `n` and `n_links`.
+`p_value` (two-sided, from the normal approximation), one row per
+country used. With `local = FALSE`, a one-row tibble of `g`, `expected`,
+`n` (countries used – the same count, so the local form returns `n`
+rows) and `n_links` (non-zero weights).
 
 ## References
 
