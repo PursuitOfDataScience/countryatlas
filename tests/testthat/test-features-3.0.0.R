@@ -1337,6 +1337,7 @@ test_that("flow_matrix fill applies only to pairs with no flow", {
 })
 
 test_that("od_map says when a named origin sends no flow", {
+  skip_if_not_installed("maps")
   # Italy appears only as a destination, so it has nothing to draw. Filtering
   # the top-N list silently is what "top N" means; dropping an origin the
   # caller named by hand is not.
@@ -2408,6 +2409,7 @@ test_that("region reports a no-match instead of drawing an empty map", {
 })
 
 test_that("world_data validates classify and language before fetching", {
+  skip_if_not_installed("maps")
   # `classify` was filtered with intersect(), which silently dropped anything
   # unrecognised -- so classify = "incomes" added no classification columns and
   # said nothing -- and `language` went straight to WDI, where a length-2 value
@@ -2541,6 +2543,7 @@ test_that("hatching and dispute marks do not discard the projection", {
 })
 
 test_that("bubble_map and spike_map count only the countries they can place", {
+  skip_if_not_installed("maps")
   # The bundled centroid table does not cover every code in the codelist, so a
   # point-per-country verb silently loses Hong Kong, Macao, Gibraltar, the
   # British Virgin Islands and Tuvalu. bubble_map left-joined and drew a point
@@ -2577,6 +2580,7 @@ test_that("bubble_map and spike_map count only the countries they can place", {
 })
 
 test_that("n_bins means the same thing in every binned style", {
+  skip_if_not_installed("maps")
   # style = "binned" passed n_bins to ggplot2 as `n.breaks`, which is only a
   # hint: scales::extended_breaks() snaps to round numbers, so n_bins of 5, 6
   # and 7 all drew five bins and 3 drew four. `n_bins` is documented as "number
@@ -2628,6 +2632,7 @@ test_that("n_bins means the same thing in every binned style", {
 })
 
 test_that("a continuous colourbar reports no classes rather than inventing them", {
+  skip_if_not_installed("maps")
   # The fallback was as.factor(vals) -- one "class" per distinct value -- so a
   # continuous fill produced a 189-row report of n = 1 that looked like a
   # classification and was not one.
@@ -2645,6 +2650,7 @@ test_that("a continuous colourbar reports no classes rather than inventing them"
 })
 
 test_that("point verbs tolerate data that already carries centroid columns", {
+  skip_if_not_installed("maps")
   # world_geometry("centroids") output, or anything joined to it, collided with
   # the internal join: dplyr suffixed both sides to .x/.y and the aes() looking
   # for `.data$centroid_lon` found no such column.
@@ -2661,6 +2667,7 @@ test_that("point verbs tolerate data that already carries centroid columns", {
 })
 
 test_that("flow_map arcs cross the antimeridian instead of the whole map", {
+  skip_if_not_installed("maps")
   # A great circle Tokyo -> Los Angeles runs ...178, 179, -179, -178..., and
   # geom_path() under coord_quickmap() joined those two points literally: every
   # trans-Pacific flow was drawn as a horizontal streak back across Africa.
@@ -2680,6 +2687,7 @@ test_that("flow_map arcs cross the antimeridian instead of the whole map", {
 })
 
 test_that("flow_map legends carry the caller's weight column name", {
+  skip_if_not_installed("maps")
   # The internal arc frame's column is literally called `weight`, so ggplot2
   # titled both legends "weight" whatever the user had mapped.
   d <- data.frame(from = "France", to = "Germany", trade_volume = 7)
@@ -2692,6 +2700,7 @@ test_that("flow_map legends carry the caller's weight column name", {
 })
 
 test_that("geom_country_labels accepts a mapping and still honours flag", {
+  skip_if_not_installed("maps")
   # to_centroids() reduced the frame to iso3c/long/lat/flag, so a mapping
   # naming any other column died on "object 'continent' not found" -- the
   # ordinary reason to pass a mapping. And modifyList(base, mapping) dropped
@@ -2856,6 +2865,7 @@ test_that("the antimeridian splitter handles the degenerate crossings", {
 })
 
 test_that("every data-bearing map verb carries readable provenance", {
+  skip_if_not_installed("maps")
   # map_provenance() is only useful if the verbs actually attach the attribute,
   # and an early return that skips it is invisible. Sweep them rather than
   # trusting each one's own test. tissot_map() is deliberately absent: it draws
@@ -2917,6 +2927,7 @@ test_that("world_table only claims a rank when it ranked something", {
 })
 
 test_that("a column argument that is not a column says so, in every verb", {
+  skip_if_not_installed("maps")
   # quo_arg_name() called rlang::as_name() straight out, so anything that was
   # not a symbol or a string threw rlang's own error -- "Can't convert a double
   # vector to a string", or for `gdp + 1` the worse "Can't convert a call to a
@@ -3309,6 +3320,7 @@ test_that("the coverage caption reads as English at every size", {
 })
 
 test_that("map_provenance carries the denominator, not just the numerator", {
+  skip_if_not_installed("maps")
   # `n_countries` is coverage$n_shown -- the countries actually drawn with a
   # value. The name reads like the map's country total, which is
   # n_countries + n_missing, so anyone taking it as the denominator understated
@@ -3670,6 +3682,7 @@ test_that("per_capita gives NA, not Inf, for an unusable population", {
 })
 
 test_that("tile_map counts only the countries the grid can place", {
+  skip_if_not_installed("maps")
   # The same overstatement bubble_map() and spike_map() had: the bundled grid
   # does not cover every code -- Hong Kong and Macao have snapshot data and no
   # tile -- so counting the input's coded countries as "shown" claimed two more
@@ -3934,6 +3947,7 @@ test_that("fetch_indicator does not trust a source's key_col claim", {
 })
 
 test_that("the numeric-column verbs reject a non-numeric column up front", {
+  skip_if_not_installed("maps")
   # country_network() validates its weight with check_numeric_col(); four verbs
   # shaped exactly like it did not. bubble_map() and flow_map() reached
   # ggplot2's bare "Discrete value supplied to a continuous scale" -- and only
@@ -4580,6 +4594,7 @@ test_that("the tmap engine honours na_label", {
 })
 
 test_that("the polygon backend says when it is ignoring projection", {
+  skip_if_not_installed("maps")
   # `recenter` already warned when it could not be honoured; `projection` was
   # documented for the sf backend but taken and dropped in silence.
   expect_warning(world_geometry(projection = "mollweide"),
@@ -4655,6 +4670,7 @@ test_that("a multi-value scale is rejected before it becomes a cache key", {
 })
 
 test_that("the polygon backend says when it is ignoring scale", {
+  skip_if_not_installed("maps")
   # It serves one bundled resolution, so `scale` cannot be honoured -- but it
   # was accepted in silence, and `scale = 2` was not even rejected.
   expect_warning(world_geometry(scale = "large"),
@@ -5292,6 +5308,7 @@ test_that("convert_country names its own from and to on a bad value", {
 })
 
 test_that("an optional column argument is validated like a required one", {
+  skip_if_not_installed("maps")
   # quo_arg_name() says it covers "every unquoted column argument in the
   # package", and for the *required* ones it did. Thirteen optional ones --
   # per_capita(pop), aggregate_regions(weight), rank_countries(within),
@@ -5514,6 +5531,7 @@ test_that("a verb hands back the class it was given", {
 })
 
 test_that("a caller column named x0/y0/x1/y1 does not break flow_map", {
+  skip_if_not_installed("maps")
   # The arc endpoints are joined in under those names, and a caller who
   # geocoded their own endpoints -- the shape of frame this verb is for -- has
   # them already. dplyr suffixed both sides and the completeness check failed

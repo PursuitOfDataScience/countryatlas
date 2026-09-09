@@ -73,3 +73,20 @@ jobs:
         with:
           upload-snapshots: true
           build_args: 'c("--no-manual","--compact-vignettes=gs+qpdf")'
+          # The depends-only leg cannot re-build vignettes. Under
+          # _R_CHECK_DEPENDS_ONLY_ the check library is Depends + Imports +
+          # VignetteBuilder (knitr) -- see tools:::setRlibs() -- so rmarkdown,
+          # which %\VignetteEngine{knitr::rmarkdown} needs to render, is
+          # hidden, and installing it would not help because the allowed set
+          # comes from DESCRIPTION rather than from what is on the runner.
+          # --as-cran additionally sets skip_run_maybe, so with no .Rout.save
+          # files `ran` stays FALSE and a re-build failure is reported as an
+          # ERROR rather than a NOTE.
+          #
+          # Dropping just the re-build keeps the leg's purpose intact and in
+          # fact widens it: with --no-build-vignettes the "running R code from
+          # vignettes" step is no longer skipped, so the vignette code itself
+          # runs with Suggests hidden and its requireNamespace() guards are
+          # exercised. The five other legs re-build the vignettes with every
+          # Suggests present, so the rendering path stays covered.
+          args: ${{ matrix.config.depends-only && 'c("--no-manual","--as-cran","--no-build-vignettes")' || 'c("--no-manual","--as-cran")' }}

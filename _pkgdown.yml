@@ -54,6 +54,7 @@ reference:
     two providers disagree.
   contents:
   - register_country_source
+  - remove_country_source
   - country_sources
   - fetch_indicator
   - add_indicator

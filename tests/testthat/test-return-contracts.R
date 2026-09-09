@@ -283,9 +283,14 @@ test_that("every map verb's provenance names the column the caller asked about",
     spike_map          = function() spike_map(d, value),
     tile_map           = function() tile_map(d, value),
     value_by_alpha_map = function() value_by_alpha_map(g, value, unc),
-    gridded_cartogram  = function() gridded_cartogram(d, value),
-    lisa_map           = function() lisa_map(g, value)
+    gridded_cartogram  = function() gridded_cartogram(d, value)
   )
+  # lisa_map() defaults to contiguity weights, which need sf. The loop asserts
+  # a per-verb invariant, so drop just this verb rather than the whole test:
+  # the block is guarded for maps, so a machine with maps and no sf reached it.
+  if (requireNamespace("sf", quietly = TRUE)) {
+    cases$lisa_map <- function() lisa_map(g, value)
+  }
   for (nm in names(cases)) {
     p <- suppressWarnings(suppressMessages(cases[[nm]]()))
     prov <- attr(p, "countryatlas_provenance")

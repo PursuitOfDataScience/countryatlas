@@ -44,12 +44,17 @@ test_that("every verb taking `origin` resolves the same awkward names", {
       # is in: resolution failing shows up as FALSE.
       if (isTRUE(in_group(x, "EU")) || isTRUE(in_group(x, "G20"))) "resolved"
         else NA_character_
-    },
-    neighbors = function(x) {
+    }
+  )
+  # neighbors() reaches country_borders(), which needs sf. The invariant is
+  # asserted per verb, so drop just this one where sf is absent rather than
+  # skipping the whole cross-verb block and losing the other four.
+  if (requireNamespace("sf", quietly = TRUE)) {
+    code_of$neighbors <- function(x) {
       out <- suppressWarnings(suppressMessages(neighbors(x)))
       if (!nrow(out)) NA_character_ else out$iso3c[1]
     }
-  )
+  }
 
   for (nm in names(code_of)) {
     f <- code_of[[nm]]

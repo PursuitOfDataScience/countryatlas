@@ -1240,6 +1240,7 @@ test_that("as_ggsql_source() checks its data and its connection", {
 # value supplied to a continuous scale" -- naming neither the argument nor the
 # fix. world_map(d, "value") was affected: the package's most common call.
 test_that("map verbs accept a column named as a string, not only unquoted", {
+  skip_if_not_installed("maps")
   skip_if_not_installed("ggplot2")
   d <- data.frame(
     iso3c = c("FRA", "DEU", "ITA", "ESP", "POL", "NLD", "BEL", "AUT"),
@@ -1267,6 +1268,7 @@ test_that("map verbs accept a column named as a string, not only unquoted", {
 })
 
 test_that("the string form keeps the legend title the unquoted form gives", {
+  skip_if_not_installed("maps")
   skip_if_not_installed("ggplot2")
   d <- data.frame(iso3c = c("FRA", "DEU", "ITA"), gdp = c(1, 2, 3),
                   stringsAsFactors = FALSE)
@@ -1305,6 +1307,7 @@ test_that("string column arguments report a bare column instead of 'not found'",
 })
 
 test_that("guarding the bare form leaves the string form and defaults working", {
+  skip_if_not_installed("maps")
   d <- data.frame(iso3c = c("FRA", "DEU"), value = 1:2, stringsAsFactors = FALSE)
   expect_no_error(attach_geometry(d, geometry = "polygon"))
   expect_no_error(attach_geometry(d, by = "iso3c", geometry = "polygon"))
