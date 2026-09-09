@@ -39,14 +39,20 @@ LazyData: true
 Depends:
     R (>= 4.1.0)
 Imports:
+    cachem,
     cli,
     countrycode,
     dplyr,
     ggplot2,
+    grDevices,
     memoise,
+    parallel,
     rlang,
+    stats,
     tibble,
     tidyr,
+    tools,
+    utils,
     WDI
 Suggests:
     biscale,

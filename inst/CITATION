@@ -8,7 +8,13 @@ bibentry(
   bibtype  = "Manual",
   title    = "{countryatlas}: Join World Bank Data, Country Codes and Maps on the ISO Spine",
   author   = person("Youzhi", "Yu"),
-  year     = sub("-.*", "", meta$Date %||% format(Sys.Date())),
+  # Not `meta$Date %||% ...`: `%||%` only entered base R in 4.4.0 and this
+  # file is evaluated by readCitationFile() outside the package namespace,
+  # so NAMESPACE's importFrom(rlang, "%||%") does not reach it -- on the
+  # R (>= 4.1.0) that DESCRIPTION declares, citation() would error. The
+  # release year is fixed rather than taken from Sys.Date(), which would
+  # otherwise drift to whenever the user happens to call citation().
+  year     = "2026",
   note     = paste("R package version", meta$Version),
   url      = "https://pursuitofdatascience.github.io/countryatlas/",
   header   = "To cite the package:"

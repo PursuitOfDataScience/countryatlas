@@ -1785,3 +1785,138 @@ test_that("the historical join reports unreachable entities, not the caller's fr
   # The modern path raises none of this.
   expect_silent(suppressMessages(attach_geometry(d3, geometry = "polygon")))
 })
+
+# --- fixes from the 3.0.0 pre-release review ---------------------------------
+
+test_that("standardize_subnational honours the country it requires", {
+  # `iso3c` was passed to the lookup and never read, and the code passthrough
+  # accepted any well-formed ISO 3166-2 code: region = "US-CA" with
+  # country = "Germany" returned iso3c = "DEU" alongside iso_3166_2 = "US-CA",
+  # a self-contradictory row, silently -- while the help page says `country` is
+  # required precisely because these codes are unique only within a country.
+  mism <- data.frame(region = "US-CA", stringsAsFactors = FALSE)
+  # Two warnings: the mismatch, and the "did not resolve" notice that follows
+  # from it. Catch the first and let the second through rather than leaving it
+  # to leak out of the test.
+  expect_warning(
+    expect_warning(out <- standardize_subnational(mism, region, country = "Germany"),
+                   class = "countryatlas_region_country_mismatch"),
+    "did not resolve")
+  expect_equal(out$iso3c, "DEU")
+  expect_true(is.na(out$iso_3166_2))
+  # A code that does belong passes through, either way round.
+  ok <- suppressMessages(standardize_subnational(
+    data.frame(region = "DE-BY", stringsAsFactors = FALSE), region, country = "Germany"))
+  expect_equal(ok$iso_3166_2, "DE-BY")
+  ok2 <- suppressMessages(standardize_subnational(
+    data.frame(region = "US-CA", stringsAsFactors = FALSE), region,
+    country = "United States"))
+  expect_equal(ok2$iso_3166_2, "US-CA")
+})
+
+test_that("share_of_world does not report years on a frame that has none", {
+  # `out$year` is NULL without a year column, so the per-year branch counted
+  # NULL -- "for 0 years" plus an empty bullet, and a tibble warning about an
+  # uninitialised column.
+  cs <- data.frame(iso3c = c("A", "B"), v = c(NA, 0), stringsAsFactors = FALSE)
+  w <- rlang::catch_cnd(share_of_world(cs, v), classes = "countryatlas_unusable_rows")
+  expect_match(conditionMessage(w), "row", fixed = TRUE)
+  expect_false(grepl("year", conditionMessage(w), fixed = TRUE))
+  # With a year column the year is still named.
+  pan <- data.frame(iso3c = c("A", "B"), year = c(2000, 2000), v = c(NA, 0),
+                    stringsAsFactors = FALSE)
+  w2 <- rlang::catch_cnd(share_of_world(pan, v), classes = "countryatlas_unusable_rows")
+  expect_match(conditionMessage(w2), "2000", fixed = TRUE)
+})
+
+test_that("theil counts the non-positive values it drops", {
+  # sum(bad) is NA wherever x is, so under na.rm = FALSE with both an NA and a
+  # non-positive value the message read "Dropping NA non-positive values".
+  w <- rlang::catch_cnd(theil(c(1, -1, NA), na.rm = FALSE))
+  expect_match(conditionMessage(w), "Dropping 1 non-positive value", fixed = TRUE)
+  expect_false(grepl("NA non-positive", conditionMessage(w), fixed = TRUE))
+})
+
+test_that("country_codes accepts a raw codelist column a shortcut also maps to", {
+  # "country" and "country.name.en" resolve to the same codelist column, so the
+  # subset carried it twice and dplyr::filter() died on duplicate names.
+  expect_no_error(out <- country_codes("country.name.en"))
+  expect_false(anyDuplicated(names(out)) > 0)
+  expect_no_error(country_codes("currency"))
+  expect_no_error(country_codes())
+})
+
+test_that("cartogram_diagnostics reports having nothing to measure", {
+  skip_if_not_installed("sf")
+  sq <- function(i) sf::st_polygon(list(cbind(c(i, i+1, i+1, i, i),
+                                              c(0, 0, 1, 1, 0))))
+  mk <- function(wv) sf::st_sf(iso3c = c("FRA", "DEU"), wt = wv,
+                               geometry = sf::st_sfc(sq(0), sq(2)), crs = 4326)
+  # max(numeric(0)) returned -Inf *and* leaked base R's "no non-missing
+  # arguments to max"; mean() gave NaN and `worst` named an arbitrary country.
+  for (wv in list(c(NA_real_, NA_real_), c(0, -1))) {
+    expect_warning(out <- cartogram_diagnostics(mk(wv), weight = wt),
+                   class = "countryatlas_no_usable_weight")
+    a <- attr(out, "countryatlas_cartogram")
+    expect_equal(a$n, 0L)
+    expect_true(is.na(a$max_abs_error))
+    expect_true(is.na(a$worst))
+  }
+  ok <- suppressMessages(cartogram_diagnostics(mk(c(1, 2)), weight = wt))
+  expect_equal(attr(ok, "countryatlas_cartogram")$n, 2L)
+})
+
+test_that("country_data does not return the panel shape it warned against", {
+  # `panel <- FALSE` was set only inside the collapse branch, which is gated on
+  # nrow(wdi) -- so with indicator = NULL the frame was crossed with `year`
+  # anyway and carried the very column the warning said it would not.
+  out <- suppressWarnings(suppressMessages(
+    country_data(2020, indicator = NULL, latest = TRUE, panel = TRUE)))
+  expect_false("year" %in% names(out))
+})
+
+test_that("index_to reports an unusable base_year instead of returning all NA", {
+  # index_to() and deflate() take the same `base_year` and match it the same
+  # way, and deflate() closed three paths that index_to() left silent. All
+  # three produced an all-NA column -- the failure mode the coverage verbs in
+  # this package exist to prevent.
+  d <- data.frame(iso3c = rep(c("USA", "FRA"), each = 3),
+                  year = rep(2000:2002, 2), v = c(1, 2, 4, 10, 20, 40),
+                  stringsAsFactors = FALSE)
+
+  # 1. A Date `year` is the one shape that cannot work. `==` coerces the
+  #    *number* to Date, so `as.Date("2000-01-01") == 2000` compares against
+  #    1970-01-01 + 2000 days and is FALSE for every row -- every base came
+  #    back empty and the whole column came back NA, silently. read.csv() with
+  #    a date-parsing reader hands back exactly this column.
+  dated <- within(d, year <- as.Date(paste0(year, "-01-01")))
+  expect_error(index_to(dated, v, base_year = 2000),
+               class = "countryatlas_date_year")
+  # A *character* year still works and must keep working: this verb only
+  # matches on the year, and `"2000" == 2000` is TRUE. Guarding it would
+  # reject input that works today.
+  expect_silent(chr <- index_to(within(d, year <- as.character(year)), v,
+                                base_year = 2000))
+  expect_equal(chr$v_index, c(100, 200, 400, 100, 200, 400))
+
+  # 2. A base year the panel does not cover still returns all NA -- that is
+  #    documented -- but it now says so, where before every country came back
+  #    NA without a word.
+  expect_warning(none <- index_to(d, v, base_year = 1999),
+                 class = "countryatlas_no_base_year")
+  expect_true(all(is.na(none$v_index)))
+
+  # 3. Present for some countries and not others: those legitimately come back
+  #    NA, but the verb must say which, or an NA row is indistinguishable from
+  #    a country the source had no data for.
+  gap <- data.frame(iso3c = c("USA", "USA", "FRA", "FRA"),
+                    year = c(2000L, 2001L, 2001L, 2002L), v = c(1, 2, 10, 20),
+                    stringsAsFactors = FALSE)
+  expect_warning(out <- index_to(gap, v, base_year = 2000),
+                 class = "countryatlas_no_base_year")
+  expect_equal(out$v_index, c(100, 200, NA, NA))
+
+  # The ordinary call is unchanged and silent.
+  expect_silent(ok <- index_to(d, v, base_year = 2000))
+  expect_equal(ok$v_index, c(100, 200, 400, 100, 200, 400))
+})

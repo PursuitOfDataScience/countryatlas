@@ -368,8 +368,18 @@ test_that("disputed_territories' party codes are ISO or a documented placeholder
 test_that("dispute_policy records a convention and warns about de jure", {
   old <- dispute_policy()
   on.exit(dispute_policy(old), add = TRUE)
-  expect_equal(dispute_policy("neutral"), "neutral")
+  # A setter returns what it REPLACED, as options()/par()/sf_use_s2() do, so
+  # `on.exit(dispute_policy(dispute_policy("neutral")))` restores the old
+  # value. It used to return the value just set, making that idiom a no-op.
+  expect_equal(dispute_policy("neutral"), old)
   expect_equal(dispute_policy(), "neutral")
+  expect_equal(dispute_policy("de_facto"), "neutral")
+  expect_equal(dispute_policy(), "de_facto")
+  # Which makes the round-trip idiom work.
+  restored <- dispute_policy(dispute_policy("neutral"))
+  expect_equal(dispute_policy(), "de_facto")
+  expect_equal(restored, "neutral")
+  dispute_policy("neutral")
   # Selecting de jure must not silently imply the shapes changed.
   expect_warning(dispute_policy("de_jure"), "still de facto")
   expect_error(dispute_policy("nonsense"), "`policy`")
@@ -970,9 +980,12 @@ test_that("the new world_map arguments combine without breaking each other", {
   for (i in seq_len(nrow(grid))) {
     g <- grid[i, ]
     args <- list(data = mapdf, fill = rlang::sym("gdp_per_capita"),
-                 style = "quantile", na_style = g$na_style,
+                 na_style = g$na_style,
                  disputes = g$disputes, footnote = "auto")
-    if (g$unc) args$uncertainty <- rlang::sym("se")
+    # `style` only when no uncertainty column is given: a value-suppressing
+    # palette sets its own classes, so passing both now reports that `style`
+    # does not apply -- correct, and tested on its own.
+    if (g$unc) args$uncertainty <- rlang::sym("se") else args$style <- "quantile"
     expect_s3_class(ggplot2::ggplotGrob(do.call(world_map, args)), "gtable")
   }
 })
@@ -3521,8 +3534,12 @@ test_that("smooth_rates and to_ppp say when they had nothing to work with", {
   # conversion factor every converted value is NA. Correct arithmetic either
   # way, but the result looked like a computation that ran rather than one with
   # nothing to run on.
-  mk <- function(den) do.call(rbind, lapply(2000:2002, function(y)
-    data.frame(iso3c = paste0("C", 1:6), year = y, num = 1:6, den = den)))
+  # A cross-section: smooth_rates() estimates its pooled prior from one row per
+  # country, so a panel now earns the countryatlas_panel warning -- correct, and
+  # tested elsewhere. What this block is about is the no-usable-denominator
+  # notices, so keep the fixture single-year.
+  mk <- function(den) data.frame(iso3c = paste0("C", 1:6), year = 2000L,
+                                 num = 1:6, den = den)
 
   expect_warning(s <- smooth_rates(mk(0), num, den),
                  class = "countryatlas_no_rates")
@@ -4172,7 +4189,8 @@ test_that("index_to says base_year is required, as deflate does", {
                   error = function(e) e)
   expect_match(cli::ansi_strip(conditionMessage(err)), "2000-01-01",
                fixed = TRUE)
-  expect_true(all(is.na(index_to(d, gdp, base_year = 1999)$gdp_index)))
+  expect_true(all(is.na(suppressWarnings(
+    index_to(d, gdp, base_year = 1999))$gdp_index)))
 })
 
 test_that("every character column argument catches a bare symbol", {
@@ -5204,7 +5222,8 @@ test_that("a missing year does not decide an answer by row order", {
                   index_to(last, v, 2000)$v_index)
   # A base year that is genuinely absent is still NA, as documented.
   absent <- data.frame(iso3c = "USA", year = c(2001L, 2002L), v = c(20, 30))
-  expect_true(all(is.na(index_to(absent, v, 2000)$v_index)))
+  expect_true(all(is.na(suppressWarnings(
+    index_to(absent, v, 2000))$v_index)))
 })
 
 test_that("compare_sources drops an unparseable year instead of inventing a row", {

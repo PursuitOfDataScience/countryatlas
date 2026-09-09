@@ -31,17 +31,23 @@
 # raised against 1.0.0. comtradr's .onLoad creates ~/.cache/R/comtradr the
 # moment its namespace loads, which skip_if_not_installed("comtradr") does.
 #
-# `~/.cache/R/comtradr` is likewise out of reach, and for a more surprising
-# reason: it is not the tests that create it. `R CMD check` resolves every
-# `pkg::fun` reference in R/ to confirm the symbol exists, which loads that
-# namespace -- and comtradr's .onLoad writes its cache directory. R/sources.R
-# calls `comtradr::ct_get_data()`, so the check creates the directory during
-# its own static analysis, before any test or example runs. Verified by
-# elimination: the directory still appears under
+# `~/.cache/R/comtradr` used to be out of reach here, and for a more
+# surprising reason: it was not the tests that created it. `R CMD check`
+# resolves every `pkg::fun` reference in R/ to confirm the symbol exists, which
+# loads that namespace -- and comtradr's .onLoad writes its cache directory.
+# R/sources.R called `comtradr::ct_get_data()`, so the check created the
+# directory during its own static analysis, before any test or example ran.
+# Verified by elimination: the directory still appeared under
 # `--no-tests --no-examples --no-build-vignettes`, while installing the package
 # and calling `library(countryatlas)` and `country_sources()` in a fresh HOME
-# writes nothing at all. Nothing here can prevent it; any package that calls
-# `comtradr::` gets the same NOTE.
+# wrote nothing at all.
+#
+# The conclusion drawn from that -- "nothing here can prevent it" -- was wrong.
+# The write is caused by the *static* reference, so removing the static
+# reference removes the write: fetch_comtrade() now resolves the symbol with
+# getExportedValue() at run time, after need_pkg() has loaded the namespace on
+# the user's own behalf. Keep the redirect below anyway, since a suggested
+# package can create a user directory from a test as easily as from a check.
 #
 # One write is deliberately *not* handled here: `~/.cache/fontconfig`. That is
 # built by the system fontconfig library the first time R's cairo PNG device

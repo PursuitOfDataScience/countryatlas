@@ -7,13 +7,17 @@
 map_provenance(x, value = NULL)
 }
 \arguments{
-\item{x}{A plot returned by any of the package's map verbs -- \code{\link[=world_map]{world_map()}},
-\code{\link[=bubble_map]{bubble_map()}}, \code{\link[=spike_map]{spike_map()}}, \code{\link[=tile_map]{tile_map()}}, \code{\link[=flow_map]{flow_map()}}, \code{\link[=globe_map]{globe_map()}},
-\code{\link[=bivariate_map]{bivariate_map()}}, \code{\link[=cartogram_map]{cartogram_map()}}, \code{\link[=dorling_map]{dorling_map()}},
-\code{\link[=gridded_cartogram]{gridded_cartogram()}}, \code{\link[=value_by_alpha_map]{value_by_alpha_map()}}, \code{\link[=coverage_map]{coverage_map()}},
-\code{\link[=classify_compare]{classify_compare()}}, \code{\link[=facet_map]{facet_map()}} or \code{\link[=lisa_map]{lisa_map()}} -- or a map-ready data
-frame, for which the data-side facts are reported and the drawing-side ones
-are \code{NA}.}
+\item{x}{A plot returned by any of the package's map verbs -- \code{\link[=world_map]{world_map()}}
+(either engine), \code{\link[=bubble_map]{bubble_map()}}, \code{\link[=spike_map]{spike_map()}}, \code{\link[=tile_map]{tile_map()}},
+\code{\link[=flow_map]{flow_map()}}, \code{\link[=od_map]{od_map()}}, \code{\link[=globe_map]{globe_map()}}, \code{\link[=bivariate_map]{bivariate_map()}},
+\code{\link[=cartogram_map]{cartogram_map()}}, \code{\link[=dorling_map]{dorling_map()}}, \code{\link[=gridded_cartogram]{gridded_cartogram()}},
+\code{\link[=value_by_alpha_map]{value_by_alpha_map()}}, \code{\link[=coverage_map]{coverage_map()}}, \code{\link[=classify_compare]{classify_compare()}},
+\code{\link[=facet_map]{facet_map()}}, \code{\link[=lisa_map]{lisa_map()}}, \code{\link[=subnational_map]{subnational_map()}} or
+\code{\link[=projection_compare]{projection_compare()}} -- or a map-ready data frame, for which the
+data-side facts are reported and the drawing-side ones are \code{NA}.
+
+\code{\link[=tissot_map]{tissot_map()}} is the one map verb that carries no provenance: it draws
+distortion ellipses for a projection and takes no data of yours.}
 
 \item{value}{For a data frame, the column whose coverage to report
 (unquoted). Ignored for a plot, which already knows its own fill.}

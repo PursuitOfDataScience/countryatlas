@@ -21,7 +21,7 @@ there is no convergence to put a rate on; and when the panel's per-country
 spans are too heterogeneous for any single span to reconcile with the
 fitted slope, which is warned about. \code{beta} and its inference are
 unaffected in both -- only the annualised figures need one common span, so
-restrict the panel to a shared window if you need them. The fitted \link{lm} object is attached as the
+restrict the panel to a shared window if you need them. The fitted \code{\link[stats:lm]{stats::lm()}} object is attached as the
 \code{"model"} attribute.
 }
 \description{

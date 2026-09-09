@@ -1309,7 +1309,11 @@ test_that("guarding the bare form leaves the string form and defaults working", 
   expect_no_error(attach_geometry(d, geometry = "polygon"))
   expect_no_error(attach_geometry(d, by = "iso3c", geometry = "polygon"))
   expect_no_error(world_query("value"))
-  expect_no_error(world_query("value", facet = "year", size = "pop"))
+  # layer = "bubble" so `size` actually applies: on the default choropleth it
+  # now draws a notice that the layer does not use it, which is correct and
+  # beside the point here -- what is being checked is the string form.
+  expect_no_error(world_query("value", facet = "year", size = "pop",
+                              layer = "bubble"))
   # A real error inside the argument must still surface as itself, not be
   # reclassified as a bare column.
   expect_error(attach_geometry(d, by = stop("boom")), "boom")
@@ -1510,4 +1514,324 @@ test_that("a custom weights matrix rejects every unusable entry by name", {
               dimnames = list(c("FRA","DEU","ITA"), c("FRA","DEU","ITA")))
   expect_error(country_weights("custom", w = m, countries = "FRA"), "Fewer than 2")
   expect_no_error(country_weights("custom", w = m, countries = c("FRA","DEU")))
+})
+
+# The package reports an argument that does not apply -- warn_projection_ignored(),
+# warn_recenter_ignored(), warn_scale_ignored(), warn_engine_ignored(). The first
+# two were applied to the verbs that *produce* polygon geometry and not to the
+# ones that draw it, and `n_bins` was inert without a word under the styles that
+# do not bin.
+test_that("world_map reports arguments that do not apply", {
+  skip_if_not_installed("ggplot2")
+  skip_if_not_installed("maps")
+  d <- data.frame(iso3c = c("FRA","DEU","ITA","ESP","POL","NLD","BEL","AUT"),
+                  value = c(10,20,40,80,15,55,33,66), grp = rep(c("a","b"), 4),
+                  stringsAsFactors = FALSE)
+  g <- attach_geometry(d, geometry = "polygon")
+
+  # The polygon backend draws in unprojected long/lat, so both of these looked
+  # honoured and changed nothing.
+  expect_warning(world_map(g, value, projection = "mercator"),
+                 class = "countryatlas_projection_ignored")
+  expect_warning(world_map(g, value, recenter = 180),
+                 class = "countryatlas_recenter_ignored")
+  # n_bins means nothing to a colourbar or to categories.
+  expect_warning(world_map(g, value, n_bins = 9),
+                 class = "countryatlas_n_bins_ignored")
+  expect_warning(world_map(g, grp, style = "categorical", n_bins = 9),
+                 class = "countryatlas_n_bins_ignored")
+
+  # None of it fires where the argument does apply, or at its default.
+  expect_silent(suppressMessages(world_map(g, value)))
+  expect_silent(suppressMessages(world_map(g, value, projection = "equal_earth")))
+  expect_silent(suppressMessages(world_map(g, value, style = "binned", n_bins = 9)))
+  expect_silent(suppressMessages(world_map(g, value, style = "quantile", n_bins = 3)))
+
+  skip_if_not_installed("sf")
+  skip_if_not_installed("rnaturalearth")
+  sf1 <- attach_geometry(d, geometry = "sf")
+  expect_silent(suppressMessages(world_map(sf1, value, projection = "mercator")))
+  expect_silent(suppressMessages(world_map(sf1, value, recenter = 180)))
+})
+
+test_that("value_by_alpha_map reports the same inert arguments", {
+  skip_if_not_installed("ggplot2")
+  skip_if_not_installed("maps")
+  d <- data.frame(iso3c = c("FRA","DEU","ITA","ESP"), value = c(10,20,40,80),
+                  unc = c(1,2,3,4), stringsAsFactors = FALSE)
+  g <- attach_geometry(d, geometry = "polygon")
+  # It carries its own `projection` and `n_bins` rather than passing them to
+  # world_map(), so it needed its own notices.
+  expect_warning(value_by_alpha_map(g, value, unc, projection = "mercator"),
+                 class = "countryatlas_projection_ignored")
+  expect_warning(value_by_alpha_map(g, value, unc, style = "continuous", n_bins = 9),
+                 class = "countryatlas_n_bins_ignored")
+  expect_silent(suppressMessages(value_by_alpha_map(g, value, unc)))
+  expect_silent(suppressMessages(
+    value_by_alpha_map(g, value, unc, style = "quantile", n_bins = 3)))
+
+  # n_bins really does bin here -- one class per bin plus the NA class -- which
+  # is what makes ignoring it under "continuous" the right thing to report.
+  nfill <- function(nb) length(unique(ggplot2::ggplot_build(suppressMessages(
+    value_by_alpha_map(g, value, unc, style = "quantile", n_bins = nb)))$data[[2]]$fill))
+  expect_true(nfill(3) < nfill(4))
+})
+
+# country_weights()'s `k`, `cutoff_km`, `w` and `scale` each belong to exactly
+# one scheme. The other three ignored them silently -- and
+# country_weights("knn", w = my_matrix) discarding the caller's own adjacency is
+# the worst of them, because nearest-neighbour weights come back looking
+# entirely reasonable.
+test_that("country_weights reports arguments its scheme does not use", {
+  iso <- c("FRA","DEU","ITA","ESP","POL","NLD","BEL","AUT")
+  m <- matrix(0, 8, 8, dimnames = list(iso, iso))
+  m[1, 2] <- m[2, 1] <- 1
+  cls <- "countryatlas_weights_args_ignored"
+
+  # Only schemes that need no geometry here: "contiguity" calls need_pkg("sf"),
+  # and expect_warning() evaluates the whole call, so under
+  # _R_CHECK_DEPENDS_ONLY_ the notice fires and the missing-sf error then
+  # propagates out of it. The contiguity cases live in their own test below.
+  expect_warning(country_weights("knn", iso, k = 2, w = m), class = cls)
+  expect_warning(country_weights("knn", iso, k = 2, cutoff_km = 500), class = cls)
+  expect_warning(country_weights("distance", iso, cutoff_km = 2000, k = 3), class = cls)
+  expect_warning(country_weights("custom", iso, w = m, scale = "medium"), class = cls)
+  expect_warning(country_weights("knn", iso, k = 2, scale = "medium"), class = cls)
+  expect_warning(country_weights("custom", iso, w = m, k = 3), class = cls)
+  expect_warning(country_weights("custom", iso, w = m, cutoff_km = 500), class = cls)
+
+  # The message names both what was ignored and what the scheme does use.
+  err <- rlang::catch_cnd(country_weights("knn", iso, k = 2, w = m), classes = cls)
+  expect_match(conditionMessage(err), "w", fixed = TRUE)
+  expect_match(conditionMessage(err), "k", fixed = TRUE)
+
+  # Each scheme's own argument, the shared `style`, and an explicitly passed
+  # default all stay quiet.
+  expect_silent(suppressMessages(country_weights("knn", iso, k = 2)))
+  expect_silent(suppressMessages(country_weights("distance", iso, cutoff_km = 2000)))
+  expect_silent(suppressMessages(country_weights("custom", iso, w = m)))
+  expect_silent(suppressMessages(country_weights("knn", iso, k = 2, style = "B")))
+})
+
+test_that("country_weights reports inert arguments for the contiguity scheme too", {
+  # Separated because contiguity is built from geometry: need_pkg("sf") errors
+  # without it, and that error would escape the expect_warning() below.
+  skip_if_not_installed("sf")
+  iso <- c("FRA","DEU","ITA","ESP","POL","NLD","BEL","AUT")
+  m <- matrix(0, 8, 8, dimnames = list(iso, iso))
+  m[1, 2] <- m[2, 1] <- 1
+  cls <- "countryatlas_weights_args_ignored"
+  expect_warning(country_weights("contiguity", iso, w = m), class = cls)
+  expect_warning(country_weights("contiguity", iso, k = 3), class = cls)
+  expect_warning(country_weights("contiguity", iso, cutoff_km = 500), class = cls)
+  # `scale` is the one this scheme uses, and an explicit default stays quiet.
+  expect_silent(suppressMessages(country_weights("contiguity", iso, scale = "medium")))
+  expect_silent(suppressMessages(country_weights("contiguity", iso, k = 5)))
+})
+
+test_that("an orthographic globe draws from every viewpoint", {
+  skip_if_not_installed("sf")
+  skip_if_not_installed("rnaturalearth")
+  skip_if_not_installed("ggplot2")
+  # coord_sf()'s graticule is clipped at the horizon on the one genuinely
+  # hemispheric projection, and a clipped line can reduce to a single point,
+  # which GEOS rejects: lon = 90, lat = 30 died on "IllegalArgumentException:
+  # point array must contain 0 or >1 elements" -- a foreign error naming
+  # neither the projection nor the viewpoint. winkel_tripel already had
+  # datum = NA for its own graticule trouble; orthographic did not.
+  g <- world_geometry("countries", geometry = "sf")
+  for (pt in list(c(90, 30), c(0, 20), c(45, 45), c(-90, 30), c(150, -30))) {
+    # expect_no_error() takes no `info`, so name the viewpoint in the label.
+    ok <- tryCatch({
+      ggplot2::ggplot_build(
+        ggplot2::ggplot(g) + ggplot2::geom_sf() +
+          countryatlas:::wdj_coord_sf("orthographic", recenter = pt[1], lat0 = pt[2]))
+      TRUE
+    }, error = function(e) conditionMessage(e))
+    expect_true(isTRUE(ok), label = paste0("orthographic at (", pt[1], ", ", pt[2], "): ",
+                                           if (isTRUE(ok)) "" else ok))
+  }
+  d <- data.frame(iso3c = c("FRA", "DEU", "ITA"), value = 1:3,
+                  stringsAsFactors = FALSE)
+  sf1 <- attach_geometry(d, geometry = "sf")
+  expect_no_error(ggplot2::ggplot_build(suppressMessages(
+    globe_map(sf1, value, lon = 90, lat = 30))))
+})
+
+test_that("globe_map reports n_bins under a style that does not bin", {
+  skip_if_not_installed("sf")
+  skip_if_not_installed("rnaturalearth")
+  d <- data.frame(iso3c = c("FRA","DEU","ITA","ESP"), value = c(1,2,3,4),
+                  grp = c("a","b","a","b"), stringsAsFactors = FALSE)
+  sf1 <- attach_geometry(d, geometry = "sf")
+  expect_warning(globe_map(sf1, value, n_bins = 9),
+                 class = "countryatlas_n_bins_ignored")
+  expect_warning(globe_map(sf1, grp, style = "categorical", n_bins = 9),
+                 class = "countryatlas_n_bins_ignored")
+  expect_silent(suppressMessages(globe_map(sf1, value)))
+  expect_silent(suppressMessages(globe_map(sf1, value, style = "quantile", n_bins = 3)))
+})
+
+# world_query()'s `size` belongs to layer = "bubble" and `n_bins` to
+# layer = "binned". The other layers took them without a word: n_bins was
+# dropped (only the binned layer emits a BIN clause) and size still went into
+# the VISUALISE list as `pop AS size` on a choropleth, which has no size
+# channel. The abort beside it already treats a layer/argument mismatch as
+# worth naming.
+test_that("world_query reports arguments its layer does not use", {
+  cls <- "countryatlas_layer_args_ignored"
+  expect_warning(world_query("value", size = "pop"), class = cls)
+  expect_warning(world_query("value", n_bins = 4), class = cls)
+  expect_warning(world_query("value", layer = "bubble", size = "pop", n_bins = 4),
+                 class = cls)
+  expect_warning(world_query("value", layer = "binned", n_bins = 4, size = "pop"),
+                 class = cls)
+  # Both at once are named together, not one warning each.
+  w <- rlang::catch_cnd(world_query("value", size = "pop", n_bins = 4), classes = cls)
+  expect_match(conditionMessage(w), "size", fixed = TRUE)
+  expect_match(conditionMessage(w), "n_bins", fixed = TRUE)
+
+  # Each layer's own argument, and the arguments common to all, stay quiet.
+  expect_silent(world_query("value"))
+  expect_silent(world_query("value", layer = "bubble", size = "pop"))
+  expect_silent(world_query("value", layer = "binned", n_bins = 4))
+  expect_silent(world_query("value", layer = "binned"))
+  expect_silent(world_query("value", facet = "year", transform = "log10"))
+
+  # "choropleth" is in neither branch of the lookup, so it must not error --
+  # `[[` on a named vector throws for a name that is absent.
+  expect_no_error(world_query("value", layer = "choropleth"))
+})
+
+# --- the four audits NEWS.md claimed complete --------------------------------
+# In every case the miss was a path that bypassed the shared helper the audit
+# reasoned about: compute_breaks() for n_bins, wdj_to_iso3c() for keys,
+# ascii_lower() for folding, wdj_return_frame() for the return class.
+
+test_that("n_bins is bounded on the tmap hand-off too", {
+  skip_if_not_installed("sf")
+  skip_if_not_installed("rnaturalearth")
+  skip_if_not_installed("tmap")
+  sf1 <- attach_geometry(data.frame(iso3c = "FRA", value = 1,
+                                    stringsAsFactors = FALSE), geometry = "sf")
+  # The branch returned before any check and handed n_bins to
+  # tm_scale_intervals(), which coerces with as.integer(): 1e18 became NA.
+  expect_error(suppressMessages(world_map(sf1, value, engine = "tmap", n_bins = 1e18)),
+               class = "countryatlas_error")
+  expect_error(suppressMessages(world_map(sf1, value, engine = "tmap", n_bins = "5")),
+               class = "countryatlas_error")
+})
+
+test_that("n_bins is bounded on the uncertainty path too", {
+  skip_if_not_installed("maps")
+  g <- attach_geometry(data.frame(iso3c = c("FRA", "DEU"), value = c(1, 2),
+                                  se = c(1, 2), stringsAsFactors = FALSE),
+                       geometry = "polygon")
+  # This path did as.integer(n_bins) and then seq_len() on it -- verbatim the
+  # seq_len(NA) failure the changelog documents for od_map(origins = ).
+  expect_error(suppressMessages(world_map(g, value, uncertainty = se, n_bins = 1e18)),
+               class = "countryatlas_error")
+  expect_error(suppressMessages(world_map(g, value, uncertainty = se, n_bins = "5")),
+               class = "countryatlas_error")
+})
+
+test_that("the code-vector entry points standardise their keys", {
+  # Both took the key verbatim, so a lowercase code matched nothing and the
+  # verb blamed its own data: check_dispute_coverage() reported zero tracked
+  # territories, and country_weights() blamed the centroid table.
+  lower <- check_dispute_coverage(c("esh", "xkx", "pse"))
+  upper <- check_dispute_coverage(c("ESH", "XKX", "PSE"))
+  expect_equal(sum(lower$in_data), sum(upper$in_data))
+  expect_gt(sum(lower$in_data), 0L)
+  expect_equal(sum(check_dispute_coverage(" esh ")$in_data), 1L)
+  # Nothing matching is now reported rather than read as a coverage finding.
+  expect_warning(check_dispute_coverage(c("ZZZ", "YYY")))
+
+  expect_no_error(w <- suppressMessages(
+    country_weights("knn", c("usa", "fra", "deu"), k = 2)))
+  expect_equal(nrow(as.matrix(w)), 3L)
+  # A key that resolves to nothing says so, and names the fix.
+  err <- rlang::catch_cnd(country_weights("knn", c("zz", "qq"), k = 1))
+  expect_match(conditionMessage(err), "standardize_country", fixed = TRUE)
+})
+
+test_that("identifier folding is ASCII everywhere, including scheme names", {
+  # tolower("ISO3C") returns a dotless i under tr_TR while the candidate list
+  # stays ASCII, so the "Did you mean" suggestion silently vanished.
+  #
+  # Reads R/ directly, which only exists in the source tree -- under R CMD check
+  # the package is installed and there is no R/*.R to read. The behavioural
+  # half of this test runs either way; only the grep needs the guard.
+  err <- rlang::catch_cnd(convert_country("France", to = "ISO3C"))
+  expect_match(conditionMessage(err), "iso3c", fixed = TRUE)
+  skip_if_no_source_tree()
+  src <- readLines(test_path("../../R/standardize.R"), warn = FALSE)
+  code <- sub("#.*$", "", src)          # strip comments before looking
+  expect_length(grep("[^_a-zA-Z.]tolower\\(", code), 0)
+})
+
+test_that("standardize_subnational normalises its return class", {
+  # A data.frame in gave a data.frame out and a grouped tibble stayed grouped,
+  # while standardize_country() next door normalises.
+  out <- suppressMessages(standardize_subnational(
+    data.frame(region = "DE-BY", stringsAsFactors = FALSE), region,
+    country = "Germany"))
+  expect_s3_class(out, "tbl_df")
+  grp <- suppressMessages(standardize_subnational(
+    dplyr::group_by(tibble::tibble(region = "DE-BY", k = 1), k), region,
+    country = "Germany"))
+  expect_false(inherits(grp, "grouped_df"))
+})
+
+test_that("compare_sources takes the numeric column, whatever else a source returns", {
+  # Reading `as.matrix(out[, sources])` followed by `abs()` suggests a
+  # character column could reach abs() and fail with base R's "non-numeric
+  # argument to mathematical function". It cannot: the per-source reshape picks
+  # the first numeric column and aborts when there is none. Pinned so that
+  # stays true if either half moves.
+  withr::defer(suppressWarnings(
+    remove_country_source(c("t_mixed", "t_numeric", "t_nonnum"))))
+  register_country_source("t_mixed", function(indicator, countries = NULL,
+                                              years = NULL, ...) {
+    tibble::tibble(iso3c = c("FRA", "DEU"), year = 2020L,
+                   gdp = c("1000", "2000"), other = c(1, 2))
+  })
+  register_country_source("t_numeric", function(indicator, countries = NULL,
+                                                years = NULL, ...) {
+    tibble::tibble(iso3c = c("FRA", "DEU"), year = 2020L, gdp = c(1000, 2000))
+  })
+  out <- compare_sources("gdp", sources = c("t_mixed", "t_numeric"),
+                         year = 2020)
+  expect_type(out$t_mixed, "double")
+  expect_type(out$t_numeric, "double")
+  expect_equal(nrow(out), 2L)
+
+  # And a source with no numeric column at all is named, not left to abs().
+  register_country_source("t_nonnum", function(indicator, countries = NULL,
+                                               years = NULL, ...) {
+    tibble::tibble(iso3c = c("FRA", "DEU"), year = 2020L,
+                   gdp = c("1000", "2000"))
+  })
+  expect_error(compare_sources("gdp", sources = c("t_nonnum", "t_numeric"),
+                               year = 2020),
+               "no numeric column")
+})
+
+test_that("od_map tells `origin` and `origins` apart", {
+  # One letter apart, adjacent in the signature, and unrelated in meaning.
+  # `origin = 3` used to fail inside check_string() talking about a coding
+  # scheme; `origins = "iso3c"` used to fail inside country-name matching.
+  skip_if_not_installed("maps")
+  od <- data.frame(from = rep(c("China", "Germany", "USA"), each = 2),
+                   to = c("USA", "Japan", "France", "Italy", "Mexico", "Canada"),
+                   value = c(500, 200, 80, 70, 300, 280),
+                   stringsAsFactors = FALSE)
+  expect_error(od_map(od, from, to, value, origin = 3), "Did you mean")
+  expect_error(od_map(od, from, to, value, origins = "iso3c"),
+               "not how to read them")
+  # Both used correctly still work.
+  expect_s3_class(suppressWarnings(suppressMessages(
+    od_map(od, from, to, value, origins = 2))), "ggplot")
+  expect_s3_class(suppressWarnings(suppressMessages(
+    od_map(od, from, to, value, origins = c("China", "USA")))), "ggplot")
 })

@@ -101,8 +101,49 @@ build_overrides <- function(extra = NULL) {
   if (!is.null(extra)) {
     nms <- names(extra)                    # capture before as.character()
     extra <- as.character(extra)
-    if (is.null(nms) || any(!nzchar(nms))) {
-      wdj_abort("{.arg extra} must be a fully named character vector.")
+    # is.na() as well as !nzchar(): nzchar(NA) is TRUE, so an NA name walked
+    # straight through this guard -- while wdj_to_iso3c() *does* reject one, so
+    # the two validators disagreed about what a valid override table is. An NA
+    # name also cannot be matched by anything, which is the silent-but-useless
+    # entry both guards exist to prevent.
+    if (is.null(nms) || any(is.na(nms) | !nzchar(nms))) {
+      wdj_abort(c(
+        "{.arg extra} must be a fully named character vector.",
+        "i" = "Each name is the country string to recognise; each value is the
+               {.field iso3c} code to map it to."
+      ))
+    }
+    # The VALUES were unvalidated, and wdj_to_iso3c() then whitelists every
+    # override value as a legitimate code -- so country_overrides(c(Freedonia =
+    # "1")) put "1" in the iso3c column and every join keyed on it, with
+    # nothing said. ISO 3166-1 alpha-3 is three uppercase letters; that also
+    # admits the user-assigned range (XKX for Kosovo is in the base table
+    # above), which is the only reason not to require membership of the known
+    # set outright.
+    # ^[A-Z][A-Z0-9]{2}$, not ^[A-Z]{3}$: the point is to refuse a value that is
+    # plainly not a code -- "1", "fra", "FRANCE", NA -- because wdj_to_iso3c()
+    # whitelists every override value as a legitimate code and every join then
+    # keys on it. A user's own three-character code such as "ZZ1" is a
+    # deliberate choice that behaves consistently wherever it lands, so it is
+    # allowed; the package's own tests thread exactly that through geometry
+    # matching.
+    bad <- extra[!grepl("^[A-Z][A-Z0-9]{2}$", extra)]
+    if (length(bad)) {
+      wdj_abort(c(
+        "Every value in {.arg extra} must be an {.field iso3c} code.",
+        "x" = "Not {.val {unique(bad)}}.",
+        "i" = "Three characters, starting with an uppercase letter: a real
+               alpha-3 code, a user-assigned one like {.val XKX}, or your own
+               such as {.val ZZ1}. Anything else would be whitelisted as a
+               real code and then joined on."
+      ))
+    }
+    if (anyNA(extra)) {
+      wdj_abort(c(
+        "{.arg extra} must not contain {.code NA}.",
+        "i" = "An override maps a name TO a code; use a real code, or leave
+               the name out and let it resolve to {.code NA} on its own."
+      ))
     }
     base[nms] <- extra
   }
@@ -134,13 +175,22 @@ wdj_code_fallback <- function() {
 wdj_fallback_cols <- function() c("iso2c", "continent", "region", "country", "flag")
 
 # Fill the fallback columns for codes countrycode leaves NA.
-apply_code_fallback <- function(df) {
+#
+# `cols` exists because "region" means two different things. In a country frame
+# it is countrycode's world region, which this table can fill; in
+# map_data("world") -- which build_world_polygons() runs through here -- it is
+# the basemap's *country name*, and filling that with "Europe" would be
+# nonsense. Harmless so far only because map_data() never leaves it NA, which
+# is not a property to rely on. Callers that hold such a frame name the columns
+# they mean.
+apply_code_fallback <- function(df, cols = wdj_fallback_cols()) {
   fb <- wdj_code_fallback()
   if (!"iso3c" %in% names(df)) return(df)
+  cols <- intersect(cols, wdj_fallback_cols())
   for (i in seq_len(nrow(fb))) {
     hit <- !is.na(df$iso3c) & df$iso3c == fb$iso3c[i]
     if (!any(hit)) next
-    for (col in wdj_fallback_cols()) {
+    for (col in cols) {
       if (col %in% names(df)) {
         miss <- hit & is.na(df[[col]])
         df[[col]][miss] <- fb[[col]][i]

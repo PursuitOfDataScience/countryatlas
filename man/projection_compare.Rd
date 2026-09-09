@@ -10,7 +10,8 @@ projection_compare(
   projections = c("equal_earth", "robinson", "winkel_tripel", "mercator"),
   ncol = NULL,
   labeller = c("name", "property"),
-  ...
+  ...,
+  projection = NULL
 )
 }
 \arguments{
@@ -31,6 +32,11 @@ name; \code{"property"} appends what it preserves, which is the point of the
 comparison.}
 
 \item{...}{Passed to \code{\link[=world_map]{world_map()}} (e.g. \code{style}, \code{palette}, \code{n_bins}).}
+
+\item{projection}{Not an argument of this function. It exists only to catch
+the singular spelling, which R's partial matching would otherwise bind to
+\code{projections} -- drawing a single panel from a function whose purpose is
+several. Passing it is an error; use \code{projections}.}
 }
 \value{
 A faceted \code{ggplot} object.

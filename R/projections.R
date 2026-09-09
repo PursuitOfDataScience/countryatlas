@@ -110,6 +110,10 @@ projection_info <- function(projection = NULL) {
 #'   name; `"property"` appends what it preserves, which is the point of the
 #'   comparison.
 #' @param ... Passed to [world_map()] (e.g. `style`, `palette`, `n_bins`).
+#' @param projection Not an argument of this function. It exists only to catch
+#'   the singular spelling, which R's partial matching would otherwise bind to
+#'   `projections` -- drawing a single panel from a function whose purpose is
+#'   several. Passing it is an error; use `projections`.
 #'
 #' @return A faceted `ggplot` object.
 #' @seealso [projection_info()], [tissot_map()]
@@ -126,7 +130,22 @@ projection_compare <- function(data, fill,
                                projections = c("equal_earth", "robinson",
                                                "winkel_tripel", "mercator"),
                                ncol = NULL, labeller = c("name", "property"),
-                               ...) {
+                               ..., projection = NULL) {
+  # `projection` is a formal *after* `...` purely to catch it. `projection` is
+  # a strict abbreviation of `projections`, so R's partial matching bound it
+  # there before it could reach `...`: projection_compare(projection =
+  # "mercator") drew a single Mercator panel -- a visibly wrong answer to this
+  # function's most likely typo, from a verb whose whole point is several
+  # projections side by side. An exact match beats a partial one, so naming it
+  # here intercepts it; `projections =` still reaches `projections`.
+  if (!is.null(projection)) {
+    wdj_abort(c(
+      "{.arg projection} is not an argument of {.fn projection_compare}.",
+      "x" = "It partially matched {.arg projections} and drew one panel.",
+      "i" = 'Did you mean {.code projections = {deparse(projection)}}? For a
+             single projection use {.fn world_map}.'
+    ), class = "countryatlas_projection_singular")
+  }
   need_pkg("sf", "for projection_compare()")
   labeller <- rlang::arg_match(labeller)
   fill_q <- rlang::enquo(fill)

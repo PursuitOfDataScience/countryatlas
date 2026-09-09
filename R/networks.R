@@ -188,6 +188,11 @@ country_network <- function(data, from, to, weight = NULL,
 #' @inheritParams flow_matrix
 #' @param origins Which origins to draw. A character vector of names or codes,
 #'   or an integer giving how many of the largest to take (default `6`).
+#'
+#'   Note that this is **not** `origin`, which it sits next to: `origin` is the
+#'   coding scheme `from`/`to` are written in, `origins` is which of them to
+#'   put on the page. Confusing the two is diagnosed rather than left to fail
+#'   further in.
 #' @param direction `"out"` (default; one panel per origin, showing
 #'   destinations) or `"in"` (one panel per destination, showing origins).
 #' @param ... Passed to [world_map()].
@@ -209,6 +214,29 @@ country_network <- function(data, from, to, weight = NULL,
 #' }
 od_map <- function(data, from, to, weight = NULL, origin = "country.name",
                    origins = 6, direction = c("out", "in"), ...) {
+  refuse_reserved_dots(rlang::list2(...), "legend", "od_map")
+  # `origin` and `origins` are one letter apart and adjacent in the signature,
+  # and they mean unrelated things: the coding scheme, and which origins to
+  # draw. Both mix-ups used to fail somewhere else -- `origin = 3` inside
+  # check_string() talking about a coding scheme, `origins = "iso3c"` inside
+  # country-name matching -- so name the likely typo here instead.
+  if (!is.character(origin)) {
+    wdj_abort(c(
+      "{.arg origin} is the coding scheme for {.arg from}/{.arg to}, not a
+       count.",
+      "x" = "Got {.obj_type_friendly {origin}}.",
+      "i" = "Did you mean {.arg origins} -- how many origins to draw?"
+    ))
+  }
+  if (is.character(origins) &&
+        all(origins %in% c("iso3c", "iso2c", "country.name", "iso3n", "cowc",
+                           "cown", "gwn", "eurostat", "wb"))) {
+    wdj_abort(c(
+      "{.arg origins} names which origins to draw, not how to read them.",
+      "x" = "Got the coding scheme {.val {origins}}.",
+      "i" = "Did you mean {.code origin = \"{origins[1]}\"}?"
+    ))
+  }
   direction <- rlang::arg_match(direction)
   m <- flow_matrix(data, {{ from }}, {{ to }}, {{ weight }}, origin = origin)
   if (identical(direction, "in")) m <- t(m)
@@ -268,8 +296,11 @@ od_map <- function(data, from, to, weight = NULL, origin = "country.name",
 
   mapped <- attach_geometry(long, geometry = "polygon")
   flow_sym <- rlang::sym(".wdj_flow")
-  world_map(mapped, !!flow_sym,
-            legend = if (identical(direction, "out")) "flow out" else "flow in",
-            ...) +
+  p <- world_map(mapped, !!flow_sym,
+                 legend = if (identical(direction, "out")) "flow out" else "flow in",
+                 ...) +
     ggplot2::facet_wrap(ggplot2::vars(.data$.wdj_panel))
+  # `.wdj_flow` *is* the quantity drawn here -- there is no user column to
+  # point at -- so only the coverage is restated, against the flow itself.
+  restate_provenance(p, mapped, ".wdj_flow")
 }

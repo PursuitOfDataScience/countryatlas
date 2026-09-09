@@ -98,8 +98,11 @@ test_that("index_to validates its column and its scalars", {
                class = "countryatlas_error")
   out <- index_to(df, gdp, base_year = 2000)
   expect_equal(out$gdp_index, c(100, 110, 120))
-  # A base year with no observation gives NA rather than a wrong index.
-  expect_true(all(is.na(index_to(df, gdp, base_year = 1999)$gdp_index)))
+  # A base year with no observation gives NA rather than a wrong index -- and
+  # now names the country it could not index, so the all-NA column is readable.
+  expect_warning(none <- index_to(df, gdp, base_year = 1999),
+                 class = "countryatlas_no_base_year")
+  expect_true(all(is.na(none$gdp_index)))
 })
 
 test_that("spin_globe renders one frame per central longitude", {
@@ -210,7 +213,14 @@ test_that("globe_map(backend = 'sf') builds on every style", {
   sfd <- attach_geometry(countryatlas::world_snapshot$countries, geometry = "sf")
   for (st in c("continuous", "binned", "quantile", "jenks")) {
     if (st == "jenks") skip_if_not_installed("classInt")
-    p <- globe_map(sfd, gdp_per_capita, backend = "sf", style = st, n_bins = 4)
+    # n_bins only for the styles that bin: passing it under "continuous" now
+    # draws a notice that the argument does not apply, which is correct and has
+    # nothing to do with what this test is checking.
+    p <- if (identical(st, "continuous")) {
+      globe_map(sfd, gdp_per_capita, backend = "sf", style = st)
+    } else {
+      globe_map(sfd, gdp_per_capita, backend = "sf", style = st, n_bins = 4)
+    }
     expect_s3_class(p, "ggplot")
     expect_no_error(ggplot2::ggplot_build(p))
   }
@@ -256,4 +266,54 @@ test_that("print.countryatlas_coverage prints every section", {
   invisible(capture.output(invisible(capture.output(ret <- print(cv))),
                            type = "message"))
   expect_identical(ret, cv)
+})
+
+test_that("remove_country_source undoes a registration", {
+  # Registering was permanent for the session, so anything that registered a
+  # source -- an example, a test, a scratch script -- left country_sources()
+  # reporting different rows for the rest of the session, with no way back.
+  before <- country_sources()$source
+  register_country_source("t_removable", function(indicator, ...) NULL)
+  expect_true("t_removable" %in% country_sources()$source)
+  expect_identical(remove_country_source("t_removable"), "t_removable")
+  expect_false("t_removable" %in% country_sources()$source)
+  expect_setequal(country_sources()$source, before)
+
+  # A name that was never registered is reported, not silently ignored.
+  expect_warning(remove_country_source("t_never_registered"),
+                 "No registered source")
+
+  # The built-ins are what ?fetch_indicator documents, so they stay.
+  for (b in c("wdi", "owid", "eurostat", "oecd", "comtrade")) {
+    expect_error(remove_country_source(b), "built-in")
+  }
+  expect_true(all(c("wdi", "owid", "eurostat", "oecd", "comtrade") %in%
+                    country_sources()$source))
+
+  # And a bad argument is named rather than reaching exists().
+  expect_error(remove_country_source(42), "must be one or more source names")
+  expect_error(remove_country_source(character(0)),
+               "must be one or more source names")
+
+  # Removing drops the memoised answers too: re-registering the same name must
+  # not serve results from the fetch function that was just removed.
+  calls <- 0L
+  register_country_source("t_memo", function(indicator, countries = NULL,
+                                             years = NULL, ...) {
+    calls <<- calls + 1L
+    tibble::tibble(iso3c = "FRA", year = 2020L, v = 1)
+  })
+  invisible(fetch_indicator("t_memo", c(v = "v"), years = 2020))
+  invisible(fetch_indicator("t_memo", c(v = "v"), years = 2020))
+  expect_equal(calls, 1L)                      # memoised
+  remove_country_source("t_memo")
+  register_country_source("t_memo", function(indicator, countries = NULL,
+                                             years = NULL, ...) {
+    calls <<- calls + 1L
+    tibble::tibble(iso3c = "FRA", year = 2020L, v = 2)
+  })
+  out <- fetch_indicator("t_memo", c(v = "v"), years = 2020)
+  expect_equal(calls, 2L)                      # the new function ran
+  expect_equal(out$v, 2)
+  remove_country_source("t_memo")
 })

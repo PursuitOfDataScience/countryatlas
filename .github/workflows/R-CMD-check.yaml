@@ -14,7 +14,7 @@ jobs:
   R-CMD-check:
     runs-on: ${{ matrix.config.os }}
 
-    name: ${{ matrix.config.os }} (${{ matrix.config.r }})
+    name: ${{ matrix.config.os }} (${{ matrix.config.r }})${{ matrix.config.depends-only && ' depends-only' || '' }}
 
     strategy:
       fail-fast: false
@@ -25,13 +25,36 @@ jobs:
           - {os: ubuntu-latest,  r: 'devel', http-user-agent: 'release'}
           - {os: ubuntu-latest,  r: 'release'}
           - {os: ubuntu-latest,  r: 'oldrel-1'}
+          # The strict leg. Every other job installs all of Suggests, so none
+          # of them exercises the configuration CRAN actually runs -- which is
+          # how a broken \link{} to a Suggests-only topic reached a release.
+          # _R_CHECK_DEPENDS_ONLY_ hides Suggests from the check, so a test or
+          # example that forgot its skip_if_not_installed() fails here.
+          - {os: ubuntu-latest,  r: 'release', depends-only: true}
 
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
+      # Spelled out on every leg, not left empty: an empty value is *set*,
+      # and R CMD check reads these through config_val_to_logical(), which
+      # cannot coerce "" and returns NA -- so `if (force_suggests)` halts the
+      # check at "checking package dependencies". These two are R's own
+      # defaults on the other legs, so those legs are unaffected.
+      _R_CHECK_DEPENDS_ONLY_: ${{ matrix.config.depends-only && 'true' || 'false' }}
+      _R_CHECK_FORCE_SUGGESTS_: ${{ matrix.config.depends-only && 'false' || 'true' }}
 
     steps:
       - uses: actions/checkout@v7
+
+      # The locale hardening -- the Turkish dotless i, which is what broke
+      # 2.0.0 on CRAN's Fedora flavours -- is guarded by
+      # skip_if(!nzchar(Sys.setlocale("LC_CTYPE", "tr_TR.UTF-8"))), and the
+      # ubuntu runners generate only C.UTF-8 and en_US.UTF-8. So that axis
+      # skipped in CI and was verified only on a developer machine. Generate
+      # tr_TR.UTF-8 -- the only locale the suite asks for -- on the Linux legs.
+      - name: Generate the locale test-locale.R needs
+        if: runner.os == 'Linux'
+        run: sudo locale-gen tr_TR.UTF-8
 
       - uses: r-lib/actions/setup-pandoc@v2
 

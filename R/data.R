@@ -66,8 +66,26 @@
 #' A curated, dated membership table for the common country groups.
 #'
 #' @format A tibble with columns `group`, `iso3c`, `country`.
-#' @source Curated from official membership lists (point-in-time; see the
-#'   package `NEWS` for the reference date).
+#' @section As of when:
+#' Membership is a snapshot taken on **2026-06-01**, carried on the table
+#' itself:
+#'
+#' ```r
+#' attr(country_groups_tbl, "as_of")
+#' #> [1] "2026-06-01"
+#' ```
+#'
+#' Read the attribute rather than this paragraph if you need the date in code;
+#' it is set from a single constant in `data-raw/build_datasets.R`, so it
+#' cannot drift from the data the way a hand-written date can. For membership
+#' at any other date use [country_groups_history] and
+#' [country_groups(as_of = )][country_groups()], which is the table this
+#' snapshot is a slice of.
+#'
+#' @source Curated from official membership lists, as of the date above. (This
+#'   used to point at the package `NEWS` for the reference date, where two
+#'   different dates were on record -- an Rd should not delegate a fact to a
+#'   changelog.)
 "country_groups_tbl"
 
 #' Equal-area world tile-grid layout
@@ -106,6 +124,16 @@
 #'     may since have been inherited by a successor (e.g. `YEM`).}
 #'   \item{dissolved}{Year the entity ceased to exist.}
 #'   \item{iso3c, country}{The successor state.}
+#'   \item{relation}{How the successor relates to the entity, per successor:
+#'     `"succession"` if it is a genuinely new state created at `dissolved`, or
+#'     `"continuation"` if the same state carried on (possibly with less
+#'     territory) or a state that already existed absorbed the entity. Sudan is
+#'     both at once -- `SDN` continued and `SSD` is new -- which is why the
+#'     relation is per successor rather than per entity. The distinction
+#'     matters: a `"continuation"` was *not* created at `dissolved`, so testing
+#'     its data against that year says nothing, and the code did not cease to
+#'     exist either. [audit_time_coverage()] keys on this column for both
+#'     reasons.}
 #' }
 #' @source Curated from ISO 3166-3 and the historical record.
 "historical_codes"
@@ -174,6 +202,15 @@
 #'     `"partially_recognised"`, `"administered"` or `"claimed"`.}
 #'   \item{note}{One sentence of context, including why the row is here.}
 #' }
+#'
+#' @section What reads these columns:
+#' Nothing in the package does. The internal layer and note builders behind
+#' `world_map(disputes = )` and [dispute_policy()] key on `iso3c` alone, and no
+#' verb filters on the parties. `administered_by` and
+#' `claimed_by` are here for your own filtering -- "show me everything Morocco
+#' administers", "drop the territories with more than one claimant" -- and are
+#' documented precisely so that such a filter is writable. Their contents are
+#' validated at build time against the placeholder list below.
 #'
 #' @section The codes in `administered_by` and `claimed_by`:
 #' Mostly ISO 3166-1 alpha-3, so they join the `iso3c` spine directly -- but not

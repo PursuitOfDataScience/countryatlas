@@ -31,12 +31,12 @@ knitr::opts_chunk$set(
 
 > **Country data onto honest maps — joined on ISO codes, never on country names.**
 
-Join the World Bank's life-expectancy table to `map_data("world")` by country
-name and **42 of 215 countries silently vanish**: nobody spells Czechia,
-Côte d'Ivoire or `"Congo, Dem. Rep."` the same way twice. `countryatlas` makes
-the ISO code the join key, so nothing goes missing — then draws the map.
-
-```{r hook, echo = FALSE, fig.height = 2.6, fig.width = 9, fig.alt = "Two world choropleths of life expectancy side by side. Joining on country name leaves dozens of countries grey and unfilled; joining with join_world() fills every one of them."}
+```{r counts, include = FALSE}
+# The two frames the figure draws, plus the counts quoted in the sentence
+# above it. Those counts used to be hard-coded prose sitting next to a figure
+# built from a live fetch, so they drifted the moment the World Bank revised
+# its coverage -- "42 of 215" had become 37 of 210 by the time anyone checked.
+# One computation, read by both.
 library(countryatlas)
 library(ggplot2)
 library(dplyr)
@@ -52,6 +52,23 @@ by_name <- map_data("world") |>
 by_iso <- join_world(life, country, warn = FALSE) |>
   mutate(how = "join_world(data, country)")
 
+# Countries each map actually fills, compared on the ISO spine so the two are
+# counted the same way.
+iso_filled <- unique(na.omit(by_iso$iso3c[!is.na(by_iso$life_exp)]))
+name_filled <- unique(na.omit(countrycode::countrycode(
+  unique(by_name$region[!is.na(by_name$life_exp)]),
+  "country.name", "iso3c", warn = FALSE)))
+n_total <- length(iso_filled)
+n_lost <- length(setdiff(iso_filled, name_filled))
+```
+
+Join the World Bank's life-expectancy table to `map_data("world")` by country
+name and **`r n_lost` of `r n_total` countries silently vanish**: nobody spells
+Czechia, Côte d'Ivoire or `"Congo, Dem. Rep."` the same way twice.
+`countryatlas` makes the ISO code the join key, so nothing goes missing — then
+draws the map.
+
+```{r hook, echo = FALSE, fig.height = 2.6, fig.width = 9, fig.alt = "Two world choropleths of life expectancy side by side. Joining on country name leaves dozens of countries grey and unfilled; joining with join_world() fills every one of them."}
 bind_rows(by_name, by_iso) |>
   mutate(how = factor(how, unique(how))) |>
   facet_map(life_exp, how, style = "quantile", ncol = 2) +
@@ -383,7 +400,7 @@ convert_country(c("Japan", "Brazil"), to = "flag")
 | | |
 |---|---|
 | **Assemble** | `world_data()` `country_data()` `world_geometry()` `attach_geometry()` `clear_country_cache()` |
-| **Other sources** | `register_country_source()` `country_sources()` `fetch_indicator()` `add_indicator()` `compare_sources()` `fetch_owid()` `fetch_eurostat()` `fetch_oecd()` `fetch_comtrade()` |
+| **Other sources** | `register_country_source()` `remove_country_source()` `country_sources()` `fetch_indicator()` `add_indicator()` `compare_sources()` `fetch_owid()` `fetch_eurostat()` `fetch_oecd()` `fetch_comtrade()` |
 | **Join** | `standardize_country()` `join_world()` `country_join()` `country_join_all()` `dissolve_country()` `standardize_subnational()` |
 | **Diagnose** | `check_country_match()` `repair_country_names()` `audit_coverage()` `audit_time_coverage()` `rate_check()` `check_dispute_coverage()` `country_overrides()` |
 | **Look up** | `convert_country()` `country_codes()` `country_groups()` `in_group()` `wdi_search()` |

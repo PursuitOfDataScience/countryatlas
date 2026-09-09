@@ -80,7 +80,17 @@ wdj_coord_sf <- function(projection = "equal_earth", recenter = NULL,
     return(ggplot2::coord_sf(crs = crs, ylim = ylim,
                              default_crs = sf::st_crs(4326L)))
   }
-  if (identical(projection, "winkel_tripel")) {
+  # `datum = NA` turns off coord_sf()'s graticule. winkel_tripel needed it
+  # already; orthographic needs it for a sharper reason -- it is the one
+  # genuinely hemispheric projection, so graticule lines are clipped at the
+  # horizon and a clipped line can reduce to a *single* point, which GEOS
+  # rejects outright: globe_map(sf_data, lon = 90, lat = 30) died on
+  # "IllegalArgumentException: point array must contain 0 or >1 elements", a
+  # foreign error naming neither the projection nor the viewpoint. Only this
+  # projection is affected -- the other three azimuthals draw the whole globe,
+  # so nothing is clipped (checked across viewpoints). A globe reads as a globe
+  # without a graticule anyway.
+  if (projection %in% c("winkel_tripel", "orthographic")) {
     return(ggplot2::coord_sf(crs = crs, datum = NA))
   }
   ggplot2::coord_sf(crs = crs)
@@ -217,6 +227,24 @@ resolve_region <- function(region, call = rlang::caller_env()) {
   iso
 }
 
+# Every branch of resolve_region() can hand back an NA: the continent branch
+# reads countrycode's codelist, where a few rows have a continent and no iso3c
+# (1 in Africa, 2 in Asia, 1 in Americas), and the name branch aborts only when
+# *all* names fail, so a partly-resolving vector keeps its NAs. That matters
+# because `%in%` treats NA as a value: `NA %in% c("FRA", NA)` is TRUE, so a
+# subset keyed on the result pulls in every geometry row whose own iso3c is NA
+# -- uncoded rows silently joining a continent. get_world_sf() guards this
+# explicitly at its filter; get_world_polygons() and neighbors() did not.
+# Dropping the NAs here fixes all three at the source: an NA code cannot select
+# a country under any reading.
+resolve_region_codes <- function(region, call = rlang::caller_env()) {
+  iso <- resolve_region(region, call = call)
+  # A bounding box is not a code vector: pass it through untouched, or
+  # na.omit() strips its class and the caller's bbox branch never fires.
+  if (is.null(iso) || inherits(iso, "wdj_bbox")) return(iso)
+  unique(stats::na.omit(iso))
+}
+
 # --- Polygon backend (maps / ggplot2::map_data) -------------------------------
 
 # Build map_data("world") as a tibble with iso3c/iso2c attached via overrides.
@@ -231,11 +259,31 @@ build_world_polygons <- function(overrides = country_overrides()) {
   md$iso2c <- suppressWarnings(
     countrycode::countrycode(iso3c, "iso3c", "iso2c", warn = FALSE)
   )
-  md <- apply_code_fallback(md)
+  # Not `region`: in map_data("world") that column is the basemap's country
+  # name, not countrycode's world region, and the fallback table would fill it
+  # with a continent. iso2c and flag are the two this frame actually wants.
+  md <- apply_code_fallback(md, cols = c("iso2c", "flag"))
   md
 }
 
-world_polygons <- memoise::memoise(build_world_polygons)
+# Declared here and given its memoised body in .onLoad(). A top-level
+# memoise::memoise() call bakes the cache into the *installed* namespace, which
+# memoise's own guidance warns against, and -- the reason it matters here --
+# leaves the cache unreachable: this is a ~99,000-row tibble per override set,
+# and there was no way to release it for the life of the session.
+world_polygons <- function(overrides = country_overrides()) {
+  # Replaced in .onLoad(); reachable only if that never ran.
+  build_world_polygons(overrides)                                     # nocov
+}
+
+# Release both geometry caches. The sf one is an environment holding a full
+# Natural Earth layer per scale (tens of MB at 50m); the polygon one is
+# memoised. clear_country_cache() with no `source` calls this.
+clear_geometry_cache <- function() {
+  rm(list = ls(.world_sf_cache, all.names = TRUE), envir = .world_sf_cache)
+  if (memoise::is.memoised(world_polygons)) memoise::forget(world_polygons)
+  invisible(TRUE)
+}
 
 get_world_polygons <- function(region = NULL, overrides = country_overrides(),
                                recenter = NULL) {
@@ -249,7 +297,7 @@ get_world_polygons <- function(region = NULL, overrides = country_overrides(),
   # what the backend cannot do, and name the one that can.
   warn_recenter_ignored(recenter)
   md <- world_polygons(overrides)
-  iso <- resolve_region(region)
+  iso <- resolve_region_codes(region)
   if (is.null(iso)) return(md)
   if (inherits(iso, "wdj_bbox")) {
     bb <- unclass(iso)
@@ -336,7 +384,7 @@ get_world_sf <- function(scale = "small", region = NULL,
     ne <- build_world_sf(scale, overrides)
   }
 
-  iso <- resolve_region(region)
+  iso <- resolve_region_codes(region)
   if (!is.null(iso)) {
     if (inherits(iso, "wdj_bbox")) {
       bb <- unclass(iso)
@@ -519,10 +567,16 @@ world_geometry <- function(what = c("countries", "centroids", "coastline",
     # promises an sf object for this backend, and the other four `what` values
     # deliver one -- so a caller writing code across them found dplyr verbs
     # failing on exactly these two. Wrap them.
-    coastline = sf::st_as_sf(sf::st_cast(
-      sf::st_union(quietly_sf(suppressWarnings(sf::st_make_valid(countries)))),
-      "MULTILINESTRING"
-    )),
+    # st_as_sf() on a bare sfc names the geometry column `x`, so this was the
+    # one `what` value whose geometry column was not called "geometry" -- and
+    # that name is part of the documented return contract, so code written
+    # against any of the other four broke here.
+    coastline = sf::st_sf(
+      geometry = sf::st_cast(
+        sf::st_union(quietly_sf(suppressWarnings(sf::st_make_valid(countries)))),
+        "MULTILINESTRING"
+      )
+    ),
     borders   = sf::st_cast(countries, "MULTILINESTRING", warn = FALSE),
     graticule = sf::st_transform(
       with_c_numbers(sf::st_graticule()),
@@ -564,7 +618,10 @@ world_geometry <- function(what = c("countries", "centroids", "coastline",
           "i" = "Use {.code what = \"graticule\"}, or an equal-area world projection."
         ))
       }
-      sf::st_as_sf(out)
+      # st_sf(geometry = ), not st_as_sf(): the latter names the geometry column
+      # `x` for a bare sfc, and the documented return contract says "geometry".
+      # Same defect the coastline branch had.
+      sf::st_sf(geometry = out)
     }
   )
 }
@@ -738,8 +795,26 @@ warn_no_geometry_match <- function(keys, geom_keys, by,
 #' when microstates matter -- Hong Kong, Macao, Tuvalu and the British Virgin
 #' Islands are each in no other backend. Gibraltar alone is in none of them.
 #'
+#' @section How many rows come back:
+#' The result is the backend's whole map, not just your rows: every country the
+#' backend carries is present, and the ones absent from `data` carry `NA` in
+#' your columns. That is what makes them draw in `na.value` rather than vanish,
+#' which is the point -- a choropleth that quietly omits the countries you have
+#' no data for reads as though they did not exist. It does mean the result is
+#' much larger than `data` and is not something to summarise directly:
+#' `attach_geometry()` on three countries returns 240 of them on the polygon
+#' backend and 176 on `"sf"`, whatever `data` held. The row count is larger
+#' still: `"polygon"` gives one row per polygon *vertex* (about 99,000), and
+#' `"sf"` one row per *feature* -- usually one per country, but a divided
+#' country appears more than once (Cyprus at `scale = "small"`; Cyprus and
+#' India at `"medium"`), so an `iso3c` join against it can fan out. Summarise
+#' `data` before attaching geometry, or use the verbs in this package, which
+#' de-duplicate to one row per country first.
+#'
 #' @return For `"polygon"`, a tibble with `long`/`lat`/`group` plus your
-#'   columns. For `"sf"`, an `sf` object.
+#'   columns, one row per polygon vertex. For `"sf"`, an `sf` object, one row
+#'   per feature. Both carry every country the backend has -- see *How many
+#'   rows come back*.
 #' @export
 #' @examples
 #' \donttest{

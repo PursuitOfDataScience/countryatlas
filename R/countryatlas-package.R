@@ -49,6 +49,14 @@
 #'   \item{`countryatlas.cache_dir`}{Where the persistent World Bank cache
 #'     lives. Defaults to `tools::R_user_dir("countryatlas", "cache")`; set it to
 #'     `""` for session-only caching. See [clear_wdi_cache()].}
+#'   \item{`countryatlas.cache_max_age`}{How long a persistent cache entry
+#'     stays usable, in seconds. Defaults to 30 days. World Bank figures are
+#'     revised, so an old entry is not merely stale on disk -- it is a
+#'     different answer from the one the API would give now.}
+#'   \item{`countryatlas.cache_max_size`}{The size cap on the persistent
+#'     cache, in bytes. Defaults to 50 MB, past which the least-recently-used
+#'     entries are dropped. CRAN policy allows a package cache under
+#'     `tools::R_user_dir()` only if its contents are actively managed.}
 #'   \item{`countryatlas.workers`}{How many processes fetch indicators in
 #'     parallel (only when the cache is on disk -- a memory-only memo cannot
 #'     survive a fork). Defaults to one fewer than the available cores, and
@@ -99,5 +107,8 @@ utils::globalVariables("year")
 # `available = FALSE` until it is installed.
 .onLoad <- function(libname, pkgname) {
   register_builtin_sources()
+  # Memoise at load time, not at build time: see the comment on
+  # world_polygons() in R/geometry.R.
+  world_polygons <<- memoise::memoise(build_world_polygons)
   invisible(NULL)
 }

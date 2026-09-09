@@ -8,8 +8,10 @@
 A tibble with columns \code{group}, \code{iso3c}, \code{country}.
 }
 \source{
-Curated from official membership lists (point-in-time; see the
-package \code{NEWS} for the reference date).
+Curated from official membership lists, as of the date above. (This
+used to point at the package \code{NEWS} for the reference date, where two
+different dates were on record -- an Rd should not delegate a fact to a
+changelog.)
 }
 \usage{
 country_groups_tbl
@@ -17,4 +19,21 @@ country_groups_tbl
 \description{
 A curated, dated membership table for the common country groups.
 }
+\section{As of when}{
+
+Membership is a snapshot taken on \strong{2026-06-01}, carried on the table
+itself:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{attr(country_groups_tbl, "as_of")
+#> [1] "2026-06-01"
+}\if{html}{\out{</div>}}
+
+Read the attribute rather than this paragraph if you need the date in code;
+it is set from a single constant in \code{data-raw/build_datasets.R}, so it
+cannot drift from the data the way a hand-written date can. For membership
+at any other date use \link{country_groups_history} and
+\link[=country_groups]{country_groups(as_of = )}, which is the table this
+snapshot is a slice of.
+}
+
 \keyword{datasets}

@@ -22,7 +22,10 @@ shapes drawn are still de facto.
 Called with no argument, returns the current policy.}
 }
 \value{
-The policy in effect, invisibly when setting.
+When called with no argument, the policy currently in effect. When
+setting, the policy that was in effect \emph{before} the call, invisibly -- R's
+convention for a setter, so
+\code{on.exit(dispute_policy(dispute_policy("neutral")))} restores it.
 }
 \description{
 Disputed territories are drawn differently by different conventions, and a
@@ -41,10 +44,9 @@ trusting a setting.
 }
 
 \examples{
-old <- dispute_policy()
-dispute_policy("neutral")
-dispute_policy()
-dispute_policy(old)
+old <- dispute_policy("neutral")   # sets, and returns what it replaced
+dispute_policy()                   # "neutral"
+dispute_policy(old)                # put it back
 }
 \seealso{
 \link{disputed_territories}, \code{\link[=check_dispute_coverage]{check_dispute_coverage()}}, \code{\link[=world_map]{world_map()}}

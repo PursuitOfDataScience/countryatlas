@@ -172,12 +172,34 @@ audit_time_coverage <- function(data, quiet = FALSE) {
   # one verb whose job is catching exactly that kind of mistake.
   df$year <- read_year(df$year, "{.arg data}")
 
-  # A dissolved entity must not carry data after it dissolved.
-  dis <- stats::setNames(hc$dissolved[!duplicated(hc$iso3c_hist)],
-                         hc$iso3c_hist[!duplicated(hc$iso3c_hist)])
-  # A successor state must not carry data before its predecessor dissolved.
-  # Where a country succeeds several entities, the earliest date wins.
-  born <- tapply(hc$dissolved, hc$iso3c, min)
+  # `historical_codes` conflates two relations and this read every row as the
+  # first, so a plain world_data(1960:2020) panel came back with about a hundred
+  # confident false alarms from the one verb whose job is catching exactly this
+  # class of error: Yemen, Sudan and Vietnam reported "after dissolution" though
+  # all three exist, Germany and Egypt reported "before existence" from 1990 and
+  # 1961, and Sudan was flagged in *both* directions. The `relation` column
+  # distinguishes them.
+  #
+  # A dissolved entity must not carry data after it dissolved -- but only if it
+  # really dissolved. A code that is listed among its own successors continued
+  # (with less territory, or under a new government), so it has no end date:
+  # `?historical_codes` warns that a code "may since have been inherited by a
+  # successor (e.g. YEM)", which is that case exactly.
+  ended <- hc[hc$relation == "succession" &
+                (is.na(hc$iso3c_hist) | hc$iso3c_hist != hc$iso3c), , drop = FALSE]
+  still_here <- unique(hc$iso3c[hc$relation == "continuation"])
+  ended <- ended[!is.na(ended$iso3c_hist) & !ended$iso3c_hist %in% still_here, ,
+                 drop = FALSE]
+  dis <- stats::setNames(ended$dissolved[!duplicated(ended$iso3c_hist)],
+                         ended$iso3c_hist[!duplicated(ended$iso3c_hist)])
+  # A successor state must not carry data before its predecessor dissolved --
+  # but only where the successor was genuinely created then. A continuation was
+  # not, so testing its data against that year says nothing. Where a country
+  # succeeds several entities, the earliest date wins.
+  succ <- hc[hc$relation == "succession", , drop = FALSE]
+  succ <- succ[!succ$iso3c %in% still_here, , drop = FALSE]
+  born <- if (nrow(succ)) tapply(succ$dissolved, succ$iso3c, min) else
+    stats::setNames(numeric(0), character(0))
 
   df$dissolved_in <- unname(dis[df$iso3c])
   df$born_in <- unname(born[df$iso3c])
@@ -232,7 +254,18 @@ audit_time_coverage <- function(data, quiet = FALSE) {
 #'   or `NULL` for unprojected lon/lat.
 #'
 #' @return An `sf` frame with `gwcode`, `country`, `iso3c` (where one can be
-#'   assigned -- see below), `status`, `from`, `to` and geometry.
+#'   assigned -- see below), `status`, `from`, `to` and geometry. Two further
+#'   CShapes columns are passed through when the installed version supplies
+#'   them, since they answer the questions this verb is usually asked:
+#'   * `owner` -- the `gwcode` of the sovereign a dependency belonged to, and
+#'     `NA` for a sovereign state. This is the column that makes
+#'     `dependencies = TRUE` legible: without it a colony and its metropole are
+#'     two unrelated rows.
+#'   * `capname` -- the capital's name at that date.
+#'
+#'   Both were returned but undocumented. Neither is guaranteed: `cshapes`
+#'   decides what its own table holds, so check with `names()` rather than
+#'   assuming.
 #'
 #' @section The ISO spine does not reach back:
 #' ISO 3166 was first published in 1974 and never covered colonies, so a

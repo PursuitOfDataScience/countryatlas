@@ -1,36 +1,50 @@
 ## Why this submission
 
-2.0.1 fixes the test failure reported for 2.0.0 on
-`r-devel-linux-x86_64-fedora-clang` and `r-devel-linux-x86_64-fedora-gcc`
-(CRAN mail of 2026-08-25, correct-by date 2026-09-15). One test, 2456 passing
-around it:
+3.0.0 is a major release: 46 new exports, two new datasets, and 26 documented
+breaking changes. It takes the package from "join World Bank data to a map" to
+"join anyone's data, to the map as it was in 1950, and say honestly what the
+picture does and does not support" -- a registry of pluggable data sources, a
+historical-geometry backend, spatial statistics, and a set of verbs whose
+purpose is reporting what a map does *not* show.
 
-    Failure ('test-standardize.R:71:5'): de-accenting only helps inside a UTF-8 locale
-    Expected `is.na(de) || is.na(suppressWarnings(convert_country(de, to = "iso3c")))` to be TRUE.
+Three of the breaking changes affect existing code and are the reason for the
+major bump rather than 2.1.0:
 
-The test, not the package, was wrong. It asserted that outside a UTF-8 locale
-`iconv(x, to = "ASCII//TRANSLIT")` cannot produce a resolvable spelling,
-generalising from `LC_CTYPE=C` -- the case `?country_overrides` documents. The
-input is written `"Cura\u00e7ao"`, and that escape makes the string UTF-8
-*marked* in every locale, so `iconv` reads it as UTF-8 and only the target
-charmap matters. Latin-1 has glibc transliteration data and still yields
-`"Curacao"` (which resolves to `CUW`); only `C`/POSIX, which has none, degrades
-to `NA` or `"Cura?ao"`. So the assertion held under `C` and failed under the
-latin1 locale the Fedora flavours use, and the Debian/Windows pretests -- both
-UTF-8 -- took the other branch and never saw it.
+* `world_map(projection = "mercator")` now draws a different -- and usable --
+  map. The previous output was unusable, so this is a fix, but the picture does
+  change.
+* `morans_i()` returns two further columns, `n_excluded` and `excluded`. Code
+  assuming a five-column result will see seven. The statistic is unchanged.
+* `geom_country_labels()` takes `data` as its second argument, matching the
+  `geom_*(mapping, data, ...)` convention. A call that passed `repel`
+  positionally must now name it; named calls are unaffected.
 
-The test now asserts the invariant that holds in every locale: de-accenting may
-or may not resolve, but it never resolves to a *different* country. Reproduced
-and verified locally by running `R CMD check --as-cran --run-donttest` under
-`LC_ALL=en_US.iso88591` (`session charset: ISO8859-1`), and the test file
-separately under `C`, `en_US.iso88591`, `en_US.iso885915` and `en_US.UTF-8` --
-failing before the change in latin1, passing in all four after.
+Four more change behaviour without changing a signature: `world_tiles` places
+171 of its 239 countries in a different cell (the placement scan reused cells
+it had already claimed), `dispute_policy()` now returns the policy it replaced
+rather than the one just set (R's setter convention), the `"coastline"` and
+`"ocean"` geometries name their geometry column `geometry` rather than `x`, and
+`gini()`/`theil()` warn where they used to return a bare `NA`.
 
-Also in this release, unrelated to the failure but visible in the same CRAN
-logs: `as_ggsql_source(format = "duckdb")` now opens its connection with
-`duckdb(shared_home = FALSE)` where the installed duckdb supports it, so a
-throwaway in-memory table no longer causes duckdb to keep extensions and secrets
-in `~/.duckdb`.
+The remaining eighteen are listed under **Breaking changes** in `NEWS.md`.
+
+Two deprecations warn from this release: `wdj_overrides()` (use
+`country_overrides()`; soft-deprecated since 2.0.0) and
+`options(countryatlas.gdp_compat = TRUE)`.
+
+`cachem` is new in `Imports`. It is an unconditional dependency of `memoise`,
+which was already imported, so it adds nothing to install; it is declared
+because the persistent cache now uses `cachem::cache_disk()` for the expiry and
+size cap CRAN policy asks for (30 days, 50 MB, both user-adjustable). The
+previous `memoise::cache_filesystem()` had neither, so the cache directory grew
+without bound. `stats`, `utils`, `tools`, `grDevices` and `parallel` are also
+now declared; they were already called with `::`.
+
+`inst/CITATION` no longer uses `%||%`. That operator only entered base R in
+4.4.0, and a CITATION file is evaluated by `readCitationFile()` outside the
+package namespace, so `NAMESPACE`'s `importFrom(rlang, "%||%")` does not reach
+it -- on the R (>= 4.1.0) this package declares, `citation("countryatlas")`
+would have failed.
 
 ## R CMD check results
 
@@ -85,7 +99,7 @@ creates it, and it shows up here only because the sandbox starts from an empty
 `HOME` -- on a machine that has ever rendered a PNG the paths already exist and
 are not new. It is reported for completeness, not as an outstanding issue.
 
-* This is a patch update (2.0.0 -> 2.0.1); see "Why this submission" above.
+* This is a major update (2.0.1 -> 3.0.0); see "Why this submission" above.
   For context, 2.0.0 was a planned major release: it added
   an optional bridge to `ggsql`'s `DRAW spatial` API and fixes several
   correctness bugs found by auditing 1.0.0 (quantile break computation,
@@ -131,7 +145,7 @@ are not new. It is reported for completeness, not as an outstanding issue.
   * `_R_CHECK_DEPENDS_ONLY_=true` (the `noSuggests` configuration, every
     optional package absent) -- OK
   * every URL in `DESCRIPTION`, the README, the vignettes and the help pages
-    resolves (20 distinct URLs, all HTTP 200)
+    resolves (29 distinct URLs, all HTTP 200)
   * the stricter check flags, all OK: `_R_CHECK_LENGTH_1_LOGIC2_=abort`,
     `_R_CHECK_LENGTH_1_CONDITION_=abort`,
     `_R_CHECK_XREFS_NOTE_MISSING_PACKAGE_ANCHORS_=true`,
@@ -158,24 +172,29 @@ depend on the locale; `?country_overrides` documents this.
 
 ## Notes
 
-* Examples: of the 55 documented topics with an `\examples{}` block, 28 run
-  unconditionally, 22 use `\donttest{}` and 6 use `\dontrun{}` (one topic uses
-  both). 19 of the 22 `\donttest{}` topics are guarded with
+* Examples: of the 99 documented topics with an `\examples{}` block, 48 run
+  unconditionally, 40 use `\donttest{}` and 13 use `\dontrun{}` (two topics use
+  both). 30 of the 40 `\donttest{}` topics are guarded with
   `requireNamespace()` so they skip rather than fail when an optional package
-  is absent; the other three (`tile_map`, `country_data`, `wdi_search`) need no
-  optional package.
+  is absent; the other ten need no optional package -- `country_weights`,
+  `gearys_c`, `getis_ord`, `local_morans`, `morans_i` and `spatial_lag` run off
+  the bundled `country_meta` centroids, `gridded_cartogram` and `tile_map` off
+  `world_tiles`, and `country_data` / `wdi_search` degrade without a
+  connection.
 * No example needs the network to succeed, verified by running the full check
   behind a blackhole proxy. `?world_data` and `?country_data` do call the World
   Bank, but a failed fetch degrades to a warning and a metadata-only frame
   rather than an error. `?wdi_search` searches `WDI`'s bundled indicator list
   and needs no connection at all. Everything else runs from the bundled
   `world_snapshot` / `world_tiles` data.
-* Example timings on the maintainer's machine: about 9s for all 55 together,
-  mean under 0.2s, and no single example over 2s -- comfortably inside CRAN's
-  per-example limit. Only three exceed one second (`world_data`,
-  `country_data`, `geom_country_labels`).
-* `\dontrun{}` is left on only 6 topics, in each case because the code
-  genuinely cannot be executed in a check:
+* Example timings on the maintainer's machine: about 63s for all 99 together
+  under `--run-donttest`, well inside CRAN's per-example limit; the check step
+  reports `checking examples ... [63s/67s] OK`.
+* `\dontrun{}` is left on 13 topics, in each case because the code genuinely
+  cannot be executed in a check -- the five source adapters and
+  `add_indicator()` / `compare_sources()` / `fetch_indicator()` need a live
+  provider, `historical_geometry()` / `nuts_geometry()` / `subnational_map()`
+  need a `cshapes` or GISCO download, and:
   * `animate_world()`, and the `world_data()` variants of `globe_map()` -- need
     a live World Bank fetch.
   * `interactive_map()` -- returns an HTML widget.

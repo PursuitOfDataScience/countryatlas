@@ -85,6 +85,10 @@ register_country_source(
 country_sources()
 fetch_indicator("demo", "demo_value")
 
+# Registering is permanent for the session, so example() would leave "demo"
+# and "demo_named" in the registry and country_sources() would report
+# different rows afterwards. Clean up at the end -- see the last lines.
+
 # A source keyed on country names rather than codes: `key_col` says which
 # column holds the key, `key_type` says how to read it.
 register_country_source(
@@ -97,6 +101,9 @@ register_country_source(
   meta = "A toy name-keyed source"
 )
 fetch_indicator("demo_named", "demo_value")
+
+# Leave the registry as it was found.
+remove_country_source(c("demo", "demo_named"))
 }
 \seealso{
 \code{\link[=country_sources]{country_sources()}}, \code{\link[=fetch_indicator]{fetch_indicator()}}, \code{\link[=compare_sources]{compare_sources()}}

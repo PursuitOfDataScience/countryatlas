@@ -355,38 +355,52 @@ test_that("the cache directory is honoured when it changes mid-session", {
   })
 })
 
-test_that("a corrupt cache entry is named as such, not blamed on the API", {
-  # An interrupted write leaves a truncated or empty .rds, and memoise surfaces
-  # readRDS()'s own "unknown input format" from inside the fetch. Reporting that
-  # as "Could not fetch ... from the World Bank API" sends the caller off to
-  # debug a connection that is fine -- the same misattribution wdj_disk_cache()
-  # already fixes for an unwritable directory. Worse, the bad entry stays put, so
-  # every later call degrades identically until the cache is cleared.
-  corrupt_with <- function(f) writeLines("not an rds", f)
-  warn_of <- function(corrupt) {
+test_that("a corrupt cache entry is recovered from, not blamed on the API", {
+  # An interrupted write leaves a truncated or empty .rds. Under
+  # memoise::cache_filesystem() that surfaced readRDS()'s own "unknown input
+  # format" from inside the fetch, which the package had to catch and explain
+  # -- and the bad entry stayed put, so every later call degraded identically
+  # until someone ran clear_wdi_cache(disk = TRUE) by hand.
+  #
+  # cachem::cache_disk() (adopted for the expiry and size cap CRAN policy
+  # wants) treats an unreadable entry as a miss instead, so the right contract
+  # is now stronger than the old warning: the data comes back correct, nothing
+  # is said, and the entry is replaced rather than left poisoned. The
+  # "on-disk cache" warning in fetch_one_safe() remains as a fallback for a
+  # read error that escapes cachem -- a directory whose permissions change
+  # mid-session, say -- but it is no longer the corrupt-entry path.
+  result_of <- function(corrupt) {
     d <- file.path(tempfile("cache"), "c")
     dir.create(d, recursive = TRUE)
     old <- options(countryatlas.cache_dir = d)
     on.exit(options(old), add = TRUE)
-    msg <- NA_character_
+    msgs <- character(0)
+    out <- NULL
     testthat::with_mocked_bindings(.package = "WDI", WDI = fake_wdi, {
       invisible(country_data(2020, "SP.POP.TOTL", parallel = FALSE))
       corrupt(list.files(d, recursive = TRUE, full.names = TRUE))
-      withCallingHandlers(
-        invisible(country_data(2020, "SP.POP.TOTL", parallel = FALSE)),
+      out <- withCallingHandlers(
+        country_data(2020, "SP.POP.TOTL", parallel = FALSE),
         warning = function(w) {
-          msg <<- conditionMessage(w)
+          msgs <<- c(msgs, conditionMessage(w))
           invokeRestart("muffleWarning")
         })
+      # And again, to prove the entry was replaced rather than left broken.
+      out2 <- country_data(2020, "SP.POP.TOTL", parallel = FALSE)
+      expect_equal(nrow(out2), nrow(out))
     })
-    msg
+    list(out = out, msgs = msgs)
   }
 
-  for (shape in list(corrupt_with, function(f) file.create(f))) {
-    m <- warn_of(shape)
-    expect_match(m, "on-disk cache")
-    expect_match(m, "clear_wdi_cache", fixed = TRUE)
-    expect_false(grepl("World Bank API", m, fixed = TRUE))
+  for (shape in list(function(f) writeLines("not an rds", f),
+                     function(f) file.create(f))) {
+    r <- result_of(shape)
+    # Silent, and the values are real rather than a table of NAs.
+    expect_length(r$msgs, 0L)
+    expect_gt(nrow(r$out), 0L)
+    expect_true("SP.POP.TOTL" %in% names(r$out) ||
+                  any(vapply(r$out, is.numeric, logical(1))))
+    expect_false(any(grepl("World Bank API", r$msgs, fixed = TRUE)))
   }
 
   # A genuine network failure must still blame the network.

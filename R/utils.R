@@ -344,6 +344,98 @@ warn_all_na_result <- function(data, val_name, new_col, needs,
   invisible(NULL)
 }
 
+# Refuse an argument the verb sets itself.
+#
+# coverage_map(), classify_compare(), lisa_map() and od_map() draw through
+# world_map() and pass `style`/`legend` themselves, so a caller supplying either
+# through `...` got base R's "formal argument \"style\" matched by multiple
+# actual arguments" -- naming neither the verb nor the reservation, while their
+# help pages advertise `...` as "Passed to world_map()" with no exclusion and
+# ?projection_compare next door offers `style` as an example of what to pass.
+# Same treatment geom_country_labels() was given for the same class.
+# ifelse() derives its result from `test`, so on a zero-row frame neither branch
+# is ever evaluated and it hands back `logical(0)` -- a logical column where the
+# verb promises a numeric one. `if (!any(usable))` is also TRUE for logical(0),
+# so the same sites warned "no usable denominator" about a frame with no rows to
+# have one. world_table() and complete_years() already return early for this;
+# these did not.
+num_ifelse <- function(test, yes) {
+  if (!length(test)) return(numeric(0))
+  ifelse(test, yes, NA_real_)
+}
+
+# summary.lm() on a fit with (near-)zero residual variance emits base R's
+# "essentially perfect fit: summary may be unreliable", which names neither the
+# verb that fitted the model nor the column that caused it -- and for the
+# internal log-t regression, names a model the caller does not know exists.
+# Muffle it here and let each caller say something useful instead; the returned
+# summary is unchanged, so nothing about the arithmetic moves.
+#
+# Whether it fired is recorded on the result rather than re-derived. Base R's
+# own test is `resvar < (mean(fitted)^2 + var(fitted)) * 1e-30`, which is not
+# the same thing as a high R-squared -- a flat fit through a constant response
+# trips it at R-squared 0.29 -- so any second guess here could disagree with
+# the summary it is describing. Reading the verdict off the warning cannot.
+lm_summary <- function(fit) {
+  perfect <- FALSE
+  s <- withCallingHandlers(
+    summary(fit),
+    warning = function(w) {
+      if (grepl("essentially perfect fit", conditionMessage(w), fixed = TRUE)) {
+        perfect <<- TRUE
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
+  attr(s, "wdj_perfect_fit") <- perfect
+  s
+}
+
+# TRUE when summary.lm() judged the fit exact, so the standard errors and
+# p-values derived from it are numerically meaningless rather than merely
+# small.
+lm_perfect_fit <- function(s) isTRUE(attr(s, "wdj_perfect_fit"))
+
+# Two reads of a ggplot object's innards, isolated here so there is one place
+# to change. ggplot2 4.0.0 moved `ggplot` to S7 with `@` accessors and a
+# compatibility layer over `$`; `$` still works, but relying on a
+# compatibility layer for the life of the package is not a plan.
+#
+# get_labs() is the supported accessor and is exported from ggplot2 4.0; fall
+# back to the list for anything older.
+gg_title <- function(p) {
+  if ("get_labs" %in% getNamespaceExports("ggplot2")) {
+    ggplot2::get_labs(p)$title
+  } else {
+    p$labels$title
+  }
+}
+
+# The plot's own data slot. layer_data() is NOT the same thing -- that is the
+# *computed* layer data, with the aesthetics resolved -- and the callers here
+# want the frame that was handed in.
+gg_plot_data <- function(p) {
+  # inherits(), not methods::is(): "S7_object" is in the class vector, so this
+  # needs no dependency on methods.
+  if (inherits(p, "S7_object")) {
+    out <- try(attr(p, "data", exact = TRUE), silent = TRUE)
+    if (!inherits(out, "try-error") && !is.null(out)) return(out)
+  }
+  p$data
+}
+
+refuse_reserved_dots <- function(dots, reserved, verb,
+                                 call = rlang::caller_env()) {
+  hit <- intersect(reserved, names(dots))
+  if (!length(hit)) return(invisible(NULL))
+  wdj_abort(c(
+    "{.fn {verb}} sets {cli::qty(length(hit))}{?this argument/these arguments}
+     itself and cannot forward {cli::qty(length(hit))}{?it/them}:
+     {.arg {hit}}.",
+    "i" = "Everything else in {.arg ...} reaches {.fn world_map} as documented."
+  ), call = call, class = "countryatlas_reserved_dots")
+}
+
 warn_engine_ignored <- function(ignored, engine, alternative) {
   if (!length(ignored)) return(invisible(NULL))
   wdj_warn(c(
@@ -1004,7 +1096,8 @@ wdj_lapply <- function(X, FUN, ..., parallel = TRUE, workers = NULL) {
 }
 
 # Validate a year (scalar or vector / range). World Bank data starts in 1960.
-validate_years <- function(year, call = rlang::caller_env()) {
+validate_years <- function(year, lo = 1960L,
+                           call = rlang::caller_env()) {
   if (missing(year) || is.null(year)) {
     wdj_abort("{.arg year} is required.", call = call)
   }
@@ -1016,9 +1109,16 @@ validate_years <- function(year, call = rlang::caller_env()) {
     wdj_abort("{.arg year} must not contain missing values.", call = call)
   }
   this_year <- as.integer(format(Sys.Date(), "%Y"))
-  if (any(year < 1960L) || any(year > this_year)) {
+  # `lo` is a parameter because the 1960 floor is the *World Bank's*, not a
+  # property of a year. fetch_indicator() and compare_sources() are the generic
+  # extension points -- any registered source, including a historical one --
+  # and they inherited the floor, so fetch_indicator("my_source", years = 1850)
+  # was refused on the World Bank's behalf. historical_geometry() already
+  # sidesteps this validator with a comment saying exactly that. The WDI-backed
+  # callers keep 1960; the registry gets a plausibility bound instead.
+  if (any(year < lo) || any(year > this_year)) {
     wdj_abort(c(
-      "{.arg year} must be between 1960 and {this_year}.",
+      "{.arg year} must be between {lo} and {this_year}.",
       "x" = "Got {.val {range(year)}}."
     ), call = call)
   }
@@ -1035,6 +1135,20 @@ normalize_indicator <- function(indicator) {
   blank <- !nzchar(nms)
   # For unnamed entries, fall back to a cleaned-up version of the code.
   nms[blank] <- make.names(indicator[blank])
+  # make.unique(): make.names() alone left duplicates, and the merge downstream
+  # uses suffix = c("", ".new") -- so world_data(2020, c(gdp = "A", gdp = "B"))
+  # silently returned both `gdp` and `gdp.new` rather than one column or an
+  # error.
+  if (anyDuplicated(nms)) {
+    dup <- unique(nms[duplicated(nms)])
+    wdj_warn(c(
+      "{length(dup)} indicator name{?s} {?is/are} used more than once:
+       {.val {dup}}.",
+      "i" = "Made unique with a suffix; name each indicator distinctly to
+             choose the columns yourself."
+    ), class = "countryatlas_duplicate_indicator")
+    nms <- make.unique(nms, sep = "_")
+  }
   stats::setNames(indicator, nms)
 }
 

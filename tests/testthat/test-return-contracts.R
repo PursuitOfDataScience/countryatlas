@@ -99,7 +99,11 @@ test_that("plot and geometry verbs return their documented objects", {
   q <- world_query(x)
   expect_s3_class(q, "ggsql_query")
   expect_type(unclass(q), "character")
-  o <- wdj_overrides()
+  # suppressWarnings(): wdj_overrides() is deprecated and warns once per
+  # session (.frequency = "once"), so a bare call here made the result depend
+  # on file order -- whichever file ran first consumed the one-shot, and the
+  # other saw nothing. test-features-3.0.0.R wraps its call for this reason.
+  o <- suppressWarnings(wdj_overrides())
   expect_type(o, "character")
   expect_false(is.null(names(o)))
   expect_true(isTRUE(clear_wdi_cache()))                     # invisibly TRUE
@@ -251,4 +255,108 @@ test_that("the 2.0.0 exports keep their leading argument order", {
   # And every one of them still exists.
   expect_length(setdiff(names(expected),
                         getNamespaceExports(asNamespace("countryatlas"))), 0L)
+})
+
+test_that("every map verb's provenance names the column the caller asked about", {
+  # One loop over every verb that carries provenance. The verbs that draw
+  # through world_map() with an internal fill -- `.wdj_available`,
+  # `.wdj_class`, `.wdj_cluster` -- used to report *that* column, and
+  # `.wdj_available` is never NA, so coverage_map()'s provenance said
+  # `n_missing = 0` while its own caption said otherwise.
+  skip_if_not_installed("maps")
+  skip_if_not_installed("ggplot2")
+  d <- data.frame(iso3c = c("FRA","DEU","ITA","ESP","POL","NLD"),
+                  value = c(10, 20, NA, 40, 15, 55), unc = c(1,2,3,4,5,6),
+                  stringsAsFactors = FALSE)
+  g <- suppressMessages(attach_geometry(d, geometry = "polygon"))
+  pan <- rbind(cbind(g, year = 2000), cbind(g, year = 2001))
+  # `na_coverage()` counts *countries*, not rows, and the geometry-attached
+  # frames carry every country in the backend's map -- so the invariant that
+  # holds for every verb is the count of countries that have a value: five of
+  # the six, since ITA is NA.
+  cases <- list(
+    world_map          = function() world_map(g, value),
+    coverage_map       = function() coverage_map(g, value),
+    classify_compare   = function() classify_compare(g, value),
+    facet_map          = function() facet_map(pan, value, facet = "year"),
+    bubble_map         = function() bubble_map(d, value),
+    spike_map          = function() spike_map(d, value),
+    tile_map           = function() tile_map(d, value),
+    value_by_alpha_map = function() value_by_alpha_map(g, value, unc),
+    gridded_cartogram  = function() gridded_cartogram(d, value),
+    lisa_map           = function() lisa_map(g, value)
+  )
+  for (nm in names(cases)) {
+    p <- suppressWarnings(suppressMessages(cases[[nm]]()))
+    prov <- attr(p, "countryatlas_provenance")
+    expect_false(is.null(prov), label = paste(nm, "carries provenance"))
+    expect_identical(prov$fill, "value", label = paste(nm, "provenance fill"))
+    # The coverage must describe the caller's column, not an internal fill such
+    # as `.wdj_available` that is never NA and so always reported every country
+    # as shown and none as missing.
+    expect_equal(prov$coverage$n_shown, 5L, label = paste(nm, "n_shown"))
+    expect_equal(prov$coverage$n_missing, prov$coverage$n_total - 5L,
+                 label = paste(nm, "n_missing"))
+    expect_gt(prov$coverage$n_missing, 0)
+  }
+})
+
+test_that("a perfect regression fit is reported, not leaked from summary.lm", {
+  # summary.lm() warns "essentially perfect fit: summary may be unreliable"
+  # when the residual variance is ~0. That reached the caller verbatim: it
+  # names neither the verb nor the column, and from convergence_club() it
+  # described an internal log-t regression the caller does not know exists.
+  iso <- c("USA", "FRA", "CHN", "IND", "BRA", "ZAF")
+  # Each country's value is the same geometric ramp times a constant, so every
+  # country's growth is identical and the fit has nothing left to explain.
+  perfect <- tibble::tibble(
+    iso3c = rep(iso, each = 20),
+    year = rep(2000:2019, length(iso)),
+    v = as.numeric(rep(seq_len(20), length(iso))) *
+      rep(c(1, 2, 5, 10, 20, 50), each = 20))
+
+  expect_warning(res <- beta_convergence(perfect, v),
+                 class = "countryatlas_perfect_fit")
+  # The message must be ours, not base R's.
+  w <- tryCatch(beta_convergence(perfect, v), warning = function(w) w)
+  expect_false(grepl("essentially perfect fit", conditionMessage(w)))
+  # beta is still the fitted slope, and the meaningless columns are still
+  # returned rather than blanked -- the warning is what says not to read them.
+  expect_true(is.finite(res$beta))
+  expect_equal(nrow(res), 1L)
+
+  # The internal log-t fit must not surface at all: its statistic is the only
+  # thing convergence_club() reports, and a degenerate one already returns NA.
+  expect_no_warning(suppressWarnings({
+    cl <- withCallingHandlers(
+      convergence_club(perfect, v),
+      warning = function(w) {
+        if (grepl("essentially perfect fit", conditionMessage(w))) {
+          stop("base R's perfect-fit warning leaked from log_t_stat()")
+        }
+        invokeRestart("muffleWarning")
+      })
+  }))
+
+  # An ordinary noisy panel says nothing.
+  set.seed(20260909)
+  noisy <- perfect
+  noisy$v <- noisy$v * exp(stats::rnorm(nrow(noisy), 0, 0.05))
+  expect_silent(force(beta_convergence(noisy, v)))
+})
+
+test_that("every world_geometry() what returns a column named `geometry`", {
+  # Two of the six returned `x`: st_as_sf() on a bare sfc names the column
+  # after the object, and "coastline" and "ocean" are both built by unioning
+  # into one shape. The name is part of the documented return contract, so code
+  # written against the other four broke on exactly those two.
+  skip_if_no_sf_geometry()
+  for (what in c("countries", "centroids", "coastline", "borders",
+                 "graticule", "ocean")) {
+    g <- suppressMessages(suppressWarnings(
+      world_geometry(what, geometry = "sf")))
+    expect_identical(attr(g, "sf_column"), "geometry",
+                     label = paste("world_geometry", what, "geometry column"))
+    expect_true("geometry" %in% names(g))
+  }
 })

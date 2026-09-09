@@ -33,6 +33,7 @@
 #' }
 #' }
 coverage_map <- function(data, value, by = NULL, title = NULL, ...) {
+  refuse_reserved_dots(rlang::list2(...), c("style", "legend"), "coverage_map")
   value_q <- rlang::enquo(value)
   value_name <- quo_arg_name(value_q, "value")
   by_q <- rlang::enquo(by)
@@ -69,7 +70,7 @@ coverage_map <- function(data, value, by = NULL, title = NULL, ...) {
     check_cols(data, by_name)
     p <- p + ggplot2::facet_wrap(ggplot2::vars(.data[[by_name]]))
   }
-  p
+  restate_provenance(p, data, value_name)
 }
 
 #' The same map under several classifications
@@ -114,6 +115,7 @@ coverage_map <- function(data, value, by = NULL, title = NULL, ...) {
 classify_compare <- function(data, value,
                              methods = c("quantile", "jenks", "equal", "pretty"),
                              n = 5, ncol = NULL, ...) {
+  refuse_reserved_dots(rlang::list2(...), c("style", "legend"), "classify_compare")
   value_q <- rlang::enquo(value)
   value_name <- quo_arg_name(value_q, "value")
   check_cols(data, value_name)
@@ -198,7 +200,7 @@ classify_compare <- function(data, value,
       ggplot2::facet_wrap(ggplot2::vars(.data$.wdj_method), ncol = ncol)
   )
   attr(p, "countryatlas_classification") <- report
-  p
+  restate_provenance(p, data, value_name)
 }
 
 # Breaks for classify_compare()'s methods. quantile/jenks reuse the package's
@@ -283,6 +285,19 @@ value_by_alpha_map <- function(data, value, equalize,
   check_map_geometry(data)
   check_string(background, "background")
   check_label_args(palette, title, legend, "No data")
+  # Same two silences world_map() reports, and for the same reasons: the
+  # polygon backend draws in unprojected longitude/latitude so `projection`
+  # changes nothing, and `n_bins` means nothing to a continuous colourbar.
+  # This verb has its own copies of both arguments rather than passing them
+  # through, so it needs its own notices.
+  if (!is_sf(data)) warn_projection_ignored(projection)
+  if (!identical(as.numeric(n_bins), 5) && identical(style, "continuous")) {
+    wdj_warn(c(
+      "{.arg n_bins} does not apply to {.code style = \"continuous\"} and is ignored.",
+      "i" = 'A continuous colourbar has no classes; use {.code style = "quantile"},
+             {.code "binned"} or {.code "jenks"} to bin.'
+    ), class = "countryatlas_n_bins_ignored")
+  }
   if (!is.numeric(alpha_range) || length(alpha_range) != 2L ||
       anyNA(alpha_range) || any(alpha_range < 0) || any(alpha_range > 1) ||
       alpha_range[1] >= alpha_range[2]) {
@@ -311,13 +326,22 @@ value_by_alpha_map <- function(data, value, equalize,
   # and a scale with no spread to rescale puts them all at the *midpoint* --
   # a uniformly half-lit map that reads as "equally weighted", which is the one
   # impression this verb exists to prevent.
-  if (!any(is.finite(eq))) {
+  # Gated on the number of *distinct* usable values, not on any() being finite.
+  # A column that is constant but finite is worse than an empty one and was
+  # unguarded: percent_rank(constant) is 0 for every row, so the default
+  # transform put every country at the floor of `alpha_range` over a grey20
+  # background -- an effectively blank map -- while "identity" and "log10" go
+  # through rescale01(), which returns 1 for a constant vector and draws every
+  # country fully opaque. Three transforms, two opposite wrong answers, and no
+  # warning for either.
+  usable <- unique(eq[is.finite(eq)])
+  if (length(usable) < 2L) {
     wdj_warn(c(
-      "No usable values in {.arg {eq_name}}, so opacity carries no information.",
-      "i" = "Every country is drawn at the floor of {.arg alpha_range}.
-             {.fn world_map} is the honest choice for a frame with no
-             equalising variable."
-    ))
+      "{.arg {eq_name}} has {cli::qty(length(usable))}{?no/only one} distinct
+       usable value, so opacity carries no information.",
+      "i" = "Every country is drawn at the same opacity. {.fn world_map} is
+             the honest choice for a frame with no equalising variable."
+    ), class = "countryatlas_no_equalize")
   }
   data[[".wdj_alpha"]] <- a
 

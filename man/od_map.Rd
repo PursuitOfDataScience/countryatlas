@@ -25,7 +25,12 @@ od_map(
 \item{origin}{How to read \code{from}/\code{to} (default \code{"country.name"}).}
 
 \item{origins}{Which origins to draw. A character vector of names or codes,
-or an integer giving how many of the largest to take (default \code{6}).}
+or an integer giving how many of the largest to take (default \code{6}).
+
+Note that this is \strong{not} \code{origin}, which it sits next to: \code{origin} is the
+coding scheme \code{from}/\code{to} are written in, \code{origins} is which of them to
+put on the page. Confusing the two is diagnosed rather than left to fail
+further in.}
 
 \item{direction}{\code{"out"} (default; one panel per origin, showing
 destinations) or \code{"in"} (one panel per destination, showing origins).}

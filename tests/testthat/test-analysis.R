@@ -118,7 +118,10 @@ test_that("index_to respects the `to` parameter", {
 
 test_that("index_to returns NA when base year is missing", {
   df <- data.frame(iso3c = "USA", year = 2000:2002, gdp = c(50, 55, 60))
-  out <- index_to(df, gdp, base_year = 1999)
+  # NA is the documented answer; the verb now also names the countries it
+  # could not index, which is what makes an all-NA column readable.
+  expect_warning(out <- index_to(df, gdp, base_year = 1999),
+                 class = "countryatlas_no_base_year")
   expect_true(all(is.na(out$gdp_index)))
 })
 
@@ -135,7 +138,10 @@ test_that("index_to is per-country", {
 
 test_that("index_to returns NA for zero-valued base", {
   df <- data.frame(iso3c = "A", year = 2000:2002, gdp = c(0, 1, 2))
-  out <- index_to(df, gdp, base_year = 2000)
+  # A zero base is unusable, so this country is reported like any other the
+  # verb cannot index.
+  expect_warning(out <- index_to(df, gdp, base_year = 2000),
+                 class = "countryatlas_no_base_year")
   expect_true(all(is.na(out$gdp_index)))
 })
 
@@ -220,8 +226,6 @@ test_that("an incidental group_by() never changes an answer", {
   # them rather than take the claim.
   expect_equal(flat(interpolate_missing(grp, "g")),
                flat(interpolate_missing(panel, "g")))
-  expect_equal(flat(smooth_rates(grp, g, population)),
-               flat(smooth_rates(panel, g, population)))
   expect_equal(flat(deflate(grp, g, 2000, deflator = population)),
                flat(deflate(panel, g, 2000, deflator = population)))
   expect_equal(flat(to_ppp(grp, g, factor = population)),
@@ -233,6 +237,10 @@ test_that("an incidental group_by() never changes an answer", {
   suppressWarnings({
     expect_equal(flat(rate_check(grp, g, population)),
                  flat(rate_check(panel, g, population)))
+    # smooth_rates() joined these once its pooled prior started reading one row
+    # per country rather than every row of the panel.
+    expect_equal(flat(smooth_rates(grp, g, population)),
+                 flat(smooth_rates(panel, g, population)))
     expect_equal(flat(correlate_indicators(grp)),
                  flat(correlate_indicators(panel)))
     expect_equal(audit_coverage(grp)$na_rates, audit_coverage(panel)$na_rates)

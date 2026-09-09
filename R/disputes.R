@@ -30,7 +30,10 @@
 #'
 #'   Called with no argument, returns the current policy.
 #'
-#' @return The policy in effect, invisibly when setting.
+#' @return When called with no argument, the policy currently in effect. When
+#'   setting, the policy that was in effect *before* the call, invisibly -- R's
+#'   convention for a setter, so
+#'   `on.exit(dispute_policy(dispute_policy("neutral")))` restores it.
 #'
 #' @section What this does and does not do:
 #' It records a choice and makes it visible. It does not redraw any boundary,
@@ -43,10 +46,9 @@
 #' @seealso [disputed_territories], [check_dispute_coverage()], [world_map()]
 #' @export
 #' @examples
-#' old <- dispute_policy()
-#' dispute_policy("neutral")
-#' dispute_policy()
-#' dispute_policy(old)
+#' old <- dispute_policy("neutral")   # sets, and returns what it replaced
+#' dispute_policy()                   # "neutral"
+#' dispute_policy(old)                # put it back
 dispute_policy <- function(policy = NULL) {
   valid <- c("none", "de_facto", "de_jure", "neutral")
   if (is.null(policy)) {
@@ -78,8 +80,15 @@ dispute_policy <- function(policy = NULL) {
       "i" = "Verify against your institution's own basemap before publishing."
     ))
   }
+  # The PREVIOUS policy, not the new one. R's convention for a setter is to
+  # hand back what it replaced -- options(), par(), sf::sf_use_s2() all do --
+  # which is what makes the one-liner
+  # `on.exit(dispute_policy(dispute_policy("neutral")))` work. Returning the
+  # new value made that a no-op, and the example below had to take a separate
+  # reading first to work around it.
+  old <- getOption("countryatlas.dispute_policy", "none")
   options(countryatlas.dispute_policy = policy)
-  invisible(policy)
+  invisible(old)
 }
 
 #' Which disputed territories does your data touch?
@@ -112,9 +121,32 @@ check_dispute_coverage <- function(data, quiet = FALSE) {
   } else {
     wdj_abort("{.arg data} must be a data frame with {.field iso3c}, or a character vector.")
   }
+  # Through wdj_to_iso3c(), which uppercases and strips Unicode whitespace, so a
+  # lowercase or padded code matches. Taken verbatim, check_dispute_coverage(
+  # c("esh","xkx","pse")) reported "0 tracked disputed territories appear in
+  # the data" -- a key problem presented as a coverage finding, which is the
+  # failure the five verbs beside it were fixed for.
+  iso_raw <- iso
+  iso <- suppressWarnings(wdj_to_iso3c(iso, origin = "iso3c"))
+  iso <- unique(stats::na.omit(iso))
   dt <- countryatlas::disputed_territories
   out <- dt
   out$in_data <- !is.na(dt$iso3c) & dt$iso3c %in% iso
+  # Only when the keys themselves failed to resolve. Zero matches is the normal
+  # answer here -- most countries have no disputed territory -- so warning on
+  # `!any(in_data)` alone turned every ordinary call into a false alarm. What is
+  # worth reporting is a key that resolved to nothing, which is what made
+  # lowercase input read as a coverage finding rather than a key problem.
+  unresolved <- iso_raw[is.na(suppressWarnings(
+    wdj_to_iso3c(iso_raw, origin = "iso3c")))]
+  if (length(unresolved)) {
+    wdj_warn(c(
+      "{length(unresolved)} value{?s} in {.arg data} {?is/are} not an ISO
+       3166-1 alpha-3 code and {?was/were} ignored:",
+      "*" = "{.val {utils::head(unresolved, 6)}}",
+      "i" = "{.fn standardize_country} normalises names and case."
+    ), class = "countryatlas_unresolved_keys")
+  }
   if (!quiet) {
     n_cov <- sum(out$in_data)
     n_uncodeable <- sum(is.na(dt$iso3c))
@@ -410,6 +442,34 @@ fill_capped <- function(x, y, method, max_gap) {
 # laid out as the value x uncertainty grid the palette actually is.
 
 # Build the per-row fill colour and the matching legend levels.
+# One resolution of the value-suppressing ramp, for the map and its legend both.
+#
+# vsup_fill() resolved it with a tryCatch fallback to viridis while vsup_scale()
+# hard-coded viridis, so the two could disagree about what the swatches mean.
+# hcl.colors() also takes a *different* set of names from
+# scale_fill_viridis_c(): it accepts "plasma", "inferno", "cividis", "mako" and
+# "rocket" but rejects "magma" and "turbo", which the rest of world_map()
+# honours. Falling back in silence would reproduce the bug this replaced --
+# `palette` accepted and quietly ignored -- so say so once.
+vsup_cols <- function(option = "viridis") {
+  base <- grDevices::hcl.colors(256, palette = "viridis")
+  if (identical(option, "viridis") || is.null(option)) return(base)
+  cols <- tryCatch(grDevices::hcl.colors(256, palette = option),
+                   error = function(e) NULL)
+  if (is.null(cols)) {
+    wdj_warn(c(
+      "{.arg palette} {.val {option}} is not available for a value-suppressing
+       palette; viridis is used.",
+      "i" = 'The uncertainty ramp is built with {.fn grDevices::hcl.colors},
+             which takes {.val plasma}, {.val inferno}, {.val cividis},
+             {.val mako} or {.val rocket} -- not {.val magma} or {.val turbo}.'
+    ), class = "countryatlas_vsup_palette_ignored", .frequency = "once",
+       .frequency_id = paste0("vsup-palette-", option))
+    return(base)
+  }
+  cols
+}
+
 vsup_fill <- function(value, uncertainty, n_bins = 4, n_uncertainty = 3,
                       option = "viridis", suppress = 0.85) {
   ok <- is.finite(value) & is.finite(uncertainty)
@@ -446,14 +506,17 @@ vsup_fill <- function(value, uncertainty, n_bins = 4, n_uncertainty = 3,
   centre <- (v_bin - 0.5) / n_bins
   shrink <- 1 - suppress * ((u_bin - 1) / max(1L, n_uncertainty - 1L))
   pos <- 0.5 + (centre - 0.5) * shrink
-  cols <- grDevices::hcl.colors(256, palette = "viridis")
-  if (!identical(option, "viridis")) {
-    cols <- tryCatch(grDevices::hcl.colors(256, palette = option),
-                     error = function(e) cols)
-  }
+  cols <- vsup_cols(option)
   fill <- rep(NA_character_, length(value))
   idx <- pmax(1L, pmin(256L, round(pos * 255) + 1L))
   fill[!is.na(idx)] <- cols[idx[!is.na(idx)]]
+  # `fill` looks unused -- world_map() maps `label` through vsup_scale() and
+  # never reads it -- but it is the only handle on the *colours* this function
+  # produces, and two tests use it to assert the defining VSUP property (each
+  # uncertainty band spans a narrower slice of the value ramp than the one
+  # below). Checking `label` cannot show that: the labels are the same
+  # whatever palette the ramp is. Keep it; the cost is one hcl.colors(256) per
+  # map.
   list(fill = fill, v_bin = v_bin, u_bin = u_bin,
        label = ifelse(is.na(v_bin) | is.na(u_bin), NA_character_,
                       sprintf("v%d / u%d", v_bin, u_bin)))
@@ -461,14 +524,19 @@ vsup_fill <- function(value, uncertainty, n_bins = 4, n_uncertainty = 3,
 
 # The legend: one swatch per (value, uncertainty) cell, laid out as a grid so
 # the 2-D structure is visible rather than asserted.
-vsup_scale <- function(vs, n_bins, n_uncertainty, value_name, uncertainty_name) {
+# `option` and `suppress` are taken rather than assumed: both were hard-coded
+# here while vsup_fill() took them as arguments, so the legend could not follow
+# the map -- world_map(palette = ) reached neither, and any future change to
+# either default would have had to be made twice. Defaults match vsup_fill()'s.
+vsup_scale <- function(vs, n_bins, n_uncertainty, value_name, uncertainty_name,
+                       option = "viridis", suppress = 0.85) {
   grid <- expand.grid(v = seq_len(n_bins), u = seq_len(n_uncertainty))
   # Compute the swatch colour from the *bin indices* directly, so the legend
   # cannot drift from the map when the data's range changes.
   centre <- (grid$v - 0.5) / n_bins
-  shrink <- 1 - 0.85 * ((grid$u - 1) / max(1L, n_uncertainty - 1L))
+  shrink <- 1 - suppress * ((grid$u - 1) / max(1L, n_uncertainty - 1L))
   pos <- 0.5 + (centre - 0.5) * shrink
-  cols <- grDevices::hcl.colors(256, palette = "viridis")
+  cols <- vsup_cols(option)
   swatch <- cols[pmax(1L, pmin(256L, round(pos * 255) + 1L))]
   labels <- sprintf("v%d / u%d", grid$v, grid$u)
   values <- stats::setNames(swatch, labels)

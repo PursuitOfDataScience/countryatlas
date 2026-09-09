@@ -213,7 +213,13 @@ country_codes <- function(codes = NULL) {
       "i" = "Use a shortcut ({.val {names(raw_of)}}) or a {.code countrycode::codelist} column name."
     ))
   }
-  keep <- raw
+  # De-duplicated: `codes` may name a raw codelist column that a friendly
+  # shortcut already maps to -- country_codes("country.name.en") resolved
+  # "country" and "country.name.en" to the same column, so the subset carried
+  # it twice, both renamed to "country", and dplyr::filter() below died on
+  # "Can't transform a data frame with duplicate names". The documented
+  # contract is that either spelling is accepted, so accept both and keep one.
+  keep <- raw[!duplicated(unname(raw))]
   out <- cl[, unname(keep), drop = FALSE]
   # Rename raw columns back to friendly names where we know them.
   names(out) <- vapply(names(out), function(nm) {

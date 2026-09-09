@@ -25,15 +25,16 @@ has_sf <- requireNamespace("sf", quietly = TRUE) &&
 ```
 
 "World data on a map" has many honest forms. A choropleth is only the first. The
-package offers a full vocabulary; this vignette tours the ones that run without
-extra dependencies and points to the rest.
+package offers a full vocabulary; this vignette tours the ones that need only
+`maps` -- itself a suggested package, so the map chunks are skipped when it is
+absent -- and points to the rest, which need `sf` or `biscale` as well.
 
 ## Proportional-symbol (bubble) maps
 
 For *totals*, a choropleth misleads: large values hide in small countries. Sized
 circles at centroids are the right idiom.
 
-```{r fig.alt = "Bubble map: population drawn as proportional circles at country centroids."}
+```{r eval = has_maps, fig.alt = "Bubble map: population drawn as proportional circles at country centroids."}
 bubble_map(snap, population)
 ```
 
@@ -43,7 +44,7 @@ The same "totals" job as bubbles, with a different overplotting trade-off:
 spikes only grow upward, so dense regions (Europe, the Caribbean) stay
 legible.
 
-```{r fig.alt = "Spike map: population drawn as vertical spikes rising from country centroids."}
+```{r eval = has_maps, fig.alt = "Spike map: population drawn as vertical spikes rising from country centroids."}
 spike_map(snap, population)
 ```
 
@@ -53,7 +54,7 @@ population -- Hong Kong, Macao, Gibraltar, the British Virgin Islands and Tuvalu
 -- have no centroid and so no symbol. Each verb warns and names them, and counts
 them as missing rather than shown:
 
-```{r}
+```{r eval = has_maps}
 cov <- attr(suppressWarnings(bubble_map(snap, population)),
             "countryatlas_provenance")$coverage
 unlist(cov[c("n_total", "n_shown", "n_missing")])
@@ -74,7 +75,7 @@ tile_map(snap, gdp_per_capita)
 
 Great-circle arcs between country pairs from an origin–destination table.
 
-```{r fig.alt = "Flow map: great-circle arcs joining four origin-destination country pairs, width by volume."}
+```{r eval = has_maps, fig.alt = "Flow map: great-circle arcs joining four origin-destination country pairs, width by volume."}
 od <- data.frame(
   from   = c("China", "Germany", "Brazil", "Nigeria"),
   to     = c("United States", "France", "Argentina", "India"),
@@ -88,7 +89,7 @@ flow_map(od, from, to, weight)
 `facet_map()` splits one choropleth into per-group panels — the static
 counterpart to `animate_world()`, for print and side-by-side comparison:
 
-```{r fig.height = 5, fig.alt = "Small multiples: one GDP per capita choropleth panel per continent."}
+```{r eval = has_maps, fig.height = 5, fig.alt = "Small multiples: one GDP per capita choropleth panel per continent."}
 world_poly <- attach_geometry(snap, geometry = "polygon") |>
   dplyr::filter(!is.na(continent))
 facet_map(world_poly, gdp_per_capita, continent, style = "quantile", ncol = 3)
@@ -102,7 +103,7 @@ collision avoidance when available. Zoom with `coord_quickmap()` rather than
 former keeps the latitude-dependent aspect ratio that stops Europe coming out
 stretched sideways.
 
-```{r fig.alt = "Choropleth of Europe with ISO codes labelled at country centroids."}
+```{r eval = has_maps, fig.alt = "Choropleth of Europe with ISO codes labelled at country centroids."}
 mapdf <- attach_geometry(
   dplyr::filter(snap, continent == "Europe"), geometry = "polygon"
 )

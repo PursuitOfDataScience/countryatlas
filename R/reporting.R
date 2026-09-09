@@ -286,6 +286,9 @@ world_table <- function(data, value = NULL, top_n = 20, desc = TRUE,
   tab <- gt::gt(df)
   # gt draws the subtitle inside the header block that a title opens, so a
   # subtitle on its own has nowhere to go -- it used to be dropped in silence.
+  # `title` was checked and `subtitle` was not, so a subtitle of the wrong type
+  # reached gt and failed there instead of being named here.
+  if (!is.null(subtitle)) check_string(subtitle, "subtitle")
   if (!is.null(subtitle) && is.null(title)) {
     wdj_abort(c(
       "{.arg subtitle} needs a {.arg title}.",
@@ -298,7 +301,10 @@ world_table <- function(data, value = NULL, top_n = 20, desc = TRUE,
                           subtitle = subtitle %||% gt::md(""))
   }
   num_cols <- names(df)[vapply(df, is.numeric, logical(1))]
-  num_cols <- setdiff(num_cols, "rank")
+  # `year` belongs with `rank`: it is an identifier, not a measurement, so
+  # fmt_number() rendered 2020 as "2,020" with a thousands separator the moment
+  # a caller asked for columns = "year" on a panel.
+  num_cols <- setdiff(num_cols, c("rank", "year"))
   if (length(num_cols)) {
     tab <- gt::fmt_number(tab, columns = dplyr::all_of(num_cols),
                           n_sigfig = 4)

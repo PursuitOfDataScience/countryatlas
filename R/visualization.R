@@ -207,6 +207,15 @@ world_map <- function(data, fill,
   check_cols(data, fill_name)
   check_map_geometry(data)
 
+  # Validated before the engine hand-off below, not after it. The tmap branch
+  # returns early and passed `n_bins` straight to tm_scale_intervals(), which
+  # coerces with as.integer() -- so n_bins = 1e18 became NA there, and a string
+  # was accepted, while every other path rejected both. Same shape as the
+  # globe_map(interactive = TRUE) hand-off that was fixed for arg_match() and
+  # check_label_args(): validate first, dispatch second. The drawing path
+  # downstream validates it too; an unusable value should get that error and
+  # not a notice that the argument it just rejected does not apply.
+  check_number(n_bins, "n_bins", lo = 2, hi = .Machine$integer.max)
   sf_mode <- is_sf(data)
   check_categorical_fill(style, data[[fill_name]], fill_name)
 
@@ -228,6 +237,33 @@ world_map <- function(data, fill,
     return(world_map_tmap(data, fill_name, style, n_bins, palette, title,
                           legend, na_label, borders, sf_mode,
                           projection, recenter))
+  }
+
+  # On this engine `projection` and `recenter` are sf-only: the polygon backend
+  # draws through coord_quickmap() in unprojected longitude/latitude, so both
+  # looked honoured and changed nothing -- the exact silence these two helpers
+  # were written for. attach_geometry(), world_geometry(), world_data() and
+  # join_world() all report it; this is the verb people actually reach for, and
+  # it did not. Placed after the tmap branch above, which does honour both.
+  if (!sf_mode) {
+    warn_projection_ignored(projection)
+    warn_recenter_ignored(recenter)
+  }
+  # `n_bins` only means something to a style that bins. It was silently inert
+  # under "continuous" (a colourbar has no classes) and "categorical" (the
+  # classes are the values), which is the same complaint the 3.0.0 fix for
+  # style = "binned" answered -- n_bins was ignored there too. Compared against
+  # the default rather than missing(), matching warn_projection_ignored().
+  #
+  if (!identical(as.numeric(n_bins), 5) &&
+      style %in% c("continuous", "categorical")) {
+    wdj_warn(c(
+      "{.arg n_bins} does not apply to {.code style = \"{style}\"} and is ignored.",
+      "i" = if (identical(style, "continuous"))
+        'A continuous colourbar has no classes; use {.code style = "binned"},
+         {.code "quantile"} or {.code "jenks"} to bin.'
+      else 'The classes are the values of the fill column.'
+    ), class = "countryatlas_n_bins_ignored")
   }
 
   # A panel drawn as one static map overplots each country's years on top of
@@ -303,9 +339,13 @@ world_map <- function(data, fill,
                country missing either one is drawn as no-data."
       ))
     }
+    # `palette` reaches the value-suppressing palette now. It used to reach
+    # neither vsup_fill() nor vsup_scale(), both of which assumed viridis, so
+    # world_map(uncertainty = , palette = "magma") drew viridis without a word.
     vsup <- vsup_fill(data[[fill_name]], data[[unc_name]],
                       n_bins = as.integer(n_bins),
-                      n_uncertainty = n_uncertainty)
+                      n_uncertainty = n_uncertainty,
+                      option = palette %||% "viridis")
     data[[".wdj_vsup"]] <- factor(
       vsup$label,
       levels = sprintf("v%d / u%d",
@@ -313,6 +353,19 @@ world_map <- function(data, fill,
                        rep(seq_len(n_uncertainty), each = as.integer(n_bins))))
   }
 
+  # `style` cannot apply when a value-suppressing palette is drawn: the VSUP
+  # mapping replaces the binned fill below, so the classification is computed
+  # and discarded. It used to be discarded in silence, and the provenance then
+  # reported that unused style as though the map had used it.
+  if (!is.null(vsup) && !identical(style, "continuous")) {
+    wdj_warn(c(
+      "{.arg style} does not apply when {.arg uncertainty} is given and is
+       ignored.",
+      "i" = "A value-suppressing palette encodes the value and its uncertainty
+             together, so it sets its own classes; {.arg n_bins} controls how
+             many."
+    ), class = "countryatlas_style_ignored")
+  }
   binned <- apply_binned_fill(data, fill_name, style, n_bins)
   data <- binned$data
   fill_mapped <- if (is.null(vsup)) binned$fill else rlang::quo(.data[[".wdj_vsup"]])
@@ -341,15 +394,30 @@ world_map <- function(data, fill,
                    na_value = na_value, breaks = attr(binned, "breaks"))
   } else {
     vsup_scale(vsup, as.integer(n_bins), n_uncertainty,
-               legend %||% fill_name, quo_arg_name(unc_q, "uncertainty"))
+               legend %||% fill_name, quo_arg_name(unc_q, "uncertainty"),
+               option = palette %||% "viridis")
   }
   p <- p + theme_world_map()
 
+  # suppressMessages() on both: each returns list(<layer>, <CoordSf>), and
+  # ggplot_add.Coord announces "Coordinate system already present. Adding new
+  # coordinate system, which will replace the existing one." whenever the
+  # existing coord is non-default -- which it is, wdj_coord_sf() having been
+  # added above. Replacing it is exactly what the re-assertion below handles, so
+  # the note describes bookkeeping the caller cannot act on. A plain sf call is
+  # silent (test-pre-cran-polish.R asserts that of every verb); these two
+  # arguments were the gap.
+  # The layer is *built* outside the suppression and only *added* inside it.
+  # na_hatch_layer() announces a missing ggpattern -- "asking for hatching and
+  # silently getting grey is the one thing worse than not offering hatching" --
+  # and wrapping the whole expression swallowed that too.
   if (identical(na_style, "hatched")) {
-    p <- p + na_hatch_layer(data, fill_name, sf_mode, borders)
+    hatch <- na_hatch_layer(data, fill_name, sf_mode, borders)
+    if (!is.null(hatch)) p <- suppressMessages(p + hatch)
   }
   if (identical(disputes, "mark")) {
-    p <- p + dispute_layer(data, sf_mode)
+    marks <- dispute_layer(data, sf_mode)
+    if (!is.null(marks)) p <- suppressMessages(p + marks)
   }
   # Re-assert the coordinate system after those two. Both return
   # list(<layer>, <CoordSf>) -- geom_sf() and ggpattern::geom_sf_pattern() each
@@ -360,7 +428,7 @@ world_map <- function(data, fill,
   # The coord is not a layer, so re-adding it here does not disturb draw order.
   if (sf_mode && (identical(na_style, "hatched") ||
                   identical(disputes, "mark"))) {
-    p <- p + wdj_coord_sf(projection, recenter)
+    p <- suppressMessages(p + wdj_coord_sf(projection, recenter))
   }
   if (!is.null(title)) p <- p + ggplot2::labs(title = title)
 
@@ -372,10 +440,16 @@ world_map <- function(data, fill,
   # Provenance travels on the object, not in a print side effect, so it survives
   # being saved, faceted or handed to map_provenance() later.
   attr(p, "countryatlas_provenance") <- list(
-    fill = fill_name, style = style, projection = if (sf_mode) projection else "coord_quickmap",
+    fill = fill_name,
+    # "vsup" rather than `style` when a value-suppressing palette was drawn:
+    # the classification `style` names is computed and then replaced, so
+    # reporting it claimed the map used a classification it did not, and the
+    # attached break table below described the same unused one.
+    style = if (is.null(vsup)) style else "vsup",
+    projection = if (sf_mode) projection else "coord_quickmap",
     backend = if (sf_mode) "sf" else "polygon", n_bins = n_bins,
     na_style = na_style, coverage = coverage,
-    breaks = attr(binned, "breaks"),
+    breaks = if (is.null(vsup)) attr(binned, "breaks") else NULL,
     disputes = disputes, dispute_policy = dispute_policy(),
     uncertainty = if (is.null(vsup)) NA_character_ else quo_arg_name(unc_q, "uncertainty"),
     n_imputed = imputed_count(data)
@@ -472,7 +546,18 @@ split_antimeridian <- function(df, id) {
       lat_c <- g$lat[i] + t * (g$lat[i + 1L] - g$lat[i])
       head_row <- g[i, , drop = FALSE]; head_row$lon <- edge; head_row$lat <- lat_c
       tail_row <- head_row; tail_row$lon <- -edge
-      pieces[[k]] <- rbind(g[start:i, , drop = FALSE], head_row)
+      # The carry from the PREVIOUS crossing belongs at the front of this
+      # piece. Every carry was computed and stored, but only the last one was
+      # ever read (by `last`, below), and the rest were dropped by the
+      # attr(x, "carry") <- NULL at the end -- so with two or more crossings
+      # the middle segments began at their first raw vertex instead of at the
+      # antimeridian edge, leaving a visible break on the re-entry side. The
+      # code read as though it handled any number of crossings; it handled one.
+      pieces[[k]] <- rbind(
+        if (k > 1L) attr(pieces[[k - 1L]], "carry"),
+        g[start:i, , drop = FALSE],
+        head_row
+      )
       pieces[[k]]$.seg <- k
       attr(pieces[[k]], "carry") <- tail_row
       start <- i + 1L
@@ -867,7 +952,17 @@ bubble_map <- function(data, size, color = NULL, projection = "equal_earth",
   check_number(max_size, "max_size", lo = 0)
   check_number(alpha, "alpha", lo = 0, hi = 1)
   # One row per country, so a country contributes a single bubble.
-  data <- distinct_countries(tibble::as_tibble(data))
+  #
+  # sf_drop() BEFORE as_tibble(), the order rate_check(), world_table(),
+  # gridded_cartogram() and align_weights() all use. as_tibble() strips the
+  # `sf` class but leaves the live sfc column in place, so the
+  # st_drop_geometry() further down saw a plain tibble and returned it
+  # unchanged -- and the join then carried the caller's geometry alongside the
+  # basemap's, producing `geometry.x` / `geometry.y` and renaming the active
+  # column out from under coord_sf(). The polygon path is unaffected: it draws
+  # from country_meta centroids, and long/lat/group are ordinary columns that
+  # sf_drop() does not touch.
+  data <- distinct_countries(tibble::as_tibble(sf_drop(data)))
 
   if (backend == "sf") {
     need_pkg("sf", "for bubble_map(backend = \"sf\")")
@@ -1245,8 +1340,12 @@ cartogram_map <- function(data, weight, type = c("contiguous", "dorling",
     auto_fill_scale(carto[[fill_name]], fill_name) +
     theme_world_map()
   # Remember what it was weighted by, so cartogram_diagnostics() can check the
-  # convergence without being told again.
+  # convergence without being told again -- and the frame itself, so that
+  # function does not have to reach into the plot object's data slot. That read
+  # went through ggplot2's `$` compatibility layer over its S7 class, which is
+  # not something to depend on indefinitely.
   attr(p, "countryatlas_cartogram_weight") <- w_name
+  attr(p, "countryatlas_cartogram_data") <- carto
   wdj_provenance(p, sf_drop(carto), fill_name, "sf", projection,
                  style = paste0("cartogram (", type, ")"),
                  extra = list(coverage = full_cov))
@@ -1386,8 +1485,16 @@ tile_map <- function(data, fill, label = TRUE) {
   # way bubble_map() and spike_map() did.
   tile_cov <- centroid_coverage(one_per_country, fill_name, grid$iso3c,
                                 "tile in the bundled grid")
+  # auto_fill_scale() picks a continuous or a discrete scale from the column's
+  # own type, so recording "categorical tile" unconditionally described a
+  # numeric fill drawn with scale_fill_viridis_c() as categorical -- in the
+  # provenance record whose whole job is to say what was drawn.
   wdj_provenance(p, data, fill_name, "tile-grid", "equal-area tile grid",
-                 style = "categorical tile",
+                 style = if (is.numeric(tiles[[fill_name]])) {
+                   "continuous tile"
+                 } else {
+                   "categorical tile"
+                 },
                  extra = list(coverage = tile_cov))
 }
 
@@ -1629,7 +1736,7 @@ animate_world <- function(data, fill, time = year, projection = "equal_earth",
     frame_lab <- "{current_frame}"
     p +
       gganimate::transition_manual(frames = .data[[time_name]]) +
-      if (is.null(p$labels$title)) ggplot2::labs(title = frame_lab) else
+      if (is.null(gg_title(p))) ggplot2::labs(title = frame_lab) else
         ggplot2::labs(subtitle = frame_lab)
   } else {
     wdj_inform(c("i" = "Package {.pkg gganimate} not installed; faceting by {.val {time_name}} instead."))
@@ -1724,17 +1831,25 @@ interactive_map <- function(data, fill, tooltip = NULL,
                                    method = "quantile", n = 5,
                                    palette = viridis_hex)$expression
       } else {
-        mapgl::match_expr(column = fill_name,
-                          # method = "radix": plain sort() consults the
-                          # collation locale, and these values are paired
-                          # positionally with the colour stops below, so the
-                          # same categories were drawn in different colours on
-                          # machines with different locales.
-                          values = { .v <- unique(as.character(g[[fill_name]]))
-                                     .v <- .v[!is.na(.v)]
-                                     .v[order(.v, method = "radix")] },
-                          stops = viridis_hex(
-                            length(unique(stats::na.omit(g[[fill_name]])))))
+        # The categories and their colour stops are computed *once* and paired
+        # by position. They used to be derived independently from the same
+        # column, and viridis_hex() floors at two colours, so exactly one
+        # distinct category gave 1 value against 2 stops and mapgl rejected the
+        # mismatch outright. head() rather than a second count, so the two can
+        # never disagree again.
+        #
+        # method = "radix": plain sort() consults the collation locale, and
+        # these values are paired positionally with the stops, so the same
+        # categories were drawn in different colours on machines with
+        # different locales.
+        {
+          cats <- unique(as.character(g[[fill_name]]))
+          cats <- cats[!is.na(cats)]
+          cats <- cats[order(cats, method = "radix")]
+          mapgl::match_expr(column = fill_name, values = cats,
+                            stops = utils::head(viridis_hex(length(cats)),
+                                                length(cats)))
+        }
       },
       fill_opacity = 0.85, fill_outline_color = "#33333366",
       tooltip = tip, hover_options = list(fill_opacity = 1)
@@ -1772,6 +1887,11 @@ interactive_map <- function(data, fill, tooltip = NULL,
     } else {
       quo_col_mapping(tooltip_name)
     }
+    # data_id below is `iso3c`, which nothing had checked for: check_cols()
+    # covers `fill` and `tooltip`, and check_map_geometry() does not require a
+    # key -- so a frame without one failed at render time from inside rlang.
+    # Same guard the leaflet branch now carries.
+    check_cols(data, "iso3c")
     if (is_sf(data)) {
       p <- ggplot2::ggplot(data) +
         ggiraph::geom_sf_interactive(
@@ -1807,15 +1927,47 @@ interactive_map <- function(data, fill, tooltip = NULL,
   }
   fill_name <- quo_arg_name(fill_q, "fill")
   tooltip_name <- if (rlang::quo_is_null(tooltip_q)) fill_name else quo_arg_name(tooltip_q, "tooltip")
-  pal <- leaflet::colorNumeric("viridis", domain = data[[fill_name]],
-                               na.color = "#dddddd")
-  leaflet::leaflet(sf::st_transform(data, 4326L)) |>
+  # A discrete fill used to reach colorNumeric() and die inside leaflet with
+  # "Wasn't able to determine range of domain" -- the same defect
+  # auto_fill_scale() was written to fix for the ggplot2 engines, and that the
+  # mapgl branch above handles with match_expr(). `?interactive_map` documents
+  # no per-engine restriction on `fill`, so branch here too.
+  #
+  # method = "radix" for the level order, as everywhere else in this file:
+  # colorFactor() pairs levels with palette stops positionally, and plain
+  # sort() consults the collation locale, which would colour the same
+  # categories differently on different machines.
+  pal <- if (is.numeric(data[[fill_name]])) {
+    leaflet::colorNumeric("viridis", domain = data[[fill_name]],
+                          na.color = "#dddddd")
+  } else {
+    lv <- unique(as.character(data[[fill_name]]))
+    lv <- lv[!is.na(lv)]
+    leaflet::colorFactor("viridis", levels = lv[order(lv, method = "radix")],
+                         na.color = "#dddddd")
+  }
+  # Values computed here rather than deferred to leaflet's `~` formulas, which
+  # it evaluates against the data as an environment. Two problems with that,
+  # both fixed by evaluating eagerly:
+  #
+  #  - `~ pal(get(fill_name))` looked up `pal` in that environment first, so a
+  #    column named `pal` shadowed the palette function and leaflet then tried
+  #    to call the column. This was the only place in the package reading a
+  #    column with get() in a formula rather than [[.
+  #  - `~ paste0(iso3c, ...)` read `iso3c` with no check that it is there.
+  #    check_cols() covered `fill` and `tooltip`; check_map_geometry() does not
+  #    require iso3c, so a frame without one failed at render time from inside
+  #    leaflet. The label is the only thing that needs it, so ask for it.
+  check_cols(data, "iso3c")
+  shapes <- sf::st_transform(data, 4326L)
+  leaflet::leaflet(shapes) |>
     leaflet::addPolygons(
-      fillColor = ~ pal(get(fill_name)), weight = 0.5, color = "grey",
+      fillColor = pal(shapes[[fill_name]]), weight = 0.5, color = "grey",
       fillOpacity = 0.8,
-      label = ~ paste0(iso3c, ": ", get(tooltip_name))
+      label = paste0(shapes$iso3c, ": ", shapes[[tooltip_name]])
     ) |>
-    leaflet::addLegend(pal = pal, values = ~ get(fill_name), title = fill_name)
+    leaflet::addLegend(pal = pal, values = shapes[[fill_name]],
+                       title = fill_name)
 }
 
 #' Centroid-anchored country labels
@@ -1868,6 +2020,17 @@ geom_country_labels <- function(mapping = NULL, data = NULL, repel = TRUE,
                                 flag = FALSE, size = 3, ...) {
   check_bool(repel, "repel")
   check_bool(flag, "flag")
+  # `size` feeds ggplot2's own arithmetic, so a string or a vector failed deep
+  # inside the geom rather than here; `mapping` reaches modifyList(), which
+  # errors on anything that is not a list.
+  check_number(size, "size", lo = 0)
+  if (!is.null(mapping) && !inherits(mapping, "uneval")) {
+    wdj_abort(c(
+      "{.arg mapping} must be a {.fn ggplot2::aes} mapping.",
+      "x" = "Got {.obj_type_friendly {mapping}}.",
+      "i" = 'Write {.code mapping = ggplot2::aes(label = country)}.'
+    ))
+  }
   explicit <- !is.null(data)
   to_centroids <- function(d) {
     # An sf frame has no long/lat columns, so the layer's own aes() died on
@@ -2037,7 +2200,12 @@ simplify_geometry <- function(x, keep = 0.05, ...) {
   # and sf::st_coordinates() is not implemented for that. get_world_sf() casts
   # for the same reason; simplifying undid it. A type change only.
   keep_multipolygon <- function(g) {
-    if (!inherits(g, "sf") || !any(grepl("POLYGON", sf::st_geometry_type(g)))) {
+    # `sf` OR `sfc`: the validator accepts both, so gating on "sf" alone
+    # skipped the documented type normalisation for half the accepted inputs --
+    # an sfc came back as a mix of POLYGON and MULTIPOLYGON where an sf frame
+    # was cast to MULTIPOLYGON throughout.
+    if (!inherits(g, c("sf", "sfc")) ||
+        !any(grepl("POLYGON", sf::st_geometry_type(g)))) {
       return(g)
     }
     suppressWarnings(sf::st_cast(g, "MULTIPOLYGON", warn = FALSE))
@@ -2154,6 +2322,19 @@ globe_map <- function(data, fill, lon = 0, lat = 20,
   # to coord_map() instead, which took a nonsense orientation without comment.
   check_number(lon, "lon", lo = -360, hi = 360)
   check_number(lat, "lat", lo = -90, hi = 90)
+  # Same notice world_map() gives: n_bins means nothing to a colourbar or to
+  # categories. This verb has its own copy of the argument.
+  check_number(n_bins, "n_bins", lo = 2, hi = .Machine$integer.max)
+  if (!identical(as.numeric(n_bins), 5) &&
+      style %in% c("continuous", "categorical")) {
+    wdj_warn(c(
+      "{.arg n_bins} does not apply to {.code style = \"{style}\"} and is ignored.",
+      "i" = if (identical(style, "continuous"))
+        'A continuous colourbar has no classes; use {.code style = "binned"},
+         {.code "quantile"} or {.code "jenks"} to bin.'
+      else 'The classes are the values of the fill column.'
+    ), class = "countryatlas_n_bins_ignored")
+  }
 
   if (backend == "polygon") {
     need_pkg("mapproj", "for globe_map(backend = \"polygon\")")
@@ -2619,7 +2800,10 @@ cartogram_diagnostics <- function(x, weight = NULL) {
   geom <- NULL
   w_name <- NULL
   if (inherits(x, "ggplot")) {
-    geom <- x$data
+    # The attribute first, the data slot only as a fallback -- a plot built by
+    # an older version of the package carries the weight name but not the
+    # frame.
+    geom <- attr(x, "countryatlas_cartogram_data") %||% gg_plot_data(x)
     prov <- attr(x, "countryatlas_cartogram_weight")
     w_name <- if (!rlang::quo_is_null(weight_q)) quo_arg_name(weight_q, "weight") else prov
     if (is.null(w_name)) {
@@ -2675,12 +2859,30 @@ cartogram_diagnostics <- function(x, weight = NULL) {
   )
   out$area_error <- (out$actual_share - out$target_share) / out$target_share
   out <- dplyr::arrange(out, dplyr::desc(abs(.data$area_error)))
-  attr(out, "countryatlas_cartogram") <- tibble::tibble(
-    n = sum(ok),
-    mean_abs_error = mean(abs(out$area_error), na.rm = TRUE),
-    max_abs_error = max(abs(out$area_error), na.rm = TRUE),
-    worst = out$iso3c[1]
-  )
+  # Guarded on sum(ok): with no usable row -- an all-NA or all-non-positive
+  # weight column, both reachable through the documented entry point --
+  # max(numeric(0)) returned -Inf *and* leaked base R's "no non-missing
+  # arguments to max", mean() returned NaN, and `worst` named whichever country
+  # happened to sort first. Report the emptiness instead of three numbers that
+  # describe nothing.
+  attr(out, "countryatlas_cartogram") <- if (!sum(ok)) {
+    tibble::tibble(n = 0L, mean_abs_error = NA_real_, max_abs_error = NA_real_,
+                   worst = NA_character_)
+  } else {
+    tibble::tibble(
+      n = sum(ok),
+      mean_abs_error = mean(abs(out$area_error), na.rm = TRUE),
+      max_abs_error = max(abs(out$area_error), na.rm = TRUE),
+      worst = out$iso3c[1]
+    )
+  }
+  if (!sum(ok)) {
+    wdj_warn(c(
+      "No country has a usable {.field {w_name}}, so no area error could be
+       measured.",
+      "i" = "A cartogram's target share needs a finite, positive weight."
+    ), class = "countryatlas_no_usable_weight")
+  }
   out
 }
 
@@ -2765,7 +2967,7 @@ world_map_tmap <- function(data, fill_name, style, n_bins, palette, title,
   # default, Equal Earth, went unhonoured just as silently as an explicit
   # request. wdj_crs() resolves both and validates the name, and tm_shape()
   # takes the proj4 string it returns.
-  tmap::tm_shape(data, crs = wdj_crs(projection, recenter)) +
+  p <- tmap::tm_shape(data, crs = wdj_crs(projection, recenter)) +
     tmap::tm_polygons(
       fill = fill_name,
       fill.scale = fill_scale,
@@ -2774,4 +2976,13 @@ world_map_tmap <- function(data, fill_name, style, n_bins, palette, title,
       lwd = 0.2
     ) +
     (if (is.null(title)) tmap::tm_layout() else tmap::tm_title(title))
+  # Provenance travels on the tmap object too. ?map_provenance says `x` is "a
+  # plot returned by any of the package's map verbs -- world_map(), ...", and
+  # this engine attached nothing, so map_provenance() refused it with an error
+  # naming world_map() as the thing that would have worked -- which is what the
+  # caller used. The attribute survives a tmap object exactly as it does a
+  # ggplot one.
+  wdj_provenance(p, data, fill_name, if (sf_mode) "sf" else "polygon",
+                 projection = projection, style = style,
+                 extra = list(n_bins = n_bins, engine = "tmap"))
 }

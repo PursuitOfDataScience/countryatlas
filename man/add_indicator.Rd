@@ -11,8 +11,8 @@ add_indicator(data, source, indicator, countries = NULL, years = NULL, ...)
 recognise).}
 
 \item{source, indicator, countries, years, ...}{Passed to \code{\link[=fetch_indicator]{fetch_indicator()}}.
-\code{countries} defaults to the codes already in \code{data}, so only what you need
-is fetched.}
+\code{countries} defaults to the codes already in \code{data}, so you never have to
+restate them. How much that saves depends on the source -- see below.}
 }
 \value{
 \code{data} with the indicator column(s) added.
@@ -22,6 +22,25 @@ is fetched.}
 any registered source and attach it to a frame you already have, matched on
 the ISO spine (and on \code{year} too, when both sides are panels).
 }
+\section{How much \code{countries} actually saves}{
+
+\code{countries} bounds the \emph{result}, not necessarily the download. Only some
+providers accept a country filter in the request:\tabular{ll}{
+   Source \tab \code{countries} reaches the provider? \cr
+   \code{comtrade} \tab yes -- sent as \code{reporter} \cr
+   \code{wdi} \tab partly -- the year range is sent, countries are filtered here \cr
+   \code{owid}, \code{eurostat}, \code{oecd} \tab no -- the full dataset is downloaded, then filtered \cr
+}
+
+
+So \code{add_indicator(one_row, "owid", "life-expectancy")} still transfers every
+country and year that dataset holds in order to keep a single value. When
+that matters, narrow with \code{years} (which the \code{wdi} and \code{comtrade} adapters do
+push down), or fetch once into a variable and reuse it rather than calling
+this per subset. The on-disk cache means a repeated \code{wdi} fetch is free;
+the other sources are memoised for the session only.
+}
+
 \examples{
 \dontrun{
 world_snapshot$countries |>

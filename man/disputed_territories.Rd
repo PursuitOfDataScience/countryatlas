@@ -34,6 +34,17 @@ another.} Where it says "administered by" it means de facto control as
 reported by the mapping sources the package already uses (Natural Earth), not
 recognition, legitimacy or endorsement.
 }
+\section{What reads these columns}{
+
+Nothing in the package does. The internal layer and note builders behind
+\code{world_map(disputes = )} and \code{\link[=dispute_policy]{dispute_policy()}} key on \code{iso3c} alone, and no
+verb filters on the parties. \code{administered_by} and
+\code{claimed_by} are here for your own filtering -- "show me everything Morocco
+administers", "drop the territories with more than one claimant" -- and are
+documented precisely so that such a filter is writable. Their contents are
+validated at build time against the placeholder list below.
+}
+
 \section{The codes in \code{administered_by} and \code{claimed_by}}{
 
 Mostly ISO 3166-1 alpha-3, so they join the \code{iso3c} spine directly -- but not

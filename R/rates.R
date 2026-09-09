@@ -75,7 +75,7 @@ rate_check <- function(data, numerator, denominator, min_denominator = NULL,
   num <- df[[num_name]]
   den <- df[[den_name]]
   r <- if (rlang::quo_is_null(rate_q)) {
-    ifelse(is.finite(den) & den > 0, num / den, NA_real_)
+    num_ifelse(is.finite(den) & den > 0, num / den)
   } else {
     rate_name <- quo_arg_name(rate_q, "rate")
     check_cols(df, rate_name)
@@ -86,7 +86,12 @@ rate_check <- function(data, numerator, denominator, min_denominator = NULL,
   # With no positive finite denominator anywhere, quantile() returns NA and the
   # comparison below yields an all-NA `flagged` column -- so sum(out$flagged),
   # the obvious next step, is NA rather than a count. Say why once.
-  if (!is.finite(thr)) {
+  #
+  # nrow() first, the same guard smooth_rates() and to_ppp() carry: quantile()
+  # of an empty vector is also NA, so a zero-row frame was told it had no
+  # usable denominator rather than simply having no rows. There is nothing to
+  # warn about in a frame with nothing in it.
+  if (nrow(df) && !is.finite(thr)) {
     wdj_warn(c(
       "No usable {.arg denominator}, so no small-denominator threshold could be
        computed.",
@@ -100,8 +105,8 @@ rate_check <- function(data, numerator, denominator, min_denominator = NULL,
     # Poisson SE of a rate: the count's variance is its mean, so the rate's SE
     # is sqrt(rate / denominator). It is the compact statement of why a small
     # denominator is untrustworthy.
-    expected_se = ifelse(is.finite(r) & is.finite(den) & den > 0,
-                         sqrt(pmax(r, 0) / den), NA_real_),
+    expected_se = num_ifelse(is.finite(r) & is.finite(den) & den > 0,
+                             sqrt(pmax(r, 0) / den)),
     # `is.finite(den) & den < thr` yields FALSE, not NA, for a non-finite
     # denominator, because R short-circuits `FALSE & NA` to FALSE. With *no*
     # computable threshold that turned the whole column into a confident
@@ -129,8 +134,8 @@ rate_check <- function(data, numerator, denominator, min_denominator = NULL,
   # to expected_se for every row with at least one event, so nothing else in
   # the table moves, and expected_se itself stays exactly the documented
   # Poisson SE.
-  ord <- ifelse(is.finite(num) & is.finite(den) & den > 0,
-                sqrt(pmax(num, 1)) / den, NA_real_)
+  ord <- num_ifelse(is.finite(num) & is.finite(den) & den > 0,
+                    sqrt(pmax(num, 1)) / den)
   dplyr::arrange(out, dplyr::desc(ord))
 }
 
@@ -185,7 +190,7 @@ smooth_rates <- function(data, numerator, denominator,
   num <- data[[num_name]]
   den <- data[[den_name]]
   ok <- is.finite(num) & is.finite(den) & den > 0
-  raw <- ifelse(ok, num / den, NA_real_)
+  raw <- num_ifelse(ok, num / den)
 
   rate_col <- paste0(num_name, "_rate")
   sm_col <- paste0(num_name, suffix)
@@ -194,7 +199,9 @@ smooth_rates <- function(data, numerator, denominator,
   # Same silence rate_check() used to have: with no usable denominator every
   # rate is NA, so the smoothed column is NA too and the result looks like a
   # computation that ran rather than one with nothing to work with.
-  if (!any(ok)) {
+  # length() first: !any(logical(0)) is TRUE, so a zero-row frame was told
+  # it had nothing usable rather than simply having nothing.
+  if (length(ok) && !any(ok)) {
     wdj_warn(c(
       "No usable {.arg denominator}, so there are no rates to smooth.",
       "i" = "A rate needs a finite, positive denominator; {.field {rate_col}}
@@ -211,7 +218,7 @@ smooth_rates <- function(data, numerator, denominator,
 
   if (identical(method, "none") || sum(ok) < 2L) {
     data[[sm_col]] <- raw
-    data[[sh_col]] <- ifelse(ok, 1, NA_real_)
+    data[[sh_col]] <- num_ifelse(ok, 1)
     # Normalised here too, not only on the smoothing path below: this early
     # return handed back whatever class arrived, so `method = "none"` leaked an
     # incoming grouping and returned a bare data.frame where every other mode
@@ -223,9 +230,30 @@ smooth_rates <- function(data, numerator, denominator,
   # pooled one, and the between-country variance is the excess over what Poisson
   # sampling alone would produce.
   d <- den[ok]; y <- num[ok]; r <- y / d
-  rbar <- sum(y) / sum(d)
-  dbar <- mean(d)
-  s2 <- sum(d * (r - rbar)^2) / sum(d)
+  # The pooled hyperparameters are estimated from one row per country, the way
+  # rate_check() reads its input, while the shrinkage below is applied to every
+  # row so the returned frame keeps its shape.
+  #
+  # Estimating them from the raw rows was wrong in two ways that both looked
+  # like a computation that had run. On a geometry-attached frame -- about
+  # 99,000 vertex rows -- every country entered `rbar`, `dbar` and `s2` once
+  # per polygon vertex, so the prior was weighted by coastline complexity and
+  # every shrinkage weight was wrong. On a panel it pooled across years without
+  # a word. distinct_countries() picks the earliest year deterministically and
+  # says that it had to choose.
+  pooled <- if ("iso3c" %in% names(data)) {
+    pd <- distinct_countries(tibble::as_tibble(sf_drop(data)))
+    pok <- is.finite(pd[[num_name]]) & is.finite(pd[[den_name]]) &
+      pd[[den_name]] > 0
+    list(y = pd[[num_name]][pok], d = pd[[den_name]][pok])
+  } else {
+    list(y = y, d = d)
+  }
+  if (!length(pooled$d)) pooled <- list(y = y, d = d)
+  py <- pooled$y; pd_ <- pooled$d; pr <- py / pd_
+  rbar <- sum(py) / sum(pd_)
+  dbar <- mean(pd_)
+  s2 <- sum(pd_ * (pr - rbar)^2) / sum(pd_)
   phi <- s2 - rbar / dbar
   w <- rep(0, length(r))
   if (is.finite(phi) && phi > 0) w <- d / (d + rbar / phi)
@@ -298,6 +326,16 @@ deflate <- function(data, value, base_year, deflator = NULL,
       "{.arg base_year} must be a single year.",
       "x" = "Got {.val {shown}}."
     ))
+  }
+  # A zero-row panel has nothing to rebase, and every downstream step
+  # misbehaved on it: the guard below aborted (nothing is `%in%` an empty
+  # vector) while reporting "Years present: Inf and -Inf" from range() of
+  # nothing, and the fetching branch would have asked the World Bank for the
+  # range Inf..-Inf. Return early with the promised column, typed -- the
+  # contract complete_years() and world_table() already follow.
+  if (!nrow(data)) {
+    data[[paste0(val_name, suffix)]] <- numeric(0)
+    return(wdj_return_frame(data))
   }
   if (!base_year %in% data$year) {
     wdj_abort(c(
@@ -423,7 +461,9 @@ to_ppp <- function(data, value, factor = NULL, suffix = "_ppp") {
   # Zero, negative and NA factors all yield NA here, which is right but was
   # silent: a bad factor column produced a mostly-empty result that looked
   # like a conversion had happened.
-  if (!any(usable)) {
+  # length() first: !any(logical(0)) is TRUE, so a zero-row frame was told
+  # it had nothing usable rather than simply having nothing.
+  if (length(usable) && !any(usable)) {
     wdj_warn(c(
       "No usable {.field {fac_name}}, so nothing could be converted.",
       "i" = "A conversion factor must be finite and positive;
@@ -436,7 +476,7 @@ to_ppp <- function(data, value, factor = NULL, suffix = "_ppp") {
       "i" = "Zero, negative and {.val {NA}} factors are all unusable."
     ), class = "countryatlas_unusable_rows")
   }
-  data[[new]] <- ifelse(usable, data[[val_name]] / fac, NA_real_)
+  data[[new]] <- num_ifelse(usable, data[[val_name]] / fac)
   if (rlang::quo_is_null(fac_q)) data$.wdj_ppp <- NULL
   # As in smooth_rates(): a bare `data` leaked an incoming grouping out.
   wdj_return_frame(data)
@@ -533,7 +573,8 @@ convergence_club <- function(data, value, min_size = 2, alpha = 0.05) {
   ti <- ncol(y)
   if (ti < 15L) {
     wdj_warn(c(
-      "The log-t test has little power on {ti} periods.",
+      "The log-t test has little power on {ti}
+       {cli::qty(ti)}period{?s}.",
       "i" = "Phillips & Sul suggest at least 15; treat the clubs as indicative."
     ))
   }
@@ -608,7 +649,12 @@ log_t_stat <- function(y) {
   rhs <- log(idx)
   fit <- try(stats::lm(lhs ~ rhs), silent = TRUE)
   if (inherits(fit, "try-error")) return(NA_real_)
-  cf <- summary(fit)$coefficients
+  # lm_summary(), not summary(): every unit starting equal makes this
+  # regression an exact fit, and base R's "essentially perfect fit" warning
+  # then reached the caller of convergence_club() talking about a model the
+  # caller does not know exists. The t-statistic is still what it is, and a
+  # degenerate one returns NA_real_ through the guards either side.
+  cf <- lm_summary(fit)$coefficients
   if (nrow(cf) < 2L) return(NA_real_)
   # HAC would be the textbook choice; the plain t is adequate at these lengths
   # and keeps the dependency footprint at zero.

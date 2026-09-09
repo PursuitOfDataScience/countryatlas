@@ -13,9 +13,10 @@
 > **Country data onto honest maps — joined on ISO codes, never on country names.**
 
 Join the World Bank's life-expectancy table to `map_data("world")` by country
-name and **42 of 215 countries silently vanish**: nobody spells Czechia,
-Côte d'Ivoire or `"Congo, Dem. Rep."` the same way twice. `countryatlas` makes
-the ISO code the join key, so nothing goes missing — then draws the map.
+name and **37 of 210 countries silently vanish**: nobody spells
+Czechia, Côte d'Ivoire or `"Congo, Dem. Rep."` the same way twice.
+`countryatlas` makes the ISO code the join key, so nothing goes missing — then
+draws the map.
 
 <img src="man/figures/README-hook-1.png" alt="Two world choropleths of life expectancy side by side. Joining on country name leaves dozens of countries grey and unfilled; joining with join_world() fills every one of them." width="100%" />
 
@@ -341,7 +342,7 @@ convert_country(c("Japan", "Brazil"), to = "flag")
 |  |  |
 |----|----|
 | **Assemble** | `world_data()` `country_data()` `world_geometry()` `attach_geometry()` `clear_country_cache()` |
-| **Other sources** | `register_country_source()` `country_sources()` `fetch_indicator()` `add_indicator()` `compare_sources()` `fetch_owid()` `fetch_eurostat()` `fetch_oecd()` `fetch_comtrade()` |
+| **Other sources** | `register_country_source()` `remove_country_source()` `country_sources()` `fetch_indicator()` `add_indicator()` `compare_sources()` `fetch_owid()` `fetch_eurostat()` `fetch_oecd()` `fetch_comtrade()` |
 | **Join** | `standardize_country()` `join_world()` `country_join()` `country_join_all()` `dissolve_country()` `standardize_subnational()` |
 | **Diagnose** | `check_country_match()` `repair_country_names()` `audit_coverage()` `audit_time_coverage()` `rate_check()` `check_dispute_coverage()` `country_overrides()` |
 | **Look up** | `convert_country()` `country_codes()` `country_groups()` `in_group()` `wdi_search()` |

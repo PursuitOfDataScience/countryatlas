@@ -6,7 +6,8 @@
 test_that("historical_codes has the expected shape", {
   expect_s3_class(historical_codes, "tbl_df")
   expect_named(historical_codes,
-               c("historical", "iso3c_hist", "dissolved", "iso3c", "country"))
+               c("historical", "iso3c_hist", "dissolved", "iso3c", "relation",
+                 "country"))
   expect_equal(nrow(historical_codes), 41L)
   expect_false(anyNA(historical_codes$iso3c))
   expect_false(anyNA(historical_codes$country))

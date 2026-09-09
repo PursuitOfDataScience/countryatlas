@@ -95,7 +95,9 @@ per_capita <- function(data, value, pop = NULL, suffix = "_per_capita",
   # stays honest". Division by zero is the only part we cannot report.
   usable <- is.finite(pop_vec) & pop_vec != 0
   pop_label <- if (!rlang::quo_is_null(pop_q)) pop_name else "population"
-  if (!any(usable)) {
+  # length() first: !any(logical(0)) is TRUE, so a zero-row frame was told
+  # it had nothing usable rather than simply having nothing.
+  if (length(usable) && !any(usable)) {
     wdj_warn(c(
       "No usable {.field {pop_label}}, so nothing could be put per capita.",
       "i" = "A denominator must be finite and non-zero; {.field {new_col}} is
@@ -109,7 +111,7 @@ per_capita <- function(data, value, pop = NULL, suffix = "_per_capita",
              nothing to divide by. Negative populations pass through."
     ), class = "countryatlas_unusable_rows")
   }
-  data[[new_col]] <- ifelse(usable, data[[val_name]] / pop_vec, NA_real_)
+  data[[new_col]] <- num_ifelse(usable, data[[val_name]] / pop_vec)
   wdj_return_frame(data)
 }
 
@@ -659,8 +661,53 @@ index_to <- function(data, value, base_year, to = 100, suffix = "_index") {
   check_number(base_year, "base_year")
   check_number(to, "to")
   check_string(suffix, "suffix")
+  # NOT check_numeric_col(data, "year"). This verb only *matches* on the year,
+  # it does no arithmetic with it, and `"2000" == 2000` is TRUE in R -- so a
+  # character year works here and is deliberately allowed (test-degenerate-
+  # input.R pins that, alongside the four verbs that do arithmetic and so do
+  # require a number).
+  #
+  # A Date or POSIXct year is the one shape that cannot work: `==` coerces the
+  # *number* to that class, so `as.Date("2000-01-01") == 2000` compares against
+  # 1970-01-01 + 2000 days and is FALSE for every row. Every base came back
+  # empty and the whole column came back NA, in silence. read.csv() with a
+  # date-parsing reader produces exactly this column.
+  if (inherits(data$year, c("Date", "POSIXct", "POSIXlt"))) {
+    wdj_abort(c(
+      "{.field year} is {.obj_type_friendly {data$year}}, which cannot be
+       matched against {.arg base_year}.",
+      "x" = "{.code ==} would compare it against {.val {base_year}} read as a
+             date, which is true for no row, so every value would come back
+             {.val {NA}}.",
+      "i" = "Use the calendar year itself:
+             {.code data$year <- as.integer(format(data$year, \"%Y\"))}."
+    ), class = "countryatlas_date_year")
+  }
   new_col <- paste0(val_name, suffix)
   warn_overwrite(data, new_col)
+  # A country with no usable base-year value comes back all NA. That is the
+  # documented behaviour and stays -- but say which countries, exactly as
+  # deflate() does, because an NA row is otherwise indistinguishable from a
+  # country the source had no data for at all. With a `base_year` the panel
+  # does not cover at all this names every country, which is the signal that
+  # was missing entirely.
+  no_base <- data %>%
+    dplyr::group_by(.data$iso3c) %>%
+    dplyr::summarise(
+      has = any(.data$year == base_year & is.finite(.data[[val_name]]) &
+                  .data[[val_name]] != 0, na.rm = TRUE),
+      .groups = "drop")
+  missing_base <- no_base$iso3c[!no_base$has]
+  if (length(missing_base)) {
+    wdj_warn(c(
+      "{length(missing_base)} countr{?y/ies} ha{?s/ve} no usable {base_year}
+       value; {.field {new_col}} is all {.val {NA}} for
+       {cli::qty(length(missing_base))}{?it/them}:",
+      "*" = "{.val {utils::head(missing_base, 8)}}",
+      "i" = "Choose a {.arg base_year} the panel covers, or drop those
+             countries first."
+    ), class = "countryatlas_no_base_year")
+  }
   out <- data %>%
     group_by_unit() %>%
     dplyr::mutate(
@@ -989,7 +1036,7 @@ warn_irregular_years <- function(data, what, call = rlang::caller_env()) {
 #'   spans are too heterogeneous for any single span to reconcile with the
 #'   fitted slope, which is warned about. `beta` and its inference are
 #'   unaffected in both -- only the annualised figures need one common span, so
-#'   restrict the panel to a shared window if you need them. The fitted [lm] object is attached as the
+#'   restrict the panel to a shared window if you need them. The fitted [stats::lm()] object is attached as the
 #'   `"model"` attribute.
 #' @export
 #' @seealso [sigma_convergence()] for the dispersion-over-time counterpart.
@@ -1042,7 +1089,13 @@ beta_convergence <- function(data, value) {
     (per_country$y1 - per_country$y0)
   log_v0 <- log(per_country$v0)
   fit <- stats::lm(growth ~ log_v0)
-  co <- summary(fit)$coefficients
+  # One summary(), reused below: it was computed twice, and it is the call that
+  # emits base R's "essentially perfect fit: summary may be unreliable" -- a
+  # warning that named neither this verb nor the reason, and which reached the
+  # caller verbatim from a panel whose growth is an exact linear function of
+  # its initial level. Say it in the package's own voice after the fit.
+  fit_summary <- lm_summary(fit)
+  co <- fit_summary$coefficients
   # With no spread in the initial levels the predictor is constant, so lm()
   # returns an NA coefficient and summary() drops the row entirely -- which
   # surfaced as a bare "subscript out of bounds" from the lookup below.
@@ -1054,6 +1107,17 @@ beta_convergence <- function(data, value) {
     ))
   }
   beta <- co["log_v0", "Estimate"]
+  if (lm_perfect_fit(fit_summary)) {
+    wdj_warn(c(
+      "The regression fits {.field {val_name}} exactly, with no residual
+       variance left over.",
+      "x" = "{.field se}, {.field t_value} and {.field p_value} are computed
+             from that zero variance, so they mean nothing here.",
+      "i" = "{.field beta} is still the fitted slope. A real panel does not do
+             this -- it happens when growth is constant across countries, or
+             when the column was built from a formula rather than measured."
+    ), class = "countryatlas_perfect_fit")
+  }
   span <- mean(per_country$y1 - per_country$y0)
   # Implied annual convergence speed: beta = -(1 - exp(-lambda * T)) / T,
   # which inverts to lambda = -log(1 + beta * T) / T and so needs
@@ -1087,7 +1151,7 @@ beta_convergence <- function(data, value) {
     se = co["log_v0", "Std. Error"],
     t_value = co["log_v0", "t value"],
     p_value = co["log_v0", "Pr(>|t|)"],
-    r_squared = summary(fit)$r.squared,
+    r_squared = fit_summary$r.squared,
     n = nrow(per_country),
     speed = speed,
     half_life = if (is.na(speed)) NA_real_ else log(2) / speed
@@ -1203,6 +1267,18 @@ gini <- function(x, weights = NULL, na.rm = TRUE) {
     ok <- !is.na(x) & !is.na(w)
     x <- x[ok]; w <- w[ok]
   }
+  # Deliberately silent, both cases. The other undefined-index paths in this
+  # file warn (zero weights, an all-zero total, infinities, negatives) because
+  # each is data that *looks* usable and is not. These two are different:
+  #
+  #  - `na.rm = FALSE` returning NA when NA is present is the argument doing
+  #    exactly what it documents, so warning would make a correct call speak;
+  #  - an empty input has no other possible answer, and the caller can see the
+  #    input was empty. world_table() and complete_years() already return
+  #    early for a zero-row frame without a word, and that is the contract.
+  #
+  # A pre-release review proposed warning here for consistency with the other
+  # paths; it does not survive the silence policy. Do not re-add it.
   if (length(x) == 0L || anyNA(x) || anyNA(w)) return(NA_real_)
   if (any(w < 0)) wdj_abort("{.arg weights} must be non-negative.")
   # Inf survives na.rm (it is not NA) and then poisons the mean, so the answer
@@ -1320,9 +1396,26 @@ theil <- function(x, weights = NULL, groups = NULL, na.rm = TRUE) {
   }
   bad <- x <= 0
   if (any(bad, na.rm = TRUE)) {
-    wdj_warn("Dropping {sum(bad)} non-positive value{?s} (Theil needs x > 0).")
-    x <- x[!bad]; w <- w[!bad]; g <- g[!bad]
+    # sum(bad, na.rm = TRUE): `bad` is NA wherever x is, so under
+    # na.rm = FALSE with both an NA and a non-positive value present the count
+    # was NA -- the message read "Dropping NA non-positive values" and cli was
+    # asked to pluralise on NA. Subsetting with `!bad` keeps NA rows out either
+    # way, and the NA is reported by the anyNA() return below.
+    wdj_warn("Dropping {sum(bad, na.rm = TRUE)} non-positive value{?s} (Theil needs x > 0).")
+    x <- x[!bad & !is.na(bad)]; w <- w[!bad & !is.na(bad)]; g <- g[!bad & !is.na(bad)]
   }
+  # Deliberately silent, both cases. The other undefined-index paths in this
+  # file warn (zero weights, an all-zero total, infinities, negatives) because
+  # each is data that *looks* usable and is not. These two are different:
+  #
+  #  - `na.rm = FALSE` returning NA when NA is present is the argument doing
+  #    exactly what it documents, so warning would make a correct call speak;
+  #  - an empty input has no other possible answer, and the caller can see the
+  #    input was empty. world_table() and complete_years() already return
+  #    early for a zero-row frame without a word, and that is the contract.
+  #
+  # A pre-release review proposed warning here for consistency with the other
+  # paths; it does not survive the silence policy. Do not re-add it.
   if (length(x) == 0L || anyNA(x) || anyNA(w)) return(NA_real_)
   if (any(w < 0)) wdj_abort("{.arg weights} must be non-negative.")
   sw <- sum(w)
@@ -1436,13 +1529,24 @@ share_of_world <- function(data, value, suffix = "_share") {
         "i" = "A total must be finite and non-zero; {.field {new_col}} is
                {.val {NA}} throughout."
       ), class = "countryatlas_no_rates")
-    } else {
+    } else if (has_year) {
       yrs <- unique(out$year[bad])
       wdj_warn(c(
         "No usable {.field {val_name}} total for {length(yrs)} year{?s}.",
         "*" = "{.val {yrs}}",
         "i" = "A total must be finite and non-zero; {.field {new_col}} is
                {.val {NA}} for {sum(bad)} row{?s}."
+      ), class = "countryatlas_unusable_rows")
+    } else {
+      # Gated on has_year: with no year column `out$year` is NULL, so the
+      # branch above counted NULL and reported "for 0 years" followed by an
+      # empty bullet -- and tibble warned "Unknown or uninitialised column".
+      # A cross-section reaches this whenever the total is unusable and some
+      # value is NA.
+      wdj_warn(c(
+        "No usable {.field {val_name}} total for {sum(bad)} row{?s}.",
+        "i" = "A total must be finite and non-zero; {.field {new_col}} is
+               {.val {NA}} there."
       ), class = "countryatlas_unusable_rows")
     }
   }

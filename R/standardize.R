@@ -194,8 +194,14 @@ abort_bad_destination <- function(shown, arg = "to",
   ok <- unique(c(extra, valid))
   near <- character(0)
   if (length(ok)) {
-    lo <- tolower(shown)
-    vl <- tolower(ok)
+    # ascii_lower(), not tolower(): under tr_TR the latter returns a dotless
+    # i, so "ISO3C" folded to "iso3c" with a dotless i while the candidate
+    # list stayed ASCII -- and the "Did you mean" suggestion silently
+    # vanished. The exemption for the fuzzy matchers does not apply here: the
+    # candidate lists are already lowercase, so folding them is a no-op while
+    # folding the *input* mangles it.
+    lo <- ascii_lower(shown)
+    vl <- ascii_lower(ok)
     hit <- grepl(lo, vl, fixed = TRUE) | startsWith(lo, vl)
     near <- ok[hit]
     if (!length(near)) {
@@ -233,8 +239,8 @@ abort_bad_origin <- function(origin, cnd, call = rlang::caller_env(),
   valid <- countrycode_schemes(conditionMessage(cnd))
   near <- character(0)
   if (length(valid)) {
-    lo <- tolower(origin)
-    vl <- tolower(valid)
+    lo <- ascii_lower(origin)
+    vl <- ascii_lower(valid)
     # A half-remembered scheme is normally a fragment of the real name --
     # "country" for "country.name", "iso3" for "iso3c" -- which edit distance
     # ranks badly: "country" is five edits from "country.name", so the one

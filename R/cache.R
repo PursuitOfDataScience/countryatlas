@@ -102,7 +102,45 @@ wdj_disk_cache <- function() {
   }, error = function(e) FALSE, warning = function(w) FALSE))
   if (file.exists(probe)) unlink(probe)
   if (!ok) return(NULL)
-  tryCatch(memoise::cache_filesystem(dir), error = function(e) NULL)
+  # cachem::cache_disk(), not memoise::cache_filesystem(): the latter has no
+  # expiry and no size cap, so this directory grew without bound for the life
+  # of the installation. CRAN's policy allows a package cache under
+  # tools::R_user_dir() only "provided that by default sizes are kept as small
+  # as possible and the contents are actively managed (including removing
+  # outdated material)" -- nothing did either. cache_disk() prunes on write:
+  # entries past max_age go, and past max_size the least-recently-used go.
+  #
+  # Ageing entries out is also correct on the merits. These are World Bank
+  # observations, which get revised; a cached 2020 GDP figure fetched two years
+  # ago is not the answer the API would give today.
+  #
+  # cachem is already an unconditional dependency of memoise, so this adds
+  # nothing to install.
+  age <- getOption("countryatlas.cache_max_age", 30L * 86400L)
+  size <- getOption("countryatlas.cache_max_size", 50L * 1024L^2)
+  cache <- tryCatch(
+    cachem::cache_disk(dir, max_age = age, max_size = size, evict = "lru",
+                       # A pruned entry must not be an error: it just means the
+                       # next call re-fetches.
+                       missing = cachem::key_missing()),
+    error = function(e) NULL
+  )
+  if (is.null(cache)) return(NULL)
+  prune_legacy_cache(dir)
+  cache
+}
+
+# memoise::cache_filesystem() wrote one extensionless file per key; cachem
+# stores <key>.rds and prunes only what it recognises, so entries written by
+# earlier versions would sit in the directory for ever -- the exact "outdated
+# material" the policy is about. Sweep them once. They are re-fetchable, so
+# losing them costs a download, and the write probe is ours too.
+prune_legacy_cache <- function(dir) {
+  files <- list.files(dir, all.files = TRUE, no.. = TRUE, full.names = TRUE)
+  files <- files[!dir.exists(files)]
+  legacy <- files[!grepl("\\.rds$", files, ignore.case = TRUE)]
+  if (length(legacy)) unlink(legacy)
+  invisible(length(legacy))
 }
 
 get_fetch_fun <- function(cache = TRUE) {
@@ -156,6 +194,19 @@ get_fetch_fun <- function(cache = TRUE) {
 #' bundled [world_snapshot] never goes near it. Under `R CMD check` the whole
 #' cache moves to the session temp directory, so a check never writes to the
 #' user's file space.
+#'
+#' @section How the cache is managed:
+#' The persistent cache expires its own contents, so it does not grow without
+#' bound and does not serve stale figures indefinitely: an entry is dropped
+#' once it is 30 days old, and if the directory exceeds 50 MB the
+#' least-recently-used entries go first. Both limits are adjustable with
+#' `options(countryatlas.cache_max_age = )` (seconds) and
+#' `options(countryatlas.cache_max_size = )` (bytes). A dropped entry costs a
+#' re-fetch, nothing more.
+#'
+#' Expiry matters beyond disk space: World Bank observations are revised, so a
+#' figure cached long ago is not necessarily the figure the API would return
+#' today.
 #'
 #' @param disk Whether to also delete the persistent on-disk cache.
 #' @return Invisibly `TRUE`.
@@ -315,12 +366,18 @@ fetch_one_safe <- function(fetch_fun, code, name, start, end, language) {
                    "i" = "Indicator {.val {code}} is skipped."),
                  class = "countryatlas_bad_response")
       } else if (looks_like_cache_read_error(msg) && !is.null(wdj_disk_cache())) {
+        # A fallback now rather than the main corrupt-entry path: cachem's
+        # cache_disk() treats an unreadable entry as a miss and re-fetches, so
+        # a truncated .rds no longer reaches here at all. What can still reach
+        # here is a read error cachem does not absorb -- a directory whose
+        # permissions change mid-session, a filesystem going read-only -- and
+        # blaming the World Bank for those would send the caller off to debug a
+        # connection that is fine.
         wdj_warn(c(
           "Could not read indicator {.val {code}} from the on-disk cache.",
           "x" = "{msg}",
-          "i" = "A cache entry looks corrupt, which an interrupted write can
-                 leave behind. It will keep failing until you clear it:
-                 {.code clear_wdi_cache(disk = TRUE)}."
+          "i" = "The cache entry could not be read. Clearing it is the
+                 quickest fix: {.code clear_wdi_cache(disk = TRUE)}."
         ))
       } else {
         wdj_warn(c(

@@ -13,13 +13,17 @@
 #' are shown versus missing. These are the questions a reviewer asks first, and
 #' the answers are already known at plot time -- this just makes them readable.
 #'
-#' @param x A plot returned by any of the package's map verbs -- [world_map()],
-#'   [bubble_map()], [spike_map()], [tile_map()], [flow_map()], [globe_map()],
-#'   [bivariate_map()], [cartogram_map()], [dorling_map()],
-#'   [gridded_cartogram()], [value_by_alpha_map()], [coverage_map()],
-#'   [classify_compare()], [facet_map()] or [lisa_map()] -- or a map-ready data
-#'   frame, for which the data-side facts are reported and the drawing-side ones
-#'   are `NA`.
+#' @param x A plot returned by any of the package's map verbs -- [world_map()]
+#'   (either engine), [bubble_map()], [spike_map()], [tile_map()],
+#'   [flow_map()], [od_map()], [globe_map()], [bivariate_map()],
+#'   [cartogram_map()], [dorling_map()], [gridded_cartogram()],
+#'   [value_by_alpha_map()], [coverage_map()], [classify_compare()],
+#'   [facet_map()], [lisa_map()], [subnational_map()] or
+#'   [projection_compare()] -- or a map-ready data frame, for which the
+#'   data-side facts are reported and the drawing-side ones are `NA`.
+#'
+#'   [tissot_map()] is the one map verb that carries no provenance: it draws
+#'   distortion ellipses for a projection and takes no data of yours.
 #' @param value For a data frame, the column whose coverage to report
 #'   (unquoted). Ignored for a plot, which already knows its own fill.
 #'
@@ -184,6 +188,30 @@ print.countryatlas_provenance <- function(x, ...) {
 # reading "any plot the package's map verbs produced". A partial implementation
 # of a provenance feature is worse than none, because the gap is invisible until
 # someone relies on it.
+# Restate a derived map's provenance in the caller's terms.
+#
+# coverage_map(), classify_compare(), lisa_map() and od_map() all draw through
+# world_map() with an *internal* column as the fill -- `.wdj_available`,
+# `.wdj_class`, `.wdj_cluster`, `.wdj_flow` -- so the provenance world_map()
+# writes describes that column and not the one the caller named.
+# `.wdj_available` is the sharp case: it is an ifelse() over a logical test with
+# both outcomes declared as factor levels, so it is *never* NA, and
+# na_coverage() therefore recorded `n_missing = 0` and `n_shown = n_total` for
+# every input -- flatly contradicting coverage_map()'s own caption, which is
+# computed honestly from the caller's column. Two coverage claims on one object,
+# in the verb whose whole purpose is honest missingness. Restate the fill name
+# and recompute the coverage against the column the caller actually asked about.
+restate_provenance <- function(p, data, value_name) {
+  prov <- attr(p, "countryatlas_provenance")
+  if (is.null(prov)) return(p)
+  prov$fill <- value_name
+  if (!is.null(value_name) && value_name %in% names(data)) {
+    prov$coverage <- na_coverage(data, value_name)
+  }
+  attr(p, "countryatlas_provenance") <- prov
+  p
+}
+
 wdj_provenance <- function(p, data, fill, backend, projection = NA_character_,
                            style = NA_character_, extra = list()) {
   cov <- if (!is.null(fill) && fill %in% names(data)) {

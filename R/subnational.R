@@ -30,13 +30,28 @@
 #'   regions get `NA`, never a guess.
 #'
 #' @section Coverage, stated plainly:
-#' Resolution uses the optional `regions` package's crosswalks -- when the
-#' installed version exposes a name-to-code pair this function recognises; it
-#' says so once per session when it does not -- plus exact and
-#' case-insensitive matching against ISO 3166-2 names. Coverage is good for
-#' Europe (where NUTS and ISO 3166-2 are both well maintained) and patchy
-#' elsewhere. This function will return `NA` rather than a plausible-looking
-#' wrong code, and [audit_coverage()] on the result is the right next step.
+#' Two things resolve, and it is worth being blunt about how little that is.
+#'
+#' A `region` value that is *already* an ISO 3166-2 code (`"DE-BY"`, `"US-CA"`)
+#' passes through, provided its country prefix matches the country the row
+#' gives -- these codes are unique only within a country, which is why
+#' `country` is required. A mismatch is reported and left as `NA`.
+#'
+#' A region *name* resolves only through the optional `regions` package's
+#' crosswalk, and only when the installed version exposes a name-to-code pair
+#' this function recognises. As of `regions` 0.1.8 none of them do:
+#' `nuts_lau_2019` offers `lau_name_national` / `lau_name_latin` and
+#' `all_valid_nuts_codes` has no name column, so **no region name resolves at
+#' all**, anywhere -- the function says so once per session. The package
+#' carries no ISO 3166-2 name table of its own, deliberately: the datasets that
+#' do pair names with codes key on NUTS codes (`DE2`) rather than ISO 3166-2
+#' (`DE-BY`), and filling `iso_3166_2` from those would put a different code
+#' system in the column.
+#'
+#' So: pass codes if you have them. If you have names, expect `NA` until
+#' `regions` ships a usable crosswalk. This function returns `NA` rather than a
+#' plausible-looking wrong code, and [audit_coverage()] on the result is the
+#' right next step.
 #'
 #' @seealso [subnational_map()], [nuts_geometry()], [standardize_country()]
 #' @export
@@ -68,7 +83,8 @@ standardize_subnational <- function(data, region, country, origin = "country.nam
   if (length(iso) != nrow(data)) {
     wdj_abort(c(
       "{.arg country} must be a column of {.arg data} or a single country.",
-      "x" = "Got {length(iso)} values for {nrow(data)} rows."
+      "x" = "Got {length(iso)} values for {nrow(data)}
+             {cli::qty(nrow(data))}row{?s}."
     ))
   }
   warn_overwrite(data, c("iso3c", "iso_3166_2"))
@@ -82,12 +98,23 @@ standardize_subnational <- function(data, region, country, origin = "country.nam
       wdj_warn(c(
         "{length(miss)} region{?s} did not resolve to an ISO 3166-2 code:",
         "*" = "{.val {utils::head(miss, 8)}}",
-        "i" = "Coverage is best in Europe; see the section in
+        # Not "coverage is best in Europe": there is no ISO 3166-2 name table
+        # in the package and, as of `regions` 0.1.8, no usable crosswalk
+        # either -- so a region *name* resolves nowhere, Europe included.
+        # Pointing at Europe sent readers looking for a coverage gap that is
+        # really a "names do not resolve at all" gap.
+        "i" = "Only values that are already ISO 3166-2 codes resolve; region
+               names need a crosswalk the installed {.pkg regions} does not
+               provide. See the section in
                {.help countryatlas::standardize_subnational}."
       ))
     }
   }
-  data
+  # Through wdj_return_frame() like its fourteen sibling column-adding verbs: a
+  # data.frame in gave a data.frame out and a grouped tibble stayed grouped,
+  # while standardize_country() next door normalises. This verb shipped in the
+  # same release as the audit that fixed the other five.
+  wdj_return_frame(data)
 }
 
 # Resolve region names within a country to ISO 3166-2. Exact, then
@@ -102,9 +129,33 @@ subnational_lookup <- function(region, iso3c) {
       .frequency = "once", .frequency_id = "subnational-no-regions"
     )
   }
-  # A region name that *is already* an ISO 3166-2 code passes straight through.
+  # A region name that *is already* an ISO 3166-2 code passes straight through
+  # -- but only when its country prefix matches the row's own country. ISO
+  # 3166-2 codes are unique only *within* a country, which is exactly why
+  # `country` is a required argument, and `iso3c` was accepted here and then
+  # never read: standardize_subnational(region = "US-CA", country = "Germany")
+  # returned iso3c = "DEU" with iso_3166_2 = "US-CA", a self-contradictory row,
+  # silently. A mismatch resolves to NA, which is this function's documented
+  # contract -- "NA rather than a plausible-looking wrong code".
   looks_code <- grepl("^[A-Z]{2}-[A-Z0-9]{1,3}$", region)
-  out[looks_code] <- region[looks_code]
+  prefix <- toupper(substr(region, 1L, 2L))
+  expect <- suppressWarnings(convert_country(iso3c, "iso2c", from = "iso3c",
+                                             warn = FALSE))
+  # A row whose country did not resolve has nothing to check against, so the
+  # code is taken at face value there rather than thrown away.
+  belongs <- looks_code & (is.na(expect) | prefix == toupper(expect))
+  out[belongs] <- region[belongs]
+  wrong <- looks_code & !belongs
+  if (any(wrong)) {
+    wdj_warn(c(
+      "{sum(wrong)} {.field region} value{?s} {?is/are} an ISO 3166-2 code for
+       a different country than {.arg country} gives:",
+      "*" = "{.val {utils::head(paste0(region[wrong], ' (country resolves to ',
+             expect[wrong], ')'), 6)}}",
+      "i" = "ISO 3166-2 codes are unique only within a country, so these are
+             left as {.val {NA}}."
+    ), class = "countryatlas_region_country_mismatch")
+  }
 
   if (has_pkg("regions")) {
     cw <- tryCatch(regions::nuts_lau_2019, error = function(e) NULL)
@@ -219,8 +270,21 @@ nuts_geometry <- function(level = 2, year = 2021, countries = NULL,
     iso <- wdj_to_iso3c(countries, origin = "iso3c")
     g <- g[!is.na(g$iso3c) & g$iso3c %in% iso, ]
     if (!nrow(g)) {
-      wdj_abort(c("No NUTS regions for {.val {countries}}.",
-                  "i" = "NUTS covers the EU, EFTA and candidate countries only."))
+      # `countries` is read as iso3c, so a country *name* resolves to nothing
+      # and the coverage note was the only explanation offered -- sending the
+      # reader off to check whether Germany is in the EU. Name the real
+      # problem when another origin explains the input, the way
+      # neighbors() and locate_country() do.
+      hint <- wdj_origin_hint(countries, "iso3c")
+      wdj_abort(c(
+        "No NUTS regions for {.val {countries}}.",
+        hint,
+        "i" = if (is.null(hint)) {
+          "NUTS covers the EU, EFTA and candidate countries only."
+        } else {
+          "NUTS also covers only the EU, EFTA and candidate countries."
+        }
+      ))
     }
   }
   keep <- intersect(c("nuts_id", "iso3c", "name", "level"), names(g))
@@ -283,7 +347,7 @@ subnational_map <- function(data, fill, by = "nuts_id", level = 2, year = 2021,
   # documented as "the code column in `data`", so the geometry side is always
   # nuts_id.
   geom[[by]] <- geom$nuts_id
-  lost <- unmatched_keys(data[[by]], geom[[by]])
+  lost <- unmatched_keys(data[[by]], geom$nuts_id)
   if (length(lost)) {
     wdj_warn(c(
       # Count, noun and both verb agreements adjacent: cli keys {?...} to the
@@ -297,16 +361,27 @@ subnational_map <- function(data, fill, by = "nuts_id", level = 2, year = 2021,
              {.arg year} do not all exist in another."
     ))
   }
-  drop <- setdiff(intersect(names(geom), names(data)), by)
+  # Joined on a reserved internal key rather than on `by` itself. The geometry
+  # side had `geom[[by]] <- geom$nuts_id` assigned unconditionally, so
+  # by = "iso3c", "name" or "level" -- all real NUTS-geometry columns --
+  # overwrote that column with NUTS codes and carried it into the returned
+  # plot's data. The assignment has to be unconditional (see above); doing it
+  # under a name of our own is what keeps it from costing a column.
+  geom[[".wdj_nuts_key"]] <- geom$nuts_id
+  dat <- tibble::as_tibble(sf_drop(data))
+  dat[[".wdj_nuts_key"]] <- as.character(dat[[by]])
+  drop <- setdiff(intersect(names(geom), names(dat)), ".wdj_nuts_key")
   geom <- geom[, setdiff(names(geom), drop), drop = FALSE]
-  joined <- dplyr::left_join(geom, tibble::as_tibble(sf_drop(data)), by = by,
+  joined <- dplyr::left_join(geom, dat, by = ".wdj_nuts_key",
                              na_matches = "never")
+  joined[[".wdj_nuts_key"]] <- NULL
   # Counted on the join KEY, not on the fill value: sum(!is.na(fill)) called a
   # panel whose indicator is entirely NA -- a real thing to map, and one this
   # package draws with an na.value and says so in the caption -- "no rows
   # matched the geometry", sending the reader off to check NUTS vintages for a
   # mismatch that never happened.
-  matched <- sum(!is.na(data[[by]]) & data[[by]] %in% geom[[by]])
+  matched <- sum(!is.na(dat[[".wdj_nuts_key"]]) &
+                   dat[[".wdj_nuts_key"]] %in% geom[[".wdj_nuts_key"]])
   if (!matched) {
     wdj_abort(c(
       "No rows of {.arg data} matched the geometry on {.val {by}}.",
@@ -316,7 +391,18 @@ subnational_map <- function(data, fill, by = "nuts_id", level = 2, year = 2021,
   }
   # coord_sf() over NUTS needs a European extent, not a world one, so let the
   # data set it rather than forcing a global projection.
+  #
+  # Which is exactly why `projection` cannot be honoured here: the coord below
+  # replaces whatever world_map() built, and suppressMessages() swallowed
+  # ggplot2's note about the replacement, so the argument looked accepted and
+  # changed nothing. warn_projection_ignored() exists for this.
+  dots <- rlang::list2(...)
+  if (!is.null(dots$projection)) {
+    warn_projection_ignored(dots$projection, where = "{.fn subnational_map}")
+    dots$projection <- NULL
+  }
   suppressMessages(
-    world_map(joined, !!fill_q, ...) + ggplot2::coord_sf(datum = NA)
+    rlang::inject(world_map(joined, !!fill_q, !!!dots)) +
+      ggplot2::coord_sf(datum = NA)
   )
 }

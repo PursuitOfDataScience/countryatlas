@@ -1452,3 +1452,45 @@ test_that("compare_sources computes rel_diff and the pair summary correctly", {
   expect_equal(s$n_disagree, 3L)
   expect_equal(sum(d$disagrees), 3L)
 })
+
+test_that("split_antimeridian wires up every crossing, not just the last", {
+  # A carry row was computed and stored per crossing, but only the last one was
+  # read -- the rest were discarded by the attr(x, "carry") <- NULL at the end.
+  # So with two or more crossings the middle segments began at their first raw
+  # vertex instead of at the antimeridian edge, leaving a visible break on the
+  # re-entry side. The code read as though it were general; it handled one.
+  # Not named `split`: that would shadow base::split(), which the assertions
+  # below use to group the result.
+  cut_at_180 <- countryatlas:::split_antimeridian
+  df <- data.frame(lon = c(170, -170, 170, 175), lat = c(10, 12, 14, 16),
+                   id = "a", stringsAsFactors = FALSE)
+  out <- cut_at_180(df, df$id)
+  segs <- split(out$lon, out$.seg)
+  expect_length(segs, 3L)
+  # Segment 1 leaves at +180.
+  expect_equal(utils::tail(segs[[1]], 1), 180)
+  # Segment 2 is the middle one: it must ENTER at -180 and LEAVE at -180.
+  expect_equal(segs[[2]][1], -180)
+  expect_equal(utils::tail(segs[[2]], 1), -180)
+  # Segment 3 enters at +180.
+  expect_equal(segs[[3]][1], 180)
+  # Consecutive segments must meet at the same latitude, or the line breaks.
+  lats <- split(out$lat, out$.seg)
+  expect_equal(utils::tail(lats[[1]], 1), lats[[2]][1])
+  expect_equal(utils::tail(lats[[2]], 1), lats[[3]][1])
+
+  # One crossing is unchanged -- the case that always worked.
+  df1 <- data.frame(lon = c(170, -170, -160), lat = c(10, 12, 14), id = "a",
+                    stringsAsFactors = FALSE)
+  o1 <- cut_at_180(df1, df1$id)
+  g1 <- split(o1$lon, o1$.seg)
+  expect_equal(g1[[1]], c(170, 180))
+  expect_equal(g1[[2]], c(-180, -170, -160))
+
+  # And a path with no crossing is passed straight through.
+  df0 <- data.frame(lon = c(10, 20, 30), lat = c(1, 2, 3), id = "a",
+                    stringsAsFactors = FALSE)
+  o0 <- cut_at_180(df0, df0$id)
+  expect_equal(o0$lon, c(10, 20, 30))
+  expect_equal(unique(o0$.seg), 1L)
+})

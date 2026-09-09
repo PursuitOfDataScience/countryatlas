@@ -13,6 +13,33 @@
 # geographic. "Countries near each other in *trade* space" is often the relevant
 # neighbourhood for an economic question, and it goes through the same API.
 
+# `k`, `cutoff_km`, `w` and `scale` each belong to exactly one scheme, and the
+# other three ignored them without a word. The costly one is
+# country_weights("knn", w = my_matrix): the caller's own adjacency was
+# discarded and nearest-neighbour weights returned instead, so the result looks
+# entirely reasonable and is not what was asked for. Same treatment the
+# projection/recenter/scale notices give an inert argument elsewhere. Each
+# argument is compared against its default rather than using missing(), so
+# passing a default explicitly stays quiet.
+warn_weights_args_ignored <- function(type, k, cutoff_km, w, scale) {
+  used <- switch(type, knn = "k", distance = "cutoff_km",
+                 contiguity = "scale", custom = "w")
+  given <- c(
+    if (!identical(as.numeric(k), 5)) "k",
+    if (!is.null(cutoff_km)) "cutoff_km",
+    if (!is.null(w)) "w",
+    if (!identical(scale, "small")) "scale"
+  )
+  ignored <- setdiff(given, used)
+  if (!length(ignored)) return(invisible(NULL))
+  wdj_warn(c(
+    "{.code type = \"{type}\"} ignores {cli::qty(length(ignored))}{?this
+     argument/these arguments}: {.arg {ignored}}.",
+    "i" = "This scheme is built from {.arg {used}}."
+  ), class = "countryatlas_weights_args_ignored")
+  invisible(NULL)
+}
+
 #' Spatial weights on the country spine
 #'
 #' Build a reusable neighbour-weights object for [morans_i()], [local_morans()],
@@ -69,9 +96,23 @@ country_weights <- function(type = c("contiguity", "knn", "distance", "custom"),
                             w = NULL, style = c("W", "B"), scale = "small") {
   type <- rlang::arg_match(type)
   style <- rlang::arg_match(style)
+  warn_weights_args_ignored(type, k, cutoff_km, w, scale)
   if (!is.null(countries)) {
-    countries <- unique(stats::na.omit(as.character(countries)))
-    if (!length(countries)) wdj_abort("{.arg countries} has no usable codes.")
+    # wdj_to_iso3c() rather than as.character(): case and padding were taken
+    # verbatim, so country_weights("knn", countries = c("usa","fra")) warned
+    # that two countries "have no bundled centroid" and then refused for want
+    # of centroids -- blaming the centroid table for a key that never matched.
+    raw_countries <- unique(stats::na.omit(as.character(countries)))
+    countries <- unique(stats::na.omit(
+      suppressWarnings(wdj_to_iso3c(raw_countries, origin = "iso3c"))))
+    if (!length(countries)) {
+      wdj_abort(c(
+        "{.arg countries} has no usable codes.",
+        "i" = if (length(raw_countries))
+          "None of {.val {utils::head(raw_countries, 4)}} resolved to an ISO
+           3166-1 alpha-3 code; {.fn standardize_country} normalises names."
+      ))
+    }
   }
 
   built <- switch(
@@ -202,7 +243,7 @@ weights_knn <- function(countries, k) {
   if (k >= n) {
     wdj_abort(c(
       "{.arg k} must be smaller than the number of countries.",
-      "x" = "Got k = {k} with {n} countries."
+      "x" = "Got k = {k} with {n} {cli::qty(n)}countr{?y/ies}."
     ))
   }
   d <- weights_distance_matrix(meta)
@@ -389,9 +430,22 @@ align_weights <- function(data, val_name, weights, scale = "small",
   # countries that also have a value -- a neighbourless row contributes nothing
   # and would divide by zero on re-standardisation.
   keep <- intersect(rownames(m), df$iso3c)
+  # Iterated to a fixed point, not pruned once. Dropping a neighbourless
+  # country can leave one of *its* neighbours with no neighbours either, and a
+  # single pass left that country in: its weight row was all zeros, the
+  # `rs[rs == 0] <- 1` below spared it the division, and it stayed in `n` with a
+  # neighbour average of exactly 0 -- treated as a real observation, and absent
+  # from `excluded` too. Symmetric schemes ("contiguity", "distance") cannot
+  # reach this, but an asymmetric one can: B loses all k of its neighbours and
+  # is dropped, A's only surviving neighbour was B, so A is now isolated.
+  repeat {
+    sub <- m[keep, keep, drop = FALSE]
+    still <- keep[rowSums(sub > 0) > 0]
+    if (length(still) == length(keep)) break
+    keep <- still
+    if (!length(keep)) break
+  }
   m <- m[keep, keep, drop = FALSE]
-  deg <- rowSums(m > 0)
-  keep <- keep[deg > 0]
   if (length(keep) < 3L) {
     wdj_abort(c(
       "Not enough connected countries with data to compute a spatial statistic.",
@@ -400,7 +454,6 @@ align_weights <- function(data, val_name, weights, scale = "small",
              {.code country_weights("knn", k = 5)}.'
     ), call = call)
   }
-  m <- m[keep, keep, drop = FALSE]
   if (identical(weights$style, "W")) {
     rs <- rowSums(m); rs[rs == 0] <- 1
     m <- m / rs
@@ -410,7 +463,11 @@ align_weights <- function(data, val_name, weights, scale = "small",
   # asymmetric). Counting non-zero cells regardless doubled the contiguity link
   # count, which the package's own numeric anchor caught.
   nz <- sum(m > 0)
-  symmetric <- isTRUE(all.equal(unname((m > 0) * 1), unname(t(m > 0) * 1)))
+  # Symmetry is a property of the *scheme*, so read it off the full matrix. Off
+  # the subset, a k-nearest graph that happens to come out symmetric once the
+  # unusable countries are dropped had its link count halved.
+  full <- weights$m > 0
+  symmetric <- isTRUE(all.equal(unname(full * 1), unname(t(full) * 1)))
   list(
     m = m, iso3c = keep,
     x = df[[val_name]][match(keep, df$iso3c)],
@@ -543,6 +600,7 @@ local_morans <- function(data, value, weights = NULL, n_perm = 999,
 #' }
 lisa_map <- function(data, value, weights = NULL, n_perm = 999, alpha = 0.05,
                      ...) {
+  refuse_reserved_dots(rlang::list2(...), c("style", "legend"), "lisa_map")
   value_q <- rlang::enquo(value)
   val_name <- quo_arg_name(value_q, "value")
   check_map_geometry(data)
@@ -562,7 +620,7 @@ lisa_map <- function(data, value, weights = NULL, n_perm = 999, alpha = 0.05,
       )
   )
   attr(p, "countryatlas_lisa") <- lisa
-  p
+  restate_provenance(p, data, val_name)
 }
 
 #' Geary's C (spatial autocorrelation)

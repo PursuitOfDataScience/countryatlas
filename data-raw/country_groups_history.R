@@ -163,18 +163,44 @@ stopifnot(
 # 2024-01-01 but in fact carries accessions later than that (Sweden to NATO in
 # March 2024, Bolivia to Mercosur in July 2024, Indonesia to BRICS in January
 # 2025) -- which is exactly the kind of drift a dated table exists to expose.
+#
+# This is a *validation*, which is what ?country_groups_history promises: "The
+# table is validated at build time against country_groups_tbl". It used to
+# message() and then write the .rda anyway, so a mismatch scrolled past in a
+# build log and shipped -- and NEWS records that this drift has already bitten
+# once. Every other invariant in this file is a hard stopifnot(); so is this
+# one now. Mismatches are accumulated first, so one run reports all of them
+# rather than stopping at the alphabetically first group.
 today <- Sys.Date()
 current <- country_groups_history |>
   filter(from <= today, is.na(to) | to > today)
+# Read the snapshot from the WORKING TREE, not from the installed package.
+# This is a validation, and validating against `countryatlas::` compares the
+# new history table to whatever snapshot happens to be installed -- which is
+# the *previous* release's whenever country_groups_tbl has just been rebuilt
+# with a new MEMBERSHIP_AS_OF. The check would then pass or fail on the wrong
+# comparison, and it is a hard stop() now. It also drops this script's need
+# for an installed countryatlas, matching overrides_snapshot.R's purpose.
+snap_env <- new.env()
+load("data/country_groups_tbl.rda", envir = snap_env)
+groups_tbl <- snap_env$country_groups_tbl
+mismatches <- character(0)
 for (g in unique(country_groups_history$group)) {
   a <- sort(current$iso3c[current$group == g])
-  b <- sort(countryatlas::country_groups_tbl$iso3c[
-    countryatlas::country_groups_tbl$group == g])
+  b <- sort(groups_tbl$iso3c[groups_tbl$group == g])
   if (!identical(a, b)) {
-    message("MISMATCH in ", g, ":\n  history-only: ",
-            paste(setdiff(a, b), collapse = ", "),
-            "\n  snapshot-only: ", paste(setdiff(b, a), collapse = ", "))
+    mismatches <- c(mismatches, paste0(
+      "  ", g, ": history-only [", paste(setdiff(a, b), collapse = ", "),
+      "], snapshot-only [", paste(setdiff(b, a), collapse = ", "), "]"))
   }
+}
+if (length(mismatches)) {
+  stop("country_groups_history disagrees with country_groups_tbl for ",
+       length(mismatches), " group(s):\n", paste(mismatches, collapse = "\n"),
+       "\nFix whichever table is wrong -- do not ship the mismatch. ",
+       "If country_groups_tbl is the stale one, rebuild it from ",
+       "data-raw/build_datasets.R and bump MEMBERSHIP_AS_OF.",
+       call. = FALSE)
 }
 
 usethis::use_data(country_groups_history, overwrite = TRUE)

@@ -36,13 +36,28 @@ on a real key instead of on spelling.
 }
 \section{Coverage, stated plainly}{
 
-Resolution uses the optional \code{regions} package's crosswalks -- when the
-installed version exposes a name-to-code pair this function recognises; it
-says so once per session when it does not -- plus exact and
-case-insensitive matching against ISO 3166-2 names. Coverage is good for
-Europe (where NUTS and ISO 3166-2 are both well maintained) and patchy
-elsewhere. This function will return \code{NA} rather than a plausible-looking
-wrong code, and \code{\link[=audit_coverage]{audit_coverage()}} on the result is the right next step.
+Two things resolve, and it is worth being blunt about how little that is.
+
+A \code{region} value that is \emph{already} an ISO 3166-2 code (\code{"DE-BY"}, \code{"US-CA"})
+passes through, provided its country prefix matches the country the row
+gives -- these codes are unique only within a country, which is why
+\code{country} is required. A mismatch is reported and left as \code{NA}.
+
+A region \emph{name} resolves only through the optional \code{regions} package's
+crosswalk, and only when the installed version exposes a name-to-code pair
+this function recognises. As of \code{regions} 0.1.8 none of them do:
+\code{nuts_lau_2019} offers \code{lau_name_national} / \code{lau_name_latin} and
+\code{all_valid_nuts_codes} has no name column, so \strong{no region name resolves at
+all}, anywhere -- the function says so once per session. The package
+carries no ISO 3166-2 name table of its own, deliberately: the datasets that
+do pair names with codes key on NUTS codes (\code{DE2}) rather than ISO 3166-2
+(\code{DE-BY}), and filling \code{iso_3166_2} from those would put a different code
+system in the column.
+
+So: pass codes if you have them. If you have names, expect \code{NA} until
+\code{regions} ships a usable crosswalk. This function returns \code{NA} rather than a
+plausible-looking wrong code, and \code{\link[=audit_coverage]{audit_coverage()}} on the result is the
+right next step.
 }
 
 \examples{

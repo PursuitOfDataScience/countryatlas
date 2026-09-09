@@ -13,6 +13,16 @@ one existed (\code{SUN}, \code{YUG}, \code{CSK}, \code{DDR}, \code{ANT}, \code{S
 may since have been inherited by a successor (e.g. \code{YEM}).}
 \item{dissolved}{Year the entity ceased to exist.}
 \item{iso3c, country}{The successor state.}
+\item{relation}{How the successor relates to the entity, per successor:
+\code{"succession"} if it is a genuinely new state created at \code{dissolved}, or
+\code{"continuation"} if the same state carried on (possibly with less
+territory) or a state that already existed absorbed the entity. Sudan is
+both at once -- \code{SDN} continued and \code{SSD} is new -- which is why the
+relation is per successor rather than per entity. The distinction
+matters: a \code{"continuation"} was \emph{not} created at \code{dissolved}, so testing
+its data against that year says nothing, and the code did not cease to
+exist either. \code{\link[=audit_time_coverage]{audit_time_coverage()}} keys on this column for both
+reasons.}
 }
 }
 \source{

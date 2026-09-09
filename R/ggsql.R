@@ -14,6 +14,9 @@ ggsql_wkb_frame <- function(data, geometry_col = "geometry") {
   # columns must be vectors"). Strip the class: the payload is already a list
   # of raw vectors, which is what nanoarrow encodes as binary and DBI writes
   # as a BLOB.
+  # Say so before clobbering, as the eleven other column-adding verbs do: a
+  # frame that already had a column of this name lost it in silence.
+  warn_overwrite(df, geometry_col)
   df[[geometry_col]] <- unclass(sf::st_as_binary(geom, EWKB = FALSE))
   tibble::as_tibble(df)
 }
@@ -85,6 +88,29 @@ world_query <- function(fill, source = "countryatlas_world",
     # "BIN fill INTO NA". compute_breaks() has carried this bound all along.
     check_number(n_bins, "n_bins", lo = 2, hi = .Machine$integer.max)
   }
+  # `size` belongs to "bubble" and `n_bins` to "binned", and the other layers
+  # took them without a word: n_bins was simply dropped (only the binned layer
+  # emits a BIN clause), while size still went into the VISUALISE list as
+  # `pop AS size` on a choropleth, which has no size channel to put it on. The
+  # emission is left alone -- it is what a pass-through query builder does, and
+  # what ggsql makes of it is ggsql's business -- but the silence is not, since
+  # the neighbouring abort already treats layer/argument mismatches as worth
+  # naming.
+  # `[[` on a named vector throws for a name that is not there, so "choropleth"
+  # -- which uses neither argument -- has to be handled explicitly.
+  layer_arg <- c(bubble = "size", binned = "n_bins")
+  used <- if (layer %in% names(layer_arg)) layer_arg[[layer]] else character(0)
+  inert <- setdiff(
+    c(if (!is.null(size)) "size", if (!is.null(n_bins)) "n_bins"), used
+  )
+  if (length(inert)) {
+    wdj_warn(c(
+      "{.code layer = \"{layer}\"} does not use
+       {cli::qty(length(inert))}{?this argument/these arguments}: {.arg {inert}}.",
+      "i" = '{.arg size} applies to {.code layer = "bubble"} and {.arg n_bins}
+             to {.code layer = "binned"}.'
+    ), class = "countryatlas_layer_args_ignored")
+  }
   if (identical(layer, "bubble") && is.null(size)) {
     wdj_abort(c(
       '{.code layer = "bubble"} needs a {.arg size} column.',
@@ -97,6 +123,21 @@ world_query <- function(fill, source = "countryatlas_world",
   if (!is.null(palette)) check_string(palette, "palette")
   if (!is.null(transform)) check_string(transform, "transform")
   if (!is.null(title)) check_string(title, "title", allow_empty = TRUE)
+  # Only `title` was escaped, and it is the one value that lands inside quotes.
+  # Everything else is interpolated as a bare SQL *identifier* or keyword, so a
+  # column name with a space produced invalid SQL with no diagnostic
+  # ("VISUALISE my col AS fill"), and a value derived from untrusted input --
+  # a column picked from a web form, a source name out of a config file --
+  # went into a string that is then handed to ggsql::ggsql_execute() to run.
+  # Validate the shape here, where the mistake is: an unquoted SQL identifier
+  # is a letter or underscore followed by letters, digits or underscores.
+  check_sql_ident(fill_name, "fill")
+  check_sql_ident(source, "source")
+  if (!is.null(size)) check_sql_ident(size, "size")
+  if (!is.null(facet)) check_sql_ident(facet, "facet")
+  if (!is.null(projection)) check_sql_ident(projection, "projection")
+  if (!is.null(palette)) check_sql_ident(palette, "palette")
+  if (!is.null(transform)) check_sql_ident(transform, "transform")
   head_line <- sprintf("VISUALISE %s AS fill", fill_name)
   if (!is.null(size)) {
     head_line <- paste0(head_line, ", ", size, " AS size")
@@ -126,6 +167,28 @@ world_query <- function(fill, source = "countryatlas_world",
     lines <- c(lines, sprintf("LABEL title => '%s'", gsub("'", "''", title)))
   }
   structure(paste(lines, collapse = "\n"), class = c("ggsql_query", "character"))
+}
+
+# Refuse anything that is not a bare SQL identifier. This builder emits a
+# query as text, so every interpolated name is unquoted SQL: a space, a quote,
+# a semicolon or a comment marker either breaks the query silently or changes
+# what it does. Names that need quoting are legal in SQL but not supported
+# here, and saying so is better than emitting something that fails inside
+# ggsql or, worse, runs.
+check_sql_ident <- function(x, arg, call = rlang::caller_env()) {
+  check_string(x, arg, call = call)
+  if (!grepl("^[A-Za-z_][A-Za-z0-9_]*$", x)) {
+    wdj_abort(c(
+      "{.arg {arg}} must be a plain SQL identifier.",
+      "x" = "Got {.val {x}}.",
+      "i" = "Letters, digits and underscores only, starting with a letter or
+             underscore. This builder emits the name unquoted, so anything
+             else would change the query rather than name a column.",
+      "i" = "Rename the column first -- {.code dplyr::rename()} -- or build
+             the query yourself."
+    ), class = "countryatlas_bad_sql_ident", call = call)
+  }
+  invisible(x)
 }
 
 #' @export

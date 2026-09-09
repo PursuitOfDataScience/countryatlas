@@ -77,6 +77,10 @@ the_sources <- new.env(parent = emptyenv())
 #' country_sources()
 #' fetch_indicator("demo", "demo_value")
 #'
+#' # Registering is permanent for the session, so example() would leave "demo"
+#' # and "demo_named" in the registry and country_sources() would report
+#' # different rows afterwards. Clean up at the end -- see the last lines.
+#'
 #' # A source keyed on country names rather than codes: `key_col` says which
 #' # column holds the key, `key_type` says how to read it.
 #' register_country_source(
@@ -89,6 +93,9 @@ the_sources <- new.env(parent = emptyenv())
 #'   meta = "A toy name-keyed source"
 #' )
 #' fetch_indicator("demo_named", "demo_value")
+#'
+#' # Leave the registry as it was found.
+#' remove_country_source(c("demo", "demo_named"))
 register_country_source <- function(name, fetch, meta = NULL, citation = NULL,
                                     key_col = "iso3c", key_type = "iso3c",
                                     cache = TRUE) {
@@ -125,6 +132,65 @@ register_country_source <- function(name, fetch, meta = NULL, citation = NULL,
                     key_type = key_type, cache = cache),
          envir = the_sources)
   invisible(name)
+}
+
+#' Remove a registered data source
+#'
+#' The counterpart to [register_country_source()]. Registering is permanent for
+#' the session, so without this there was no way to undo one -- which made any
+#' code that registers a source (an example, a test, an exploratory script)
+#' leave the registry permanently changed, and [country_sources()] report
+#' different rows afterwards.
+#'
+#' The five built-in sources cannot be removed: they are what the package
+#' documents, and dropping one would make `?fetch_indicator` wrong. Pass
+#' `cache = FALSE` to a fetch instead if you want to bypass one.
+#'
+#' @param source One or more source names, as given to
+#'   [register_country_source()].
+#' @return The names actually removed, invisibly.
+#' @seealso [register_country_source()], [country_sources()]
+#' @export
+#' @examples
+#' register_country_source("scratch", function(indicator, ...) NULL)
+#' "scratch" %in% country_sources()$source
+#' remove_country_source("scratch")
+#' "scratch" %in% country_sources()$source
+remove_country_source <- function(source) {
+  if (!is.character(source) || !length(source)) {
+    wdj_abort(c(
+      "{.arg source} must be one or more source names.",
+      "x" = "Got {.obj_type_friendly {source}}."
+    ))
+  }
+  builtin <- c("wdi", "owid", "eurostat", "oecd", "comtrade")
+  protected <- intersect(source, builtin)
+  if (length(protected)) {
+    wdj_abort(c(
+      "{cli::qty(length(protected))}Cannot remove the built-in
+       source{?s} {.val {protected}}.",
+      "i" = "They are what {.fn fetch_indicator} documents. Only sources you
+             registered yourself can be removed."
+    ))
+  }
+  present <- source[vapply(source, exists, logical(1),
+                           envir = the_sources, inherits = FALSE)]
+  unknown <- setdiff(source, present)
+  if (length(unknown)) {
+    wdj_warn(c(
+      "{cli::qty(length(unknown))}No registered source{?s}
+       named {.val {unknown}}.",
+      "i" = "Registered: {.val {sort(ls(the_sources))}}."
+    ))
+  }
+  for (nm in present) {
+    # The memoised answers go with it: leaving them behind means re-registering
+    # the same name later serves results from a fetch function that no longer
+    # exists -- the case register_country_source() already guards.
+    drop_source_memo(nm)
+    rm(list = nm, envir = the_sources)
+  }
+  invisible(present)
 }
 
 #' The registered data sources
@@ -214,7 +280,10 @@ fetch_indicator <- function(source, indicator, countries = NULL, years = NULL,
     countries <- wdj_to_iso3c(countries, origin = "iso3c")
     countries <- unique(stats::na.omit(countries))
   }
-  if (!is.null(years)) years <- validate_years(years)
+  # lo = 1500: this is the generic extension point, so the bound is only a
+  # plausibility check. A registered historical source may legitimately ask for
+  # 1850; the World Bank's 1960 floor belongs to the WDI adapter.
+  if (!is.null(years)) years <- validate_years(years, lo = 1500L)
 
   # `cache` was stored in the registry and reported by country_sources(), but
   # nothing ever read it -- the documented "results should be memoised for the
@@ -358,8 +427,25 @@ fetch_indicator <- function(source, indicator, countries = NULL, years = NULL,
 #' @param data A frame with `iso3c` (or a country column [join_world()] would
 #'   recognise).
 #' @param source,indicator,countries,years,... Passed to [fetch_indicator()].
-#'   `countries` defaults to the codes already in `data`, so only what you need
-#'   is fetched.
+#'   `countries` defaults to the codes already in `data`, so you never have to
+#'   restate them. How much that saves depends on the source -- see below.
+#'
+#' @section How much `countries` actually saves:
+#' `countries` bounds the *result*, not necessarily the download. Only some
+#' providers accept a country filter in the request:
+#'
+#' | Source | `countries` reaches the provider? |
+#' |---|---|
+#' | `comtrade` | yes -- sent as `reporter` |
+#' | `wdi` | partly -- the year range is sent, countries are filtered here |
+#' | `owid`, `eurostat`, `oecd` | no -- the full dataset is downloaded, then filtered |
+#'
+#' So `add_indicator(one_row, "owid", "life-expectancy")` still transfers every
+#' country and year that dataset holds in order to keep a single value. When
+#' that matters, narrow with `years` (which the `wdi` and `comtrade` adapters do
+#' push down), or fetch once into a variable and reuse it rather than calling
+#' this per subset. The on-disk cache means a repeated `wdi` fetch is free;
+#' the other sources are memoised for the session only.
 #'
 #' @return `data` with the indicator column(s) added.
 #' @seealso [fetch_indicator()], [country_join()]
@@ -475,7 +561,7 @@ add_indicator <- function(data, source, indicator, countries = NULL,
 compare_sources <- function(indicator, sources = c("wdi", "owid"), year,
                             countries = NULL, tolerance = 0.05) {
   if (missing(year)) wdj_abort("{.arg year} is required.")
-  year <- validate_years(year)
+  year <- validate_years(year, lo = 1500L)
   if (length(year) != 1L) {
     wdj_abort("{.arg year} must be a single year; got {length(year)}.")
   }
@@ -543,6 +629,11 @@ compare_sources <- function(indicator, sources = c("wdi", "owid"), year,
   out <- Reduce(function(a, b) dplyr::full_join(a, b, by = "iso3c",
                                          na_matches = "never"), vals)
 
+  # No non-numeric guard needed here: the per-source reshape above selects the
+  # first *numeric* column and aborts with "returned no numeric column" when
+  # there is none, so every column in `sources` is already a number and
+  # as.matrix() cannot produce a character matrix. (Reading the abs() below in
+  # isolation suggests otherwise -- the guard is 20 lines up, not here.)
   mat <- as.matrix(out[, sources, drop = FALSE])
   out$n_sources <- rowSums(!is.na(mat))
   rng <- t(apply(mat, 1, function(r) {
@@ -705,8 +796,26 @@ fetch_comtrade <- function(indicator, countries = NULL, years = NULL, ...) {
   # one column -- against the documented "one column per indicator", and without
   # saying that the rest had been dropped.
   nms <- names(indicator) %||% indicator
+  # Resolved at run time, not written as `comtradr::ct_get_data`. `R CMD check`
+  # resolves every `pkg::fun` in R/ to confirm the symbol exists, which loads
+  # that namespace -- and comtradr's .onLoad creates ~/.cache/R/comtradr, so
+  # the check itself wrote into the checking account's home and earned a "new
+  # files in some other directories" NOTE before any test or example ran.
+  # need_pkg() above has already loaded the namespace by the time we get here,
+  # where the write is the user's own doing.
+  #
+  # The cost is that the symbol's existence is no longer checked statically, so
+  # name it in the error if it ever goes away.
+  ct_get_data <- tryCatch(
+    getExportedValue("comtradr", "ct_get_data"),
+    error = function(e) wdj_abort(c(
+      "The installed {.pkg comtradr} does not export {.fun ct_get_data}.",
+      "i" = "Update {.pkg comtradr}, or fetch the data yourself and use
+             {.fn register_country_source}."
+    ))
+  )
   frames <- lapply(seq_along(indicator), function(i) {
-    raw <- tibble::as_tibble(comtradr::ct_get_data(
+    raw <- tibble::as_tibble(ct_get_data(
       commodity_code = indicator[[i]],
       reporter = countries %||% "all_countries",
       start_date = if (!is.null(years)) min(years) else NULL,
@@ -929,6 +1038,16 @@ register_builtin_sources <- function() {
 #'
 #' Empties the memoised in-session cache and, optionally, the on-disk one.
 #'
+#' @section What a global clear releases:
+#' Called with no `source`, this also drops the two cached *geometry* backends:
+#' the Natural Earth `sf` layer held per scale (tens of megabytes at
+#' `scale = "medium"`) and the memoised `map_data("world")` tibble (about
+#' 99,000 rows per override set). Those are the largest things the package
+#' keeps in memory, and in a long-lived process -- a Shiny app or a plumber
+#' API -- this is the only way to release them. They rebuild on the next map.
+#'
+#' Naming a `source` leaves geometry alone, since it is not a data source.
+#'
 #' @param source Which source's cache to clear, or `NULL` (default) for all.
 #'   Only the World Bank cache is currently persisted to disk; other sources are
 #'   memoised per session.
@@ -946,6 +1065,8 @@ clear_country_cache <- function(source = NULL, disk = FALSE) {
   # first component is the source name; drop this source's entries, or all.
   if (is.null(source)) {
     .wdj_state$source_memo <- list()
+    # Geometry is not a data source, so only the global clear touches it.
+    clear_geometry_cache()
   } else {
     drop_source_memo(source)
   }

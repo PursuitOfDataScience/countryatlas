@@ -127,7 +127,7 @@ join_world <- function(data,
     # plain "region subset" rather than an sf-backend option -- so asking for
     # one region with geometry = "none" handed back every row.
     if (!is.null(region)) {
-      iso <- resolve_region(region)
+      iso <- resolve_region_codes(region)
       if (inherits(iso, "wdj_bbox")) {
         wdj_abort(c(
           "A bounding-box {.arg region} needs geometry to clip against.",
@@ -208,6 +208,22 @@ country_join <- function(x, y, by_x, by_y,
 
   x <- tibble::as_tibble(x)
   y <- tibble::as_tibble(y)
+  # Replacing an existing key column is usually right -- deriving it is the
+  # point of the join -- but doing it in silence is not: eleven other
+  # column-adding verbs call warn_overwrite(), and standardize_country() reports
+  # exactly this. An `iso3c` the caller had curated by hand was overwritten with
+  # whatever the names resolved to, and nothing said so.
+  if (warn) {
+    for (side in list(list(f = x, nm = "x"), list(f = y, nm = "y"))) {
+      if (key %in% names(side$f)) {
+        wdj_warn(c(
+          "{.arg {side$nm}} already has {.field {key}}; it is replaced with the
+           code derived from the join column.",
+          "i" = "Rename it first if you need to keep both."
+        ), class = "countryatlas_key_overwritten")
+      }
+    }
+  }
   x[[key]] <- wdj_to_key(x[[bx]], origin = origin_x, key = key, side = "`x`",
                          warn_unresolved = warn)
   y[[key]] <- wdj_to_key(y[[by_]], origin = origin_y, key = key, side = "`y`",
@@ -315,6 +331,14 @@ country_join_all <- function(tables, by, origin = "country.name",
     tb <- tibble::as_tibble(tables[[i]])
     if (!by[i] %in% names(tb)) {
       wdj_abort("Column {.val {by[i]}} not found in table {i}.")
+    }
+    # Same silence as country_join(), once per table.
+    if (warn && key %in% names(tb)) {
+      wdj_warn(c(
+        "Table {i} already has {.field {key}}; it is replaced with the code
+         derived from {.val {by[i]}}.",
+        "i" = "Rename it first if you need to keep both."
+      ), class = "countryatlas_key_overwritten")
     }
     tb[[key]] <- wdj_to_key(tb[[by[i]]], origin = origin[i], key = key,
                             side = sprintf("table %d", i),

@@ -35,6 +35,9 @@
 library(tibble)
 library(dplyr)
 
+# Standalone helpers, so this script needs no installed countryatlas.
+source("data-raw/overrides_snapshot.R")
+
 d <- function(territory, iso3c, administered_by, claimed_by, status, note) {
   tibble(territory = territory, iso3c = iso3c,
          administered_by = administered_by, claimed_by = claimed_by,
@@ -118,7 +121,31 @@ stopifnot(
   !anyNA(disputed_territories$note),
   # Every ISO code present must be one the package recognises.
   all(is.na(disputed_territories$iso3c) |
-        disputed_territories$iso3c %in% countryatlas:::wdj_known_iso3c())
+        disputed_territories$iso3c %in% wdj_known_iso3c_snapshot())
 )
+
+# The party columns were unvalidated: only `iso3c` was checked, while
+# ?disputed_territories makes a precise 17-line claim about `administered_by`
+# and `claimed_by` -- that they hold ISO codes plus exactly six named non-ISO
+# placeholders. Nothing enforced that the set stayed at six, or caught a typo
+# like "SRB;XKK" in a semicolon-separated list. Both are semicolon-separated,
+# so split before checking.
+placeholders <- c("ABK", "CYP-N", "OST", "PMR", "SAH", "SOL")
+allowed <- c(wdj_known_iso3c_snapshot(), placeholders)
+parties <- unlist(strsplit(
+  na.omit(c(disputed_territories$administered_by,
+            disputed_territories$claimed_by)), ";"))
+parties <- trimws(parties)
+bad <- setdiff(parties, allowed)
+if (length(bad)) {
+  stop("unknown party code(s) in administered_by/claimed_by: ",
+       paste(bad, collapse = ", "),
+       "\nAdd a real ISO code, or extend the documented placeholder list in ",
+       "?disputed_territories -- which names exactly these six: ",
+       paste(placeholders, collapse = ", "), call. = FALSE)
+}
+# And the other direction: the Rd promises exactly six placeholders, so an
+# unused one is also a documentation error.
+stopifnot(all(placeholders %in% parties))
 
 usethis::use_data(disputed_territories, overwrite = TRUE)

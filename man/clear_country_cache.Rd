@@ -19,6 +19,18 @@ Invisibly \code{TRUE}.
 \description{
 Empties the memoised in-session cache and, optionally, the on-disk one.
 }
+\section{What a global clear releases}{
+
+Called with no \code{source}, this also drops the two cached \emph{geometry} backends:
+the Natural Earth \code{sf} layer held per scale (tens of megabytes at
+\code{scale = "medium"}) and the memoised \code{map_data("world")} tibble (about
+99,000 rows per override set). Those are the largest things the package
+keeps in memory, and in a long-lived process -- a Shiny app or a plumber
+API -- this is the only way to release them. They rebuild on the next map.
+
+Naming a \code{source} leaves geometry alone, since it is not a data source.
+}
+
 \examples{
 clear_country_cache()
 }

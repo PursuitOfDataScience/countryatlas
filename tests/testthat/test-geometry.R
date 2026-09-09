@@ -2,7 +2,7 @@ test_that("distance_between computes great-circle distance (no sf needed)", {
   d <- distance_between("France", "Germany")
   expect_type(d, "double")
   expect_gt(d, 0)
-  # Paris–Berlin ~ 878 km, centroids should be in that ballpark
+  # Paris-Berlin ~ 878 km, centroids should be in that ballpark
   expect_gt(d, 500)
   expect_lt(d, 1500)
 })

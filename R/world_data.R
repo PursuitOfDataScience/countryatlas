@@ -159,7 +159,7 @@ world_data <- function(year,
     # returned every country in the world, silently and with no hint that the
     # argument had been dropped.
     if (!is.null(region)) {
-      iso <- resolve_region(region)
+      iso <- resolve_region_codes(region)
       if (inherits(iso, "wdj_bbox")) {
         wdj_abort(c(
           "A bounding-box {.arg region} needs geometry to clip against.",
@@ -252,6 +252,13 @@ country_data <- function(year,
       "i" = "Pass a year range for a panel, or {.code latest = FALSE} to pin
              the requested year."
     ))
+    # Honoured here, next to the warning that promises it. It used to be
+    # cleared only inside the collapse branch further down, which is gated on
+    # nrow(wdi) -- so with indicator = NULL, or after a fetch that came back
+    # empty, `panel` stayed TRUE and the frame was crossed with `year` after
+    # all: the result carried the very year column the warning said it would
+    # not.
+    panel <- FALSE
   }
   panel <- isTRUE(panel) || length(year) > 1L
   # intersect() silently dropped anything unrecognised, so classify = "incomes"
@@ -289,6 +296,8 @@ country_data <- function(year,
                       ~ dplyr::last(stats::na.omit(.x)) %||% NA),
         .groups = "drop"
       )
+    # Already cleared beside the warning above for the single-year case; kept
+    # for the path where `latest = TRUE` collapses without having warned.
     panel <- FALSE
   }
 
