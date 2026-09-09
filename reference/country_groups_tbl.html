@@ -58,8 +58,25 @@
     </div>
     <div class="section level2">
     <h2 id="source">Source<a class="anchor" aria-label="anchor" href="#source"></a></h2>
-    <p>Curated from official membership lists (point-in-time; see the
-package <code>NEWS</code> for the reference date).</p>
+    <p>Curated from official membership lists, as of the date above. (This
+used to point at the package <code>NEWS</code> for the reference date, where two
+different dates were on record – an Rd should not delegate a fact to a
+changelog.)</p>
+    </div>
+    <div class="section level2">
+    <h2 id="as-of-when">As of when<a class="anchor" aria-label="anchor" href="#as-of-when"></a></h2>
+
+
+<p>Membership is a snapshot taken on <strong>2026-06-01</strong>, carried on the table
+itself:</p>
+<p></p><div class="sourceCode r"><pre><code><span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">country_groups_tbl</span>, <span class="st">"as_of"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "2026-06-01"</span></span></code></pre><p></p></div>
+<p>Read the attribute rather than this paragraph if you need the date in code;
+it is set from a single constant in <code>data-raw/build_datasets.R</code>, so it
+cannot drift from the data the way a hand-written date can. For membership
+at any other date use <a href="country_groups_history.html">country_groups_history</a> and
+<a href="country_groups.html">country_groups(as_of = )</a>, which is the table this
+snapshot is a slice of.</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

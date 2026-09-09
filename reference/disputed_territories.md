@@ -49,6 +49,18 @@ founded than another.** Where it says "administered by" it means de
 facto control as reported by the mapping sources the package already
 uses (Natural Earth), not recognition, legitimacy or endorsement.
 
+## What reads these columns
+
+Nothing in the package does. The internal layer and note builders behind
+`world_map(disputes = )` and
+[`dispute_policy()`](https://pursuitofdatascience.github.io/countryatlas/reference/dispute_policy.md)
+key on `iso3c` alone, and no verb filters on the parties.
+`administered_by` and `claimed_by` are here for your own filtering –
+"show me everything Morocco administers", "drop the territories with
+more than one claimant" – and are documented precisely so that such a
+filter is writable. Their contents are validated at build time against
+the placeholder list below.
+
 ## The codes in `administered_by` and `claimed_by`
 
 Mostly ISO 3166-1 alpha-3, so they join the `iso3c` spine directly – but

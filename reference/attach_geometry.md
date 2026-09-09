@@ -74,8 +74,10 @@ attach_geometry(
 
 ## Value
 
-For `"polygon"`, a tibble with `long`/`lat`/`group` plus your columns.
-For `"sf"`, an `sf` object.
+For `"polygon"`, a tibble with `long`/`lat`/`group` plus your columns,
+one row per polygon vertex. For `"sf"`, an `sf` object, one row per
+feature. Both carry every country the backend has – see *How many rows
+come back*.
 
 ## One row in, one row out
 
@@ -102,6 +104,24 @@ the 215 countries in
 when microstates matter – Hong Kong, Macao, Tuvalu and the British
 Virgin Islands are each in no other backend. Gibraltar alone is in none
 of them.
+
+## How many rows come back
+
+The result is the backend's whole map, not just your rows: every country
+the backend carries is present, and the ones absent from `data` carry
+`NA` in your columns. That is what makes them draw in `na.value` rather
+than vanish, which is the point – a choropleth that quietly omits the
+countries you have no data for reads as though they did not exist. It
+does mean the result is much larger than `data` and is not something to
+summarise directly: `attach_geometry()` on three countries returns 240
+of them on the polygon backend and 176 on `"sf"`, whatever `data` held.
+The row count is larger still: `"polygon"` gives one row per polygon
+*vertex* (about 99,000), and `"sf"` one row per *feature* – usually one
+per country, but a divided country appears more than once (Cyprus at
+`scale = "small"`; Cyprus and India at `"medium"`), so an `iso3c` join
+against it can fan out. Summarise `data` before attaching geometry, or
+use the verbs in this package, which de-duplicate to one row per country
+first.
 
 ## Examples
 

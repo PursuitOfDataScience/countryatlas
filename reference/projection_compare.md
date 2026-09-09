@@ -13,7 +13,8 @@ projection_compare(
   projections = c("equal_earth", "robinson", "winkel_tripel", "mercator"),
   ncol = NULL,
   labeller = c("name", "property"),
-  ...
+  ...,
+  projection = NULL
 )
 ```
 
@@ -51,6 +52,13 @@ projection_compare(
   Passed to
   [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
   (e.g. `style`, `palette`, `n_bins`).
+
+- projection:
+
+  Not an argument of this function. It exists only to catch the singular
+  spelling, which R's partial matching would otherwise bind to
+  `projections` – drawing a single panel from a function whose purpose
+  is several. Passing it is an error; use `projections`.
 
 ## Value
 

@@ -71,6 +71,18 @@ memoised per session.</p></dd>
     <p>Invisibly <code>TRUE</code>.</p>
     </div>
     <div class="section level2">
+    <h2 id="what-a-global-clear-releases">What a global clear releases<a class="anchor" aria-label="anchor" href="#what-a-global-clear-releases"></a></h2>
+
+
+<p>Called with no <code>source</code>, this also drops the two cached <em>geometry</em> backends:
+the Natural Earth <code>sf</code> layer held per scale (tens of megabytes at
+<code>scale = "medium"</code>) and the memoised <code>map_data("world")</code> tibble (about
+99,000 rows per override set). Those are the largest things the package
+keeps in memory, and in a long-lived process – a Shiny app or a plumber
+API – this is the only way to release them. They rebuild on the next map.</p>
+<p>Naming a <code>source</code> leaves geometry alone, since it is not a data source.</p>
+    </div>
+    <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
     <div class="dont-index"><p><code><a href="country_sources.html">country_sources()</a></code>, <code><a href="fetch_indicator.html">fetch_indicator()</a></code></p></div>
     </div>

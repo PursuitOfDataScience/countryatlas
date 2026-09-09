@@ -33,7 +33,20 @@ historical_geometry(year, dependencies = FALSE, projection = "equal_earth")
 ## Value
 
 An `sf` frame with `gwcode`, `country`, `iso3c` (where one can be
-assigned – see below), `status`, `from`, `to` and geometry.
+assigned – see below), `status`, `from`, `to` and geometry. Two further
+CShapes columns are passed through when the installed version supplies
+them, since they answer the questions this verb is usually asked:
+
+- `owner` – the `gwcode` of the sovereign a dependency belonged to, and
+  `NA` for a sovereign state. This is the column that makes
+  `dependencies = TRUE` legible: without it a colony and its metropole
+  are two unrelated rows.
+
+- `capname` – the capital's name at that date.
+
+Both were returned but undocumented. Neither is guaranteed: `cshapes`
+decides what its own table holds, so check with
+[`names()`](https://rdrr.io/r/base/names.html) rather than assuming.
 
 ## The ISO spine does not reach back
 

@@ -33,8 +33,8 @@ per-country spans are too heterogeneous for any single span to reconcile
 with the fitted slope, which is warned about. `beta` and its inference
 are unaffected in both – only the annualised figures need one common
 span, so restrict the panel to a shared window if you need them. The
-fitted [lm](https://rdrr.io/r/stats/lm.html) object is attached as the
-`"model"` attribute.
+fitted [`stats::lm()`](https://rdrr.io/r/stats/lm.html) object is
+attached as the `"model"` attribute.
 
 ## See also
 

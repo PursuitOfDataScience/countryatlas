@@ -69,13 +69,25 @@ recognise).</p></dd>
 
 <dt id="arg-source-indicator-countries-years-">source, indicator, countries, years, ...<a class="anchor" aria-label="anchor" href="#arg-source-indicator-countries-years-"></a></dt>
 <dd><p>Passed to <code><a href="fetch_indicator.html">fetch_indicator()</a></code>.
-<code>countries</code> defaults to the codes already in <code>data</code>, so only what you need
-is fetched.</p></dd>
+<code>countries</code> defaults to the codes already in <code>data</code>, so you never have to
+restate them. How much that saves depends on the source – see below.</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p><code>data</code> with the indicator column(s) added.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="how-much-countries-actually-saves">How much <code>countries</code> actually saves<a class="anchor" aria-label="anchor" href="#how-much-countries-actually-saves"></a></h2>
+
+
+<p><code>countries</code> bounds the <em>result</em>, not necessarily the download. Only some
+providers accept a country filter in the request:</p><table class="table table"><tr><td>Source</td><td><code>countries</code> reaches the provider?</td></tr><tr><td><code>comtrade</code></td><td>yes – sent as <code>reporter</code></td></tr><tr><td><code>wdi</code></td><td>partly – the year range is sent, countries are filtered here</td></tr><tr><td><code>owid</code>, <code>eurostat</code>, <code>oecd</code></td><td>no – the full dataset is downloaded, then filtered</td></tr></table><p>So <code>add_indicator(one_row, "owid", "life-expectancy")</code> still transfers every
+country and year that dataset holds in order to keep a single value. When
+that matters, narrow with <code>years</code> (which the <code>wdi</code> and <code>comtrade</code> adapters do
+push down), or fetch once into a variable and reuse it rather than calling
+this per subset. The on-disk cache means a repeated <code>wdi</code> fetch is free;
+the other sources are memoised for the session only.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

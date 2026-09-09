@@ -61,7 +61,8 @@ classification are held fixed; only the CRS varies.</p>
 <span>  projections <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"equal_earth"</span>, <span class="st">"robinson"</span>, <span class="st">"winkel_tripel"</span>, <span class="st">"mercator"</span><span class="op">)</span>,</span>
 <span>  ncol <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  labeller <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"name"</span>, <span class="st">"property"</span><span class="op">)</span>,</span>
-<span>  <span class="va">...</span></span>
+<span>  <span class="va">...</span>,</span>
+<span>  projection <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -97,6 +98,13 @@ comparison.</p></dd>
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
 <dd><p>Passed to <code><a href="world_map.html">world_map()</a></code> (e.g. <code>style</code>, <code>palette</code>, <code>n_bins</code>).</p></dd>
+
+
+<dt id="arg-projection">projection<a class="anchor" aria-label="anchor" href="#arg-projection"></a></dt>
+<dd><p>Not an argument of this function. It exists only to catch
+the singular spelling, which R's partial matching would otherwise bind to
+<code>projections</code> – drawing a single panel from a function whose purpose is
+several. Passing it is an error; use <code>projections</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">

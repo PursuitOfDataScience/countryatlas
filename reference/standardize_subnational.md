@@ -48,13 +48,29 @@ get `NA`, never a guess.
 
 ## Coverage, stated plainly
 
-Resolution uses the optional `regions` package's crosswalks – when the
-installed version exposes a name-to-code pair this function recognises;
-it says so once per session when it does not – plus exact and
-case-insensitive matching against ISO 3166-2 names. Coverage is good for
-Europe (where NUTS and ISO 3166-2 are both well maintained) and patchy
-elsewhere. This function will return `NA` rather than a
-plausible-looking wrong code, and
+Two things resolve, and it is worth being blunt about how little that
+is.
+
+A `region` value that is *already* an ISO 3166-2 code (`"DE-BY"`,
+`"US-CA"`) passes through, provided its country prefix matches the
+country the row gives – these codes are unique only within a country,
+which is why `country` is required. A mismatch is reported and left as
+`NA`.
+
+A region *name* resolves only through the optional `regions` package's
+crosswalk, and only when the installed version exposes a name-to-code
+pair this function recognises. As of `regions` 0.1.8 none of them do:
+`nuts_lau_2019` offers `lau_name_national` / `lau_name_latin` and
+`all_valid_nuts_codes` has no name column, so **no region name resolves
+at all**, anywhere – the function says so once per session. The package
+carries no ISO 3166-2 name table of its own, deliberately: the datasets
+that do pair names with codes key on NUTS codes (`DE2`) rather than ISO
+3166-2 (`DE-BY`), and filling `iso_3166_2` from those would put a
+different code system in the column.
+
+So: pass codes if you have them. If you have names, expect `NA` until
+`regions` ships a usable crosswalk. This function returns `NA` rather
+than a plausible-looking wrong code, and
 [`audit_coverage()`](https://pursuitofdatascience.github.io/countryatlas/reference/audit_coverage.md)
 on the result is the right next step.
 
@@ -79,11 +95,14 @@ if (requireNamespace("regions", quietly = TRUE)) {
 #> This message is displayed once per session.
 #> Warning: 3 regions did not resolve to an ISO 3166-2 code:
 #> • "Bavaria", "Hesse", and "Nowhere"
-#> ℹ Coverage is best in Europe; see the section in
+#> ℹ Only values that are already ISO 3166-2 codes resolve; region names need a
+#>   crosswalk the installed regions does not provide. See the section in
 #>   `?countryatlas::standardize_subnational()`.
-#>    region value iso3c iso_3166_2
-#> 1 Bavaria     1   DEU       <NA>
-#> 2   Hesse     2   DEU       <NA>
-#> 3 Nowhere     3   DEU       <NA>
+#> # A tibble: 3 × 4
+#>   region  value iso3c iso_3166_2
+#>   <chr>   <int> <chr> <chr>     
+#> 1 Bavaria     1 DEU   NA        
+#> 2 Hesse       2 DEU   NA        
+#> 3 Nowhere     3 DEU   NA        
 # }
 ```

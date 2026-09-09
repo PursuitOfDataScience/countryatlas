@@ -130,6 +130,10 @@ fetch_indicator("demo", "demo_value")
 #> 1 USA    2020          1
 #> 2 FRA    2020          2
 
+# Registering is permanent for the session, so example() would leave "demo"
+# and "demo_named" in the registry and country_sources() would report
+# different rows afterwards. Clean up at the end -- see the last lines.
+
 # A source keyed on country names rather than codes: `key_col` says which
 # column holds the key, `key_type` says how to read it.
 register_country_source(
@@ -147,4 +151,7 @@ fetch_indicator("demo_named", "demo_value")
 #>   <chr>         <int>      <dbl> <chr>
 #> 1 United States  2020          3 USA  
 #> 2 Japan          2020          4 JPN  
+
+# Leave the registry as it was found.
+remove_country_source(c("demo", "demo_named"))
 ```

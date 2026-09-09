@@ -167,6 +167,10 @@ cheap to arrange.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> USA    <span style="text-decoration: underline;">2</span>020          1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> FRA    <span style="text-decoration: underline;">2</span>020          2</span>
 <span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Registering is permanent for the session, so example() would leave "demo"</span></span></span>
+<span class="r-in"><span><span class="co"># and "demo_named" in the registry and country_sources() would report</span></span></span>
+<span class="r-in"><span><span class="co"># different rows afterwards. Clean up at the end -- see the last lines.</span></span></span>
+<span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># A source keyed on country names rather than codes: `key_col` says which</span></span></span>
 <span class="r-in"><span><span class="co"># column holds the key, `key_type` says how to read it.</span></span></span>
 <span class="r-in"><span><span class="fu">register_country_source</span><span class="op">(</span></span></span>
@@ -184,6 +188,9 @@ cheap to arrange.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>         <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> United States  <span style="text-decoration: underline;">2</span>020          3 USA  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> Japan          <span style="text-decoration: underline;">2</span>020          4 JPN  </span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Leave the registry as it was found.</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="remove_country_source.html">remove_country_source</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"demo"</span>, <span class="st">"demo_named"</span><span class="op">)</span><span class="op">)</span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

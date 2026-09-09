@@ -2,7 +2,9 @@
 
 “World data on a map” has many honest forms. A choropleth is only the
 first. The package offers a full vocabulary; this vignette tours the
-ones that run without extra dependencies and points to the rest.
+ones that need only `maps` – itself a suggested package, so the map
+chunks are skipped when it is absent – and points to the rest, which
+need `sf` or `biscale` as well.
 
 ## Proportional-symbol (bubble) maps
 

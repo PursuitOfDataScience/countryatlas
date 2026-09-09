@@ -89,7 +89,11 @@ answer to the arc map's central problem: past a few dozen flows,
 
 <dt id="arg-origins">origins<a class="anchor" aria-label="anchor" href="#arg-origins"></a></dt>
 <dd><p>Which origins to draw. A character vector of names or codes,
-or an integer giving how many of the largest to take (default <code>6</code>).</p></dd>
+or an integer giving how many of the largest to take (default <code>6</code>).</p>
+<p>Note that this is <strong>not</strong> <code>origin</code>, which it sits next to: <code>origin</code> is the
+coding scheme <code>from</code>/<code>to</code> are written in, <code>origins</code> is which of them to
+put on the page. Confusing the two is diagnosed rather than left to fail
+further in.</p></dd>
 
 
 <dt id="arg-direction">direction<a class="anchor" aria-label="anchor" href="#arg-direction"></a></dt>

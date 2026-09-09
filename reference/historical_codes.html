@@ -83,6 +83,18 @@ may since have been inherited by a successor (e.g. <code>YEM</code>).</p></dd>
 <dt>iso3c, country</dt>
 <dd><p>The successor state.</p></dd>
 
+<dt>relation</dt>
+<dd><p>How the successor relates to the entity, per successor:
+<code>"succession"</code> if it is a genuinely new state created at <code>dissolved</code>, or
+<code>"continuation"</code> if the same state carried on (possibly with less
+territory) or a state that already existed absorbed the entity. Sudan is
+both at once – <code>SDN</code> continued and <code>SSD</code> is new – which is why the
+relation is per successor rather than per entity. The distinction
+matters: a <code>"continuation"</code> was <em>not</em> created at <code>dissolved</code>, so testing
+its data against that year says nothing, and the code did not cease to
+exist either. <code><a href="audit_time_coverage.html">audit_time_coverage()</a></code> keys on this column for both
+reasons.</p></dd>
+
 
 </dl></div>
     <div class="section level2">

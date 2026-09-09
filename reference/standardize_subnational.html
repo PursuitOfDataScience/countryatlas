@@ -99,13 +99,25 @@ regions get <code>NA</code>, never a guess.</p>
     <h2 id="coverage-stated-plainly">Coverage, stated plainly<a class="anchor" aria-label="anchor" href="#coverage-stated-plainly"></a></h2>
 
 
-<p>Resolution uses the optional <code>regions</code> package's crosswalks – when the
-installed version exposes a name-to-code pair this function recognises; it
-says so once per session when it does not – plus exact and
-case-insensitive matching against ISO 3166-2 names. Coverage is good for
-Europe (where NUTS and ISO 3166-2 are both well maintained) and patchy
-elsewhere. This function will return <code>NA</code> rather than a plausible-looking
-wrong code, and <code><a href="audit_coverage.html">audit_coverage()</a></code> on the result is the right next step.</p>
+<p>Two things resolve, and it is worth being blunt about how little that is.</p>
+<p>A <code>region</code> value that is <em>already</em> an ISO 3166-2 code (<code>"DE-BY"</code>, <code>"US-CA"</code>)
+passes through, provided its country prefix matches the country the row
+gives – these codes are unique only within a country, which is why
+<code>country</code> is required. A mismatch is reported and left as <code>NA</code>.</p>
+<p>A region <em>name</em> resolves only through the optional <code>regions</code> package's
+crosswalk, and only when the installed version exposes a name-to-code pair
+this function recognises. As of <code>regions</code> 0.1.8 none of them do:
+<code>nuts_lau_2019</code> offers <code>lau_name_national</code> / <code>lau_name_latin</code> and
+<code>all_valid_nuts_codes</code> has no name column, so <strong>no region name resolves at
+all</strong>, anywhere – the function says so once per session. The package
+carries no ISO 3166-2 name table of its own, deliberately: the datasets that
+do pair names with codes key on NUTS codes (<code>DE2</code>) rather than ISO 3166-2
+(<code>DE-BY</code>), and filling <code>iso_3166_2</code> from those would put a different code
+system in the column.</p>
+<p>So: pass codes if you have them. If you have names, expect <code>NA</code> until
+<code>regions</code> ships a usable crosswalk. This function returns <code>NA</code> rather than a
+plausible-looking wrong code, and <code><a href="audit_coverage.html">audit_coverage()</a></code> on the result is the
+right next step.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
@@ -126,12 +138,15 @@ wrong code, and <code><a href="audit_coverage.html">audit_coverage()</a></code> 
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #555555;">This message is displayed once per session.</span></span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>3 regions did not resolve to an ISO 3166-2 code:</span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> <span style="color: #0000BB;">"Bavaria"</span>, <span style="color: #0000BB;">"Hesse"</span>, and <span style="color: #0000BB;">"Nowhere"</span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Coverage is best in Europe; see the section in</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Only values that are already ISO 3166-2 codes resolve; region names need a</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span>   crosswalk the installed <span style="color: #0000BB;">regions</span> does not provide. See the section in</span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span>   `?countryatlas::standardize_subnational()`.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    region value iso3c iso_3166_2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 Bavaria     1   DEU       &lt;NA&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2   Hesse     2   DEU       &lt;NA&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 Nowhere     3   DEU       &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 3 × 4</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   region  value iso3c iso_3166_2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> Bavaria     1 DEU   <span style="color: #BB0000;">NA</span>        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> Hesse       2 DEU   <span style="color: #BB0000;">NA</span>        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span> Nowhere     3 DEU   <span style="color: #BB0000;">NA</span>        </span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

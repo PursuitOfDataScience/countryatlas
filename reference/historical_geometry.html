@@ -84,7 +84,16 @@ or <code>NULL</code> for unprojected lon/lat.</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>An <code>sf</code> frame with <code>gwcode</code>, <code>country</code>, <code>iso3c</code> (where one can be
-assigned – see below), <code>status</code>, <code>from</code>, <code>to</code> and geometry.</p>
+assigned – see below), <code>status</code>, <code>from</code>, <code>to</code> and geometry. Two further
+CShapes columns are passed through when the installed version supplies
+them, since they answer the questions this verb is usually asked:</p><ul><li><p><code>owner</code> – the <code>gwcode</code> of the sovereign a dependency belonged to, and
+<code>NA</code> for a sovereign state. This is the column that makes
+<code>dependencies = TRUE</code> legible: without it a colony and its metropole are
+two unrelated rows.</p></li>
+<li><p><code>capname</code> – the capital's name at that date.</p></li>
+</ul><p>Both were returned but undocumented. Neither is guaranteed: <code>cshapes</code>
+decides what its own table holds, so check with <code><a href="https://rdrr.io/r/base/names.html" class="external-link">names()</a></code> rather than
+assuming.</p>
     </div>
     <div class="section level2">
     <h2 id="the-iso-spine-does-not-reach-back">The ISO spine does not reach back<a class="anchor" aria-label="anchor" href="#the-iso-spine-does-not-reach-back"></a></h2>

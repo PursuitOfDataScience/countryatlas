@@ -79,7 +79,10 @@ shapes drawn are still de facto.</p></li>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>The policy in effect, invisibly when setting.</p>
+    <p>When called with no argument, the policy currently in effect. When
+setting, the policy that was in effect <em>before</em> the call, invisibly – R's
+convention for a setter, so
+<code>on.exit(dispute_policy(dispute_policy("neutral")))</code> restores it.</p>
     </div>
     <div class="section level2">
     <h2 id="what-this-does-and-does-not-do">What this does and does not do<a class="anchor" aria-label="anchor" href="#what-this-does-and-does-not-do"></a></h2>
@@ -99,11 +102,10 @@ trusting a setting.</p>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">old</span> <span class="op">&lt;-</span> <span class="fu">dispute_policy</span><span class="op">(</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu">dispute_policy</span><span class="op">(</span><span class="st">"neutral"</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu">dispute_policy</span><span class="op">(</span><span class="op">)</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">old</span> <span class="op">&lt;-</span> <span class="fu">dispute_policy</span><span class="op">(</span><span class="st">"neutral"</span><span class="op">)</span>   <span class="co"># sets, and returns what it replaced</span></span></span>
+<span class="r-in"><span><span class="fu">dispute_policy</span><span class="op">(</span><span class="op">)</span>                   <span class="co"># "neutral"</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] "neutral"</span>
-<span class="r-in"><span><span class="fu">dispute_policy</span><span class="op">(</span><span class="va">old</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">dispute_policy</span><span class="op">(</span><span class="va">old</span><span class="op">)</span>                <span class="co"># put it back</span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

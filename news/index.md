@@ -25,12 +25,15 @@ takes `data` as its second argument. Details under **Breaking changes**.
   follows. A call that passed `repel` positionally –
   `geom_country_labels(aes(...), FALSE)` – now binds that `FALSE` to
   `data` and must name it. Named calls are unaffected.
+
 - **[`morans_i()`](https://pursuitofdatascience.github.io/countryatlas/reference/morans_i.md)
   returns `n_excluded` and `excluded`.** Code that assumed a five-column
   result will see seven. The statistic itself is unchanged.
+
 - **`world_map(projection = "mercator")` draws a different map** – see
   the bug fix below. It was previously unusable, so this is a fix rather
   than a regression, but the output does change.
+
 - **`style = "binned"` draws different bins** in
   [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md),
   [`globe_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/globe_map.md)
@@ -39,13 +42,16 @@ takes `data` as its second argument. Details under **Breaking changes**.
   `n_bins` was silently ignored there (see the bug fix below), so the
   bin count and boundaries change for any existing call.
   `style = "quantile"` and `"jenks"` are unaffected.
+
 - **`classification_report = TRUE` returns `NULL` for
   `style = "continuous"`** instead of a row-per-distinct-value table,
   and warns. Code that read the attribute after a continuous map got a
   table that described nothing; it now gets nothing, explicitly.
+
 - [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)’s
   new arguments were deliberately appended *after* `recenter`, so no
   existing positional call to it changes meaning.
+
 - **[`country_join()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_join.md)
   and
   [`country_join_all()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_join_all.md)
@@ -53,6 +59,7 @@ takes `data` as its second argument. Details under **Breaking changes**.
   that resolve to nothing, so code that joins on messy names will start
   emitting a warning it did not before. The join result is unchanged;
   pass `warn = FALSE` for the old silence.
+
 - **`world_map(engine = "tmap")` failed opaquely on an older tmap.** The
   engine builds its scales with `tm_scale_intervals()`,
   `tm_scale_continuous()` and `tm_scale_categorical()` – the tmap 4 API.
@@ -68,6 +75,7 @@ takes `data` as its second argument. Details under **Breaking changes**.
   [`as_ggsql_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/as_ggsql_source.md)
   already does for duckdb’s `shared_home`: that is the thing actually
   required, and it stays correct whichever release introduced it.
+
 - **[`locate_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/locate_country.md)
   measured its snap-back distance from the wrong point.** A point
   falling just outside the coarse coastline is snapped to the nearest
@@ -86,6 +94,7 @@ takes `data` as its second argument. Details under **Breaking changes**.
   tolerance would have attributed a point to a country it is not in.
   Fixed, with a length check so it cannot silently regress to a cross
   product again.
+
 - **[`spatial_lag()`](https://pursuitofdatascience.github.io/countryatlas/reference/spatial_lag.md)
   did not say which countries its weights excluded.** A country with no
   neighbour gets `NA`, which the documentation states – but that `NA` is
@@ -108,6 +117,7 @@ takes `data` as its second argument. Details under **Breaking changes**.
   always lacks a land neighbour, so a warning would fire on every
   ordinary call. On a panel the attribute holds the union across years,
   since the weights are geography rather than time.
+
 - **[`neighbors()`](https://pursuitofdatascience.github.io/countryatlas/reference/neighbors.md)
   could not tell a typo from an island.** An unresolved name becomes
   `NA`, and the `%in%` filter simply never matches it, so a misspelling
@@ -121,6 +131,7 @@ takes `data` as its second argument. Details under **Breaking changes**.
   [`neighbors()`](https://pursuitofdatascience.github.io/countryatlas/reference/neighbors.md)
   now does too, and gains `warn = TRUE`. Iceland still returns zero rows
   in silence, because that zero is real.
+
 - **[`country_timeline()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_timeline.md)
   said nothing about a name it could not resolve.** An unrecognised
   input came back as a row of `NA`, which reads as a country with no
@@ -137,6 +148,7 @@ takes `data` as its second argument. Details under **Breaking changes**.
   name is still silent: `"USSR"` is *meant* to fail the ISO lookup and
   be resolved by the historical spine, which is why that lookup’s own
   warning stays suppressed.
+
 - **Three panel verbs did nothing, silently, on a cross-section.**
   Handed one year per country,
   [`growth_rate()`](https://pursuitofdatascience.github.io/countryatlas/reference/growth_rate.md),
@@ -152,11 +164,13 @@ takes `data` as its second argument. Details under **Breaking changes**.
   The notice fires only when the whole column is `NA` and the source
   column had data, so the ordinary panel case – where just the first
   year per country is `NA` – stays silent.
+
 - **[`country_network()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_network.md)
   validated `top_n` after building the network.** It was the one verb
   here that did its whole job and then rejected an argument it could
   have rejected at the door. `top_n` only trims the finished edge list,
   so the check is now made first.
+
 - **[`share_of_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/share_of_world.md)
   returned a column of `NA` without saying why.** A zero or non-finite
   total is a dead end – the division would give `NaN` or `Inf` – and the
@@ -169,11 +183,13 @@ takes `data` as its second argument. Details under **Breaking changes**.
   countries have no share” rather than “there was no total to take a
   share of”. It now reports it, naming the years affected on a panel
   (only the bad years go `NA`; the rest keep their shares).
+
 - **`world_map(engine = "tmap")` now projects.** It took `projection`
   and `recenter` and drew in the frame’s own CRS regardless (see the bug
   fix below), so every existing tmap map changes: the default is Equal
   Earth, as it already was on the ggplot2 engine. A bad projection name
   is now an error there rather than being ignored.
+
 - **Five verbs now return a tibble rather than the class they were
   handed.**
   [`to_ppp()`](https://pursuitofdatascience.github.io/countryatlas/reference/to_ppp.md),
@@ -187,11 +203,13 @@ takes `data` as its second argument. Details under **Breaking changes**.
   normalise, as their sibling verbs always did. Code that relied on
   `df[, "col"]` dropping to a vector, or on an inherited grouping
   surviving the call, changes.
+
 - **[`complete_years()`](https://pursuitofdatascience.github.io/countryatlas/reference/complete_years.md)
   returns an `sf` frame when given one.** It previously dropped the
   class while leaving the geometry column in place, so a pipeline that
   repaired the result with `st_as_sf()` is now re-wrapping something
   that is already `sf` – harmless, but no longer necessary.
+
 - **A duplicated column name is now refused.**
   [`per_capita()`](https://pursuitofdatascience.github.io/countryatlas/reference/per_capita.md)
   and
@@ -199,6 +217,7 @@ takes `data` as its second argument. Details under **Breaking changes**.
   accepted a frame with two `gdp` columns and silently computed from the
   first; ten other verbs failed with a message about internals in
   tibble. All of them now reject it up front (see the bug fix below).
+
 - **`region` is applied when `geometry = "none"`.**
   [`world_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_data.md)
   and
@@ -207,6 +226,7 @@ takes `data` as its second argument. Details under **Breaking changes**.
   the bug fix below), so a call passing both now gets fewer rows – the
   ones it asked for. A bounding box, having nothing to clip against, is
   refused rather than silently dropped.
+
 - **Several backends now warn where they used to accept an argument and
   drop it** – `scale` and `projection` on the polygon backend, the
   ggplot2-only arguments on the `tmap` and `mapgl` renderers,
@@ -216,6 +236,7 @@ takes `data` as its second argument. Details under **Breaking changes**.
   engines. The drawings are unchanged; only the silence is. Code running
   under `options(warn = 2)` will now stop where it previously carried
   on.
+
 - **Argument values are no longer partially matched.** Every exported
   function that takes a fixed set of choices now validates with
   [`rlang::arg_match()`](https://rlang.r-lib.org/reference/arg_match.html)
@@ -227,7 +248,256 @@ takes `data` as its second argument. Details under **Breaking changes**.
   `'arg' should be one of ...`, naming neither. Spelled-out values are
   unaffected.
 
+- **`world_tiles` places 171 of its 239 countries in a different cell.**
+  The [`break`](https://rdrr.io/r/base/Control.html) in the placement
+  scan left only its inner loop, so a country whose own cell was taken
+  was re-placed at the *last* free cell in the search square rather than
+  the first – and every cell claimed along the way stayed marked
+  occupied for nobody. That wasted 129 of 368 cells and pushed later
+  countries further out still: mean displacement from a country’s true
+  position was 1.9 cells with a worst case of 7.1, against 0.9 and 2.8
+  now.
+  [`tile_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/tile_map.md)
+  layouts change accordingly. The grid is still 40x24 and still has one
+  country per cell.
+
+- **[`dispute_policy()`](https://pursuitofdatascience.github.io/countryatlas/reference/dispute_policy.md)
+  returns the policy it replaced, not the one you set.** R’s convention
+  for a setter – [`options()`](https://rdrr.io/r/base/options.html),
+  [`par()`](https://rdrr.io/r/graphics/par.html),
+  [`sf::sf_use_s2()`](https://r-spatial.github.io/sf/reference/s2.html)
+  – so `on.exit(dispute_policy(dispute_policy("neutral")))` now restores
+  the old value, where before it was a no-op. Reading the current policy
+  with no argument is unchanged.
+
+- **`world_geometry("coastline")` and `world_geometry("ocean")` name
+  their geometry column `geometry`.** It was `x`, from `st_as_sf()` on a
+  bare `sfc`, making these the only two `what` values whose column was
+  not called what the return contract says. Code that referred to `$x`
+  must change; code written against the other four now works on all six.
+
+- **[`gini()`](https://pursuitofdatascience.github.io/countryatlas/reference/gini.md)
+  and
+  [`theil()`](https://pursuitofdatascience.github.io/countryatlas/reference/theil.md)
+  warn instead of returning a bare `NA`** when the input is empty, or
+  when `na.rm = FALSE` and values are missing. The value is unchanged;
+  code running under `options(warn = 2)` will now stop where it
+  previously carried an unexplained `NA` forward.
+
 ### Bug fixes
+
+- **`interactive_map(engine = "leaflet")` hard-wired a numeric colour
+  scale.** A discrete fill reached
+  [`leaflet::colorNumeric()`](https://rstudio.github.io/leaflet/reference/colorNumeric.html)
+  and died inside leaflet with “Wasn’t able to determine range of
+  domain” – the same defect `auto_fill_scale()` was written to fix for
+  the ggplot2 engines, and that the `mapgl` engine handles with
+  `match_expr()`.
+  [`?interactive_map`](https://pursuitofdatascience.github.io/countryatlas/reference/interactive_map.md)
+  documents no per-engine restriction on `fill`, so the leaflet engine
+  now branches on the column’s type and uses `colorFactor()` for a
+  discrete one.
+
+- **The leaflet engine could be broken by a column named `pal`.** Its
+  `fillColor = ~ pal(get(fill_name))` formula was evaluated by leaflet
+  against the data as an environment, so a column of that name was found
+  before the palette function and then called. The values are computed
+  directly now, which also removes the only
+  [`get()`](https://rdrr.io/r/base/get.html)-in-a-formula column read in
+  the package.
+
+- **The leaflet and ggiraph engines read `iso3c` without checking for
+  it.** `check_cols()` covered `fill` and `tooltip`, and
+  `check_map_geometry()` does not require a key, so an `sf` frame
+  without one failed at render time from inside leaflet or rlang. Both
+  now name the missing column.
+
+- **`bubble_map(backend = "sf")` carried two geometry columns.**
+  `as_tibble()` strips the `sf` class but leaves the live `sfc` column,
+  so the `st_drop_geometry()` further down saw a plain tibble and
+  returned it unchanged – and the join then produced `geometry.x` /
+  `geometry.y`, renaming the active column out from under
+  [`coord_sf()`](https://ggplot2.tidyverse.org/reference/ggsf.html). It
+  now uses `sf_drop()` first, as four other verbs already do.
+
+- **[`index_to()`](https://pursuitofdatascience.github.io/countryatlas/reference/index_to.md)
+  returned an all-`NA` column in silence, three ways.** It and
+  [`deflate()`](https://pursuitofdatascience.github.io/countryatlas/reference/deflate.md)
+  take the same `base_year` and match it the same way, and
+  [`deflate()`](https://pursuitofdatascience.github.io/countryatlas/reference/deflate.md)
+  reports every case where the rebasing cannot happen while this
+  reported none. A `Date` or `POSIXct` `year` was the worst: `==`
+  coerces the *number* to that class, so `as.Date("2000-01-01") == 2000`
+  compares against 1970-01-01 plus 2000 days and is false for every row
+  – every country indexed to `NA`, and
+  [`read.csv()`](https://rdrr.io/r/utils/read.table.html) with a
+  date-parsing reader produces exactly that column. That shape is now
+  refused by name. A `base_year` the panel does not cover, and a country
+  whose base-year value is missing or zero, still come back `NA` as
+  documented – but the verb now names the countries it could not index,
+  so an all-`NA` column is readable rather than indistinguishable from a
+  source that had no data. A *character* `year` still works,
+  deliberately: this verb only matches on the year, and `"2000" == 2000`
+  is true.
+
+- **[`deflate()`](https://pursuitofdatascience.github.io/countryatlas/reference/deflate.md)
+  aborted on a zero-row panel**, reporting “Years present: Inf and -Inf”
+  from [`range()`](https://rdrr.io/r/base/range.html) of nothing, and
+  would have asked the World Bank for the year range `Inf..-Inf`. It
+  returns early with the promised column, typed.
+
+- **[`rate_check()`](https://pursuitofdatascience.github.io/countryatlas/reference/rate_check.md)
+  warned that a zero-row frame had no usable denominator.**
+  [`quantile()`](https://rdrr.io/r/stats/quantile.html) of an empty
+  vector is `NA` too, so the guard for an all-`NA` denominator fired for
+  a frame that simply had no rows.
+
+- **[`beta_convergence()`](https://pursuitofdatascience.github.io/countryatlas/reference/beta_convergence.md)
+  and
+  [`convergence_club()`](https://pursuitofdatascience.github.io/countryatlas/reference/convergence_club.md)
+  leaked base R’s “essentially perfect fit: summary may be
+  unreliable”.** It named neither the verb nor the column, and from
+  [`convergence_club()`](https://pursuitofdatascience.github.io/countryatlas/reference/convergence_club.md)
+  it described an internal log-t regression the caller does not know
+  exists.
+  [`beta_convergence()`](https://pursuitofdatascience.github.io/countryatlas/reference/beta_convergence.md)
+  now says so in the package’s own voice – naming which columns are
+  meaningless as a result – and the internal fit is silent.
+
+- **[`simplify_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/simplify_geometry.md)
+  skipped its documented MULTIPOLYGON cast for an `sfc`.** The validator
+  accepts `sf` and `sfc`; the cast gated on `sf` alone, so half the
+  accepted inputs came back as a mix of POLYGON and MULTIPOLYGON.
+
+- **`world_table(engine = "gt")` rendered `year` as “2,020”.** `year`
+  now joins `rank` in the columns `fmt_number()` leaves alone – it is an
+  identifier, not a measurement.
+
+- **[`tile_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/tile_map.md)’s
+  provenance called a numeric fill “categorical”.** `auto_fill_scale()`
+  picks the scale from the column’s type, so a numeric fill was drawn
+  continuously and recorded as categorical, in the record whose job is
+  to say what was drawn.
+
+- **`split_antimeridian()` wired up only the last crossing.** A carry
+  row was computed and stored for every crossing but only the last was
+  read, so with two or more crossings the middle segments began at their
+  first raw vertex instead of at the antimeridian edge, leaving a
+  visible break on the re-entry side. The code read as though it were
+  general; it handled one.
+
+- **A `region` that resolves to `NA` codes selected uncoded geometry.**
+  `resolve_region()`’s continent branch reads countrycode’s codelist,
+  where a few rows carry a continent and no `iso3c`, and `%in%` treats
+  `NA` as a value – so `NA %in% c("FRA", NA)` is `TRUE` and a subset
+  keyed on the result pulled in every geometry row whose own `iso3c` was
+  `NA`. The `sf` backend guarded this; the polygon backend did not. The
+  codes are now filtered at the source, so all callers are covered.
+
+- **[`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)
+  accepted any string as an `iso3c` value.** `wdj_to_iso3c()` whitelists
+  every override value as a legitimate code, so
+  `country_overrides(c(Freedonia = "1"))` put `"1"` in the `iso3c`
+  column and every join keyed on it. Values must now look like an ISO
+  3166-1 alpha-3 code. Separately, `any(!nzchar(nms))` missed an `NA`
+  name – `nzchar(NA)` is `TRUE` – while `wdj_to_iso3c()` rejected one,
+  so the two validators disagreed about what a valid override table is.
+
+- **[`world_query()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_query.md)
+  interpolated identifiers into SQL without escaping them.** Only
+  `title` was escaped, and it is the one value that lands inside quotes;
+  every other name went in as bare SQL. A column name with a space
+  produced invalid SQL with no diagnostic, and a name derived from
+  untrusted input reached a string that
+  [`ggsql::ggsql_execute()`](https://r.ggsql.org/reference/ggsql_execute.html)
+  then runs. `fill`, `source`, `size`, `facet`, `projection`, `palette`
+  and `transform` are now checked against a plain SQL identifier.
+
+- **`nuts_geometry(countries = "Germany")`** said “NUTS covers the EU,
+  EFTA and candidate countries only” – true, and not the problem.
+  `countries` is read as `iso3c`, so a country name resolves to nothing;
+  the error now names the origin that would have worked.
+
+- **[`od_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/od_map.md)’s
+  `origin` and `origins`** are one letter apart and adjacent in the
+  signature, and mean unrelated things. Both mix-ups used to fail
+  somewhere else; each is now diagnosed where it was made.
+
+- **[`geom_country_labels()`](https://pursuitofdatascience.github.io/countryatlas/reference/geom_country_labels.md)
+  did not validate `size` or `mapping`**, which feed ggplot2 arithmetic
+  and [`modifyList()`](https://rdrr.io/r/utils/modifyList.html)
+  respectively;
+  [`world_table()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_table.md)
+  checked `title` but not `subtitle`; and `ggsql_wkb_frame()` overwrote
+  an existing column of the geometry column’s name in silence, where
+  eleven other column-adding verbs warn.
+
+- **[`world_query()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_query.md)
+  silently ignored arguments its layer does not use.** `size` belongs to
+  `layer = "bubble"` and `n_bins` to `layer = "binned"`, and the other
+  layers took them without a word: `n_bins` was dropped, since only the
+  binned layer emits a `BIN` clause, while `size` still went into the
+  `VISUALISE` list as `pop AS size` on a choropleth, which has no size
+  channel to put it on. Both are now reported, together when both are
+  given. The emitted query is unchanged – a pass-through builder passing
+  a clause through is defensible – but the silence was not, since the
+  abort beside it already treats a layer/argument mismatch as worth
+  naming.
+
+- **[`globe_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/globe_map.md)
+  crashed at some viewpoints with an error from the geometry engine.**
+  `globe_map(sf_data, lon = 90, lat = 30)` died on
+  `IllegalArgumentException: point array must contain 0 or >1 elements`,
+  which names neither the projection nor the viewpoint.
+  [`coord_sf()`](https://ggplot2.tidyverse.org/reference/ggsf.html)
+  draws a graticule, and on the one genuinely hemispheric projection
+  those lines are clipped at the horizon – a clipped line can reduce to
+  a *single* point, which GEOS rejects. `winkel_tripel` already had
+  `datum = NA` for its own graticule trouble; `"orthographic"` now does
+  too, and all 65 sampled viewpoints draw. The other three azimuthal
+  projections show the whole globe, so nothing is clipped and they are
+  unaffected.
+
+- **[`country_weights()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_weights.md)
+  silently ignored the arguments its scheme does not use.** `k`,
+  `cutoff_km`, `w` and `scale` each belong to exactly one scheme, and
+  the other three dropped them without a word. The costly case is
+  `country_weights("knn", w = my_matrix)`: the caller’s own adjacency
+  matrix was discarded and nearest-neighbour weights returned instead,
+  so the result looks entirely reasonable and is not what was asked for.
+  `cutoff_km` passed to `"knn"` reads as a distance cap that was never
+  applied, and `scale` only ever affected `"contiguity"`. All eleven
+  combinations now report which arguments were ignored and which one the
+  chosen scheme is built from; each scheme’s own argument, the shared
+  `style`, and a default passed explicitly stay quiet.
+
+- **Arguments that do not apply were silently ignored by the map
+  verbs.** The package reports an inert argument rather than pretending
+  to honour it – that is what `warn_projection_ignored()` and
+  `warn_recenter_ignored()` are for, and
+  [`attach_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/attach_geometry.md),
+  [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md),
+  [`world_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_data.md)
+  and
+  [`join_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/join_world.md)
+  all call them.
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
+  did not, though it takes both arguments and is the verb people
+  actually reach for: on the polygon backend, which draws in unprojected
+  longitude/latitude, `projection = "mollweide"` and `recenter = 180`
+  looked honoured and changed nothing. `n_bins` was inert in the same
+  way under `style = "continuous"` (a colourbar has no classes) and
+  `style = "categorical"` (the classes are the values) – the same
+  complaint the 3.0.0 fix for `style = "binned"` answered. All three are
+  now reported, under `countryatlas_projection_ignored`,
+  `countryatlas_recenter_ignored` and `countryatlas_n_bins_ignored`, and
+  [`value_by_alpha_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/value_by_alpha_map.md)
+  gets the two that apply to it since it carries its own copies of those
+  arguments.
+  [`facet_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/facet_map.md)
+  and
+  [`coverage_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/coverage_map.md)
+  inherit them by passing `...` through.
 
 - **`attach_geometry(year = )` warned about the caller’s frame size, not
   the geometry.** Its threshold was `matched < nrow(geom) * 0.5`, so an
@@ -3310,6 +3580,156 @@ A contract, not N bespoke fetchers.
   `gdp_per_capita_2015` alias dates from 1.0.0 and will be removed.
 
 ### Other changes
+
+- **New
+  [`remove_country_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/remove_country_source.md).**
+  [`register_country_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/register_country_source.md)
+  had no counterpart, so registering was permanent for the session:
+  anything that registered a source – an example, a test, an exploratory
+  script – left
+  [`country_sources()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_sources.md)
+  reporting different rows for the rest of the session with no way back.
+  Removing a source also drops its memoised answers, so re-registering
+  the same name cannot serve results from the function that was just
+  removed. The five built-in sources are protected.
+
+- **The persistent World Bank cache now expires and is size-capped.** It
+  used
+  [`memoise::cache_filesystem()`](https://memoise.r-lib.org/reference/cache_filesystem.html),
+  which has neither, so the directory grew without bound for the life of
+  the installation – while CRAN policy allows a cache under
+  [`tools::R_user_dir()`](https://rdrr.io/r/tools/userdir.html) only if
+  “sizes are kept as small as possible and the contents are actively
+  managed (including removing outdated material)”. It now uses
+  [`cachem::cache_disk()`](https://cachem.r-lib.org/reference/cache_disk.html):
+  entries expire after 30 days and the least-recently-used go once the
+  directory passes 50 MB, both adjustable with
+  `options(countryatlas.cache_max_age = )` and
+  `options(countryatlas.cache_max_size = )`. Expiry also matters on the
+  merits, since World Bank observations are revised. Entries written by
+  earlier versions are swept once, and a corrupt entry is now silently
+  re-fetched rather than warned about and left in place. `cachem` is an
+  unconditional dependency of `memoise`, so this adds nothing to
+  install.
+
+- **[`clear_country_cache()`](https://pursuitofdatascience.github.io/countryatlas/reference/clear_country_cache.md)
+  can now release the geometry caches.** Called with no `source` it also
+  drops the Natural Earth `sf` layer held per scale (tens of megabytes
+  at `scale = "medium"`) and the memoised `map_data("world")` tibble
+  (~99,000 rows per override set). Those are the largest things the
+  package keeps in memory and there was no API to release them; in a
+  Shiny app or a plumber process they were held for the life of the
+  process. Naming a `source` leaves geometry alone. Relatedly,
+  `world_polygons` is memoised in `.onLoad()` rather than at build time,
+  which is both memoise’s own guidance and what makes the cache
+  reachable.
+
+- **[`add_indicator()`](https://pursuitofdatascience.github.io/countryatlas/reference/add_indicator.md)
+  no longer claims “only what you need is fetched”.** True for
+  `comtrade`, partly true for `wdi`, and false for `owid`, `eurostat`
+  and `oecd`, which download the full dataset and filter locally – so
+  `add_indicator(one_row, "owid", "life-expectancy")` transfers every
+  country and year to keep one value.
+  [`?add_indicator`](https://pursuitofdatascience.github.io/countryatlas/reference/add_indicator.md)
+  now says which is which.
+
+- **[`?map_provenance`](https://pursuitofdatascience.github.io/countryatlas/reference/map_provenance.md)
+  listed 15 of the verbs that carry provenance.**
+  [`od_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/od_map.md),
+  [`subnational_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/subnational_map.md),
+  [`projection_compare()`](https://pursuitofdatascience.github.io/countryatlas/reference/projection_compare.md)
+  and `world_map(engine = "tmap")` also carry it;
+  [`tissot_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/tissot_map.md)
+  is the one map verb that carries none, and now says so. A test loops
+  over every verb and asserts the provenance names the column the caller
+  asked about.
+
+- **[`?historical_geometry`](https://pursuitofdatascience.github.io/countryatlas/reference/historical_geometry.md)
+  did not document `owner` or `capname`**, which it returns when the
+  installed `cshapes` supplies them. `owner` is what makes
+  `dependencies = TRUE` legible, so it is worth naming.
+
+- **[`?country_groups_tbl`](https://pursuitofdatascience.github.io/countryatlas/reference/country_groups_tbl.md)
+  gives the membership date.** It pointed at the package `NEWS` for the
+  reference date, where two different dates were on record; the Rd now
+  states 2026-06-01 and documents the `as_of` attribute that carries it
+  in code. An Rd should not delegate a fact to a changelog.
+
+- **[`?disputed_territories`](https://pursuitofdatascience.github.io/countryatlas/reference/disputed_territories.md)
+  says that nothing in the package reads `administered_by` or
+  `claimed_by`.** `dispute_layer()` and `dispute_note()` key on `iso3c`
+  alone; the party columns are for your own filtering, and are
+  documented precisely so such a filter is writable.
+
+- **The `README` computes the count it quotes.** “42 of 215 countries
+  silently vanish” was hard-coded prose next to a figure built from a
+  live fetch, so it drifted as the World Bank revised its coverage – by
+  the time anyone checked it was 37 of 210. Both now come from one
+  computation.
+
+- **`stats`, `utils`, `tools`, `grDevices` and `parallel` are declared
+  in `Imports`.** They were called with `::` and not declared.
+  Base-priority packages are exempt from the undeclared-`::` check, so
+  this was never a check finding; declaring them is conventional and
+  removes any dependence on how that exemption is treated in future R.
+
+- **Two reads of `ggplot` internals are isolated.** ggplot2 4.0.0 moved
+  `ggplot` to S7 with `@` accessors and a compatibility layer over `$`.
+  [`animate_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/animate_world.md)
+  now reads the title with
+  [`ggplot2::get_labs()`](https://ggplot2.tidyverse.org/reference/labs.html)
+  where available, and
+  [`cartogram_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/cartogram_map.md)
+  stores its frame in an attribute so
+  [`cartogram_diagnostics()`](https://pursuitofdatascience.github.io/countryatlas/reference/cartogram_diagnostics.md)
+  need not reach into the plot’s data slot at all.
+
+- **Build-time validation that only reported.**
+  [`?country_groups_history`](https://pursuitofdatascience.github.io/countryatlas/reference/country_groups_history.md)
+  says the table “is validated at build time against
+  `country_groups_tbl`”; the script compared,
+  [`message()`](https://rdrr.io/r/base/message.html)d a mismatch, and
+  wrote the `.rda` anyway, so a disagreement scrolled past in a build
+  log – and `NEWS` records that this drift has already bitten once. It
+  is a hard [`stop()`](https://rdrr.io/r/base/stop.html) now,
+  accumulating every mismatch first, and it reads the snapshot from the
+  working tree rather than from the installed package (which would
+  compare the new table against the *previous* release’s snapshot).
+  `world_snapshot`’s assembly gained `relationship = "one-to-one"` and a
+  uniqueness assertion, and `disputed_territories` now validates
+  `administered_by` / `claimed_by` against its documented six
+  placeholders in both directions.
+
+- **`country_meta$area_km2` is anchored to real areas.** The formula
+  that produced it lived in `data-raw/` as a copy of the package’s
+  `ring_area_km2()` that had silently missed the antimeridian fix – and
+  nothing pinned the column numerically, the only assertions being `> 0`
+  and “\>90% non-NA”, both of which a 179x-inflated value passes. The
+  copies are reunited, the build script self-checks against the analytic
+  area for an equatorial square, a wrapped square and a polar cap, and
+  the shipped values are checked against ten known country areas. (The
+  shipped values were correct; nothing had established that.)
+  `data-raw/overrides_snapshot.R`’s copy of the override table is
+  likewise pinned to the package’s.
+
+- **The CI matrix gained a `_R_CHECK_DEPENDS_ONLY_` leg.** All five
+  existing legs install every `Suggests`, so none of them ran the
+  configuration CRAN actually runs – which is how a broken `\link{}` to
+  a Suggests-only topic reached a release. The Linux legs also generate
+  `tr_TR.UTF-8`, so the Turkish-dotless-i hardening that broke 2.0.0 on
+  CRAN’s Fedora flavours is actually exercised rather than skipped.
+
+- **The silence policy covers every offline verb.** It enforced “a
+  correct call to any verb is completely silent” for 39 of 102 exports,
+  and every warning bug found in the pre-release review sat in the gap.
+  It now covers 32 more, plus the cross-product of
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)’s
+  `na_style` / `disputes` / `style` arguments and a zero-row leg for the
+  rate verbs – which is what found the
+  [`deflate()`](https://pursuitofdatascience.github.io/countryatlas/reference/deflate.md)
+  and
+  [`rate_check()`](https://pursuitofdatascience.github.io/countryatlas/reference/rate_check.md)
+  bugs above.
 
 - **The *Honest maps* vignette named two countries that contiguity
   weights do not drop.** Its island list included the United Kingdom and

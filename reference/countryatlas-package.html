@@ -132,6 +132,18 @@ geometry (<code><a href="https://ggplot2.tidyverse.org/reference/map_data.html" 
 lives. Defaults to <code>tools::R_user_dir("countryatlas", "cache")</code>; set it to
 <code>""</code> for session-only caching. See <code><a href="clear_wdi_cache.html">clear_wdi_cache()</a></code>.</p></dd>
 
+<dt><code>countryatlas.cache_max_age</code></dt>
+<dd><p>How long a persistent cache entry
+stays usable, in seconds. Defaults to 30 days. World Bank figures are
+revised, so an old entry is not merely stale on disk – it is a
+different answer from the one the API would give now.</p></dd>
+
+<dt><code>countryatlas.cache_max_size</code></dt>
+<dd><p>The size cap on the persistent
+cache, in bytes. Defaults to 50 MB, past which the least-recently-used
+entries are dropped. CRAN policy allows a package cache under
+<code><a href="https://rdrr.io/r/tools/userdir.html" class="external-link">tools::R_user_dir()</a></code> only if its contents are actively managed.</p></dd>
+
 <dt><code>countryatlas.workers</code></dt>
 <dd><p>How many processes fetch indicators in
 parallel (only when the cache is on disk – a memory-only memo cannot

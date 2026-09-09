@@ -43,6 +43,11 @@ od_map(
   Which origins to draw. A character vector of names or codes, or an
   integer giving how many of the largest to take (default `6`).
 
+  Note that this is **not** `origin`, which it sits next to: `origin` is
+  the coding scheme `from`/`to` are written in, `origins` is which of
+  them to put on the page. Confusing the two is diagnosed rather than
+  left to fail further in.
+
 - direction:
 
   `"out"` (default; one panel per origin, showing destinations) or

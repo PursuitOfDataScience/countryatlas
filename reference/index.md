@@ -28,6 +28,8 @@ where two providers disagree.
 
 - [`register_country_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/register_country_source.md)
   : Register a data source on the country spine
+- [`remove_country_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/remove_country_source.md)
+  : Remove a registered data source
 - [`country_sources()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_sources.md)
   : The registered data sources
 - [`fetch_indicator()`](https://pursuitofdatascience.github.io/countryatlas/reference/fetch_indicator.md)

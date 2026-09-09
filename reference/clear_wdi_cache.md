@@ -36,6 +36,20 @@ never goes near it. Under `R CMD check` the whole cache moves to the
 session temp directory, so a check never writes to the user's file
 space.
 
+## How the cache is managed
+
+The persistent cache expires its own contents, so it does not grow
+without bound and does not serve stale figures indefinitely: an entry is
+dropped once it is 30 days old, and if the directory exceeds 50 MB the
+least-recently-used entries go first. Both limits are adjustable with
+`options(countryatlas.cache_max_age = )` (seconds) and
+`options(countryatlas.cache_max_size = )` (bytes). A dropped entry costs
+a re-fetch, nothing more.
+
+Expiry matters beyond disk space: World Bank observations are revised,
+so a figure cached long ago is not necessarily the figure the API would
+return today.
+
 ## Examples
 
 ``` r

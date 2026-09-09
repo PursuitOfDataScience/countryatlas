@@ -89,6 +89,18 @@ reported by the mapping sources the package already uses (Natural Earth), not
 recognition, legitimacy or endorsement.</p>
     </div>
     <div class="section level2">
+    <h2 id="what-reads-these-columns">What reads these columns<a class="anchor" aria-label="anchor" href="#what-reads-these-columns"></a></h2>
+
+
+<p>Nothing in the package does. The internal layer and note builders behind
+<code>world_map(disputes = )</code> and <code><a href="dispute_policy.html">dispute_policy()</a></code> key on <code>iso3c</code> alone, and no
+verb filters on the parties. <code>administered_by</code> and
+<code>claimed_by</code> are here for your own filtering – "show me everything Morocco
+administers", "drop the territories with more than one claimant" – and are
+documented precisely so that such a filter is writable. Their contents are
+validated at build time against the placeholder list below.</p>
+    </div>
+    <div class="section level2">
     <h2 id="the-codes-in-administered-by-and-claimed-by">The codes in <code>administered_by</code> and <code>claimed_by</code><a class="anchor" aria-label="anchor" href="#the-codes-in-administered-by-and-claimed-by"></a></h2>
 
 

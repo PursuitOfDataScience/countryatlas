@@ -19,11 +19,13 @@ map_provenance(x, value = NULL)
 - x:
 
   A plot returned by any of the package's map verbs –
-  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md),
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
+  (either engine),
   [`bubble_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/bubble_map.md),
   [`spike_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/spike_map.md),
   [`tile_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/tile_map.md),
   [`flow_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/flow_map.md),
+  [`od_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/od_map.md),
   [`globe_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/globe_map.md),
   [`bivariate_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/bivariate_map.md),
   [`cartogram_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/cartogram_map.md),
@@ -32,11 +34,17 @@ map_provenance(x, value = NULL)
   [`value_by_alpha_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/value_by_alpha_map.md),
   [`coverage_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/coverage_map.md),
   [`classify_compare()`](https://pursuitofdatascience.github.io/countryatlas/reference/classify_compare.md),
-  [`facet_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/facet_map.md)
+  [`facet_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/facet_map.md),
+  [`lisa_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/lisa_map.md),
+  [`subnational_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/subnational_map.md)
   or
-  [`lisa_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/lisa_map.md)
+  [`projection_compare()`](https://pursuitofdatascience.github.io/countryatlas/reference/projection_compare.md)
   – or a map-ready data frame, for which the data-side facts are
   reported and the drawing-side ones are `NA`.
+
+  [`tissot_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/tissot_map.md)
+  is the one map verb that carries no provenance: it draws distortion
+  ellipses for a projection and takes no data of yours.
 
 - value:
 

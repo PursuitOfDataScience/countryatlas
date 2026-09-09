@@ -37,7 +37,10 @@ dispute_policy(policy = NULL)
 
 ## Value
 
-The policy in effect, invisibly when setting.
+When called with no argument, the policy currently in effect. When
+setting, the policy that was in effect *before* the call, invisibly –
+R's convention for a setter, so
+`on.exit(dispute_policy(dispute_policy("neutral")))` restores it.
 
 ## What this does and does not do
 
@@ -57,9 +60,8 @@ institution's own basemap rather than trusting a setting.
 ## Examples
 
 ``` r
-old <- dispute_policy()
-dispute_policy("neutral")
-dispute_policy()
+old <- dispute_policy("neutral")   # sets, and returns what it replaced
+dispute_policy()                   # "neutral"
 #> [1] "neutral"
-dispute_policy(old)
+dispute_policy(old)                # put it back
 ```

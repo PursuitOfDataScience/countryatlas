@@ -37,6 +37,20 @@ A tibble with one row per (entity, successor):
 
   The successor state.
 
+- relation:
+
+  How the successor relates to the entity, per successor: `"succession"`
+  if it is a genuinely new state created at `dissolved`, or
+  `"continuation"` if the same state carried on (possibly with less
+  territory) or a state that already existed absorbed the entity. Sudan
+  is both at once – `SDN` continued and `SSD` is new – which is why the
+  relation is per successor rather than per entity. The distinction
+  matters: a `"continuation"` was *not* created at `dissolved`, so
+  testing its data against that year says nothing, and the code did not
+  cease to exist either.
+  [`audit_time_coverage()`](https://pursuitofdatascience.github.io/countryatlas/reference/audit_time_coverage.md)
+  keys on this column for both reasons.
+
 ## Source
 
 Curated from ISO 3166-3 and the historical record.

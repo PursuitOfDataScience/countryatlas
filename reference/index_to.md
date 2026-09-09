@@ -59,6 +59,9 @@ index_to(df, gdp, base_year = 2000)
 
 # A base year the data does not have gives NA, not an error:
 index_to(df, gdp, base_year = 1999)
+#> Warning: 1 country has no usable 1999 value; gdp_index is all NA for it:
+#> • "USA"
+#> ℹ Choose a `base_year` the panel covers, or drop those countries first.
 #> # A tibble: 3 × 4
 #>   iso3c  year   gdp gdp_index
 #>   <chr> <int> <dbl>     <dbl>
