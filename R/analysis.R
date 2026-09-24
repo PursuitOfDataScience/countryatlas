@@ -43,6 +43,11 @@ per_capita <- function(data, value, pop = NULL, suffix = "_per_capita",
     if (!"iso3c" %in% names(data)) {
       wdj_abort("{.arg data} needs an {.field iso3c} column to fetch population.")
     }
+    # The fetched population is joined on `year`, and a character year (what
+    # read.csv() gives for "2020") made dplyr refuse with "Can't join
+    # `x$year` with `y$year` due to incompatible types", after the download.
+    # deflate() carries this guard for the same join; checked before fetching.
+    if ("year" %in% names(data)) check_numeric_col(data, "year")
     years <- if ("year" %in% names(data)) unique(stats::na.omit(data$year)) else NULL
     # An all-NA (or absent) year column leaves nothing to bound the fetch with;
     # min()/max() would return Inf/-Inf and the World Bank request would be
@@ -104,8 +109,11 @@ per_capita <- function(data, value, pop = NULL, suffix = "_per_capita",
              {.val {NA}} throughout."
     ), class = "countryatlas_no_rates")
   } else if (any(!usable)) {
+    # "zero, missing or infinite": `usable` is is.finite() & != 0, so an
+    # infinite population lands here too, and a message naming only the other
+    # two sent the reader looking for a zero or a gap that was not there.
     wdj_warn(c(
-      "{sum(!usable)} row{?s} ha{?s/ve} a zero or missing
+      "{sum(!usable)} row{?s} ha{?s/ve} a zero, missing or infinite
        {.field {pop_label}}, so {.field {new_col}} is {.val {NA}} there.",
       "i" = "A zero population would divide to {.val {Inf}}; a missing one has
              nothing to divide by. Negative populations pass through."
@@ -449,9 +457,16 @@ complete_years <- function(data, years = NULL, value = NULL,
   # copied one unidentified country's polygon onto the other's invented rows.
   # iso3c is filled downup like the other static columns now that it is no
   # longer the grouping column; it is constant within a unit either way.
+  # Sorted by year before anything is carried. complete() lays the requested
+  # grid out first and appends the rows it did not ask for (a year the data
+  # has but `years` omits) after it, so a panel of 1999 and 2001 completed to
+  # 2000:2002 came back as 2000, 2001, 2002, 1999. "locf" then carried in row
+  # order, not time order: 2000 stayed NA though 1999 held a value, and the
+  # frame came back out of order. "linear" sorted for itself; "locf" did not.
   out <- data %>%
     group_by_unit() %>%
     tidyr::complete(year = years) %>%
+    dplyr::arrange(.data$year, .by_group = TRUE) %>%
     tidyr::fill(dplyr::all_of(setdiff(static, ".wdj_unit")),
                 .direction = "downup")
 
@@ -502,7 +517,11 @@ wdj_interp_linear <- function(x, y) {
   # filled it, and no warning. See year_sort_key(); a Date x is left alone and
   # still goes through approx() numerically, as before.
   x <- year_sort_key(x)
-  ok <- !is.na(y)
+  # An anchor needs a position as well as a value. A row with no year handed
+  # approx() an NA x, which it drops, so a country with two observations,
+  # one of them undated, left a single anchor and approx() died on "need at
+  # least two non-NA values to interpolate" inside a dplyr across() error.
+  ok <- !is.na(y) & !is.na(x)
   if (sum(ok) < 2L) return(y)
   # approx() collapses tied x-values to their mean, and says so with a warning
   # that reaches the caller through dplyr as "There was 1 warning in
@@ -532,7 +551,9 @@ wdj_interp_linear <- function(x, y) {
 #'   `"cagr"` needs a positive ratio at both ends, so a negative value gives
 #'   `NA` for that row (with a warning) and a non-positive base year gives `NA`
 #'   for that country; a value of exactly `0` is a legitimate annualised -100%.
-#'   `"yoy"` is a plain ratio change and is defined for negative values.
+#'   `"yoy"` is a plain ratio change and is defined for negative values, but
+#'   not after a zero: a change from `0` has no ratio, so that row is `NA`
+#'   (with a warning) rather than `Inf`.
 #' @param suffix Suffix for the new column (default `"_growth"`).
 #'
 #' @return `data` with a growth-rate column added (a proportion, so 0.03 = 3%).
@@ -563,11 +584,24 @@ growth_rate <- function(data, value, type = c("yoy", "cagr"),
   out <- data %>%
     group_by_unit() %>%
     dplyr::arrange(year_sort_key(.data$year), .by_group = TRUE)
+  n_zero <- 0L
   out <- if (type == "yoy") {
-    dplyr::mutate(
+    # A change from zero has no ratio: 5 after 0 divided to Inf and 0 after 0
+    # to NaN, both in silence. "cagr" refuses a non-positive base for the same
+    # reason, and per_capita(), deflate(), to_ppp() and index_to() all give NA
+    # for a zero denominator rather than let an infinity run into every scale
+    # and summary downstream: a map of the column drew the country as
+    # no-data while its value read as the largest growth in the table.
+    out <- dplyr::mutate(
       out,
-      "{new_col}" := .data[[val_name]] / dplyr::lag(.data[[val_name]]) - 1
+      .wdj_prev = dplyr::lag(.data[[val_name]]),
+      "{new_col}" := num_ifelse(!is.na(.data$.wdj_prev) & .data$.wdj_prev != 0,
+                                .data[[val_name]] / .data$.wdj_prev - 1)
     )
+    n_zero <- sum(!is.na(out$.wdj_prev) & out$.wdj_prev == 0 &
+                    !is.na(out[[val_name]]))
+    out$.wdj_prev <- NULL
+    out
   } else {
     dplyr::mutate(
       out,
@@ -589,10 +623,32 @@ growth_rate <- function(data, value, type = c("yoy", "cagr"),
       }
     )
   }
-  out <- wdj_return_frame(out)
+  out <- wdj_return_frame(na_where_no_year(out, new_col))
   if (type == "cagr") warn_cagr_negative(out, val_name, new_col)
-  warn_all_na_result(out, val_name, new_col,
-                     "A growth rate needs two years for the same country.")
+  if (n_zero) {
+    wdj_warn(c(
+      "{n_zero} row{?s} follow{?s/} a zero {.field {val_name}}, so
+       {.field {new_col}} is {.val {NA}} there.",
+      "i" = "A change from zero has no ratio; it would divide to {.val {Inf}}."
+    ), class = "countryatlas_zero_base")
+  } else {
+    # Only when zeros are not the reason: "needs two years for the same
+    # country" is the wrong diagnosis for a series that has them.
+    warn_all_na_result(out, val_name, new_col,
+                       "A growth rate needs two years for the same country.")
+  }
+  out
+}
+
+# A row whose year is missing cannot be placed in time, so it has no
+# neighbour to be compared with. arrange() sorts it last within its country,
+# which made it the "next year" after the latest real one: lag_by_country()
+# handed it that year's value and growth_rate() a change from it: numbers
+# for a row that has no position in the series. The rows around it were never
+# affected, since a row sorted last is nobody's predecessor.
+na_where_no_year <- function(out, new_col) {
+  gone <- is.na(out$year)
+  if (any(gone)) out[[new_col]][gone] <- NA
   out
 }
 
@@ -691,19 +747,13 @@ index_to <- function(data, value, base_year, to = 100, suffix = "_index") {
   # country the source had no data for at all. With a `base_year` the panel
   # does not cover at all this names every country, which is the signal that
   # was missing entirely.
-  no_base <- data %>%
-    dplyr::group_by(.data$iso3c) %>%
-    dplyr::summarise(
-      has = any(.data$year == base_year & is.finite(.data[[val_name]]) &
-                  .data[[val_name]] != 0, na.rm = TRUE),
-      .groups = "drop")
-  missing_base <- no_base$iso3c[!no_base$has]
+  missing_base <- units_without_base(data, val_name, base_year)
   if (length(missing_base)) {
     wdj_warn(c(
       "{length(missing_base)} countr{?y/ies} ha{?s/ve} no usable {base_year}
        value; {.field {new_col}} is all {.val {NA}} for
        {cli::qty(length(missing_base))}{?it/them}:",
-      "*" = "{.val {utils::head(missing_base, 8)}}",
+      "*" = "{.val {utils::head(sort(unique(missing_base)), 8)}}",
       "i" = "Choose a {.arg base_year} the panel covers, or drop those
              countries first."
     ), class = "countryatlas_no_base_year")
@@ -855,7 +905,7 @@ lag_by_country <- function(data, value, n = 1, suffix = NULL) {
     group_by_unit() %>%
     dplyr::arrange(year_sort_key(.data$year), .by_group = TRUE) %>%
     dplyr::mutate("{new_col}" := dplyr::lag(.data[[val_name]], n = n))
-  out <- wdj_return_frame(out)
+  out <- wdj_return_frame(na_where_no_year(out, new_col))
   warn_all_na_result(out, val_name, new_col,
                      "A lag of {n} needs {n + 1} years for the same country.")
   out
@@ -879,11 +929,25 @@ diff_by_country <- function(data, value, n = 1, suffix = NULL) {
     dplyr::mutate(
       "{new_col}" := .data[[val_name]] - dplyr::lag(.data[[val_name]], n = n)
     )
-  out <- wdj_return_frame(out)
+  out <- wdj_return_frame(na_where_no_year(out, new_col))
   warn_all_na_result(out, val_name, new_col,
                      "A difference over {n} year{?s} needs {n + 1} years for
                       the same country.")
   out
+}
+
+# The units with no usable base-year value, one label per unit, for the
+# warning index_to() and deflate() give. Keyed on unit_key(), the key the
+# rebasing itself groups on, rather than on iso3c: group_by(iso3c) puts
+# every unresolved row in one NA group, so two unidentified countries were
+# reported as "1 country ... NA" while both came back all NA.
+units_without_base <- function(data, col, base_year) {
+  hit <- !is.na(data$year) & data$year == base_year &
+    is.finite(data[[col]]) & data[[col]] != 0
+  uk <- unit_key(data)
+  has <- vapply(split(hit, uk), any, logical(1))
+  miss <- names(has)[!has]
+  unit_label(data)[match(miss, uk)]
 }
 
 # Shared validation for the panel helpers.
@@ -1066,8 +1130,13 @@ beta_convergence <- function(data, value) {
   # in 'x'" -- an unclassed error naming nothing. gini() and theil() already
   # treat an infinity as unusable; this filter is where that belongs here,
   # alongside the NA and non-positive values it already drops.
+  # !is.na(year) too: a row with no year sorts last, so it became the
+  # country's "final" observation, y1 came out NA, and the `y1 > y0` filter
+  # below then dropped the whole country: two perfectly good observations
+  # lost to one stray row, and `n` quietly one smaller.
   per_country <- data %>%
-    dplyr::filter(is.finite(.data[[val_name]]), .data[[val_name]] > 0) %>%
+    dplyr::filter(is.finite(.data[[val_name]]), .data[[val_name]] > 0,
+                  !is.na(.data$year)) %>%
     group_by_unit() %>%
     dplyr::arrange(year_sort_key(.data$year), .by_group = TRUE) %>%
     dplyr::summarise(
@@ -1196,8 +1265,11 @@ sigma_convergence <- function(data, value, measure = c("sd_log", "cv")) {
   # is.finite(), not !is.na(): Inf satisfies both the NA test and `> 0`, so an
   # infinity survived into sd(log(x)) and that year's sigma came back NaN in
   # silence, next to perfectly good years. Same hole beta_convergence() had.
+  # A row with no year has no year to be dispersed in: grouped as-is, it came
+  # back as a `year = NA` row of its own, a phantom period in the series.
   keep <- data %>%
-    dplyr::filter(is.finite(.data[[val_name]]), .data[[val_name]] > 0)
+    dplyr::filter(is.finite(.data[[val_name]]), .data[[val_name]] > 0,
+                  !is.na(.data$year))
   if (!nrow(keep)) {
     wdj_warn(c(
       "No positive {.field {val_name}} values, so there is no dispersion to
@@ -1358,10 +1430,10 @@ gini <- function(x, weights = NULL, na.rm = TRUE) {
 #'   component's `share` of the total (`NA` when the total is `0`, i.e.
 #'   perfect equality, and the shares are undefined).
 #'
-#'   When there is nothing to compute -- no values left after `na.rm`, a zero
-#'   total weight, or an infinity in `x` or `weights` -- the result is a single
-#'   `NA` whatever `groups` says, so reach for the components only after checking
-#'   `is.data.frame()`.
+#'   When there is nothing to compute (no values left after `na.rm`, a zero
+#'   total weight, an infinity in `x` or `weights`, or, with `na.rm = FALSE`, a
+#'   missing value or group), the result is a single `NA` whatever `groups`
+#'   says, so reach for the components only after checking `is.data.frame()`.
 #' @export
 #' @seealso [gini()] for the more familiar single-number summary, which does not
 #'   decompose.
@@ -1416,7 +1488,15 @@ theil <- function(x, weights = NULL, groups = NULL, na.rm = TRUE) {
   #
   # A pre-release review proposed warning here for consistency with the other
   # paths; it does not survive the silence policy. Do not re-add it.
-  if (length(x) == 0L || anyNA(x) || anyNA(w)) return(NA_real_)
+  #
+  # A missing *group* is the same case. na.rm = TRUE drops those rows; with
+  # na.rm = FALSE they stayed in `total` while split() below left them out of
+  # both components, so total no longer equalled between + within: the
+  # exact decomposition this function exists for, silently broken (the
+  # shares summed to 0.49 on a four-row example).
+  if (length(x) == 0L || anyNA(x) || anyNA(w) || (!is.null(g) && anyNA(g))) {
+    return(NA_real_)
+  }
   if (any(w < 0)) wdj_abort("{.arg weights} must be non-negative.")
   sw <- sum(w)
   # All-zero weights leave every share 0/0; NA is the honest answer (gini()
@@ -1514,6 +1594,10 @@ share_of_world <- function(data, value, suffix = "_share") {
     "{new_col}" := { .wdj_tot <- sum(.data[[val_name]], na.rm = TRUE); if (!is.finite(.wdj_tot) || .wdj_tot == 0) NA_real_ else .data[[val_name]] / .wdj_tot }
   )
   out <- wdj_return_frame(dplyr::ungroup(out))
+  # A row with no year has no year's total to be a share of. group_by(year)
+  # made the undated rows a phantom year of their own, so two of them came
+  # back as 0.5 and 0.5, each other's share of a world that is only them.
+  if (has_year) out <- na_where_no_year(out, new_col)
   # The guard in the mutate above is right -- a zero or non-finite total would
   # divide to NaN or Inf -- but it was the silent one of the three. per_capita()
   # and to_ppp() both report an unusable denominator, under the same two
@@ -1521,7 +1605,8 @@ share_of_world <- function(data, value, suffix = "_share") {
   # reads as "these countries have no share" rather than "there was no total to
   # take a share of". A value that is present while its share is NA can only
   # mean the total was unusable, so that identifies the rows exactly.
-  bad <- is.na(out[[new_col]]) & !is.na(out[[val_name]])
+  bad <- is.na(out[[new_col]]) & !is.na(out[[val_name]]) &
+    (if (has_year) !is.na(out$year) else TRUE)
   if (any(bad)) {
     if (all(bad)) {
       wdj_warn(c(

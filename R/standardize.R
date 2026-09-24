@@ -421,7 +421,8 @@ standardize_country <- function(data,
         "i" = "{.arg add} defaults to
                {.code c(\"iso3c\", \"iso2c\", \"continent\", \"region\")}.
                Pass {.code add = \"iso3c\"} to add only the code, or rename
-               your columns to keep them."
+               {cli::qty(length(unasked))}{?that column/those columns} to keep
+               {?it/them}."
       ), class = "countryatlas_unasked_overwrite")
     }
   }

@@ -323,6 +323,22 @@ weights_custom <- function(w, countries) {
     }
     m <- w
     storage.mode(m) <- "double"
+    # Case and padding normalised, as country_weights(countries = ) is: codes
+    # were taken verbatim, so a matrix named in lowercase matched no country
+    # in any data frame and every statistic built on it refused with "Not
+    # enough connected countries ... Try a scheme that connects islands":
+    # a key problem diagnosed as a connectivity one. Unknown codes are kept:
+    # a user-assigned code (see country_overrides()) is legitimate here.
+    rn <- norm_weight_code(rownames(w))
+    if (anyDuplicated(rn)) {
+      wdj_abort(c(
+        "A custom weights matrix names the same country twice.",
+        "x" = "{.val {unique(rn[duplicated(rn)])}} after ignoring case and
+               surrounding spaces.",
+        "i" = "Give each country one row and one column."
+      ))
+    }
+    dimnames(m) <- list(rn, rn)
   } else if (is.data.frame(w)) {
     check_cols(w, c("iso3c", "neighbor"), arg = "w")
     val <- if ("weight" %in% names(w)) w$weight else rep(1, nrow(w))
@@ -360,9 +376,12 @@ weights_custom <- function(w, countries) {
         "i" = "Use {.val {0}} for {.emph not a neighbour}, or drop the row."
       ))
     }
-    iso <- sort(unique(c(w$iso3c, w$neighbor)))
+    # Normalised like the matrix branch above, for the same reason.
+    from <- norm_weight_code(w$iso3c)
+    to <- norm_weight_code(w$neighbor)
+    iso <- sort(unique(c(from, to)))
     m <- matrix(0, length(iso), length(iso), dimnames = list(iso, iso))
-    m[cbind(as.character(w$iso3c), as.character(w$neighbor))] <- val
+    m[cbind(from, to)] <- val
   } else {
     wdj_abort(c(
       "{.arg w} must be a named square matrix or a long data frame.",
@@ -378,6 +397,13 @@ weights_custom <- function(w, countries) {
   }
   diag(m) <- 0
   list(m = m, n_links = sum(m > 0), degree = rowSums(m))
+}
+
+# A custom weights code, the way wdj_to_iso3c(origin = "iso3c") reads one
+# (ASCII upper case, Unicode padding trimmed) but without its whitelist, so a
+# user-assigned code survives.
+norm_weight_code <- function(x) {
+  ascii_upper(trimws(as.character(x), whitespace = "[\\h\\v]"))
 }
 
 # --- align a weights object to a data frame -------------------------------------
@@ -430,6 +456,22 @@ align_weights <- function(data, val_name, weights, scale = "small",
   # countries that also have a value -- a neighbourless row contributes nothing
   # and would divide by zero on re-standardisation.
   keep <- intersect(rownames(m), df$iso3c)
+  # Nothing in common *as written*, while the same codes would match once case
+  # and padding are normalised, is a key problem rather than a connectivity
+  # one: lowercase codes in `data` matched nothing, and the abort below then
+  # advised "a scheme that connects islands". Only that case is claimed here;
+  # an island absent from the contiguity weights is exactly what the advice
+  # below is for.
+  if (!length(keep) && nrow(df) &&
+      length(intersect(rownames(m), norm_weight_code(df$iso3c)))) {
+    wdj_abort(c(
+      "No country in {.arg data} matches {.arg weights} as written.",
+      "x" = "{.arg data} has {.val {utils::head(unique(df$iso3c), 3)}};
+             {.arg weights} has {.val {utils::head(rownames(m), 3)}}.",
+      "i" = "They differ in case or surrounding spaces;
+             {.fn standardize_country} normalises both."
+    ), call = call, class = "countryatlas_weights_no_overlap")
+  }
   # Iterated to a fixed point, not pruned once. Dropping a neighbourless
   # country can leave one of *its* neighbours with no neighbours either, and a
   # single pass left that country in: its weight row was all zeros, the
@@ -452,7 +494,7 @@ align_weights <- function(data, val_name, weights, scale = "small",
       "i" = "Got {length(keep)}; need at least 3.",
       "*" = 'Try a scheme that connects islands, e.g.
              {.code country_weights("knn", k = 5)}.'
-    ), call = call)
+    ), call = call, class = "countryatlas_too_few_connected")
   }
   if (identical(weights$style, "W")) {
     rs <- rowSums(m); rs[rs == 0] <- 1
@@ -546,13 +588,29 @@ local_morans <- function(data, value, weights = NULL, n_perm = 999,
   p <- rep(NA_real_, n)
   n_perm <- as.integer(n_perm)
   if (n_perm > 0L && !flat) {
-    # Conditional permutation: hold each country's own value fixed and shuffle
-    # the rest, which is the standard LISA reference distribution.
+    # Conditional permutation (Anselin 1995): hold each country's own value
+    # fixed and draw its neighbours' values from the *other* n - 1. This used
+    # to shuffle all n values with one permutation shared by every country,
+    # which lets a country's own value land among its neighbours, and for
+    # the extreme values a hot-spot map is about, that inflates |I_i*| and so
+    # the p-value. Monaco's GDP per capita, the most extreme in the snapshot,
+    # came out at p = 0.028 under five nearest neighbours where the
+    # conditional reference distribution (and spdep's localmoran_perm()) gives
+    # 0.0035.
     ge <- integer(n)
-    for (b in seq_len(n_perm)) {
-      zp <- sample(z)
-      iip <- (z / m2) * as.numeric(m %*% zp)
-      ge <- ge + (abs(iip) >= abs(ii))
+    for (i in seq_len(n)) {
+      nb <- which(m[i, ] != 0)
+      others <- z[-i]
+      # One draw of length(nb) values, without replacement, per permutation;
+      # vapply() keeps a single neighbour as a row vector, which matrix()
+      # shapes into the same k-by-n_perm layout as several.
+      draws <- matrix(
+        others[vapply(seq_len(n_perm),
+                      function(b) sample.int(n - 1L, length(nb)),
+                      integer(length(nb)))],
+        nrow = length(nb))
+      iip <- (z[i] / m2) * colSums(draws * m[i, nb])
+      ge[i] <- sum(abs(iip) >= abs(ii[i]))
     }
     p <- (1 + ge) / (n_perm + 1)
   }
@@ -860,12 +918,37 @@ spatial_lag <- function(data, value, weights = NULL, suffix = "_lag") {
     if (is.null(weights)) weights <- country_weights("contiguity")
     out <- rep(NA_real_, nrow(data))
     exc <- character(0)
+    # One sparse year is that year's problem. A year with too few connected
+    # countries used to abort the whole call (every other year's lags lost,
+    # under advice about islands) when the rows it could not place are
+    # exactly what the documented NA is for.
+    thin <- list()
     for (y in yrs) {
       idx <- which(!is.na(data$year) & data$year == y)
-      al_y <- align_weights(data[idx, , drop = FALSE], val_name, weights)
+      skip_year <- function(e) {
+        thin[[length(thin) + 1L]] <<- list(year = y, cnd = e)
+        NULL
+      }
+      al_y <- tryCatch(
+        align_weights(data[idx, , drop = FALSE], val_name, weights),
+        countryatlas_too_few_connected = skip_year,
+        countryatlas_weights_no_overlap = skip_year)
+      if (is.null(al_y)) next
       out[idx] <- as.numeric(al_y$m %*% al_y$x)[
         match(data$iso3c[idx], al_y$iso3c)]
       exc <- union(exc, al_y$excluded)
+    }
+    # Nothing computed at all is the single-year failure, and says so the
+    # same way.
+    if (length(thin) == length(yrs)) rlang::cnd_signal(thin[[1]]$cnd)
+    if (length(thin)) {
+      thin_yrs <- vapply(thin, function(t) format(t$year), character(1))
+      wdj_warn(c(
+        "{length(thin_yrs)} year{?s} ha{?s/ve} too few connected countries for
+         a spatial lag; {.field {new}} is {.val {NA}} there:",
+        "*" = "{.val {thin_yrs}}",
+        "i" = "A lag needs at least three countries the weights connect."
+      ), class = "countryatlas_thin_year")
     }
     data[[new]] <- out
     # The union across years: the weights are geography, so a country excluded

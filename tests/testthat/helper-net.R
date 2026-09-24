@@ -20,3 +20,24 @@ skip_if_wdi_empty <- function(data, cols) {
     all(vapply(cols, function(cl) any(!is.na(data[[cl]])), logical(1)))
   if (!isTRUE(ok)) testthat::skip("World Bank fetch returned no data")
 }
+
+# A live fetch that degrades after the reachability probe above has passed
+# (a timeout, a rate limit) warns by design, because that is the package's
+# contract for a failed download, and then comes back empty, at which point
+# skip_if_wdi_empty() skips. Those warnings belong to the network rather than
+# to the code under test, yet they reached the suite's summary as three
+# "Timeout of 60 seconds was reached" entries on a slow day. Turn them into
+# the skip they precede.
+wdi_live <- function(expr) {
+  failed <- FALSE
+  out <- withCallingHandlers(expr, warning = function(w) {
+    if (inherits(w, "countryatlas_no_data") ||
+        grepl("Could not fetch|Timeout|timed out|cannot open URL|resolve host",
+              conditionMessage(w))) {
+      failed <<- TRUE
+      invokeRestart("muffleWarning")
+    }
+  })
+  if (failed) testthat::skip("World Bank fetch failed in this run")
+  out
+}

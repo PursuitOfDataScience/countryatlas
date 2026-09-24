@@ -468,6 +468,10 @@ add_indicator <- function(data, source, indicator, countries = NULL,
                          years = years, ...)
   carry_year <- FALSE
   by <- if (all(c("year", "iso3c") %in% names(data)) && "year" %in% names(new)) {
+    # The fetched year is an integer (read_year()), so a character one on the
+    # caller's side failed on dplyr's "Can't join `x$year` with `y$year` due
+    # to incompatible types", the join per_capita() and deflate() guard.
+    check_numeric_col(data, "year")
     c("iso3c", "year")
   } else {
     # A panel joined to a single-year fetch would fan out; drop the fetch's year
@@ -610,6 +614,14 @@ compare_sources <- function(indicator, sources = c("wdi", "owid"), year,
       if (!length(num)) wdj_abort("Source {.val {s}} returned no numeric column.")
       d[[s]] <- d[[num[1]]]
     }
+    # A row whose key did not resolve is not a country to compare, and
+    # fetch_indicator() has already named it. Kept, it did three wrong things:
+    # distinct() folded several unresolved rows into one and the warning below
+    # called that a "duplicate country"; the full join then carried each as
+    # an `iso3c = NA` row of the comparison table; and the pair summary
+    # counted them in `only_x`/`only_y`, as coverage one source had and the
+    # other lacked.
+    d <- d[!is.na(d$iso3c), , drop = FALSE]
     # A provider answering twice for one country-year hands back whichever row
     # came first, order-dependently. fetch_wdi() reports exactly this and
     # argues why -- "this is the response of a third party, which is more

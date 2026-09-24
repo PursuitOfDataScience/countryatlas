@@ -1,7 +1,7 @@
 test_that("world_data(year) keeps the classic backward-compatible output", {
   skip_if_offline_wb()
   skip_if_not_installed("maps")
-  w <- world_data(2020)
+  w <- wdi_live(world_data(2020))
   skip_if_wdi_empty(w, "gdp_per_capita")
   expect_true(all(c("long", "lat", "group", "iso3c", "iso2c", "income",
                     "continent", "gdp_per_capita") %in% names(w)))
@@ -20,7 +20,7 @@ test_that("world_data(year) keeps the classic backward-compatible output", {
 
 test_that("multi-indicator named vectors drive clean column names", {
   skip_if_offline_wb()
-  md <- country_data(2020, c(gdp = "NY.GDP.PCAP.KD", pop = "SP.POP.TOTL"))
+  md <- wdi_live(country_data(2020, c(gdp = "NY.GDP.PCAP.KD", pop = "SP.POP.TOTL")))
   skip_if_wdi_empty(md, c("gdp", "pop"))
   expect_true(all(c("gdp", "pop") %in% names(md)))
   expect_false(any(c("NY.GDP.PCAP.KD", "SP.POP.TOTL") %in% names(md)))
@@ -29,7 +29,7 @@ test_that("multi-indicator named vectors drive clean column names", {
 
 test_that("a year range yields a panel keyed on iso3c + year", {
   skip_if_offline_wb()
-  pan <- country_data(2018:2020, c(gdp = "NY.GDP.PCAP.KD"))
+  pan <- wdi_live(country_data(2018:2020, c(gdp = "NY.GDP.PCAP.KD")))
   skip_if_wdi_empty(pan, "gdp")
   expect_true("year" %in% names(pan))
   expect_setequal(unique(pan$year), 2018:2020)

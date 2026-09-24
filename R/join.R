@@ -214,8 +214,15 @@ country_join <- function(x, y, by_x, by_y,
   # exactly this. An `iso3c` the caller had curated by hand was overwritten with
   # whatever the names resolved to, and nothing said so.
   if (warn) {
-    for (side in list(list(f = x, nm = "x"), list(f = y, nm = "y"))) {
-      if (key %in% names(side$f)) {
+    # Not when the join column *is* the key column. Joining two tables that are
+    # already coded (country_join(a, b, iso3c, iso3c, origin_x = "iso3c",
+    # origin_y = "iso3c"), the most natural call there is) warned twice that
+    # `iso3c` was "replaced with the code derived from the join column" and
+    # advised renaming it "to keep both", when there is only one column and the
+    # derivation merely normalises its case and padding.
+    for (side in list(list(f = x, nm = "x", by = bx),
+                      list(f = y, nm = "y", by = by_))) {
+      if (key %in% names(side$f) && !identical(side$by, key)) {
         wdj_warn(c(
           "{.arg {side$nm}} already has {.field {key}}; it is replaced with the
            code derived from the join column.",
@@ -317,6 +324,22 @@ country_join_all <- function(tables, by, origin = "country.name",
   if (!is.list(tables) || !length(tables)) {
     wdj_abort("{.arg tables} must be a non-empty list of data frames.")
   }
+  # See abort_bare_column(): `by` takes column names as strings, and
+  # `by = country` otherwise died on base R's "object 'country' not found" at
+  # the first use below: the same slip country_join() next door, which takes
+  # its keys unquoted, invites.
+  by_expr <- substitute(by)
+  by <- tryCatch(force(by), error = function(e) {
+    abort_bare_column(by_expr, "by", e)
+  })
+  if (!is.character(by) || !length(by) || anyNA(by)) {
+    wdj_abort(c(
+      "{.arg by} must name the country column: one string, or one per table.",
+      # See check_string(): a function or environment cannot be formatted.
+      "x" = if (is.function(by) || is.environment(by)) "Got {.cls {class(by)[1]}}."
+            else if (!length(by)) "Got 0 values." else "Got {.val {by}}."
+    ))
+  }
   n <- length(tables)
   by <- if (length(by) == 1L) rep(by, n) else by
   origin <- if (length(origin) == 1L) rep(origin, n) else origin
@@ -332,8 +355,9 @@ country_join_all <- function(tables, by, origin = "country.name",
     if (!by[i] %in% names(tb)) {
       wdj_abort("Column {.val {by[i]}} not found in table {i}.")
     }
-    # Same silence as country_join(), once per table.
-    if (warn && key %in% names(tb)) {
+    # Same silence as country_join(), once per table, and the same exception
+    # when the country column is the key column itself.
+    if (warn && key %in% names(tb) && !identical(by[i], key)) {
       wdj_warn(c(
         "Table {i} already has {.field {key}}; it is replaced with the code
          derived from {.val {by[i]}}.",

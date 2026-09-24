@@ -254,7 +254,10 @@ od_map <- function(data, from, to, weight = NULL, origin = "country.name",
     if (length(missing_iso)) {
       wdj_abort("No flows for {.val {missing_iso}} in {.arg data}.")
     }
-    iso
+    # One panel per country: c("China", "China"), or a name and its code,
+    # reached the panel labels twice and died on base R's "factor level [2] is
+    # duplicated".
+    unique(iso)
   } else {
     # hi: as.integer() below returns NA past 2^31-1, and min(NA, nrow(m))
     # then propagates it into seq_len().

@@ -18,9 +18,10 @@ world_table(
 \arguments{
 \item{data}{A country-level or map-ready frame.}
 
-\item{value}{The column to rank on (unquoted). \code{NULL} keeps every numeric
-column, does not sort, and omits the \code{rank} column -- there is nothing to
-rank by, and \code{top_n} then takes an arbitrary slice (it warns when it does).}
+\item{value}{The column to rank on (unquoted). Tied values share a rank, as
+in \code{\link[=rank_countries]{rank_countries()}}. \code{NULL} keeps every numeric column, does not sort,
+and omits the \code{rank} column: there is nothing to rank by, and \code{top_n}
+then takes an arbitrary slice (it warns when it does).}
 
 \item{top_n}{How many rows (default \code{20}). \code{Inf} for all.}
 

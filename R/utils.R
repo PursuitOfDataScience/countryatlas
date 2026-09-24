@@ -230,13 +230,13 @@ check_cols <- function(data, cols, arg = "data", call = rlang::caller_env()) {
   missing <- setdiff(cols, names(data))
   if (length(missing)) {
     # cli::qty(): with {?s} ahead of the value, cli reaches for the most
-  # recent interpolation to get a quantity, and a *numeric* vector there is
-  # read as the quantity itself -- which must be length 1, so a length-2
-  # numeric died on cli's own "length(object) == 1 is not TRUE" instead of
-  # reporting the bad input. A character vector works, which is why this only
-  # showed up for numeric arguments. qty(length(x)) states the count outright -- qty(x) on a
-# numeric hits the same trap, since cli reads a numeric as the count itself.
-
+    # recent interpolation to get a quantity, and a *numeric* vector there is
+    # read as the quantity itself, which must be length 1, so a length-2
+    # numeric died on cli's own "length(object) == 1 is not TRUE" instead of
+    # reporting the bad input. A character vector works, which is why this
+    # only showed up for numeric arguments. qty(length(x)) states the count
+    # outright; qty(x) on a numeric hits the same trap, since cli reads a
+    # numeric as the count itself.
     wdj_abort("Column{cli::qty(length(missing))}{?s} {.val {missing}} not found in {.arg {arg}}.",
               call = call)
   }
@@ -673,6 +673,32 @@ blank_key <- function(x) {
   is.na(x) | !nzchar(trimws(x, whitespace = "[\\h\\v]"))
 }
 
+# A value the map verbs can actually draw. is.na() alone misses an infinity,
+# and every fill and size scale here renders one as no data (ggplot2 paints
+# +/-Inf in `na.value`, and cut() puts it in no class), so a country holding
+# Inf was drawn grey while the caption and map_provenance() counted it as
+# shown. A category only needs the NA test.
+has_value <- function(x) {
+  if (is.numeric(x)) is.finite(x) else !is.na(x)
+}
+
+# How to name a unit in a message. unit_key() is built for grouping, and its
+# fallback keys ("country\rFreedonia") are not for reading; a row with no code
+# is named by whatever does identify it, the same columns in the same order.
+unit_label <- function(df) {
+  out <- as.character(df$iso3c)
+  miss <- blank_key(out)
+  for (nm in intersect(c("country", "group"), names(df))) {
+    if (!any(miss)) break
+    alt <- as.character(df[[nm]])
+    take <- miss & !blank_key(alt)
+    out[take] <- alt[take]
+    miss <- miss & !take
+  }
+  out[miss] <- "(unidentified)"
+  out
+}
+
 unit_key <- function(df) {
   key <- as.character(df$iso3c)
   miss <- blank_key(key)
@@ -969,7 +995,8 @@ warn_overwrite <- function(data, cols) {
     # failed with "Cannot pluralize without a quantity".
     wdj_warn(c(
       "Overwriting {length(hit)} existing column{?s} in {.arg data}: {.val {hit}}.",
-      "i" = "Rename them first to keep the original values."
+      "i" = "Rename {cli::qty(length(hit))}{?it/them} first to keep the original
+             values."
     ))
   }
   invisible(data)

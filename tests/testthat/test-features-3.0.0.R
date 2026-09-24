@@ -1569,7 +1569,8 @@ test_that("gridded_cartogram reports the whole input as its denominator", {
   # Two warnings here: the missing weights, and the one country with no bundled
   # centroid. Nest so neither escapes into the suite summary.
   expect_warning(
-    expect_warning(p <- gridded_cartogram(snap, w2, cells = 300), "no positive"),
+    expect_warning(p <- gridded_cartogram(snap, w2, cells = 300),
+                   "no finite, positive"),
     "no bundled centroid")
   cov <- attr(suppressWarnings(gridded_cartogram(snap, w2, cells = 300)),
               "countryatlas_provenance")$coverage
@@ -1609,7 +1610,7 @@ test_that("a bare `as_of` year means 1 January of that year", {
   expect_false(in_group("Croatia", "EU", as_of = "2013-06-30"))
   expect_true(in_group("Croatia", "EU", as_of = "2013-07-01"))
   expect_true(in_group("Croatia", "EU", as_of = 2014))
-  # The UK left on 2020-01-31, so a bare 2020 still counts it in.
+  # The UK left at the end of 2020-01-31, so a bare 2020 still counts it in.
   expect_true(in_group("United Kingdom", "EU", as_of = 2020))
   expect_false(in_group("United Kingdom", "EU", as_of = "2020-06-01"))
   # The 2004 enlargement -- ten countries on 2004-05-01 -- is the largest
@@ -2392,7 +2393,9 @@ test_that("region reports a no-match instead of drawing an empty map", {
 
   expect_error(wg("Nowhere"), "matched no countries")
   expect_error(wg("Europ"), "matched no countries")
-  expect_error(wg(1), "matched no countries")
+  # A number is only ever a bounding box, and says so rather than being read
+  # as a country name.
+  expect_error(wg(1), "bounding box of four numbers")
   expect_error(wg(NA), "must not contain missing values")
   expect_error(wg(c("France", NA)), "must not contain missing values")
 
@@ -2482,7 +2485,16 @@ test_that("clear_wdi_cache(disk = FALSE) does not touch the disk", {
   invisible(countryatlas:::fetch_wdi(c(x = "I1"), 2000, 2000, parallel = FALSE))
   expect_equal(hits, 1L)
 
-  # disk = TRUE still removes it, which is what that argument is for.
+  # disk = TRUE removes the cache, which is what that argument is for: the
+  # cache's own entries, not the caller's file beside them. This used to be
+  # unlink(d, recursive = TRUE), and this test asserted the folder was gone,
+  # bystander and all.
+  clear_wdi_cache(disk = TRUE)
+  expect_true(file.exists(bystander))
+  expect_equal(list.files(d), basename(bystander))
+  # Once nothing else is in it, the folder goes too.
+  unlink(bystander)
+  invisible(countryatlas:::fetch_wdi(c(x = "I1"), 2000, 2000, parallel = FALSE))
   clear_wdi_cache(disk = TRUE)
   expect_false(dir.exists(d))
 })
@@ -3546,9 +3558,8 @@ test_that("smooth_rates and to_ppp say when they had nothing to work with", {
   # conversion factor every converted value is NA. Correct arithmetic either
   # way, but the result looked like a computation that ran rather than one with
   # nothing to run on.
-  # A cross-section: smooth_rates() estimates its pooled prior from one row per
-  # country, so a panel now earns the countryatlas_panel warning -- correct, and
-  # tested elsewhere. What this block is about is the no-usable-denominator
+  # A cross-section: smooth_rates() estimates one prior per year, which a panel
+  # exercises elsewhere. What this block is about is the no-usable-denominator
   # notices, so keep the fixture single-year.
   mk <- function(den) data.frame(iso3c = paste0("C", 1:6), year = 2000L,
                                  num = 1:6, den = den)

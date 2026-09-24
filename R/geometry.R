@@ -163,7 +163,32 @@ resolve_region <- function(region, call = rlang::caller_env()) {
     ), call = call)
   }
   # A bounding box: c(xmin, ymin, xmax, ymax).
-  if (is.numeric(region) && length(region) == 4L) {
+  if (is.numeric(region)) {
+    # Numbers are only ever a box. Any other length fell through to the code
+    # branches below as text, and "250" (three characters, unchanged by
+    # upper-casing) was taken at face value as an unknown alpha-3 code, so
+    # world_geometry(region = 250) and region = c(100, 200, 300) returned an
+    # empty map in silence.
+    if (length(region) != 4L) {
+      wdj_abort(c(
+        "A numeric {.arg region} must be a bounding box of four numbers.",
+        "x" = "Got {length(region)} number{?s}.",
+        "i" = "Write {.code c(xmin, ymin, xmax, ymax)} in degrees, or name a
+               continent, a group or {.field iso3c} codes as text."
+      ), call = call)
+    }
+    # And a box that selects nothing in any case is a mistake, not a subset:
+    # reversed corners matched no vertex on the polygon backend and cropped
+    # to a meaningless sliver on the sf one.
+    if (!all(is.finite(region)) || region[1] >= region[3] ||
+        region[2] >= region[4]) {
+      wdj_abort(c(
+        "A bounding-box {.arg region} needs finite corners with
+         {.code xmin < xmax} and {.code ymin < ymax}.",
+        "x" = "Got {.val {region}}.",
+        "i" = "The order is {.code c(xmin, ymin, xmax, ymax)}."
+      ), call = call)
+    }
     return(structure(region, class = "wdj_bbox"))
   }
   region <- as.character(region)
@@ -1002,7 +1027,10 @@ locate_country <- function(lon = NULL, lat = NULL, points = NULL,
     # documented idiom for "no country here" is already an NA row, so give
     # those rows exactly that and locate the rest.
     ok <- !is.na(lon) & !is.na(lat)
-    if (!all(ok)) {
+    # No points at all is the same shape of answer, zero rows of it. It used to
+    # reach the spatial join, which leaked four of base R's "no non-missing
+    # arguments to min; returning Inf" from an empty bounding box.
+    if (!length(ok) || !all(ok)) {
       if (!any(ok)) {
         # Learn the shape from the normal path instead of naming columns here,
         # so this keeps matching whatever `add` asks for. (0, 0) is open ocean

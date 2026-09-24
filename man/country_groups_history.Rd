@@ -11,7 +11,10 @@ A tibble with 176 rows:
 \item{iso3c}{ISO 3166-1 alpha-3 code.}
 \item{country}{Country name.}
 \item{from}{Date membership took effect.}
-\item{to}{Date membership ended, or \code{NA} for a current member.}
+\item{to}{The first date on which the country was no longer a member
+(membership runs up to the day before), or \code{NA} for a current member.
+The United Kingdom's EU \code{to} is therefore 2020-02-01: it left at the
+end of 31 January 2020.}
 }
 }
 \usage{

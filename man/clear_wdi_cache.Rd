@@ -26,6 +26,11 @@ Bank answers; only a successful fetch leaves a response in it, and reading the
 bundled \link{world_snapshot} never goes near it. Under \verb{R CMD check} the whole
 cache moves to the session temp directory, so a check never writes to the
 user's file space.
+
+The directory may hold other files too. The cache only ever writes, expires
+and deletes its own entries (named by a hash, with the extension
+\code{.countryatlas}), and \code{disk = TRUE} removes the directory itself only when
+that leaves it empty.
 }
 
 \section{How the cache is managed}{

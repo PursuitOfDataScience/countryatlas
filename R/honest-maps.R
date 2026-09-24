@@ -42,8 +42,11 @@ coverage_map <- function(data, value, by = NULL, title = NULL, ...) {
   if (!is.null(title)) check_string(title, "title")
 
   cov <- na_coverage(data, value_name)
+  # has_value(), the same test the caption's count uses: an infinite value
+  # cannot be mapped, so painting it "Reported" while the caption counted it
+  # missing put two answers on one plot.
   data[[".wdj_available"]] <- factor(
-    ifelse(is.na(data[[value_name]]), "Missing", "Reported"),
+    ifelse(has_value(data[[value_name]]), "Reported", "Missing"),
     levels = c("Reported", "Missing")
   )
   avail_sym <- rlang::sym(".wdj_available")
@@ -130,14 +133,18 @@ classify_compare <- function(data, value,
     # recent interpolation to get a quantity, and a *numeric* vector there is
     # read as the quantity itself -- which must be length 1, so a length-2
     # numeric died on cli's own "length(object) == 1 is not TRUE" instead of
-    # reporting the bad input. A character vector works, which is why this only
-    # showed up for numeric arguments. qty(length(x)) states the count outright -- qty(x) on a
-# numeric hits the same trap, since cli reads a numeric as the count itself.
-
+    # reporting the bad input. A character vector works, which is why this
+    # only showed up for numeric arguments. qty(length(x)) states the count
+    # outright; qty(x) on a numeric hits the same trap, since cli reads a
+    # numeric as the count itself.
     wdj_abort(c("Unknown classification method{cli::qty(length(bad))}{?s} {.val {bad}}.",
                 "i" = "Available: {.val {known}}."))
   }
   if (!length(methods)) wdj_abort("{.arg methods} must name at least one method.")
+  # One panel per method. A repeat is a panel that says nothing new, and it
+  # died on base R's "factor level [2] is duplicated" when the panels were
+  # labelled below.
+  methods <- unique(methods)
 
   # Break on one value per country, for the same reason world_map() does: on the
   # polygon backend a country contributes one row per boundary vertex, so raw
@@ -283,6 +290,14 @@ value_by_alpha_map <- function(data, value, equalize,
   check_cols(data, c(value_name, eq_name))
   check_numeric_col(data, eq_name)
   check_map_geometry(data)
+  # Every style this verb offers bins or scales a number. world_map() has
+  # refused a non-numeric fill for these styles since 2.0.0; this verb did not,
+  # so value_by_alpha_map(d, continent, population) drew the categories on a
+  # discrete scale and recorded "value-by-alpha (quantile, rank)": a quantile
+  # classification it never computed.
+  check_categorical_fill(style, data[[value_name]], value_name)
+  # An infinity draws as no data here too; see world_map().
+  warn_infinite_fill(data, value_name)
   check_string(background, "background")
   check_label_args(palette, title, legend, "No data")
   # Same two silences world_map() reports, and for the same reasons: the

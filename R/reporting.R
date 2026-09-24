@@ -182,9 +182,10 @@ print.countryatlas_factsheet <- function(x, ...) {
 #' installed and a plain tibble otherwise, so it never becomes a hard dependency.
 #'
 #' @param data A country-level or map-ready frame.
-#' @param value The column to rank on (unquoted). `NULL` keeps every numeric
-#'   column, does not sort, and omits the `rank` column -- there is nothing to
-#'   rank by, and `top_n` then takes an arbitrary slice (it warns when it does).
+#' @param value The column to rank on (unquoted). Tied values share a rank, as
+#'   in [rank_countries()]. `NULL` keeps every numeric column, does not sort,
+#'   and omits the `rank` column: there is nothing to rank by, and `top_n`
+#'   then takes an arbitrary slice (it warns when it does).
 #' @param top_n How many rows (default `20`). `Inf` for all.
 #' @param desc Sort descending (default `TRUE`).
 #' @param columns Extra columns to keep, beyond `iso3c`, `country` and `value`.
@@ -264,7 +265,17 @@ world_table <- function(data, value = NULL, top_n = 20, desc = TRUE,
     }
     df <- utils::head(df, as.integer(top_n))
   }
-  if (ranked) df <- tibble::add_column(df, rank = seq_len(nrow(df)), .before = 1)
+  # min_rank(), as rank_countries() uses: tied values share a rank. Numbering
+  # the rows 1..n gave two countries with the same value different ranks, and
+  # which one "won" depended only on the order they arrived in. The frame is
+  # already sorted and cut to top_n, and every row better than one kept is
+  # itself kept, so ranking the kept rows gives the same numbers as ranking
+  # them all.
+  if (ranked) {
+    v <- df[[val_name]]
+    df <- tibble::add_column(
+      df, rank = dplyr::min_rank(if (desc) dplyr::desc(v) else v), .before = 1)
+  }
 
   if (identical(engine, "tibble") || !has_pkg("gt")) {
     if (identical(engine, "gt")) {

@@ -40,6 +40,14 @@ what equal-area \emph{means}, and it is worth checking rather than trusting.
 A conformal projection has \code{"angular"} distortion of 0 everywhere and
 unbounded areal distortion. A compromise projection is bad at both by a
 little, everywhere, which is the trade it makes.
+
+Distortion is measured against the WGS84 ellipsoid, the datum every CRS the
+package builds is defined on. Equal Earth, Gall-Peters and the three Lambert
+azimuthal projections have ellipsoidal forms and read exactly 1. PROJ
+implements Mollweide and Eckert IV with their spherical formulas, so on this
+datum they are equal-area only to within about 0.7\% (\code{"areal"} between
+0.993 and 1.007): a property of the maps drawn here, and the kind of thing
+this check exists to show.
 }
 
 \examples{

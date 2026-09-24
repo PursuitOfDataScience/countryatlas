@@ -12,6 +12,12 @@
 #' [world_data()], [country_data()], [world_geometry()], [locate_country()],
 #' [country_borders()], [neighbors()], [distance_between()].
 #'
+#' @section Data sources beyond the World Bank:
+#' [fetch_indicator()], [add_indicator()], [compare_sources()],
+#' [country_sources()], [register_country_source()],
+#' [remove_country_source()], and the adapters [fetch_owid()],
+#' [fetch_eurostat()], [fetch_oecd()] and [fetch_comtrade()].
+#'
 #' @section The join engine:
 #' [standardize_country()], [join_world()], [attach_geometry()], [country_join()],
 #' [country_join_all()], [dissolve_country()].
@@ -23,28 +29,52 @@
 #' @section Reference data:
 #' [convert_country()], [country_codes()], [country_groups()], [in_group()],
 #' [wdi_search()], and the datasets [country_meta], [common_indicators],
-#' [country_groups_tbl], [world_snapshot], [world_tiles], [historical_codes].
+#' [country_groups_tbl], [country_groups_history], [world_snapshot],
+#' [world_tiles], [historical_codes], [disputed_territories].
+#'
+#' @section Time:
+#' [country_timeline()], [audit_time_coverage()], [historical_geometry()].
 #'
 #' @section Analysis helpers:
 #' [per_capita()], [aggregate_regions()], [rank_countries()], [complete_years()],
-#' [growth_rate()], [index_to()], [share_of_world()], [lag_by_country()],
-#' [diff_by_country()], [correlate_indicators()], [beta_convergence()],
-#' [sigma_convergence()], [gini()], [theil()], [morans_i()].
+#' [interpolate_missing()], [growth_rate()], [index_to()], [share_of_world()],
+#' [lag_by_country()], [diff_by_country()], [deflate()], [to_ppp()],
+#' [rate_check()], [smooth_rates()], [correlate_indicators()],
+#' [beta_convergence()], [sigma_convergence()], [convergence_club()], [gini()],
+#' [theil()].
+#'
+#' @section Spatial statistics and networks:
+#' [country_weights()], [morans_i()], [local_morans()], [lisa_map()],
+#' [gearys_c()], [getis_ord()], [spatial_lag()]; [flow_matrix()],
+#' [country_network()], [od_map()].
 #'
 #' @section Visualization:
 #' [world_map()], [globe_map()], [spin_globe()], [facet_map()], [bubble_map()],
 #' [spike_map()], [bivariate_map()], [cartogram_map()], [dorling_map()],
-#' [tile_map()], [flow_map()], [animate_world()], [interactive_map()],
-#' [geom_country_labels()], [theme_world_map()], [simplify_geometry()].
+#' [gridded_cartogram()], [tile_map()], [flow_map()], [animate_world()],
+#' [interactive_map()], [geom_country_labels()], [theme_world_map()],
+#' [simplify_geometry()].
+#'
+#' @section Honest maps:
+#' [classify_compare()], [coverage_map()], [value_by_alpha_map()],
+#' [projection_info()], [projection_compare()], [projection_distortion()],
+#' [tissot_map()], [cartogram_diagnostics()], [map_provenance()],
+#' [dispute_policy()], [check_dispute_coverage()].
+#'
+#' @section Subnational:
+#' [standardize_subnational()], [nuts_geometry()], [subnational_map()].
+#'
+#' @section Reporting:
+#' [country_factsheet()], [world_table()].
 #'
 #' @section Database rendering (ggsql):
 #' [as_ggsql_source()], [world_query()].
 #'
 #' @section Performance & caching:
-#' [clear_wdi_cache()].
+#' [clear_wdi_cache()], [clear_country_cache()].
 #'
 #' @section Options:
-#' Four options change the package's behaviour. All are unset by default.
+#' Six options change the package's behaviour. All are unset by default.
 #' \describe{
 #'   \item{`countryatlas.cache_dir`}{Where the persistent World Bank cache
 #'     lives. Defaults to `tools::R_user_dir("countryatlas", "cache")`; set it to

@@ -79,6 +79,10 @@ rate_check <- function(data, numerator, denominator, min_denominator = NULL,
   } else {
     rate_name <- quo_arg_name(rate_q, "rate")
     check_cols(df, rate_name)
+    # The numerator and denominator are both checked; the rate that replaces
+    # their ratio was not, so a character column went into the table as the
+    # `rate` and every expected_se came back NA without a word.
+    check_numeric_col(df, rate_name)
     df[[rate_name]]
   }
   thr <- min_denominator %||% stats::quantile(den[is.finite(den) & den > 0],
@@ -168,6 +172,9 @@ rate_check <- function(data, numerator, denominator, min_denominator = NULL,
 #' every rate shrinks fully to the global mean, which is the right answer:
 #' the data contain no evidence of real between-country variation.
 #'
+#' On a panel the prior is estimated separately for each `year`, so every
+#' rate is shrunk toward its own year's global rate and every row is kept.
+#'
 #' @seealso [rate_check()], [per_capita()], [value_by_alpha_map()]
 #' @export
 #' @examples
@@ -229,45 +236,66 @@ smooth_rates <- function(data, numerator, denominator,
   # Method-of-moments Poisson-gamma (Marshall 1991): the global rate is the
   # pooled one, and the between-country variance is the excess over what Poisson
   # sampling alone would produce.
-  d <- den[ok]; y <- num[ok]; r <- y / d
-  # The pooled hyperparameters are estimated from one row per country, the way
-  # rate_check() reads its input, while the shrinkage below is applied to every
-  # row so the returned frame keeps its shape.
   #
-  # Estimating them from the raw rows was wrong in two ways that both looked
-  # like a computation that had run. On a geometry-attached frame -- about
-  # 99,000 vertex rows -- every country entered `rbar`, `dbar` and `s2` once
-  # per polygon vertex, so the prior was weighted by coastline complexity and
-  # every shrinkage weight was wrong. On a panel it pooled across years without
-  # a word. distinct_countries() picks the earliest year deterministically and
-  # says that it had to choose.
-  pooled <- if ("iso3c" %in% names(data)) {
-    pd <- distinct_countries(tibble::as_tibble(sf_drop(data)))
-    pok <- is.finite(pd[[num_name]]) & is.finite(pd[[den_name]]) &
-      pd[[den_name]] > 0
-    list(y = pd[[num_name]][pok], d = pd[[den_name]][pok])
+  # One prior per year on a panel. The prior is a cross-sectional quantity
+  # (this year's global rate and this year's between-country variance), and it
+  # used to be estimated from the earliest year alone and then applied to every
+  # row, so each later year was shrunk toward the wrong global rate, under a
+  # warning that said the other years were "dropped" when every row came back.
+  # This is spatial_lag()'s design for the same shape: a statistic per year,
+  # every row kept, nothing to announce. A frame with one year (or none) is a
+  # single period, as before.
+  period <- if ("year" %in% names(data) &&
+                length(unique(stats::na.omit(data$year))) > 1L) {
+    ifelse(is.na(data$year), "\rNA", as.character(data$year))
   } else {
-    list(y = y, d = d)
+    rep("", nrow(data))
   }
-  if (!length(pooled$d)) pooled <- list(y = y, d = d)
-  py <- pooled$y; pd_ <- pooled$d; pr <- py / pd_
-  rbar <- sum(py) / sum(pd_)
-  dbar <- mean(pd_)
-  s2 <- sum(pd_ * (pr - rbar)^2) / sum(pd_)
-  phi <- s2 - rbar / dbar
-  w <- rep(0, length(r))
-  if (is.finite(phi) && phi > 0) w <- d / (d + rbar / phi)
-
   sm <- rep(NA_real_, length(raw))
   shr <- rep(NA_real_, length(raw))
-  sm[ok] <- w * r + (1 - w) * rbar
-  shr[ok] <- w
+  for (p in unique(period[ok])) {
+    rows <- ok & period == p
+    prior <- eb_prior(data[period == p, , drop = FALSE], num_name, den_name,
+                      fallback = list(y = num[rows], d = den[rows]))
+    d <- den[rows]; r <- num[rows] / d
+    w <- rep(0, length(r))
+    if (is.finite(prior$phi) && prior$phi > 0) {
+      w <- d / (d + prior$rbar / prior$phi)
+    }
+    sm[rows] <- w * r + (1 - w) * prior$rbar
+    shr[rows] <- w
+  }
   data[[sm_col]] <- sm
   data[[sh_col]] <- shr
   # Was a bare `data`, so this verb handed back whatever class arrived: a
   # grouped frame stayed grouped, and the caller's next mutate() then computed
   # per-group without asking. The eleven sibling verbs all normalise here.
   wdj_return_frame(data)
+}
+
+# The empirical-Bayes hyperparameters for one period: the pooled rate `rbar`
+# and the excess variance `phi`.
+#
+# Estimated from one row per country, the way rate_check() reads its input,
+# while the shrinkage is applied to every row so the returned frame keeps its
+# shape. Estimating from the raw rows weighted each country by its row count:
+# on a geometry-attached frame (about 99,000 vertex rows) every country
+# entered `rbar`, `dbar` and `s2` once per polygon vertex, so the prior was
+# weighted by coastline complexity and every shrinkage weight was wrong.
+eb_prior <- function(frame, num_name, den_name, fallback) {
+  pooled <- if ("iso3c" %in% names(frame)) {
+    pd <- distinct_countries(tibble::as_tibble(sf_drop(frame)))
+    pok <- is.finite(pd[[num_name]]) & is.finite(pd[[den_name]]) &
+      pd[[den_name]] > 0
+    list(y = pd[[num_name]][pok], d = pd[[den_name]][pok])
+  } else {
+    fallback
+  }
+  if (!length(pooled$d)) pooled <- fallback
+  py <- pooled$y; pd_ <- pooled$d; pr <- py / pd_
+  rbar <- sum(py) / sum(pd_)
+  s2 <- sum(pd_ * (pr - rbar)^2) / sum(pd_)
+  list(rbar = rbar, phi = s2 - rbar / mean(pd_))
 }
 
 #' Convert a money series to constant prices
@@ -306,6 +334,11 @@ deflate <- function(data, value, base_year, deflator = NULL,
   defl_q <- rlang::enquo(deflator)
   check_string(suffix, "suffix")
   check_panel_cols(data, val_name)
+  # The deflator column was checked for a number and the value it divides was
+  # not, so a character value column reached the division inside mutate() and
+  # surfaced as dplyr's "non-numeric argument to binary operator" wrapped in
+  # "In group 1: `.wdj_unit = ...`", naming an internal key, not the column.
+  check_numeric_col(data, val_name)
   # to_ppp() and smooth_rates(), the two verbs shaped exactly like this one,
   # both announce it before they clobber a column the caller already had.
   # deflate() wrote over it in silence.
@@ -367,18 +400,12 @@ deflate <- function(data, value, base_year, deflator = NULL,
   # against, so every one of its values comes back NA -- which in the output is
   # indistinguishable from a country the source had no data for at all. The
   # arithmetic is right; the silence is not.
-  base_ok <- data %>%
-    dplyr::group_by(.data$iso3c) %>%
-    dplyr::summarise(
-      has = any(.data$year == base_year & is.finite(.data[[defl_name]]) &
-                  .data[[defl_name]] != 0, na.rm = TRUE),
-      .groups = "drop")
-  no_base <- base_ok$iso3c[!base_ok$has]
+  no_base <- units_without_base(data, defl_name, base_year)
   if (length(no_base)) {
     wdj_warn(c(
       "{length(no_base)} countr{?y/ies} ha{?s/ve} no usable {base_year}
        deflator; the rebased values are all {.val {NA}}:",
-      "*" = "{.val {utils::head(no_base, 8)}}",
+      "*" = "{.val {utils::head(sort(unique(no_base)), 8)}}",
       "i" = "Choose a {.arg base_year} the panel covers, or drop those
              countries first."
     ))
@@ -405,8 +432,8 @@ deflate <- function(data, value, base_year, deflator = NULL,
   # group_by_unit() rather than iso3c: the base-year deflator is read from
   # within the group, so two rows whose iso3c did not resolve were rebased
   # against each other. deflate() does not route through wdj_return_frame(),
-  # so the key is dropped here. The base_ok warning above still groups on
-  # iso3c, because its job is to name the countries it found.
+  # so the key is dropped here. The warning above keys on the same unit, and
+  # names each one by its code or, lacking one, by what identifies it.
   out$.wdj_unit <- NULL
   if (rlang::quo_is_null(defl_q)) out$.wdj_defl <- NULL
   out
@@ -438,8 +465,17 @@ to_ppp <- function(data, value, factor = NULL, suffix = "_ppp") {
   fac_q <- rlang::enquo(factor)
   check_string(suffix, "suffix")
   check_panel_cols(data, val_name)
+  # As in deflate(): the factor was checked and the value it divides was not,
+  # so a character column died on base R's bare "non-numeric argument to
+  # binary operator".
+  check_numeric_col(data, val_name)
 
   if (rlang::quo_is_null(fac_q)) {
+    # The fetched factor is joined on `year`, so a character year failed on
+    # dplyr's "Can't join `x$year` with `y$year` due to incompatible types"
+    # after the download; deflate() guards the same join. A factor column of
+    # the caller's own needs no join and keeps accepting such a year.
+    check_numeric_col(data, "year")
     # As in deflate() and per_capita(): drop a caller's colliding column so the
     # join cannot suffix the fetched one out of reach.
     data[[".wdj_ppp"]] <- NULL
@@ -559,6 +595,17 @@ convergence_club <- function(data, value, min_size = 2, alpha = 0.05) {
              the duplicates first. {.fn check_panel_unique} lists them."
     ))
   }
+  # Chronological columns, whatever order the rows arrived in. pivot_wider()
+  # lays its columns out in order of first appearance, and everything below
+  # reads them by position: ncol(y) is "the final period" countries are ranked
+  # on, and log_t_stat() treats column t as time t. A panel whose first
+  # country lacked the first year put that year last, and a shuffled panel put
+  # the years anywhere: the same data came back with different clubs and
+  # nothing said so. Sorted on year_sort_key() so a factor year sorts by its
+  # labels, and handed over as text so the order established here is the one
+  # pivot_wider() keeps.
+  df <- df[order(year_sort_key(df$year)), , drop = FALSE]
+  df$year <- as.character(df$year)
   wide <- tidyr::pivot_wider(df, names_from = "year", values_from = dplyr::all_of(val_name))
   wide <- wide[stats::complete.cases(wide), ]
   if (nrow(wide) < 2L) {

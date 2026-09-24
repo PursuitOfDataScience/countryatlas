@@ -291,13 +291,13 @@ country_groups <- function(group = NULL, as_of = NULL) {
     if (length(bad)) {
       wdj_abort(c(
         # cli::qty(): with {?s} ahead of the value, cli reaches for the most
-        # recent interpolation to get a quantity, and a *numeric* vector there is
-        # read as the quantity itself -- which must be length 1, so a length-2
-        # numeric died on cli's own "length(object) == 1 is not TRUE" instead of
-        # reporting the bad input. A character vector works, which is why this only
-        # showed up for numeric arguments. qty(length(x)) states the count outright -- qty(x) on a
-# numeric hits the same trap, since cli reads a numeric as the count itself.
-
+        # recent interpolation to get a quantity, and a *numeric* vector there
+        # is read as the quantity itself, which must be length 1, so a
+        # length-2 numeric died on cli's own "length(object) == 1 is not TRUE"
+        # instead of reporting the bad input. A character vector works, which
+        # is why this only showed up for numeric arguments. qty(length(x))
+        # states the count outright; qty(x) on a numeric hits the same trap,
+        # since cli reads a numeric as the count itself.
         "Unknown group{cli::qty(length(bad))}{?s}: {.val {bad}}.",
         "i" = "Available groups: {.val {valid}}."
       ))

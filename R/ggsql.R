@@ -334,7 +334,6 @@ as_ggsql_source <- function(data, name = "countryatlas_world",
     )
   }
   DBI::dbWriteTable(con, name, as.data.frame(df), overwrite = TRUE)
-  if (own_con) written <- TRUE
 
   if (format == "parquet") {
     path <- ggsql_parquet_path(name, path)
@@ -344,8 +343,14 @@ as_ggsql_source <- function(data, name = "countryatlas_world",
       "COPY %s TO %s (FORMAT PARQUET)",
       DBI::dbQuoteIdentifier(con, name), DBI::dbQuoteString(con, path)
     ))
-    if (own_con) DBI::dbDisconnect(con, shutdown = TRUE)
+    # Not marked `written` on this branch, so the on.exit() above closes a
+    # connection we opened whether the COPY succeeds or fails. It used to be
+    # marked straight after the table write, which disarmed that handler, and
+    # the disconnect below the COPY was then the only one, so a path that
+    # could not be written left the in-memory database open with no handle
+    # the caller could close.
     return(invisible(path))
   }
+  if (own_con) written <- TRUE
   invisible(con)
 }

@@ -148,12 +148,12 @@ subnational_lookup <- function(region, iso3c) {
   wrong <- looks_code & !belongs
   if (any(wrong)) {
     wdj_warn(c(
-      "{sum(wrong)} {.field region} value{?s} {?is/are} an ISO 3166-2 code for
-       a different country than {.arg country} gives:",
+      "{sum(wrong)} {.field region} value{?s} {?is an ISO 3166-2 code/are ISO
+       3166-2 codes} for a different country than {.arg country} gives:",
       "*" = "{.val {utils::head(paste0(region[wrong], ' (country resolves to ',
              expect[wrong], ')'), 6)}}",
-      "i" = "ISO 3166-2 codes are unique only within a country, so these are
-             left as {.val {NA}}."
+      "i" = "ISO 3166-2 codes are unique only within a country, so
+             {cli::qty(sum(wrong))}{?it is/they are} left as {.val {NA}}."
     ), class = "countryatlas_region_country_mismatch")
   }
 
@@ -398,7 +398,21 @@ subnational_map <- function(data, fill, by = "nuts_id", level = 2, year = 2021,
   # changed nothing. warn_projection_ignored() exists for this.
   dots <- rlang::list2(...)
   if (!is.null(dots$projection)) {
-    warn_projection_ignored(dots$projection, where = "{.fn subnational_map}")
+    # Its own message, not warn_projection_ignored(): that one is written for
+    # the polygon backend, so it advised `geometry = "sf"`, which this verb,
+    # already sf, has no use for, and the `where` passed to it arrived as
+    # literal markup, because cli does not re-interpolate a substituted
+    # value: "`projection` is not supported on {.fn subnational_map}".
+    if (!identical(dots$projection, "equal_earth")) {
+      wdj_warn(c(
+        "{.fn subnational_map} does not support {.arg projection} and ignores
+         it.",
+        "!" = "The regions are drawn in longitude/latitude, at the extent of
+               the data.",
+        "i" = "Reproject the result yourself, e.g.
+               {.code + ggplot2::coord_sf(crs = 3035)} for Europe."
+      ), class = "countryatlas_projection_ignored")
+    }
     dots$projection <- NULL
   }
   suppressMessages(

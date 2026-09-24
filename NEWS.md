@@ -182,6 +182,109 @@ existing code: `world_map(projection = "mercator")` now produces a different
 
 ## Bug fixes
 
+* **The on-disk cache could delete files it had not written.** With
+  `options(countryatlas.cache_dir = )` pointed at a folder that held anything
+  else, the first cached fetch deleted every file in it without an `.rds`
+  extension (a sweep meant for entries left by 2.0.x), cachem's 30-day expiry
+  and size cap applied to every `.rds` file there, and
+  `clear_wdi_cache(disk = TRUE)` removed the folder and everything below it.
+  Entries now carry their own `.countryatlas` extension, pruning and clearing
+  touch only files the cache wrote, and the folder itself is removed only when
+  that leaves it empty.
+* **`local_morans()` did not permute conditionally, as it documents.** It
+  shuffled all *n* values with one permutation shared by every country, so a
+  country's own value could land among its neighbours. For the extreme values a
+  hot-spot map is about, that inflated the pseudo p-value: Monaco came out at
+  0.028 where the conditional reference distribution (and spdep's
+  `localmoran_perm()`) gives 0.0035. Each country's neighbours are now drawn
+  from the other *n* - 1 values.
+* **`convergence_club()` depended on row order.** `pivot_wider()` lays its
+  columns out in order of first appearance and the log-t test reads them by
+  position, so a shuffled panel, or one whose first country lacked the first
+  year, formed different clubs from the same data. The years are sorted first.
+* **`smooth_rates()` shrank every year of a panel toward the earliest year's
+  global rate**, under a warning that said the other years were dropped though
+  every row came back. The empirical-Bayes prior is now estimated per year,
+  the design `spatial_lag()` already uses for a panel.
+* **`bubble_map()` drew a negative total as a bubble of its absolute value**
+  (France at -1.4e9 as large as China) and an infinite one as an infinite
+  bubble. `bubble_map()` and `spike_map()` now set negative and infinite values
+  aside with a warning and count them as missing; `spike_map()` used to drop
+  them and blame a missing centroid. A missing size on the polygon backend no
+  longer leaks ggplot2's "Removed 1 row" at print time.
+* **An infinite fill was counted as shown.** Every fill scale draws `Inf` as no
+  data, but the `footnote = "auto"` caption, `map_provenance()` and
+  `coverage_map()` counted it as present: "189 of 240 countries shown" over a
+  map showing 187. It now counts as missing everywhere, `na_style = "omit"` and
+  `"hatched"` treat it as the no-data it is drawn as, and the map verbs name
+  the countries holding one. `interactive_map(engine = "leaflet")` no longer
+  fails on one with leaflet's "Wasn't able to determine range of domain".
+* **`flow_map()` with a missing or infinite weight** leaked "Removed 50 rows",
+  or failed at print time with grid's "'lwd' must be non-negative and finite".
+  Those flows are dropped with a warning, as `flow_matrix()` drops them.
+  `cartogram_map()` and `dorling_map()` likewise name an infinite weight
+  instead of handing it to cartogram.
+* **`growth_rate(type = "yoy")` returned `Inf` and `NaN` after a zero**, where
+  every sibling verb gives `NA` for a zero denominator. It now gives `NA`, with
+  a warning.
+* **A row with a missing `year` was treated as the latest year.**
+  `lag_by_country()`, `diff_by_country()` and `growth_rate()` gave it a value
+  computed from the last real year, `beta_convergence()` dropped its whole
+  country, `sigma_convergence()` and `share_of_world()` reported a phantom `NA`
+  year, and `interpolate_missing()` crashed on it, and could have overwritten
+  an undated observed value with `NA`. Undated rows are now left out of
+  anything that needs a position in time.
+* **`complete_years(method = "locf")` carried values in row order**, not time
+  order, when the data held years outside `years`, and returned the frame out
+  of order.
+* **The United Kingdom left the EU a day early.** `country_groups_history`
+  reads `to` as the first day of non-membership (Austria left EFTA and joined
+  the EU on 1995-01-01), but the UK's exit was recorded as 2020-01-31, its last
+  day as a member. It is now 2020-02-01, and the column's help states the
+  convention.
+* **`projection_distortion()` measured a WGS84 projection against a sphere.**
+  Equal Earth read between 0.9955 and 1.009 instead of 1, and Mercator showed
+  up to 0.38 degrees of angular distortion, contradicting both checks its
+  documentation offers. It now uses the ellipsoid's radii of curvature and
+  central differences: Equal Earth, Gall-Peters and the Lambert azimuthals read
+  1, Mercator 0, and the 0.7% that Mollweide and Eckert IV show (PROJ applies
+  their spherical formulas to the ellipsoid) is documented.
+* **`theil(na.rm = FALSE)` broke its own decomposition on a missing group.**
+  The row stayed in `total` and fell out of both components, so `total` no
+  longer equalled `between + within`. It now returns `NA`, as it already does
+  for a missing value under `na.rm = FALSE`.
+* **Reports that said something false.** `country_timeline()` warned that
+  "Tanganyika", "Zanzibar" and the "United Arab Republic" matched nothing while
+  returning their history. `audit_time_coverage()` returned a phantom all-`NA`
+  row for an unreadable year, and now names the dissolved codes it flags.
+  `compare_sources()` kept unresolved keys as `iso3c = NA` rows, counted them
+  in `only_x`/`only_y`, and called two of them "a duplicate country".
+  `index_to()` and `deflate()` reported two unidentified countries as "1
+  country: NA". `world_table()` gave tied values different ranks.
+  `country_join()` and `country_join_all()` warned that `iso3c` was "replaced"
+  when it was the join column itself. `subnational_map(projection = )` printed
+  raw cli markup and advised `geometry = "sf"`. `audit_coverage()` left a blank
+  code out of `unmatched`, and `check_dispute_coverage()` listed `NA` and
+  repeated values as bad codes.
+* **Inputs accepted and then failed somewhere else.** A numeric `region` that
+  is not a four-number box (`region = 250`) drew an empty map, and a reversed
+  box was accepted. Custom `country_weights()` codes were taken verbatim, so
+  lowercase ones made every statistic report "Not enough connected countries"
+  with advice about islands; they are normalised, and codes that differ only in
+  case are now named as the key problem they are. `spatial_lag()` on a panel
+  aborted entirely when one year was too sparse. `deflate()`, `to_ppp()` and
+  `rate_check(rate = )` did not check that their value column was numeric, and
+  `per_capita()`, `to_ppp()` and `add_indicator()` leaked dplyr's join-type
+  error for a character `year`. `value_by_alpha_map()` drew a character
+  `value` as categories labelled "quantile". `classify_compare()`,
+  `projection_compare()` and `od_map()` died on "factor level [2] is
+  duplicated" for a repeated method, projection or origin.
+  `country_join_all(by = iso3c)` gave "object 'iso3c' not found".
+  `historical_geometry(Inf)` failed inside `as.Date()`, `locate_country()` on
+  zero points leaked four base R warnings, and
+  `as_ggsql_source(format = "parquet")` left its connection open when the
+  write failed.
+
 * **`interactive_map(engine = "leaflet")` hard-wired a numeric colour scale.**
   A discrete fill reached `leaflet::colorNumeric()` and died inside leaflet
   with "Wasn't able to determine range of domain" -- the same defect
@@ -2751,18 +2854,18 @@ A major release that wires countryatlas into the database-rendering world via
 by auditing 1.0.0. The version is bumped to 2.0.0 because the bug fixes change
 the output of `world_map()` (quantile binning), `bubble_map()` / `flow_map()`
 (de-duplicated symbols), `geom_country_labels()` (label placement) and
-`convert_country()` (override-only entities) — code that depended on the old
+`convert_country()` (override-only entities), so code that depended on the old
 behaviour may see different maps or values.
 
 ## New: database-side rendering with ggsql
 
 * `as_ggsql_source()` exports a curated, ISO-reconciled, WDI-joined table (with
-  `sf` geometry WKB-encoded) as a [ggsql](https://ggsql.org) source — a DuckDB
+  `sf` geometry WKB-encoded) as a [ggsql](https://ggsql.org) source: a DuckDB
   connection, a Parquet file, or a nanoarrow stream. countryatlas does the
   reconciliation ggsql's static bundled world can't; ggsql does the database
   push-down and Vega-Lite output countryatlas doesn't.
 * `world_query()` emits a `ggsql` spatial query (`VISUALISE … DRAW spatial
-  PROJECT TO … SCALE … LABEL …`) — a dependency-free string builder.
+  PROJECT TO … SCALE … LABEL …`), a dependency-free string builder.
 * `interactive_map(engine = "ggsql")` registers the data and renders the map in
   DuckDB, returning a Vega-Lite widget.
 * `ggsql`, `duckdb`, `DBI` and `nanoarrow` are optional `Suggests`. See the new
@@ -2770,61 +2873,61 @@ behaviour may see different maps or values.
 
 ## New: maps, projections and helpers
 
-* `globe_map()` — an orthographic globe choropleth, with `backend = "sf"`
+* `globe_map()`: an orthographic globe choropleth, with `backend = "sf"`
   (smoothest limb) or `backend = "polygon"` (needs only `maps` + `mapproj`).
-* `spin_globe()` — a rotating-globe animated GIF (one `globe_map()` frame per
+* `spin_globe()`: a rotating-globe animated GIF (one `globe_map()` frame per
   central longitude, assembled with `gifski` or `magick`).
-* `facet_map()` — small-multiple choropleths (the static counterpart to
+* `facet_map()`: small-multiple choropleths (the static counterpart to
   `animate_world()`).
 * `wdj_crs()` gains eight projections (`mercator`, `winkel_tripel`, `eckert4`,
   `gall_peters`, `orthographic`, `azimuthal_equal_area`, `north_polar`,
   `south_polar`); `world_map()` / `world_geometry()` accept them all.
-* `locate_country()` — point-in-polygon lookup tagging `lon`/`lat` with `iso3c`.
-* `repair_country_names()` — the "act on it" companion to
+* `locate_country()`: point-in-polygon lookup tagging `lon`/`lat` with `iso3c`.
+* `repair_country_names()`: the "act on it" companion to
   `check_country_match()`: auto-applies confident string-distance fixes.
-* `country_join_all()` — reduce-join many messy country tables on the ISO spine.
-* `growth_rate()`, `index_to()`, `share_of_world()` — panel analysis helpers.
-* `country_overrides()` — preferred name for `wdj_overrides()` (kept as an
+* `country_join_all()`: reduce-join many messy country tables on the ISO spine.
+* `growth_rate()`, `index_to()`, `share_of_world()`: panel analysis helpers.
+* `country_overrides()`: preferred name for `wdj_overrides()` (kept as an
   alias) after the rename to countryatlas.
 * `country_groups_tbl` gains `Mercosur`, `GCC`, `Nordic` and `Visegrad`.
-* `country_borders()` — a tidy adjacency edge list built from polygon topology
+* `country_borders()`: a tidy adjacency edge list built from polygon topology
   (`sf::st_touches()`), with `neighbors()` for a vectorised per-country lookup.
-* `distance_between()` — great-circle (haversine) distance between two
+* `distance_between()`: great-circle (haversine) distance between two
   countries' centroids; needs neither `sf` nor the network.
-* `dorling_map()` — the Dorling cartogram promoted to a first-class verb, with
+* `dorling_map()`: the Dorling cartogram promoted to a first-class verb, with
   `k`/`itermax` tuning; `cartogram_map()` itself gains `...` passthrough to the
   underlying `cartogram::cartogram_*()` call.
 
 ## New: historical entities, inequality and spatial statistics
 
-* `historical_codes` — a curated, dated crosswalk of dissolved entities
+* `historical_codes`: a curated, dated crosswalk of dissolved entities
   (Soviet Union, Yugoslavia, Czechoslovakia, East Germany, Netherlands
   Antilles, North/South Yemen, pre-2011 Sudan, United Arab Republic,
   Tanganyika/Zanzibar, North/South Vietnam, Serbia and Montenegro) to their
   successor states, with retired ISO codes where they existed. Kosovo is
   included among the Yugoslav successors on a territory basis (documented).
-* `dissolve_country()` — resolve a mixed vector of historical *and* modern
+* `dissolve_country()`: resolve a mixed vector of historical *and* modern
   names to successor `iso3c` rows (one-to-many, dated); modern names pass
   through as single rows, so a whole messy column pipes in unchanged.
 * `check_country_match()` gains a `historical` column. It flags dissolved
-  entities **even when countrycode "matches" them** — the headline case is
+  entities **even when countrycode "matches" them**. The headline case is
   `"USSR"`, which countrycode silently resolves to Russia's `RUS`, so
   Soviet-era data becomes Russian data with no warning.
-* `correlate_indicators()` — pairwise indicator correlations on the spine
+* `correlate_indicators()`: pairwise indicator correlations on the spine
   (pearson/spearman, pairwise-complete, per-pair `n`), tidy long output.
-* `beta_convergence()` / `sigma_convergence()` — the two standard convergence
+* `beta_convergence()` / `sigma_convergence()`: the two standard convergence
   diagnostics: the growth-on-initial-level regression (with implied
   convergence speed and half-life) and per-year cross-country dispersion.
-* `gini()` and `theil()` — inequality across countries, population-weightable;
+* `gini()` and `theil()`: inequality across countries, population-weightable;
   `theil()` decomposes exactly into between/within components when a grouping
   (continent, income) is supplied.
-* `lag_by_country()` / `diff_by_country()` — panel lag and difference grouped
+* `lag_by_country()` / `diff_by_country()`: panel lag and difference grouped
   by `iso3c` and ordered by `year`, completing the panel toolkit around
   `growth_rate()` / `index_to()` / `complete_years()`.
-* `morans_i()` — global Moran's I with a permutation pseudo-p-value, computed
+* `morans_i()`: global Moran's I with a permutation pseudo-p-value, computed
   on the row-standardised `country_borders()` adjacency. No `spdep`
   dependency: the weights come from the package's own curated topology.
-* `spike_map()` — triangular spikes at country centroids (height ∝ value), the
+* `spike_map()`: triangular spikes at country centroids (height ∝ value), the
   overplotting-resistant cousin of `bubble_map()`; needs only `maps`.
 * `convert_country()` accepts `to = "name_<lang>"` (`"name_fr"`, `"name_es"`,
   `"name_zh"`, …) for localized country names via countrycode's CLDR tables.
@@ -2934,7 +3037,7 @@ behaviour may see different maps or values.
   base map (off the map). The base map and bubbles now share one projected CRS
   via `coord_sf()`.
 * Polygon centroids returned more than one row for ten `iso3c` codes (overrides
-  map several names — Azores/Madeira → PRT — to one code), fanning out joins in
+  map several names, such as Azores/Madeira → PRT, to one code), fanning out joins in
   `bubble_map()` / `flow_map()`. Centroids are now one antimeridian-safe row per
   country (the largest piece).
 * `geom_country_labels()` placed labels at the bounding-box midpoint over all of
@@ -2949,13 +3052,13 @@ behaviour may see different maps or values.
   derives every other destination from that.
 * Kosovo's `XKX` needed extra care: it has no row at all in
   `countrycode::codelist`, so deriving destinations purely via the `iso3c`
-  round-trip above is `NA` for everything — which would have *regressed*
+  round-trip above is `NA` for everything, which would have *regressed*
   `flag`/`region`/`country`, since 1.0.0 already resolved those via direct
   name matching (verified against the actual 1.0.0 code). `convert_country()`
   now recovers from the original name when the `iso3c` round-trip comes back
   empty, and fills `iso2c`/`continent` (which neither path classifies) from
   the same curated fallback `standardize_country()` uses. Net effect versus
-  1.0.0: zero regressions, plus newly-working `continent`/`iso2c` for Kosovo —
+  1.0.0: zero regressions, plus newly-working `continent`/`iso2c` for Kosovo,
   which also fixes `locate_country(..., add = "continent")` for points inside
   it.
 * `interactive_map(..., tooltip = )` was accepted but silently ignored by every
@@ -3830,7 +3933,7 @@ behaviour may see different maps or values.
   skipping in that configuration; they now share a `skip_if_no_sf_geometry()`
   helper.
 * New hex logo, drawn by the package itself (`data-raw/hex_logo.R`): an
-  orthographic globe — `globe_map()`'s projection — carrying a viridis
+  orthographic globe (`globe_map()`'s projection) carrying a viridis
   choropleth of `world_snapshot` GDP per capita on Natural Earth geometry
   joined by `attach_geometry()`, with `spike_map()`-style population spikes
   rising off the horizon and the binned-legend swatches under the wordmark.
@@ -4091,8 +4194,8 @@ behaviour may see different maps or values.
 
 A single, comprehensive release that takes the package from a one-function proof
 of concept to a complete toolkit for joining world data to maps. The spirit is
-unchanged — *ISO codes as the universal join key, one call to a map-ready
-table* — but pushed to its full potential.
+unchanged (*ISO codes as the universal join key, one call to a map-ready
+table*) but pushed to its full potential.
 
 ## Breaking-ish changes
 
@@ -4112,8 +4215,8 @@ table* — but pushed to its full potential.
 * `world_data()` gains `indicator` (one or many WDI codes; named vectors drive
   clean column names), multi-year **panels**, an `sf` backend
   (`geometry = "sf"`), `region` subsetting, `latest`, projections and caching.
-* `country_data()` — the lightweight, one-row-per-country analysis table.
-* `world_geometry()` — projected, region-subset geometry (countries, centroids,
+* `country_data()`: the lightweight, one-row-per-country analysis table.
+* `world_geometry()`: projected, region-subset geometry (countries, centroids,
   coastline, borders, graticule, ocean).
 
 ## New: the join engine (exposed for *your* data)
@@ -4122,7 +4225,7 @@ table* — but pushed to its full potential.
 
 ## New: diagnostics
 
-* `check_country_match()`, `wdj_overrides()`, `audit_coverage()` — never lose a
+* `check_country_match()`, `wdj_overrides()`, `audit_coverage()`: never lose a
   country silently.
 
 ## New: reference data & translation

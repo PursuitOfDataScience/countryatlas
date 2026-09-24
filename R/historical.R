@@ -114,7 +114,10 @@ dissolve_country <- function(x, warn = TRUE) {
   out <- dplyr::bind_rows(out)
 
   if (isTRUE(warn)) {
-    miss <- unique(out$input[is.na(out$iso3c)])
+    # A missing input is not a name that failed to match: it came back as
+    # `NA` in the "matched neither" list, as country_timeline() did, while
+    # standardize_country() and convert_country() leave it unreported.
+    miss <- unique(out$input[is.na(out$iso3c) & !is.na(out$input)])
     if (length(miss)) {
       wdj_warn(c(
         "{length(miss)} name{?s} matched neither a historical entity nor a modern country:",

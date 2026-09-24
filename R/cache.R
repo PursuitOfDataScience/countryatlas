@@ -120,6 +120,10 @@ wdj_disk_cache <- function() {
   size <- getOption("countryatlas.cache_max_size", 50L * 1024L^2)
   cache <- tryCatch(
     cachem::cache_disk(dir, max_age = age, max_size = size, evict = "lru",
+                       # See WDJ_CACHE_EXT: cachem expires, evicts and resets by
+                       # extension, so the extension is what keeps it to our
+                       # own files.
+                       extension = WDJ_CACHE_EXT,
                        # A pruned entry must not be an error: it just means the
                        # next call re-fetches.
                        missing = cachem::key_missing()),
@@ -130,15 +134,46 @@ wdj_disk_cache <- function() {
   cache
 }
 
-# memoise::cache_filesystem() wrote one extensionless file per key; cachem
-# stores <key>.rds and prunes only what it recognises, so entries written by
-# earlier versions would sit in the directory for ever -- the exact "outdated
-# material" the policy is about. Sweep them once. They are re-fetchable, so
-# losing them costs a download, and the write probe is ours too.
+# The extension of this package's cache entries. cachem ages out, evicts and
+# resets every file in the directory that carries its extension, and the
+# directory is the caller's to choose (options(countryatlas.cache_dir = )
+# is documented for exactly that), so under the default ".rds" a cache
+# pointed at a folder that also held the caller's own .rds files would delete
+# those after 30 days, or sooner under the size cap. Nothing else writes this
+# extension.
+WDJ_CACHE_EXT <- ".countryatlas"
+
+# The files this cache has written, and only those: entries are named by
+# memoise's hash (32 hexadecimal digits) plus WDJ_CACHE_EXT, "<hash>.rds" from
+# the 3.0.0 development builds that used cachem's default extension, and a
+# bare "<hash>" from memoise::cache_filesystem() in 2.0.x; plus the write
+# probe. Matching the *shape* of the name is the point: anything else in the
+# directory may be the caller's.
+wdj_cache_files <- function(dir, legacy_only = FALSE) {
+  ext <- gsub(".", "\\.", WDJ_CACHE_EXT, fixed = TRUE)
+  pattern <- if (legacy_only) {
+    "^[0-9a-f]{32,128}(\\.rds)?$"
+  } else {
+    paste0("^([0-9a-f]{32,128}(\\.rds|", ext, ")?|\\.countryatlas-write-probe)$")
+  }
+  files <- list.files(dir, pattern = pattern, all.files = TRUE,
+                      full.names = TRUE)
+  files[!dir.exists(files)]
+}
+
+# Entries from earlier versions, which cachem (keyed on the extension above)
+# does not recognise and so would never prune, the "outdated material" CRAN's
+# cache policy is about. Swept once per cache construction; they are
+# re-fetchable, so losing them costs a download.
+#
+# By the shape of the name, not "every file that is not ours": this used to
+# delete every file in the directory without an .rds extension, which was
+# harmless in the package's own R_user_dir() folder and destroyed the caller's
+# files in any other: the first cached fetch after pointing
+# countryatlas.cache_dir at a project folder deleted every non-.rds file in
+# it.
 prune_legacy_cache <- function(dir) {
-  files <- list.files(dir, all.files = TRUE, no.. = TRUE, full.names = TRUE)
-  files <- files[!dir.exists(files)]
-  legacy <- files[!grepl("\\.rds$", files, ignore.case = TRUE)]
+  legacy <- wdj_cache_files(dir, legacy_only = TRUE)
   if (length(legacy)) unlink(legacy)
   invisible(length(legacy))
 }
@@ -195,6 +230,11 @@ get_fetch_fun <- function(cache = TRUE) {
 #' cache moves to the session temp directory, so a check never writes to the
 #' user's file space.
 #'
+#' The directory may hold other files too. The cache only ever writes, expires
+#' and deletes its own entries (named by a hash, with the extension
+#' `.countryatlas`), and `disk = TRUE` removes the directory itself only when
+#' that leaves it empty.
+#'
 #' @section How the cache is managed:
 #' The persistent cache expires its own contents, so it does not grow without
 #' bound and does not serve stale figures indefinitely: an entry is dropped
@@ -233,7 +273,16 @@ clear_wdi_cache <- function(disk = FALSE) {
   .wdj_state$fetch_memo <- NULL
   if (isTRUE(disk)) {
     dir <- wdj_cache_dir()
-    if (dir.exists(dir)) unlink(dir, recursive = TRUE)
+    # The cache's own files, then the directory only if that leaves it empty.
+    # This was unlink(dir, recursive = TRUE): with countryatlas.cache_dir set
+    # to a folder the caller also used, "delete the persistent cache" deleted
+    # the folder, every file in it and every subdirectory below it.
+    if (length(dir) && nzchar(dir) && dir.exists(dir)) {
+      unlink(wdj_cache_files(dir))
+      if (!length(list.files(dir, all.files = TRUE, no.. = TRUE))) {
+        unlink(dir, recursive = TRUE)
+      }
+    }
   }
   invisible(TRUE)
 }

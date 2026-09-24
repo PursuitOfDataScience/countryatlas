@@ -287,13 +287,21 @@ world_map <- function(data, fill,
     }
   }
 
+  # An infinity has no colour on any scale: ggplot2 paints it in `na.value`
+  # and cut() puts it in no class, so it is drawn as no data. It is counted
+  # that way below; say so here, because a country holding a real-looking
+  # value that comes out grey is otherwise baffling. It is nearly always a
+  # division by zero upstream.
+  warn_infinite_fill(data, fill_name)
   # Coverage is counted before anything is dropped, so `na_style = "omit"` still
   # reports honestly on what it removed.
   coverage <- na_coverage(data, fill_name)
   # Kept for the VSUP recount below, which has to run against the frame as it
   # arrived rather than whatever `na_style = "omit"` leaves behind.
   data_full <- data
-  missing_rows <- is.na(data[[fill_name]])
+  # has_value(), so "omit" and "hatched" treat an infinity as the no-data it is
+  # drawn as, rather than leaving it grey among the hatched or omitted ones.
+  missing_rows <- !has_value(data[[fill_name]])
   if (identical(na_style, "omit")) data <- data[!missing_rows, , drop = FALSE]
 
   # A value-suppressing uncertainty palette replaces the ordinary fill entirely:
@@ -327,7 +335,7 @@ world_map <- function(data, fill,
     # claim that footnote exists to keep honest.
     coverage <- na_coverage(
       data_full, fill_name,
-      shown = !is.na(data_full[[fill_name]]) & is.finite(data_full[[unc_name]]))
+      shown = has_value(data_full[[fill_name]]) & is.finite(data_full[[unc_name]]))
     lost <- setdiff(coverage$missing_iso3c,
                     na_coverage(data_full, fill_name)$missing_iso3c)
     if (length(lost)) {
@@ -490,7 +498,10 @@ na_coverage <- function(data, fill_name, shown = NULL) {
   # where provenance could name only 16.
   if ("iso3c" %in% names(df)) df <- df[!is.na(df$iso3c), , drop = FALSE]
   key <- wdj_unit_key(names(df))
-  ok <- if (is.null(shown)) !is.na(df[[fill_name]]) else df[[".wdj_shown"]]
+  # has_value(), not !is.na(): an infinite value is drawn in the no-data grey
+  # by every scale here, so counting it as shown made the caption read "189 of
+  # 240 countries shown" over a map showing 187.
+  ok <- if (is.null(shown)) has_value(df[[fill_name]]) else df[[".wdj_shown"]]
   if (length(key)) {
     # Counted once per country, as imputed_count() does, and by "has a value in
     # any of its rows" rather than distinct()'s first row. On the map-ready
@@ -513,6 +524,40 @@ na_coverage <- function(data, fill_name, shown = NULL) {
   }
   list(n_total = length(ok), n_shown = sum(ok), n_missing = sum(!ok),
        missing_iso3c = if ("iso3c" %in% names(df)) sort(df$iso3c[!ok]) else character(0))
+}
+
+# Name the countries whose fill is infinite: they are drawn as no data and
+# counted as missing, and the reason is otherwise invisible. Counted once per
+# country, since the polygon backend repeats the value down every vertex.
+warn_infinite_fill <- function(data, fill_name) {
+  v <- data[[fill_name]]
+  if (!is.numeric(v)) return(invisible(NULL))
+  inf <- is.infinite(v)
+  if (!any(inf)) return(invisible(NULL))
+  df <- sf_drop(data)
+  who <- if ("iso3c" %in% names(df)) {
+    sort(unique(unit_label(df[inf, , drop = FALSE])))
+  } else character(0)
+  # Two whole templates rather than one with the noun spliced in: cli does not
+  # re-interpolate a substituted value, so a spliced "{?y/ies}" would print as
+  # literal braces.
+  if (length(who)) {
+    n <- length(who)
+    head_msg <- "{n} countr{?y/ies} ha{?s/ve} an infinite {.field {fill_name}},
+                 drawn as no data:"
+  } else {
+    n <- sum(inf)
+    head_msg <- "{n} row{?s} ha{?s/ve} an infinite {.field {fill_name}}, drawn
+                 as no data."
+  }
+  wdj_warn(c(
+    head_msg,
+    if (length(who)) c("*" = "{.val {utils::head(who, 8)}}"),
+    "i" = "No colour scale can place an infinity; it is usually a division
+           by zero upstream. It is counted as missing in the caption and in
+           {.fn map_provenance}."
+  ), class = "countryatlas_infinite_fill")
+  invisible(NULL)
 }
 
 # A frame that already carries centroid_lon/centroid_lat -- the output of
@@ -600,8 +645,12 @@ centroid_coverage <- function(data, value_name, drawn_iso,
   # for. "A correct call to any verb is completely silent" holds for the six
   # pre-CRAN warning sites it was written about; a country the lookup cannot
   # place is information, not noise, and its sibling verb already says so.
-  shown <- data$iso3c %in% drawn_iso & !is.na(data[[value_name]])
-  lost <- sort(data$iso3c[!is.na(data[[value_name]]) & !data$iso3c %in% drawn_iso])
+  # has_value(): a value the verb cannot draw (an infinity, or a size the
+  # caller's verb has already set aside) is not shown, and it is not a missing
+  # centroid either, and blaming the lookup for it named the wrong cause.
+  present <- has_value(data[[value_name]])
+  shown <- data$iso3c %in% drawn_iso & present
+  lost <- sort(data$iso3c[present & !data$iso3c %in% drawn_iso])
   if (length(lost)) {
     wdj_warn(c(
       "{.field {value_name}}: {length(lost)} countr{?y/ies} {?is/are} not
@@ -612,6 +661,27 @@ centroid_coverage <- function(data, value_name, drawn_iso,
     ), class = "countryatlas_no_centroid")
   }
   na_coverage(data, value_name, shown = shown)
+}
+
+# Set aside the values a size-encoded mark cannot show: negative (an area or a
+# height has no negative) and infinite. They become NA on this internal copy,
+# so the drawing skips them and the coverage counts them as missing, and the
+# countries are named once here so the reason is not left to be guessed.
+drop_unusable_sizes <- function(data, col, mark) {
+  v <- data[[col]]
+  bad <- !is.na(v) & !(is.finite(v) & v >= 0)
+  if (!any(bad)) return(data)
+  who <- sort(unit_label(data[bad, , drop = FALSE]))
+  wdj_warn(c(
+    "{length(who)} countr{?y/ies} ha{?s/ve} a negative or infinite
+     {.field {col}} and {cli::qty(length(who))}{?gets/get} no {mark}:",
+    "*" = "{.val {utils::head(who, 8)}}",
+    "i" = "A {mark} encodes a non-negative total; drawing the absolute value
+           would misstate it. {cli::qty(length(who))}{?It is/They are} counted
+           as missing in {.fn map_provenance}."
+  ), class = "countryatlas_unusable_size")
+  data[[col]][bad] <- NA
+  data
 }
 
 # Drop sf geometry for counting without requiring sf to be attached.
@@ -648,7 +718,7 @@ na_hatch_layer <- function(data, fill_name, sf_mode, borders) {
     )
     return(NULL)
   }
-  nd <- data[is.na(data[[fill_name]]), , drop = FALSE]
+  nd <- data[!has_value(data[[fill_name]]), , drop = FALSE]
   if (!nrow(nd)) return(NULL)
   common <- list(
     data = nd, fill = "grey93", pattern = "stripe",
@@ -963,6 +1033,11 @@ bubble_map <- function(data, size, color = NULL, projection = "equal_earth",
   # from country_meta centroids, and long/lat/group are ordinary columns that
   # sf_drop() does not touch.
   data <- distinct_countries(tibble::as_tibble(sf_drop(data)))
+  # A bubble's area is the value, and scale_size_area() draws the *absolute*
+  # value: France at -1.4e9 came out as big a bubble as China, and an infinite
+  # value as an infinite one. Neither is a total a bubble can show, so they
+  # are set aside, said here, and counted as missing below.
+  data <- drop_unusable_sizes(data, size_name, "bubble")
 
   if (backend == "sf") {
     need_pkg("sf", "for bubble_map(backend = \"sf\")")
@@ -1014,8 +1089,12 @@ bubble_map <- function(data, size, color = NULL, projection = "equal_earth",
   cov <- centroid_coverage(data, size_name, pts$iso3c[
     !is.na(pts$centroid_lon) & !is.na(pts$centroid_lat)])
   # Drop them here rather than handing ggplot2 a point at (NA, NA): the warning
-  # above says which countries and why, which "Removed 5 rows" does not.
-  pts <- pts[!is.na(pts$centroid_lon) & !is.na(pts$centroid_lat), , drop = FALSE]
+  # above says which countries and why, which "Removed 5 rows" does not. A
+  # missing size goes too, as it does on the sf path: geom_point() otherwise
+  # announced "Removed 1 row containing missing values" at print time, a
+  # count with no names for a country the coverage already reports.
+  pts <- pts[!is.na(pts$centroid_lon) & !is.na(pts$centroid_lat) &
+               !is.na(pts[[size_name]]), , drop = FALSE]
   p <- ggplot2::ggplot() +
     ggplot2::geom_polygon(
       data = world_geometry("countries", geometry = "polygon"),
@@ -1072,10 +1151,15 @@ spike_map <- function(data, height, max_height = 20, width = 1.6,
   check_number(width, "width", lo = 0)
   check_number(alpha, "alpha", lo = 0, hi = 1)
   data <- drop_centroid_cols(distinct_countries(tibble::as_tibble(data)))
+  # Negative and infinite heights were filtered out below in silence, and the
+  # coverage warning then listed those countries as having "no bundled
+  # centroid": the wrong reason, for countries whose centroid is right there.
+  # Set them aside with their own message first, as bubble_map() does.
+  data <- drop_unusable_sizes(data, h_name, "spike")
   cent <- world_geometry("centroids", geometry = "polygon")
   pts <- dplyr::inner_join(data, cent[, c("iso3c", "centroid_lon", "centroid_lat")],
                            by = "iso3c", na_matches = "never")
-  pts <- pts[is.finite(pts[[h_name]]) & pts[[h_name]] >= 0, ]
+  pts <- pts[!is.na(pts[[h_name]]), ]
   if (!nrow(pts)) {
     wdj_abort("No rows with a non-negative {.val {h_name}} joined to a centroid.")
   }
@@ -1152,6 +1236,13 @@ bivariate_map <- function(data, fill_x, fill_y, palette = "GrPink", dim = 3,
   # negative subscripts" -- which says nothing about the data. Note this bites
   # a *joined* frame too: attach_geometry() keeps every geometry row, so an
   # empty input arrives here as full-length columns of NA.
+  # An infinity cannot be classified (biscale's quantile breaks would take
+  # it as a bound), so, as in world_map(), it is named, then treated as the
+  # missing value it is drawn as.
+  for (nm in c(x_name, y_name)) {
+    warn_infinite_fill(data, nm)
+    data[[nm]][is.infinite(data[[nm]])] <- NA
+  }
   if (!any(!is.na(data[[x_name]]) & !is.na(data[[y_name]]))) {
     wdj_abort(c(
       "No country has both {.val {x_name}} and {.val {y_name}}.",
@@ -1208,7 +1299,7 @@ bivariate_map <- function(data, fill_x, fill_y, palette = "GrPink", dim = 3,
   # drawn as no-data. Coverage counted on x alone called it shown -- the same
   # overstatement the VSUP path made, in a different verb.
   cov <- na_coverage(data, x_name,
-                     shown = !is.na(data[[x_name]]) & !is.na(data[[y_name]]))
+                     shown = has_value(data[[x_name]]) & has_value(data[[y_name]]))
   lost <- setdiff(cov$missing_iso3c, na_coverage(data, x_name)$missing_iso3c)
   if (length(lost)) {
     wdj_warn(c(
@@ -1292,17 +1383,25 @@ cartogram_map <- function(data, weight, type = c("contiguous", "dorling",
   # computed on the survivors -- so n_total shrank to match and the map claimed
   # near-complete coverage of a world it had quietly cut down. Measure coverage
   # against the frame as it arrived, and say what could not be sized.
-  keep <- !is.na(data[[w_name]]) & data[[w_name]] > 0
+  # is.finite(), not !is.na(): an infinite weight passed this filter and
+  # reached cartogram, which rejected the whole frame as "all sizes are missing
+  # and/or non-positive", naming neither the country nor the column.
+  keep <- is.finite(data[[w_name]]) & data[[w_name]] > 0
   full_cov <- na_coverage(sf_drop(data), fill_name,
-                          shown = keep & !is.na(data[[fill_name]]))
+                          shown = keep & has_value(data[[fill_name]]))
+  # The baseline is "has a value at all", not has_value(): an infinite weight
+  # is exactly the case this warning is for, and has_value() would already
+  # have counted it missing, leaving the country off without a word.
   lost <- setdiff(full_cov$missing_iso3c,
-                  na_coverage(sf_drop(data), fill_name)$missing_iso3c)
+                  na_coverage(sf_drop(data), fill_name,
+                              shown = !is.na(data[[fill_name]]))$missing_iso3c)
   # Only when something survives: if nothing does, the abort below says it
   # better on its own, and warning first just doubles the message.
   if (length(lost) && any(keep)) {
     wdj_warn(c(
-      "{length(lost)} countr{?y/ies} ha{?s/ve} no positive {.field {w_name}} and
-       cannot be sized, so the cartogram leaves them off:",
+      "{length(lost)} countr{?y/ies} ha{?s/ve} no finite, positive
+       {.field {w_name}} and cannot be sized, so the cartogram leaves
+       {cli::qty(length(lost))}{?it/them} off:",
       "*" = "{.val {utils::head(lost, 8)}}",
       "i" = "A cartogram's area *is* the weight; there is no area to give a
              country the weight is missing for."
@@ -1315,7 +1414,7 @@ cartogram_map <- function(data, weight, type = c("contiguous", "dorling",
   if (!nrow(data)) {
     wdj_abort(c(
       "No country has a positive {.val {w_name}} to size a cartogram by.",
-      "i" = "Cartogram weights must be present and greater than zero."
+      "i" = "Cartogram weights must be finite and greater than zero."
     ))
   }
   carto <- switch(
@@ -1449,6 +1548,8 @@ tile_map <- function(data, fill, label = TRUE) {
   # Deduplicated once and reused below: calling distinct_countries() a second
   # time for the coverage would emit its panel warning twice for one call.
   one_per_country <- distinct_countries(tibble::as_tibble(data))
+  # An infinity draws as no data here too; see world_map().
+  warn_infinite_fill(one_per_country, fill_name)
   # The grid supplies `row` and `col`, and those are common enough column names
   # that a caller's frame may carry its own. They collided in the join below:
   # dplyr suffixed both sides to `.x`/`.y`, and aes(.data$col, -.data$row) then
@@ -1588,6 +1689,23 @@ flow_map <- function(data, from, to, weight = NULL, origin = "country.name",
       "i" = "Unrecognised names give no arc. Check {.arg origin} -- iso3c codes
              need {.code origin = \"iso3c\"} -- or use {.fn check_country_match}."
     ))
+  }
+  # A weight the scales cannot place: NA drew as ggplot2's "Removed 50 rows
+  # containing missing values" at print time, and an infinite one did not draw
+  # at all: grid refused the linewidth ("'lwd' must be non-negative and
+  # finite") when the plot was printed, long after this returned. Drop those
+  # arcs here and say so, the way flow_matrix() does for the same rows.
+  if (!rlang::quo_is_null(weight_q)) {
+    w_col <- quo_arg_name(weight_q, "weight")
+    bad_w <- keep & !is.finite(d[[w_col]])
+    if (any(bad_w)) {
+      wdj_warn(c(
+        "{sum(bad_w)} flow{?s} dropped: the weight is missing or infinite.",
+        "i" = "Both endpoints resolved; it is {.field {w_col}} that is
+               unusable."
+      ))
+      keep <- keep & !bad_w
+    }
   }
   d <- d[keep, ]
 
@@ -1805,6 +1923,19 @@ interactive_map <- function(data, fill, tooltip = NULL,
   # a clause it does not know, so gate on the version, not mere presence.
   need_pkg(engine, sprintf("for interactive_map(engine = \"%s\")", engine),
            version = if (identical(engine, "ggsql")) "0.4.1" else NULL)
+
+  # The three engines below that build their own colour scale meet an
+  # infinity without world_map()'s handling: leaflet's colorNumeric() died on
+  # "Wasn't able to determine range of domain", and the other two drew it as
+  # no data without a word. Say so as world_map() does, and hand them the
+  # no-data value it is.
+  if (engine %in% c("ggiraph", "leaflet", "mapgl")) {
+    fill_name0 <- quo_arg_name(fill_q, "fill")
+    if (fill_name0 %in% names(data) && is.numeric(data[[fill_name0]])) {
+      warn_infinite_fill(data, fill_name0)
+      data[[fill_name0]][is.infinite(data[[fill_name0]])] <- NA
+    }
+  }
 
   if (engine == "ggsql") {
     need_pkg(c("sf", "DBI", "duckdb"),
@@ -2352,6 +2483,8 @@ globe_map <- function(data, fill, lon = 0, lat = 20,
     }
     check_cols(data, fill_name)
     check_categorical_fill(style, data[[fill_name]], fill_name)
+    # An infinity draws as no data here too; see world_map().
+    warn_infinite_fill(data, fill_name)
     binned <- apply_binned_fill(data, fill_name, style, n_bins)
     data <- binned$data
     fill_mapped <- binned$fill
@@ -2380,6 +2513,7 @@ globe_map <- function(data, fill, lon = 0, lat = 20,
   }
   check_cols(data, fill_name)
   check_categorical_fill(style, data[[fill_name]], fill_name)
+  warn_infinite_fill(data, fill_name)
   binned <- apply_binned_fill(data, fill_name, style, n_bins)
   data <- binned$data
   fill_mapped <- binned$fill
@@ -2648,8 +2782,8 @@ gridded_cartogram <- function(data, value, cells = 1000, fill = NULL,
   # story, so do not warn first.
   if (any(!usable) && any(usable)) {
     wdj_warn(c(
-      "{sum(!usable)} countr{?y/ies} ha{?s/ve} no positive {.field {val_name}}
-       and get no cells:",
+      "{sum(!usable)} countr{?y/ies} ha{?s/ve} no finite, positive
+       {.field {val_name}} and {cli::qty(sum(!usable))}{?gets/get} no cells:",
       "*" = "{.val {utils::head(sort(df$iso3c[!usable]), 8)}}",
       "i" = "A gridded cartogram allocates cells in proportion to the value,
              so there is no share to give without one."

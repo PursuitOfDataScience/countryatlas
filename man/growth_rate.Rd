@@ -16,7 +16,9 @@ annual growth rate vs. the first non-\code{NA} year).
 \code{"cagr"} needs a positive ratio at both ends, so a negative value gives
 \code{NA} for that row (with a warning) and a non-positive base year gives \code{NA}
 for that country; a value of exactly \code{0} is a legitimate annualised -100\%.
-\code{"yoy"} is a plain ratio change and is defined for negative values.}
+\code{"yoy"} is a plain ratio change and is defined for negative values, but
+not after a zero: a change from \code{0} has no ratio, so that row is \code{NA}
+(with a warning) rather than \code{Inf}.}
 
 \item{suffix}{Suffix for the new column (default \code{"_growth"}).}
 }

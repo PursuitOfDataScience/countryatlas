@@ -169,6 +169,9 @@ projection_compare <- function(data, fill,
       "i" = "Available: {.val {known}}."
     ))
   }
+  # One panel per projection: a repeated name died on base R's "factor level
+  # [2] is duplicated" when the panels were labelled, as in classify_compare().
+  projections <- unique(projections)
 
   info <- projection_info()
   lab_of <- function(p) {
@@ -348,6 +351,14 @@ tissot_map <- function(projection = "equal_earth", spacing = 30,
 #' unbounded areal distortion. A compromise projection is bad at both by a
 #' little, everywhere, which is the trade it makes.
 #'
+#' Distortion is measured against the WGS84 ellipsoid, the datum every CRS the
+#' package builds is defined on. Equal Earth, Gall-Peters and the three Lambert
+#' azimuthal projections have ellipsoidal forms and read exactly 1. PROJ
+#' implements Mollweide and Eckert IV with their spherical formulas, so on this
+#' datum they are equal-area only to within about 0.7% (`"areal"` between
+#' 0.993 and 1.007): a property of the maps drawn here, and the kind of thing
+#' this check exists to show.
+#'
 #' @seealso [tissot_map()], [projection_info()], [projection_compare()]
 #' @export
 #' @examples
@@ -371,29 +382,49 @@ projection_distortion <- function(projection = "equal_earth",
   lats <- seq(-max_lat, max_lat, by = spacing)
   grid <- expand.grid(lon = lons, lat = lats)
 
-  # Finite-difference the projection at each point: step a small distance east
-  # and north, and read the local Jacobian off the projected offsets. Everything
-  # below -- area, angle, scale -- is a function of its singular values.
+  # Finite-difference the projection at each point: step a small distance
+  # either side, east-west and north-south, and read the local Jacobian off
+  # the projected offsets. Everything below (area, angle, scale) is a
+  # function of its singular values. Central differences, whose error is
+  # second order in the step: a one-sided step is first order, which is what
+  # showed near an azimuthal projection's antipode.
   eps <- 1e-3
-  base <- cbind(grid$lon, grid$lat)
-  east <- cbind(grid$lon + eps, grid$lat)
-  north <- cbind(grid$lon, grid$lat + eps)
-  pr <- function(m) {
-    p <- sf::st_as_sf(data.frame(x = m[, 1], y = m[, 2]),
+  pr <- function(lon, lat) {
+    p <- sf::st_as_sf(data.frame(x = lon, y = lat),
                       coords = c("x", "y"), crs = 4326L)
     sf::st_coordinates(quietly_sf(suppressWarnings(sf::st_transform(p, crs))))
   }
-  p0 <- pr(base); pe <- pr(east); pn <- pr(north)
+  # The grid starts on -180, where a westward step would wrap to +179.999 and
+  # land on the far edge of the map; take the step on the east side only
+  # there. (The grid stops short of +180 and of the poles, so no other step
+  # leaves the domain.)
+  lon_w <- pmax(grid$lon - eps, -180)
+  lon_e <- grid$lon + eps
+  dlon <- lon_e - lon_w
+  pe <- pr(lon_e, grid$lat); pw <- pr(lon_w, grid$lat)
+  pn <- pr(grid$lon, grid$lat + eps); ps <- pr(grid$lon, grid$lat - eps)
 
-  # Metres per degree on the sphere at this latitude, so the Jacobian is
-  # dimensionless (projected metres per ground metre) rather than per-degree.
+  # Metres per degree of the ground, so the Jacobian is dimensionless
+  # (projected metres per ground metre) rather than per-degree, on the WGS84
+  # ellipsoid, because that is the datum every CRS here is built on
+  # (wdj_crs() writes +datum=WGS84). Measured on a sphere instead, the ground
+  # and the map disagreed by the flattening alone: Equal Earth, which PROJ
+  # implements on the ellipsoid and which is exactly equal-area there, read as
+  # 0.9955-1.009, and Mercator showed up to 0.38 degrees of angular
+  # distortion, contradicting both of the checks the documentation below
+  # offers. M is the meridional radius of curvature and N the prime vertical.
   d2r <- pi / 180
-  mx <- EARTH_RADIUS_KM * 1000 * d2r * cos(grid$lat * d2r)
-  my <- EARTH_RADIUS_KM * 1000 * d2r
-  a <- (pe[, 1] - p0[, 1]) / (eps * mx)
-  b <- (pn[, 1] - p0[, 1]) / (eps * my)
-  cc <- (pe[, 2] - p0[, 2]) / (eps * mx)
-  d <- (pn[, 2] - p0[, 2]) / (eps * my)
+  wgs84_a <- 6378137
+  wgs84_e2 <- (1 / 298.257223563) * (2 - 1 / 298.257223563)
+  s2 <- sin(grid$lat * d2r)^2
+  big_n <- wgs84_a / sqrt(1 - wgs84_e2 * s2)
+  big_m <- wgs84_a * (1 - wgs84_e2) / (1 - wgs84_e2 * s2)^1.5
+  mx <- big_n * cos(grid$lat * d2r) * d2r
+  my <- big_m * d2r
+  a <- (pe[, 1] - pw[, 1]) / (dlon * mx)
+  b <- (pn[, 1] - ps[, 1]) / (2 * eps * my)
+  cc <- (pe[, 2] - pw[, 2]) / (dlon * mx)
+  d <- (pn[, 2] - ps[, 2]) / (2 * eps * my)
 
   det <- a * d - b * cc
   # Principal scale factors: the singular values of the 2x2 Jacobian. For a

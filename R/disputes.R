@@ -112,7 +112,10 @@ dispute_policy <- function(policy = NULL) {
 check_dispute_coverage <- function(data, quiet = FALSE) {
   check_bool(quiet, "quiet")
   iso <- if (is.character(data)) {
-    data
+    # Missing and repeated values out first, as the data-frame branch below
+    # does: a vector with an NA reported "NA" among the values that are "not
+    # an ISO code", and a repeated bad value was listed, and counted, twice.
+    unique(stats::na.omit(data))
   } else if (is.data.frame(data)) {
     if (!"iso3c" %in% names(data)) {
       wdj_abort("{.arg data} must contain an {.field iso3c} column.")
@@ -372,9 +375,15 @@ fill_capped <- function(x, y, method, max_gap) {
   # about. A non-numeric year (read.csv gives "2000", and this verb otherwise
   # tolerates it) falls back to the row count rather than erroring.
   r <- rle(na)
-  keep <- rep(TRUE, length(y))
+  # A row with no year has no place in the series, so nothing is carried or
+  # interpolated into it: sorted last, "locf" filled it from the latest real
+  # year and flagged the result as imputed.
+  keep <- !is.na(x)
   xn <- suppressWarnings(as.numeric(as.character(x)))
-  if (anyNA(xn)) xn <- NULL
+  # Only a year that is present and unreadable disables the span check. A
+  # missing one used to as well, silently switching the whole series from
+  # "years between observations" back to a row count.
+  if (anyNA(xn[!is.na(x)])) xn <- NULL
   pos <- 1L
   for (i in seq_along(r$lengths)) {
     if (r$values[i]) {
@@ -426,8 +435,14 @@ fill_capped <- function(x, y, method, max_gap) {
   # when the series actually had a gap, because the no-NA path above returns
   # `y` untouched -- so the same column changed type depending on its data.
   # Assigning into a copy of `y` preserves the class through `[<-`.
+  #
+  # Only the cells that were missing. `filled` is the whole series recomputed,
+  # and for an observed row that is the observed value, except where the
+  # filler cannot place the row at all, as approx() cannot for a row with no
+  # year, which came back NA and was written over a value that had been there.
+  fill <- keep & na
   out <- y
-  out[keep] <- filled[keep]
+  out[fill] <- filled[fill]
   out
 }
 

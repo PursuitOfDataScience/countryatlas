@@ -21,6 +21,14 @@ The happy path stays one call: \code{\link[=world_data]{world_data()}}. Everythi
 \code{\link[=country_borders]{country_borders()}}, \code{\link[=neighbors]{neighbors()}}, \code{\link[=distance_between]{distance_between()}}.
 }
 
+\section{Data sources beyond the World Bank}{
+
+\code{\link[=fetch_indicator]{fetch_indicator()}}, \code{\link[=add_indicator]{add_indicator()}}, \code{\link[=compare_sources]{compare_sources()}},
+\code{\link[=country_sources]{country_sources()}}, \code{\link[=register_country_source]{register_country_source()}},
+\code{\link[=remove_country_source]{remove_country_source()}}, and the adapters \code{\link[=fetch_owid]{fetch_owid()}},
+\code{\link[=fetch_eurostat]{fetch_eurostat()}}, \code{\link[=fetch_oecd]{fetch_oecd()}} and \code{\link[=fetch_comtrade]{fetch_comtrade()}}.
+}
+
 \section{The join engine}{
 
 \code{\link[=standardize_country]{standardize_country()}}, \code{\link[=join_world]{join_world()}}, \code{\link[=attach_geometry]{attach_geometry()}}, \code{\link[=country_join]{country_join()}},
@@ -37,23 +45,57 @@ The happy path stays one call: \code{\link[=world_data]{world_data()}}. Everythi
 
 \code{\link[=convert_country]{convert_country()}}, \code{\link[=country_codes]{country_codes()}}, \code{\link[=country_groups]{country_groups()}}, \code{\link[=in_group]{in_group()}},
 \code{\link[=wdi_search]{wdi_search()}}, and the datasets \link{country_meta}, \link{common_indicators},
-\link{country_groups_tbl}, \link{world_snapshot}, \link{world_tiles}, \link{historical_codes}.
+\link{country_groups_tbl}, \link{country_groups_history}, \link{world_snapshot},
+\link{world_tiles}, \link{historical_codes}, \link{disputed_territories}.
+}
+
+\section{Time}{
+
+\code{\link[=country_timeline]{country_timeline()}}, \code{\link[=audit_time_coverage]{audit_time_coverage()}}, \code{\link[=historical_geometry]{historical_geometry()}}.
 }
 
 \section{Analysis helpers}{
 
 \code{\link[=per_capita]{per_capita()}}, \code{\link[=aggregate_regions]{aggregate_regions()}}, \code{\link[=rank_countries]{rank_countries()}}, \code{\link[=complete_years]{complete_years()}},
-\code{\link[=growth_rate]{growth_rate()}}, \code{\link[=index_to]{index_to()}}, \code{\link[=share_of_world]{share_of_world()}}, \code{\link[=lag_by_country]{lag_by_country()}},
-\code{\link[=diff_by_country]{diff_by_country()}}, \code{\link[=correlate_indicators]{correlate_indicators()}}, \code{\link[=beta_convergence]{beta_convergence()}},
-\code{\link[=sigma_convergence]{sigma_convergence()}}, \code{\link[=gini]{gini()}}, \code{\link[=theil]{theil()}}, \code{\link[=morans_i]{morans_i()}}.
+\code{\link[=interpolate_missing]{interpolate_missing()}}, \code{\link[=growth_rate]{growth_rate()}}, \code{\link[=index_to]{index_to()}}, \code{\link[=share_of_world]{share_of_world()}},
+\code{\link[=lag_by_country]{lag_by_country()}}, \code{\link[=diff_by_country]{diff_by_country()}}, \code{\link[=deflate]{deflate()}}, \code{\link[=to_ppp]{to_ppp()}},
+\code{\link[=rate_check]{rate_check()}}, \code{\link[=smooth_rates]{smooth_rates()}}, \code{\link[=correlate_indicators]{correlate_indicators()}},
+\code{\link[=beta_convergence]{beta_convergence()}}, \code{\link[=sigma_convergence]{sigma_convergence()}}, \code{\link[=convergence_club]{convergence_club()}}, \code{\link[=gini]{gini()}},
+\code{\link[=theil]{theil()}}.
+}
+
+\section{Spatial statistics and networks}{
+
+\code{\link[=country_weights]{country_weights()}}, \code{\link[=morans_i]{morans_i()}}, \code{\link[=local_morans]{local_morans()}}, \code{\link[=lisa_map]{lisa_map()}},
+\code{\link[=gearys_c]{gearys_c()}}, \code{\link[=getis_ord]{getis_ord()}}, \code{\link[=spatial_lag]{spatial_lag()}}; \code{\link[=flow_matrix]{flow_matrix()}},
+\code{\link[=country_network]{country_network()}}, \code{\link[=od_map]{od_map()}}.
 }
 
 \section{Visualization}{
 
 \code{\link[=world_map]{world_map()}}, \code{\link[=globe_map]{globe_map()}}, \code{\link[=spin_globe]{spin_globe()}}, \code{\link[=facet_map]{facet_map()}}, \code{\link[=bubble_map]{bubble_map()}},
 \code{\link[=spike_map]{spike_map()}}, \code{\link[=bivariate_map]{bivariate_map()}}, \code{\link[=cartogram_map]{cartogram_map()}}, \code{\link[=dorling_map]{dorling_map()}},
-\code{\link[=tile_map]{tile_map()}}, \code{\link[=flow_map]{flow_map()}}, \code{\link[=animate_world]{animate_world()}}, \code{\link[=interactive_map]{interactive_map()}},
-\code{\link[=geom_country_labels]{geom_country_labels()}}, \code{\link[=theme_world_map]{theme_world_map()}}, \code{\link[=simplify_geometry]{simplify_geometry()}}.
+\code{\link[=gridded_cartogram]{gridded_cartogram()}}, \code{\link[=tile_map]{tile_map()}}, \code{\link[=flow_map]{flow_map()}}, \code{\link[=animate_world]{animate_world()}},
+\code{\link[=interactive_map]{interactive_map()}}, \code{\link[=geom_country_labels]{geom_country_labels()}}, \code{\link[=theme_world_map]{theme_world_map()}},
+\code{\link[=simplify_geometry]{simplify_geometry()}}.
+}
+
+\section{Honest maps}{
+
+\code{\link[=classify_compare]{classify_compare()}}, \code{\link[=coverage_map]{coverage_map()}}, \code{\link[=value_by_alpha_map]{value_by_alpha_map()}},
+\code{\link[=projection_info]{projection_info()}}, \code{\link[=projection_compare]{projection_compare()}}, \code{\link[=projection_distortion]{projection_distortion()}},
+\code{\link[=tissot_map]{tissot_map()}}, \code{\link[=cartogram_diagnostics]{cartogram_diagnostics()}}, \code{\link[=map_provenance]{map_provenance()}},
+\code{\link[=dispute_policy]{dispute_policy()}}, \code{\link[=check_dispute_coverage]{check_dispute_coverage()}}.
+}
+
+\section{Subnational}{
+
+\code{\link[=standardize_subnational]{standardize_subnational()}}, \code{\link[=nuts_geometry]{nuts_geometry()}}, \code{\link[=subnational_map]{subnational_map()}}.
+}
+
+\section{Reporting}{
+
+\code{\link[=country_factsheet]{country_factsheet()}}, \code{\link[=world_table]{world_table()}}.
 }
 
 \section{Database rendering (ggsql)}{
@@ -63,12 +105,12 @@ The happy path stays one call: \code{\link[=world_data]{world_data()}}. Everythi
 
 \section{Performance & caching}{
 
-\code{\link[=clear_wdi_cache]{clear_wdi_cache()}}.
+\code{\link[=clear_wdi_cache]{clear_wdi_cache()}}, \code{\link[=clear_country_cache]{clear_country_cache()}}.
 }
 
 \section{Options}{
 
-Four options change the package's behaviour. All are unset by default.
+Six options change the package's behaviour. All are unset by default.
 \describe{
 \item{\code{countryatlas.cache_dir}}{Where the persistent World Bank cache
 lives. Defaults to \code{tools::R_user_dir("countryatlas", "cache")}; set it to

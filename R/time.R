@@ -97,7 +97,15 @@ country_timeline <- function(x, origin = "country.name", warn = TRUE) {
   # takes the same input shape and has warned about exactly this all along, so
   # this is its message, down to the {.fn check_country_match} pointer.
   if (isTRUE(warn)) {
-    miss <- unique(out$input[is.na(out$iso3c)])
+    # "Matched neither" has to mean that, not "has no code". Three entities in
+    # the table predate ISO 3166-3 and carry no code at all (Tanganyika,
+    # Zanzibar and the United Arab Republic), so their rows resolve through
+    # the historical branch with `iso3c` NA, and keying on that told the
+    # caller that "Tanganyika" matched nothing while handing back its
+    # dissolution year and its successor. A missing input is not a name that
+    # failed to match either; standardize_country() leaves those unreported.
+    hist_hit <- !is.na(canon) & canon %in% hc$historical
+    miss <- unique(out$input[is.na(out$iso3c) & !hist_hit & !is.na(out$input)])
     if (length(miss)) {
       wdj_warn(c(
         "{length(miss)} name{?s} matched neither a historical entity nor a
@@ -203,8 +211,14 @@ audit_time_coverage <- function(data, quiet = FALSE) {
 
   df$dissolved_in <- unname(dis[df$iso3c])
   df$born_in <- unname(born[df$iso3c])
-  after <- !is.na(df$dissolved_in) & df$year > df$dissolved_in
-  before <- !is.na(df$born_in) & df$year < df$born_in
+  # !is.na(year): read_year() turns a value it cannot read into NA (and warns
+  # that it has), and `NA > 1991` is NA, which, used as an index below,
+  # produced a row of all-NA columns. A dissolved code carrying one unreadable
+  # year therefore reported a phantom "NA, after_dissolution, until NA" row,
+  # and the console summary counted it.
+  after <- !is.na(df$dissolved_in) & !is.na(df$year) &
+    df$year > df$dissolved_in
+  before <- !is.na(df$born_in) & !is.na(df$year) & df$year < df$born_in
 
   out <- dplyr::bind_rows(
     tibble::tibble(iso3c = df$iso3c[after], year = df$year[after],
@@ -217,6 +231,11 @@ audit_time_coverage <- function(data, quiet = FALSE) {
   if (nrow(out)) {
     out$country <- suppressWarnings(
       convert_country(out$iso3c, from = "iso3c", to = "country", warn = FALSE))
+    # countrycode has no name for a dissolved entity's code (SUN, YUG, CSK,
+    # DDR), so the rows this audit exists to flag came back with `country`
+    # NA. historical_codes names them.
+    unnamed <- is.na(out$country)
+    out$country[unnamed] <- hc$historical[match(out$iso3c[unnamed], hc$iso3c_hist)]
     out <- out[, c("iso3c", "country", "year", "issue", "existed")]
     out <- dplyr::arrange(out, .data$iso3c, year_sort_key(.data$year))
   } else {
@@ -301,17 +320,26 @@ historical_geometry <- function(year, dependencies = FALSE,
     }
     year
   } else {
-    if (!is.numeric(year) || length(year) != 1L || is.na(year)) {
+    # is.finite(), not is.na(): Inf passed, reached as.integer() (NA, with
+    # base R's "NAs introduced by coercion to integer range") and then
+    # as.Date("NA-06-30"), which failed on "character string is not in a
+    # standard unambiguous format".
+    if (!is.numeric(year) || length(year) != 1L || !is.finite(year)) {
       wdj_abort(c("{.arg year} must be a single year or {.cls Date}.",
                   "x" = "Got {.val {year}}."))
     }
-    as.Date(sprintf("%d-06-30", as.integer(year)))   # mid-year, a stable choice
+    # A finite year past integer range (1e10) hit the same as.integer() NA,
+    # so clamp it into a range that still fails the coverage check below.
+    as.Date(sprintf("%d-06-30",                      # mid-year, a stable choice
+                    as.integer(min(max(year, 1L), 9999L))))
   }
   span <- c(as.Date("1886-01-01"), as.Date("2019-12-31"))
   if (when < span[1] || when > span[2]) {
+    # The caller's own value, not the clamped date built from it above.
+    asked <- if (inherits(year, "Date")) format(when, "%Y-%m-%d") else format(year)
     wdj_abort(c(
       "CShapes covers 1886-2019.",
-      "x" = "Asked for {.val {format(when, '%Y-%m-%d')}}.",
+      "x" = "Asked for {.val {asked}}.",
       "i" = "For the present day use {.fn world_geometry}."
     ))
   }

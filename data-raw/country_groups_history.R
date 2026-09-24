@@ -13,9 +13,13 @@
 # than admitting there isn't one. country_groups(as_of =) falls back to the
 # snapshot for those, with a warning, rather than pretending.
 #
-# `from` is the date membership took effect; `to` is the date it ended, or NA
-# for a current member. Dates are the treaty/accession date where one exists,
-# otherwise 1 January of the accession year.
+# `from` is the date membership took effect; `to` is the first date on which
+# the country was no longer a member (membership runs up to the day before),
+# or NA for a current member. country_groups() reads it that way (a member
+# on `when` if from <= when < to), which is also how every departure below is
+# dated: Austria left EFTA and joined the EU on the same 1995-01-01. Dates are
+# the treaty/accession date where one exists, otherwise 1 January of the
+# accession year.
 
 library(tibble)
 library(dplyr)
@@ -28,7 +32,11 @@ m <- function(group, iso3c, from, to = NA_character_) {
 eu <- bind_rows(
   m("EU", c("BEL", "FRA", "DEU", "ITA", "LUX", "NLD"), "1958-01-01"),
   m("EU", c("DNK", "IRL"), "1973-01-01"),
-  m("EU", "GBR", "1973-01-01", "2020-01-31"),          # Brexit
+  # Brexit: the UK left at 23:00 GMT on 31 January 2020, so 1 February is the
+  # first day it was not a member. This was 2020-01-31, the last day it *was*
+  # one, which, read as the exclusive end every other row uses, dropped the
+  # UK from the EU a day early.
+  m("EU", "GBR", "1973-01-01", "2020-02-01"),
   m("EU", "GRC", "1981-01-01"),
   m("EU", c("ESP", "PRT"), "1986-01-01"),
   m("EU", c("AUT", "FIN", "SWE"), "1995-01-01"),

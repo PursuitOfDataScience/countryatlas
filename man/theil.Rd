@@ -30,10 +30,10 @@ equality). With \code{groups}: a tibble with components \code{"total"},
 component's \code{share} of the total (\code{NA} when the total is \code{0}, i.e.
 perfect equality, and the shares are undefined).
 
-When there is nothing to compute -- no values left after \code{na.rm}, a zero
-total weight, or an infinity in \code{x} or \code{weights} -- the result is a single
-\code{NA} whatever \code{groups} says, so reach for the components only after checking
-\code{is.data.frame()}.
+When there is nothing to compute (no values left after \code{na.rm}, a zero
+total weight, an infinity in \code{x} or \code{weights}, or, with \code{na.rm = FALSE}, a
+missing value or group), the result is a single \code{NA} whatever \code{groups}
+says, so reach for the components only after checking \code{is.data.frame()}.
 }
 \description{
 The Theil T inequality index -- less famous than Gini, but it decomposes

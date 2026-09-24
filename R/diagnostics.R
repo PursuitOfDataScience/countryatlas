@@ -144,7 +144,11 @@ audit_coverage <- function(data,
 
   unmatched <- if ("iso3c" %in% names(data)) {
     key <- if ("country" %in% names(data)) "country" else "iso3c"
-    miss <- data[is.na(data$iso3c), , drop = FALSE]
+    # blank_key(), not is.na(): read.csv() without na.strings = "" gives a
+    # blank for an empty cell, a blank code matches nothing, and
+    # distinct_countries() above already treats it as uncoded, so a row it
+    # kept for that reason was then left out of the unmatched list.
+    miss <- data[blank_key(data$iso3c), , drop = FALSE]
     tibble::tibble(country = as.character(miss[[key]]))
   } else {
     tibble::tibble(country = character(0))

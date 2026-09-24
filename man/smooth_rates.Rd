@@ -45,6 +45,9 @@ quantity that \code{rate_check()} flags. Where the between-country variance is
 estimated as non-positive (rates no more dispersed than Poisson noise alone),
 every rate shrinks fully to the global mean, which is the right answer:
 the data contain no evidence of real between-country variation.
+
+On a panel the prior is estimated separately for each \code{year}, so every
+rate is shrunk toward its own year's global rate and every row is kept.
 }
 
 \examples{
