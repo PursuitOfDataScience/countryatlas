@@ -286,6 +286,182 @@ takes `data` as its second argument. Details under **Breaking changes**.
 
 ### Bug fixes
 
+- **The on-disk cache could delete files it had not written.** With
+  `options(countryatlas.cache_dir = )` pointed at a folder that held
+  anything else, the first cached fetch deleted every file in it without
+  an `.rds` extension (a sweep meant for entries left by 2.0.x),
+  cachem’s 30-day expiry and size cap applied to every `.rds` file
+  there, and `clear_wdi_cache(disk = TRUE)` removed the folder and
+  everything below it. Entries now carry their own `.countryatlas`
+  extension, pruning and clearing touch only files the cache wrote, and
+  the folder itself is removed only when that leaves it empty.
+
+- **[`local_morans()`](https://pursuitofdatascience.github.io/countryatlas/reference/local_morans.md)
+  did not permute conditionally, as it documents.** It shuffled all *n*
+  values with one permutation shared by every country, so a country’s
+  own value could land among its neighbours. For the extreme values a
+  hot-spot map is about, that inflated the pseudo p-value: Monaco came
+  out at 0.028 where the conditional reference distribution (and spdep’s
+  `localmoran_perm()`) gives 0.0035. Each country’s neighbours are now
+  drawn from the other *n* - 1 values.
+
+- **[`convergence_club()`](https://pursuitofdatascience.github.io/countryatlas/reference/convergence_club.md)
+  depended on row order.** `pivot_wider()` lays its columns out in order
+  of first appearance and the log-t test reads them by position, so a
+  shuffled panel, or one whose first country lacked the first year,
+  formed different clubs from the same data. The years are sorted first.
+
+- **[`smooth_rates()`](https://pursuitofdatascience.github.io/countryatlas/reference/smooth_rates.md)
+  shrank every year of a panel toward the earliest year’s global rate**,
+  under a warning that said the other years were dropped though every
+  row came back. The empirical-Bayes prior is now estimated per year,
+  the design
+  [`spatial_lag()`](https://pursuitofdatascience.github.io/countryatlas/reference/spatial_lag.md)
+  already uses for a panel.
+
+- **[`bubble_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/bubble_map.md)
+  drew a negative total as a bubble of its absolute value** (France at
+  -1.4e9 as large as China) and an infinite one as an infinite bubble.
+  [`bubble_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/bubble_map.md)
+  and
+  [`spike_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/spike_map.md)
+  now set negative and infinite values aside with a warning and count
+  them as missing;
+  [`spike_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/spike_map.md)
+  used to drop them and blame a missing centroid. A missing size on the
+  polygon backend no longer leaks ggplot2’s “Removed 1 row” at print
+  time.
+
+- **An infinite fill was counted as shown.** Every fill scale draws
+  `Inf` as no data, but the `footnote = "auto"` caption,
+  [`map_provenance()`](https://pursuitofdatascience.github.io/countryatlas/reference/map_provenance.md)
+  and
+  [`coverage_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/coverage_map.md)
+  counted it as present: “189 of 240 countries shown” over a map
+  showing 187. It now counts as missing everywhere, `na_style = "omit"`
+  and `"hatched"` treat it as the no-data it is drawn as, and the map
+  verbs name the countries holding one.
+  `interactive_map(engine = "leaflet")` no longer fails on one with
+  leaflet’s “Wasn’t able to determine range of domain”.
+
+- **[`flow_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/flow_map.md)
+  with a missing or infinite weight** leaked “Removed 50 rows”, or
+  failed at print time with grid’s “‘lwd’ must be non-negative and
+  finite”. Those flows are dropped with a warning, as
+  [`flow_matrix()`](https://pursuitofdatascience.github.io/countryatlas/reference/flow_matrix.md)
+  drops them.
+  [`cartogram_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/cartogram_map.md)
+  and
+  [`dorling_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/dorling_map.md)
+  likewise name an infinite weight instead of handing it to cartogram.
+
+- **`growth_rate(type = "yoy")` returned `Inf` and `NaN` after a zero**,
+  where every sibling verb gives `NA` for a zero denominator. It now
+  gives `NA`, with a warning.
+
+- **A row with a missing `year` was treated as the latest year.**
+  [`lag_by_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/lag_by_country.md),
+  [`diff_by_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/lag_by_country.md)
+  and
+  [`growth_rate()`](https://pursuitofdatascience.github.io/countryatlas/reference/growth_rate.md)
+  gave it a value computed from the last real year,
+  [`beta_convergence()`](https://pursuitofdatascience.github.io/countryatlas/reference/beta_convergence.md)
+  dropped its whole country,
+  [`sigma_convergence()`](https://pursuitofdatascience.github.io/countryatlas/reference/sigma_convergence.md)
+  and
+  [`share_of_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/share_of_world.md)
+  reported a phantom `NA` year, and
+  [`interpolate_missing()`](https://pursuitofdatascience.github.io/countryatlas/reference/interpolate_missing.md)
+  crashed on it, and could have overwritten an undated observed value
+  with `NA`. Undated rows are now left out of anything that needs a
+  position in time.
+
+- **`complete_years(method = "locf")` carried values in row order**, not
+  time order, when the data held years outside `years`, and returned the
+  frame out of order.
+
+- **The United Kingdom left the EU a day early.**
+  `country_groups_history` reads `to` as the first day of non-membership
+  (Austria left EFTA and joined the EU on 1995-01-01), but the UK’s exit
+  was recorded as 2020-01-31, its last day as a member. It is now
+  2020-02-01, and the column’s help states the convention.
+
+- **[`projection_distortion()`](https://pursuitofdatascience.github.io/countryatlas/reference/projection_distortion.md)
+  measured a WGS84 projection against a sphere.** Equal Earth read
+  between 0.9955 and 1.009 instead of 1, and Mercator showed up to 0.38
+  degrees of angular distortion, contradicting both checks its
+  documentation offers. It now uses the ellipsoid’s radii of curvature
+  and central differences: Equal Earth, Gall-Peters and the Lambert
+  azimuthals read 1, Mercator 0, and the 0.7% that Mollweide and Eckert
+  IV show (PROJ applies their spherical formulas to the ellipsoid) is
+  documented.
+
+- **`theil(na.rm = FALSE)` broke its own decomposition on a missing
+  group.** The row stayed in `total` and fell out of both components, so
+  `total` no longer equalled `between + within`. It now returns `NA`, as
+  it already does for a missing value under `na.rm = FALSE`.
+
+- **Reports that said something false.**
+  [`country_timeline()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_timeline.md)
+  warned that “Tanganyika”, “Zanzibar” and the “United Arab Republic”
+  matched nothing while returning their history.
+  [`audit_time_coverage()`](https://pursuitofdatascience.github.io/countryatlas/reference/audit_time_coverage.md)
+  returned a phantom all-`NA` row for an unreadable year, and now names
+  the dissolved codes it flags.
+  [`compare_sources()`](https://pursuitofdatascience.github.io/countryatlas/reference/compare_sources.md)
+  kept unresolved keys as `iso3c = NA` rows, counted them in
+  `only_x`/`only_y`, and called two of them “a duplicate country”.
+  [`index_to()`](https://pursuitofdatascience.github.io/countryatlas/reference/index_to.md)
+  and
+  [`deflate()`](https://pursuitofdatascience.github.io/countryatlas/reference/deflate.md)
+  reported two unidentified countries as “1 country: NA”.
+  [`world_table()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_table.md)
+  gave tied values different ranks.
+  [`country_join()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_join.md)
+  and
+  [`country_join_all()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_join_all.md)
+  warned that `iso3c` was “replaced” when it was the join column itself.
+  `subnational_map(projection = )` printed raw cli markup and advised
+  `geometry = "sf"`.
+  [`audit_coverage()`](https://pursuitofdatascience.github.io/countryatlas/reference/audit_coverage.md)
+  left a blank code out of `unmatched`, and
+  [`check_dispute_coverage()`](https://pursuitofdatascience.github.io/countryatlas/reference/check_dispute_coverage.md)
+  listed `NA` and repeated values as bad codes.
+
+- **Inputs accepted and then failed somewhere else.** A numeric `region`
+  that is not a four-number box (`region = 250`) drew an empty map, and
+  a reversed box was accepted. Custom
+  [`country_weights()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_weights.md)
+  codes were taken verbatim, so lowercase ones made every statistic
+  report “Not enough connected countries” with advice about islands;
+  they are normalised, and codes that differ only in case are now named
+  as the key problem they are.
+  [`spatial_lag()`](https://pursuitofdatascience.github.io/countryatlas/reference/spatial_lag.md)
+  on a panel aborted entirely when one year was too sparse.
+  [`deflate()`](https://pursuitofdatascience.github.io/countryatlas/reference/deflate.md),
+  [`to_ppp()`](https://pursuitofdatascience.github.io/countryatlas/reference/to_ppp.md)
+  and `rate_check(rate = )` did not check that their value column was
+  numeric, and
+  [`per_capita()`](https://pursuitofdatascience.github.io/countryatlas/reference/per_capita.md),
+  [`to_ppp()`](https://pursuitofdatascience.github.io/countryatlas/reference/to_ppp.md)
+  and
+  [`add_indicator()`](https://pursuitofdatascience.github.io/countryatlas/reference/add_indicator.md)
+  leaked dplyr’s join-type error for a character `year`.
+  [`value_by_alpha_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/value_by_alpha_map.md)
+  drew a character `value` as categories labelled “quantile”.
+  [`classify_compare()`](https://pursuitofdatascience.github.io/countryatlas/reference/classify_compare.md),
+  [`projection_compare()`](https://pursuitofdatascience.github.io/countryatlas/reference/projection_compare.md)
+  and
+  [`od_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/od_map.md)
+  died on “factor level \[2\] is duplicated” for a repeated method,
+  projection or origin. `country_join_all(by = iso3c)` gave “object
+  ‘iso3c’ not found”. `historical_geometry(Inf)` failed inside
+  [`as.Date()`](https://rdrr.io/r/base/as.Date.html),
+  [`locate_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/locate_country.md)
+  on zero points leaked four base R warnings, and
+  `as_ggsql_source(format = "parquet")` left its connection open when
+  the write failed.
+
 - **`interactive_map(engine = "leaflet")` hard-wired a numeric colour
   scale.** A discrete fill reached
   [`leaflet::colorNumeric()`](https://rstudio.github.io/leaflet/reference/colorNumeric.html)
@@ -3873,20 +4049,20 @@ correctness issues found by auditing 1.0.0. The version is bumped to
 [`geom_country_labels()`](https://pursuitofdatascience.github.io/countryatlas/reference/geom_country_labels.md)
 (label placement) and
 [`convert_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/convert_country.md)
-(override-only entities) — code that depended on the old behaviour may
+(override-only entities), so code that depended on the old behaviour may
 see different maps or values.
 
 ### New: database-side rendering with ggsql
 
 - [`as_ggsql_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/as_ggsql_source.md)
   exports a curated, ISO-reconciled, WDI-joined table (with `sf`
-  geometry WKB-encoded) as a [ggsql](https://ggsql.org) source — a
-  DuckDB connection, a Parquet file, or a nanoarrow stream. countryatlas
-  does the reconciliation ggsql’s static bundled world can’t; ggsql does
-  the database push-down and Vega-Lite output countryatlas doesn’t.
+  geometry WKB-encoded) as a [ggsql](https://ggsql.org) source: a DuckDB
+  connection, a Parquet file, or a nanoarrow stream. countryatlas does
+  the reconciliation ggsql’s static bundled world can’t; ggsql does the
+  database push-down and Vega-Lite output countryatlas doesn’t.
 - [`world_query()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_query.md)
   emits a `ggsql` spatial query
-  (`VISUALISE … DRAW spatial PROJECT TO … SCALE … LABEL …`) — a
+  (`VISUALISE … DRAW spatial PROJECT TO … SCALE … LABEL …`), a
   dependency-free string builder.
 - `interactive_map(engine = "ggsql")` registers the data and renders the
   map in DuckDB, returning a Vega-Lite widget.
@@ -3895,15 +4071,15 @@ see different maps or values.
 
 ### New: maps, projections and helpers
 
-- [`globe_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/globe_map.md)
-  — an orthographic globe choropleth, with `backend = "sf"` (smoothest
+- [`globe_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/globe_map.md):
+  an orthographic globe choropleth, with `backend = "sf"` (smoothest
   limb) or `backend = "polygon"` (needs only `maps` + `mapproj`).
-- [`spin_globe()`](https://pursuitofdatascience.github.io/countryatlas/reference/spin_globe.md)
-  — a rotating-globe animated GIF (one
+- [`spin_globe()`](https://pursuitofdatascience.github.io/countryatlas/reference/spin_globe.md):
+  a rotating-globe animated GIF (one
   [`globe_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/globe_map.md)
   frame per central longitude, assembled with `gifski` or `magick`).
-- [`facet_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/facet_map.md)
-  — small-multiple choropleths (the static counterpart to
+- [`facet_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/facet_map.md):
+  small-multiple choropleths (the static counterpart to
   [`animate_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/animate_world.md)).
 - `wdj_crs()` gains eight projections (`mercator`, `winkel_tripel`,
   `eckert4`, `gall_peters`, `orthographic`, `azimuthal_equal_area`,
@@ -3912,34 +4088,34 @@ see different maps or values.
   /
   [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md)
   accept them all.
-- [`locate_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/locate_country.md)
-  — point-in-polygon lookup tagging `lon`/`lat` with `iso3c`.
-- [`repair_country_names()`](https://pursuitofdatascience.github.io/countryatlas/reference/repair_country_names.md)
-  — the “act on it” companion to
+- [`locate_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/locate_country.md):
+  point-in-polygon lookup tagging `lon`/`lat` with `iso3c`.
+- [`repair_country_names()`](https://pursuitofdatascience.github.io/countryatlas/reference/repair_country_names.md):
+  the “act on it” companion to
   [`check_country_match()`](https://pursuitofdatascience.github.io/countryatlas/reference/check_country_match.md):
   auto-applies confident string-distance fixes.
-- [`country_join_all()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_join_all.md)
-  — reduce-join many messy country tables on the ISO spine.
+- [`country_join_all()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_join_all.md):
+  reduce-join many messy country tables on the ISO spine.
 - [`growth_rate()`](https://pursuitofdatascience.github.io/countryatlas/reference/growth_rate.md),
   [`index_to()`](https://pursuitofdatascience.github.io/countryatlas/reference/index_to.md),
-  [`share_of_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/share_of_world.md)
-  — panel analysis helpers.
-- [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)
-  — preferred name for
+  [`share_of_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/share_of_world.md):
+  panel analysis helpers.
+- [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md):
+  preferred name for
   [`wdj_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)
   (kept as an alias) after the rename to countryatlas.
 - `country_groups_tbl` gains `Mercosur`, `GCC`, `Nordic` and `Visegrad`.
-- [`country_borders()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_borders.md)
-  — a tidy adjacency edge list built from polygon topology
+- [`country_borders()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_borders.md):
+  a tidy adjacency edge list built from polygon topology
   ([`sf::st_touches()`](https://r-spatial.github.io/sf/reference/geos_binary_pred.html)),
   with
   [`neighbors()`](https://pursuitofdatascience.github.io/countryatlas/reference/neighbors.md)
   for a vectorised per-country lookup.
-- [`distance_between()`](https://pursuitofdatascience.github.io/countryatlas/reference/distance_between.md)
-  — great-circle (haversine) distance between two countries’ centroids;
+- [`distance_between()`](https://pursuitofdatascience.github.io/countryatlas/reference/distance_between.md):
+  great-circle (haversine) distance between two countries’ centroids;
   needs neither `sf` nor the network.
-- [`dorling_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/dorling_map.md)
-  — the Dorling cartogram promoted to a first-class verb, with
+- [`dorling_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/dorling_map.md):
+  the Dorling cartogram promoted to a first-class verb, with
   `k`/`itermax` tuning;
   [`cartogram_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/cartogram_map.md)
   itself gains `...` passthrough to the underlying
@@ -3947,56 +4123,56 @@ see different maps or values.
 
 ### New: historical entities, inequality and spatial statistics
 
-- `historical_codes` — a curated, dated crosswalk of dissolved entities
+- `historical_codes`: a curated, dated crosswalk of dissolved entities
   (Soviet Union, Yugoslavia, Czechoslovakia, East Germany, Netherlands
   Antilles, North/South Yemen, pre-2011 Sudan, United Arab Republic,
   Tanganyika/Zanzibar, North/South Vietnam, Serbia and Montenegro) to
   their successor states, with retired ISO codes where they existed.
   Kosovo is included among the Yugoslav successors on a territory basis
   (documented).
-- [`dissolve_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/dissolve_country.md)
-  — resolve a mixed vector of historical *and* modern names to successor
+- [`dissolve_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/dissolve_country.md):
+  resolve a mixed vector of historical *and* modern names to successor
   `iso3c` rows (one-to-many, dated); modern names pass through as single
   rows, so a whole messy column pipes in unchanged.
 - [`check_country_match()`](https://pursuitofdatascience.github.io/countryatlas/reference/check_country_match.md)
   gains a `historical` column. It flags dissolved entities **even when
-  countrycode “matches” them** — the headline case is `"USSR"`, which
+  countrycode “matches” them**. The headline case is `"USSR"`, which
   countrycode silently resolves to Russia’s `RUS`, so Soviet-era data
   becomes Russian data with no warning.
-- [`correlate_indicators()`](https://pursuitofdatascience.github.io/countryatlas/reference/correlate_indicators.md)
-  — pairwise indicator correlations on the spine (pearson/spearman,
+- [`correlate_indicators()`](https://pursuitofdatascience.github.io/countryatlas/reference/correlate_indicators.md):
+  pairwise indicator correlations on the spine (pearson/spearman,
   pairwise-complete, per-pair `n`), tidy long output.
 - [`beta_convergence()`](https://pursuitofdatascience.github.io/countryatlas/reference/beta_convergence.md)
   /
-  [`sigma_convergence()`](https://pursuitofdatascience.github.io/countryatlas/reference/sigma_convergence.md)
-  — the two standard convergence diagnostics: the
-  growth-on-initial-level regression (with implied convergence speed and
-  half-life) and per-year cross-country dispersion.
+  [`sigma_convergence()`](https://pursuitofdatascience.github.io/countryatlas/reference/sigma_convergence.md):
+  the two standard convergence diagnostics: the growth-on-initial-level
+  regression (with implied convergence speed and half-life) and per-year
+  cross-country dispersion.
 - [`gini()`](https://pursuitofdatascience.github.io/countryatlas/reference/gini.md)
   and
-  [`theil()`](https://pursuitofdatascience.github.io/countryatlas/reference/theil.md)
-  — inequality across countries, population-weightable;
+  [`theil()`](https://pursuitofdatascience.github.io/countryatlas/reference/theil.md):
+  inequality across countries, population-weightable;
   [`theil()`](https://pursuitofdatascience.github.io/countryatlas/reference/theil.md)
   decomposes exactly into between/within components when a grouping
   (continent, income) is supplied.
 - [`lag_by_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/lag_by_country.md)
   /
-  [`diff_by_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/lag_by_country.md)
-  — panel lag and difference grouped by `iso3c` and ordered by `year`,
+  [`diff_by_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/lag_by_country.md):
+  panel lag and difference grouped by `iso3c` and ordered by `year`,
   completing the panel toolkit around
   [`growth_rate()`](https://pursuitofdatascience.github.io/countryatlas/reference/growth_rate.md)
   /
   [`index_to()`](https://pursuitofdatascience.github.io/countryatlas/reference/index_to.md)
   /
   [`complete_years()`](https://pursuitofdatascience.github.io/countryatlas/reference/complete_years.md).
-- [`morans_i()`](https://pursuitofdatascience.github.io/countryatlas/reference/morans_i.md)
-  — global Moran’s I with a permutation pseudo-p-value, computed on the
+- [`morans_i()`](https://pursuitofdatascience.github.io/countryatlas/reference/morans_i.md):
+  global Moran’s I with a permutation pseudo-p-value, computed on the
   row-standardised
   [`country_borders()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_borders.md)
   adjacency. No `spdep` dependency: the weights come from the package’s
   own curated topology.
-- [`spike_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/spike_map.md)
-  — triangular spikes at country centroids (height ∝ value), the
+- [`spike_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/spike_map.md):
+  triangular spikes at country centroids (height ∝ value), the
   overplotting-resistant cousin of
   [`bubble_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/bubble_map.md);
   needs only `maps`.
@@ -4168,8 +4344,8 @@ see different maps or values.
   projected CRS via
   [`coord_sf()`](https://ggplot2.tidyverse.org/reference/ggsf.html).
 - Polygon centroids returned more than one row for ten `iso3c` codes
-  (overrides map several names — Azores/Madeira → PRT — to one code),
-  fanning out joins in
+  (overrides map several names, such as Azores/Madeira → PRT, to one
+  code), fanning out joins in
   [`bubble_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/bubble_map.md)
   /
   [`flow_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/flow_map.md).
@@ -4193,7 +4369,7 @@ see different maps or values.
 - Kosovo’s `XKX` needed extra care: it has no row at all in
   [`countrycode::codelist`](https://rdrr.io/pkg/countrycode/man/codelist.html),
   so deriving destinations purely via the `iso3c` round-trip above is
-  `NA` for everything — which would have *regressed*
+  `NA` for everything, which would have *regressed*
   `flag`/`region`/`country`, since 1.0.0 already resolved those via
   direct name matching (verified against the actual 1.0.0 code).
   [`convert_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/convert_country.md)
@@ -4202,7 +4378,7 @@ see different maps or values.
   classifies) from the same curated fallback
   [`standardize_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/standardize_country.md)
   uses. Net effect versus 1.0.0: zero regressions, plus newly-working
-  `continent`/`iso2c` for Kosovo — which also fixes
+  `continent`/`iso2c` for Kosovo, which also fixes
   `locate_country(..., add = "continent")` for points inside it.
 - `interactive_map(..., tooltip = )` was accepted but silently ignored
   by every engine (pre-dating 2.0.0). The `"ggiraph"` and `"leaflet"`
@@ -5509,9 +5685,9 @@ see different maps or values.
   `skip_if_no_sf_geometry()` helper.
 
 - New hex logo, drawn by the package itself (`data-raw/hex_logo.R`): an
-  orthographic globe —
-  [`globe_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/globe_map.md)’s
-  projection — carrying a viridis choropleth of `world_snapshot` GDP per
+  orthographic globe
+  ([`globe_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/globe_map.md)’s
+  projection) carrying a viridis choropleth of `world_snapshot` GDP per
   capita on Natural Earth geometry joined by
   [`attach_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/attach_geometry.md),
   with
@@ -5967,8 +6143,8 @@ CRAN release: 2026-06-24
 
 A single, comprehensive release that takes the package from a
 one-function proof of concept to a complete toolkit for joining world
-data to maps. The spirit is unchanged — *ISO codes as the universal join
-key, one call to a map-ready table* — but pushed to its full potential.
+data to maps. The spirit is unchanged (*ISO codes as the universal join
+key, one call to a map-ready table*) but pushed to its full potential.
 
 ### Breaking-ish changes
 
@@ -5994,10 +6170,10 @@ key, one call to a map-ready table* — but pushed to its full potential.
   column names), multi-year **panels**, an `sf` backend
   (`geometry = "sf"`), `region` subsetting, `latest`, projections and
   caching.
-- [`country_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_data.md)
-  — the lightweight, one-row-per-country analysis table.
-- [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md)
-  — projected, region-subset geometry (countries, centroids, coastline,
+- [`country_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_data.md):
+  the lightweight, one-row-per-country analysis table.
+- [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md):
+  projected, region-subset geometry (countries, centroids, coastline,
   borders, graticule, ocean).
 
 ### New: the join engine (exposed for *your* data)
@@ -6011,8 +6187,8 @@ key, one call to a map-ready table* — but pushed to its full potential.
 
 - [`check_country_match()`](https://pursuitofdatascience.github.io/countryatlas/reference/check_country_match.md),
   [`wdj_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md),
-  [`audit_coverage()`](https://pursuitofdatascience.github.io/countryatlas/reference/audit_coverage.md)
-  — never lose a country silently.
+  [`audit_coverage()`](https://pursuitofdatascience.github.io/countryatlas/reference/audit_coverage.md):
+  never lose a country silently.
 
 ### New: reference data & translation
 

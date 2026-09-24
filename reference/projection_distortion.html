@@ -103,6 +103,13 @@ what equal-area <em>means</em>, and it is worth checking rather than trusting.
 A conformal projection has <code>"angular"</code> distortion of 0 everywhere and
 unbounded areal distortion. A compromise projection is bad at both by a
 little, everywhere, which is the trade it makes.</p>
+<p>Distortion is measured against the WGS84 ellipsoid, the datum every CRS the
+package builds is defined on. Equal Earth, Gall-Peters and the three Lambert
+azimuthal projections have ellipsoidal forms and read exactly 1. PROJ
+implements Mollweide and Eckert IV with their spherical formulas, so on this
+datum they are equal-area only to within about 0.7% (<code>"areal"</code> between
+0.993 and 1.007): a property of the maps drawn here, and the kind of thing
+this check exists to show.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
@@ -119,7 +126,7 @@ little, everywhere, which is the trade it makes.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 1 × 5</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   projection measure  mean   min   max</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> mercator   areal    4.40  1.00  132.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> mercator   areal    4.37  1.01  131.</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

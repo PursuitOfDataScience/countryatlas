@@ -99,10 +99,10 @@ equality). With <code>groups</code>: a tibble with components <code>"total"</cod
 <code>"between"</code> and <code>"within"</code> (<code>total = between + within</code>) and each
 component's <code>share</code> of the total (<code>NA</code> when the total is <code>0</code>, i.e.
 perfect equality, and the shares are undefined).</p>
-<p>When there is nothing to compute – no values left after <code>na.rm</code>, a zero
-total weight, or an infinity in <code>x</code> or <code>weights</code> – the result is a single
-<code>NA</code> whatever <code>groups</code> says, so reach for the components only after checking
-<code><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">is.data.frame()</a></code>.</p>
+<p>When there is nothing to compute (no values left after <code>na.rm</code>, a zero
+total weight, an infinity in <code>x</code> or <code>weights</code>, or, with <code>na.rm = FALSE</code>, a
+missing value or group), the result is a single <code>NA</code> whatever <code>groups</code>
+says, so reach for the components only after checking <code><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">is.data.frame()</a></code>.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

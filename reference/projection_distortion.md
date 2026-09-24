@@ -53,6 +53,14 @@ trusting. A conformal projection has `"angular"` distortion of 0
 everywhere and unbounded areal distortion. A compromise projection is
 bad at both by a little, everywhere, which is the trade it makes.
 
+Distortion is measured against the WGS84 ellipsoid, the datum every CRS
+the package builds is defined on. Equal Earth, Gall-Peters and the three
+Lambert azimuthal projections have ellipsoidal forms and read exactly 1.
+PROJ implements Mollweide and Eckert IV with their spherical formulas,
+so on this datum they are equal-area only to within about 0.7%
+(`"areal"` between 0.993 and 1.007): a property of the maps drawn here,
+and the kind of thing this check exists to show.
+
 ## See also
 
 [`tissot_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/tissot_map.md),
@@ -70,6 +78,6 @@ if (requireNamespace("sf", quietly = TRUE)) {
 #> # A tibble: 1 × 5
 #>   projection measure  mean   min   max
 #>   <chr>      <chr>   <dbl> <dbl> <dbl>
-#> 1 mercator   areal    4.40  1.00  132.
+#> 1 mercator   areal    4.37  1.01  131.
 # }
 ```

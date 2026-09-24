@@ -27,7 +27,9 @@ growth_rate(data, value, type = c("yoy", "cagr"), suffix = "_growth")
   ratio at both ends, so a negative value gives `NA` for that row (with
   a warning) and a non-positive base year gives `NA` for that country; a
   value of exactly `0` is a legitimate annualised -100%. `"yoy"` is a
-  plain ratio change and is defined for negative values.
+  plain ratio change and is defined for negative values, but not after a
+  zero: a change from `0` has no ratio, so that row is `NA` (with a
+  warning) rather than `Inf`.
 
 - suffix:
 

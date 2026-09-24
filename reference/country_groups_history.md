@@ -33,7 +33,10 @@ A tibble with 176 rows:
 
 - to:
 
-  Date membership ended, or `NA` for a current member.
+  The first date on which the country was no longer a member (membership
+  runs up to the day before), or `NA` for a current member. The United
+  Kingdom's EU `to` is therefore 2020-02-01: it left at the end of 31
+  January 2020.
 
 ## Details
 

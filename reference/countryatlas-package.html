@@ -72,6 +72,15 @@ geometry (<code><a href="https://ggplot2.tidyverse.org/reference/map_data.html" 
 <code><a href="country_borders.html">country_borders()</a></code>, <code><a href="neighbors.html">neighbors()</a></code>, <code><a href="distance_between.html">distance_between()</a></code>.</p>
     </div>
     <div class="section level2">
+    <h2 id="data-sources-beyond-the-world-bank">Data sources beyond the World Bank<a class="anchor" aria-label="anchor" href="#data-sources-beyond-the-world-bank"></a></h2>
+
+
+<p><code><a href="fetch_indicator.html">fetch_indicator()</a></code>, <code><a href="add_indicator.html">add_indicator()</a></code>, <code><a href="compare_sources.html">compare_sources()</a></code>,
+<code><a href="country_sources.html">country_sources()</a></code>, <code><a href="register_country_source.html">register_country_source()</a></code>,
+<code><a href="remove_country_source.html">remove_country_source()</a></code>, and the adapters <code><a href="source_adapters.html">fetch_owid()</a></code>,
+<code><a href="source_adapters.html">fetch_eurostat()</a></code>, <code><a href="source_adapters.html">fetch_oecd()</a></code> and <code><a href="source_adapters.html">fetch_comtrade()</a></code>.</p>
+    </div>
+    <div class="section level2">
     <h2 id="the-join-engine">The join engine<a class="anchor" aria-label="anchor" href="#the-join-engine"></a></h2>
 
 
@@ -91,16 +100,33 @@ geometry (<code><a href="https://ggplot2.tidyverse.org/reference/map_data.html" 
 
 <p><code><a href="convert_country.html">convert_country()</a></code>, <code><a href="country_codes.html">country_codes()</a></code>, <code><a href="country_groups.html">country_groups()</a></code>, <code><a href="in_group.html">in_group()</a></code>,
 <code><a href="wdi_search.html">wdi_search()</a></code>, and the datasets <a href="country_meta.html">country_meta</a>, <a href="common_indicators.html">common_indicators</a>,
-<a href="country_groups_tbl.html">country_groups_tbl</a>, <a href="world_snapshot.html">world_snapshot</a>, <a href="world_tiles.html">world_tiles</a>, <a href="historical_codes.html">historical_codes</a>.</p>
+<a href="country_groups_tbl.html">country_groups_tbl</a>, <a href="country_groups_history.html">country_groups_history</a>, <a href="world_snapshot.html">world_snapshot</a>,
+<a href="world_tiles.html">world_tiles</a>, <a href="historical_codes.html">historical_codes</a>, <a href="disputed_territories.html">disputed_territories</a>.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="time">Time<a class="anchor" aria-label="anchor" href="#time"></a></h2>
+
+
+<p><code><a href="country_timeline.html">country_timeline()</a></code>, <code><a href="audit_time_coverage.html">audit_time_coverage()</a></code>, <code><a href="historical_geometry.html">historical_geometry()</a></code>.</p>
     </div>
     <div class="section level2">
     <h2 id="analysis-helpers">Analysis helpers<a class="anchor" aria-label="anchor" href="#analysis-helpers"></a></h2>
 
 
 <p><code><a href="per_capita.html">per_capita()</a></code>, <code><a href="aggregate_regions.html">aggregate_regions()</a></code>, <code><a href="rank_countries.html">rank_countries()</a></code>, <code><a href="complete_years.html">complete_years()</a></code>,
-<code><a href="growth_rate.html">growth_rate()</a></code>, <code><a href="index_to.html">index_to()</a></code>, <code><a href="share_of_world.html">share_of_world()</a></code>, <code><a href="lag_by_country.html">lag_by_country()</a></code>,
-<code><a href="lag_by_country.html">diff_by_country()</a></code>, <code><a href="correlate_indicators.html">correlate_indicators()</a></code>, <code><a href="beta_convergence.html">beta_convergence()</a></code>,
-<code><a href="sigma_convergence.html">sigma_convergence()</a></code>, <code><a href="gini.html">gini()</a></code>, <code><a href="theil.html">theil()</a></code>, <code><a href="morans_i.html">morans_i()</a></code>.</p>
+<code><a href="interpolate_missing.html">interpolate_missing()</a></code>, <code><a href="growth_rate.html">growth_rate()</a></code>, <code><a href="index_to.html">index_to()</a></code>, <code><a href="share_of_world.html">share_of_world()</a></code>,
+<code><a href="lag_by_country.html">lag_by_country()</a></code>, <code><a href="lag_by_country.html">diff_by_country()</a></code>, <code><a href="deflate.html">deflate()</a></code>, <code><a href="to_ppp.html">to_ppp()</a></code>,
+<code><a href="rate_check.html">rate_check()</a></code>, <code><a href="smooth_rates.html">smooth_rates()</a></code>, <code><a href="correlate_indicators.html">correlate_indicators()</a></code>,
+<code><a href="beta_convergence.html">beta_convergence()</a></code>, <code><a href="sigma_convergence.html">sigma_convergence()</a></code>, <code><a href="convergence_club.html">convergence_club()</a></code>, <code><a href="gini.html">gini()</a></code>,
+<code><a href="theil.html">theil()</a></code>.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="spatial-statistics-and-networks">Spatial statistics and networks<a class="anchor" aria-label="anchor" href="#spatial-statistics-and-networks"></a></h2>
+
+
+<p><code><a href="country_weights.html">country_weights()</a></code>, <code><a href="morans_i.html">morans_i()</a></code>, <code><a href="local_morans.html">local_morans()</a></code>, <code><a href="lisa_map.html">lisa_map()</a></code>,
+<code><a href="gearys_c.html">gearys_c()</a></code>, <code><a href="getis_ord.html">getis_ord()</a></code>, <code><a href="spatial_lag.html">spatial_lag()</a></code>; <code><a href="flow_matrix.html">flow_matrix()</a></code>,
+<code><a href="country_network.html">country_network()</a></code>, <code><a href="od_map.html">od_map()</a></code>.</p>
     </div>
     <div class="section level2">
     <h2 id="visualization">Visualization<a class="anchor" aria-label="anchor" href="#visualization"></a></h2>
@@ -108,8 +134,30 @@ geometry (<code><a href="https://ggplot2.tidyverse.org/reference/map_data.html" 
 
 <p><code><a href="world_map.html">world_map()</a></code>, <code><a href="globe_map.html">globe_map()</a></code>, <code><a href="spin_globe.html">spin_globe()</a></code>, <code><a href="facet_map.html">facet_map()</a></code>, <code><a href="bubble_map.html">bubble_map()</a></code>,
 <code><a href="spike_map.html">spike_map()</a></code>, <code><a href="bivariate_map.html">bivariate_map()</a></code>, <code><a href="cartogram_map.html">cartogram_map()</a></code>, <code><a href="dorling_map.html">dorling_map()</a></code>,
-<code><a href="tile_map.html">tile_map()</a></code>, <code><a href="flow_map.html">flow_map()</a></code>, <code><a href="animate_world.html">animate_world()</a></code>, <code><a href="interactive_map.html">interactive_map()</a></code>,
-<code><a href="geom_country_labels.html">geom_country_labels()</a></code>, <code><a href="theme_world_map.html">theme_world_map()</a></code>, <code><a href="simplify_geometry.html">simplify_geometry()</a></code>.</p>
+<code><a href="gridded_cartogram.html">gridded_cartogram()</a></code>, <code><a href="tile_map.html">tile_map()</a></code>, <code><a href="flow_map.html">flow_map()</a></code>, <code><a href="animate_world.html">animate_world()</a></code>,
+<code><a href="interactive_map.html">interactive_map()</a></code>, <code><a href="geom_country_labels.html">geom_country_labels()</a></code>, <code><a href="theme_world_map.html">theme_world_map()</a></code>,
+<code><a href="simplify_geometry.html">simplify_geometry()</a></code>.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="honest-maps">Honest maps<a class="anchor" aria-label="anchor" href="#honest-maps"></a></h2>
+
+
+<p><code><a href="classify_compare.html">classify_compare()</a></code>, <code><a href="coverage_map.html">coverage_map()</a></code>, <code><a href="value_by_alpha_map.html">value_by_alpha_map()</a></code>,
+<code><a href="projection_info.html">projection_info()</a></code>, <code><a href="projection_compare.html">projection_compare()</a></code>, <code><a href="projection_distortion.html">projection_distortion()</a></code>,
+<code><a href="tissot_map.html">tissot_map()</a></code>, <code><a href="cartogram_diagnostics.html">cartogram_diagnostics()</a></code>, <code><a href="map_provenance.html">map_provenance()</a></code>,
+<code><a href="dispute_policy.html">dispute_policy()</a></code>, <code><a href="check_dispute_coverage.html">check_dispute_coverage()</a></code>.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="subnational">Subnational<a class="anchor" aria-label="anchor" href="#subnational"></a></h2>
+
+
+<p><code><a href="standardize_subnational.html">standardize_subnational()</a></code>, <code><a href="nuts_geometry.html">nuts_geometry()</a></code>, <code><a href="subnational_map.html">subnational_map()</a></code>.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="reporting">Reporting<a class="anchor" aria-label="anchor" href="#reporting"></a></h2>
+
+
+<p><code><a href="country_factsheet.html">country_factsheet()</a></code>, <code><a href="world_table.html">world_table()</a></code>.</p>
     </div>
     <div class="section level2">
     <h2 id="database-rendering-ggsql-">Database rendering (ggsql)<a class="anchor" aria-label="anchor" href="#database-rendering-ggsql-"></a></h2>
@@ -121,13 +169,13 @@ geometry (<code><a href="https://ggplot2.tidyverse.org/reference/map_data.html" 
     <h2 id="performance-amp-caching">Performance &amp; caching<a class="anchor" aria-label="anchor" href="#performance-amp-caching"></a></h2>
 
 
-<p><code><a href="clear_wdi_cache.html">clear_wdi_cache()</a></code>.</p>
+<p><code><a href="clear_wdi_cache.html">clear_wdi_cache()</a></code>, <code><a href="clear_country_cache.html">clear_country_cache()</a></code>.</p>
     </div>
     <div class="section level2">
     <h2 id="options">Options<a class="anchor" aria-label="anchor" href="#options"></a></h2>
 
 
-<p>Four options change the package's behaviour. All are unset by default.</p><dl><dt><code>countryatlas.cache_dir</code></dt>
+<p>Six options change the package's behaviour. All are unset by default.</p><dl><dt><code>countryatlas.cache_dir</code></dt>
 <dd><p>Where the persistent World Bank cache
 lives. Defaults to <code>tools::R_user_dir("countryatlas", "cache")</code>; set it to
 <code>""</code> for session-only caching. See <code><a href="clear_wdi_cache.html">clear_wdi_cache()</a></code>.</p></dd>

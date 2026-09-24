@@ -76,7 +76,9 @@ annual growth rate vs. the first non-<code>NA</code> year).
 <code>"cagr"</code> needs a positive ratio at both ends, so a negative value gives
 <code>NA</code> for that row (with a warning) and a non-positive base year gives <code>NA</code>
 for that country; a value of exactly <code>0</code> is a legitimate annualised -100%.
-<code>"yoy"</code> is a plain ratio change and is defined for negative values.</p></dd>
+<code>"yoy"</code> is a plain ratio change and is defined for negative values, but
+not after a zero: a change from <code>0</code> has no ratio, so that row is <code>NA</code>
+(with a warning) rather than <code>Inf</code>.</p></dd>
 
 
 <dt id="arg-suffix">suffix<a class="anchor" aria-label="anchor" href="#arg-suffix"></a></dt>

@@ -36,6 +36,11 @@ never goes near it. Under `R CMD check` the whole cache moves to the
 session temp directory, so a check never writes to the user's file
 space.
 
+The directory may hold other files too. The cache only ever writes,
+expires and deletes its own entries (named by a hash, with the extension
+`.countryatlas`), and `disk = TRUE` removes the directory itself only
+when that leaves it empty.
+
 ## How the cache is managed
 
 The persistent cache expires its own contents, so it does not grow

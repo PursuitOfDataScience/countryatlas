@@ -110,6 +110,8 @@ quantity that <code><a href="rate_check.html">rate_check()</a></code> flags. Whe
 estimated as non-positive (rates no more dispersed than Poisson noise alone),
 every rate shrinks fully to the global mean, which is the right answer:
 the data contain no evidence of real between-country variation.</p>
+<p>On a panel the prior is estimated separately for each <code>year</code>, so every
+rate is shrunk toward its own year's global rate and every row is kept.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

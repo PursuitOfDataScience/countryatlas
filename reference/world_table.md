@@ -29,9 +29,11 @@ world_table(
 
 - value:
 
-  The column to rank on (unquoted). `NULL` keeps every numeric column,
-  does not sort, and omits the `rank` column – there is nothing to rank
-  by, and `top_n` then takes an arbitrary slice (it warns when it does).
+  The column to rank on (unquoted). Tied values share a rank, as in
+  [`rank_countries()`](https://pursuitofdatascience.github.io/countryatlas/reference/rank_countries.md).
+  `NULL` keeps every numeric column, does not sort, and omits the `rank`
+  column: there is nothing to rank by, and `top_n` then takes an
+  arbitrary slice (it warns when it does).
 
 - top_n:
 

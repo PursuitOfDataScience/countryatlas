@@ -77,6 +77,10 @@ Bank answers; only a successful fetch leaves a response in it, and reading the
 bundled <a href="world_snapshot.html">world_snapshot</a> never goes near it. Under <code>R CMD check</code> the whole
 cache moves to the session temp directory, so a check never writes to the
 user's file space.</p>
+<p>The directory may hold other files too. The cache only ever writes, expires
+and deletes its own entries (named by a hash, with the extension
+<code>.countryatlas</code>), and <code>disk = TRUE</code> removes the directory itself only when
+that leaves it empty.</p>
     </div>
     <div class="section level2">
     <h2 id="how-the-cache-is-managed">How the cache is managed<a class="anchor" aria-label="anchor" href="#how-the-cache-is-managed"></a></h2>

@@ -46,10 +46,10 @@ With `groups`: a tibble with components `"total"`, `"between"` and
 the total (`NA` when the total is `0`, i.e. perfect equality, and the
 shares are undefined).
 
-When there is nothing to compute – no values left after `na.rm`, a zero
-total weight, or an infinity in `x` or `weights` – the result is a
-single `NA` whatever `groups` says, so reach for the components only
-after checking
+When there is nothing to compute (no values left after `na.rm`, a zero
+total weight, an infinity in `x` or `weights`, or, with `na.rm = FALSE`,
+a missing value or group), the result is a single `NA` whatever `groups`
+says, so reach for the components only after checking
 [`is.data.frame()`](https://rdrr.io/r/base/as.data.frame.html).
 
 ## See also

@@ -59,6 +59,9 @@ flags. Where the between-country variance is estimated as non-positive
 fully to the global mean, which is the right answer: the data contain no
 evidence of real between-country variation.
 
+On a panel the prior is estimated separately for each `year`, so every
+rate is shrunk toward its own year's global rate and every row is kept.
+
 ## See also
 
 [`rate_check()`](https://pursuitofdatascience.github.io/countryatlas/reference/rate_check.md),
