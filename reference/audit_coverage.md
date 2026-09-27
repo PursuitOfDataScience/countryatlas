@@ -43,7 +43,10 @@ elements by name to use the numbers programmatically.
 
 - `na_rates` – one row per indicator: `n` is the number of countries
   *considered*, `n_missing` how many of them lack a value, and `na_rate`
-  is `n_missing / n`.
+  is `n_missing / n`. An infinite value counts as lacking one: no map
+  can draw it, and
+  [`coverage_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/coverage_map.md)
+  shows it as missing too.
 
 - `by_group` – one row per group: `n_countries` is how many countries
   are *in that group*, and `na_rate` is the share of those lacking a

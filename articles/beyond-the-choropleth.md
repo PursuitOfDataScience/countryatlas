@@ -89,7 +89,7 @@ volume.](beyond-the-choropleth_files/figure-html/unnamed-chunk-6-1.png)
 ## Small multiples
 
 [`facet_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/facet_map.md)
-splits one choropleth into per-group panels — the static counterpart to
+splits one choropleth into per-group panels, the static counterpart to
 [`animate_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/animate_world.md),
 for print and side-by-side comparison:
 
@@ -134,12 +134,12 @@ optional packages, so they are shown here as code:
 
 ``` r
 
-# Bivariate choropleth (two variables at once) — needs `biscale` + `sf`
+# Bivariate choropleth (two variables at once): needs `biscale` + `sf`
 world_data(2020, c(gdp = "NY.GDP.PCAP.KD", life = "SP.DYN.LE00.IN"),
            geometry = "sf") |>
   bivariate_map(gdp, life)
 
-# Area-honest cartogram — needs `cartogram` + `sf`
+# Area-honest cartogram: needs `cartogram` + `sf`
 world_data(2020, c(pop = "SP.POP.TOTL"), geometry = "sf") |>
   cartogram_map(pop, type = "dorling")
 
@@ -147,15 +147,15 @@ world_data(2020, c(pop = "SP.POP.TOTL"), geometry = "sf") |>
 world_data(2020, c(pop = "SP.POP.TOTL"), geometry = "sf") |>
   dorling_map(pop, k = 4)
 
-# The fast flow-based cartogram (Gastner-Seguy-More) — needs `cartogramR`
+# The fast flow-based cartogram (Gastner-Seguy-More): needs `cartogramR`
 world_data(2020, c(pop = "SP.POP.TOTL"), geometry = "sf") |>
   cartogram_map(pop, type = "flow")
 
-# Animated choropleth over a year panel — needs `gganimate`
+# Animated choropleth over a year panel: needs `gganimate`
 world_data(2000:2020, c(gdp = "NY.GDP.PCAP.KD")) |>
   animate_world(gdp)
 
-# Interactive choropleth — needs `leaflet`, `ggiraph` or `plotly`
+# Interactive choropleth: needs `leaflet`, `ggiraph` or `plotly`
 world_data(2020) |>
   interactive_map(gdp_per_capita, engine = "plotly")
 ```
@@ -186,8 +186,8 @@ reach for it rather than for
 
 Two lightweight spatial helpers that aren’t choropleths at all.
 [`distance_between()`](https://pursuitofdatascience.github.io/countryatlas/reference/distance_between.md)
-answers “how far apart” from the bundled `country_meta` centroids — no
-`sf` or network required:
+answers “how far apart” from the bundled `country_meta` centroids, with
+no `sf` or network required:
 
 ``` r
 

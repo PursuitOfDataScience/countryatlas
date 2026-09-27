@@ -77,7 +77,7 @@
     
     
 <p>The headline use case: <em>I have a frame keyed on messy country
-names — get it on a map.</em> The package exposes the same matching
+names; get it on a map.</em> The package exposes the same matching
 machinery it uses internally.</p>
 <div class="section level2">
 <h2 id="standardise-any-frame">Standardise any frame<a class="anchor" aria-label="anchor" href="#standardise-any-frame"></a>
@@ -133,7 +133,7 @@ names, by reconciling both sides to <code>iso3c</code> first:</p>
 </h2>
 <p><code><a href="../reference/country_join_all.html">country_join_all()</a></code> generalises this to a whole list of
 frames: every table is reconciled to <code>iso3c</code> first, then
-reduce-joined — three sources spelled three ways collapse into one
+reduce-joined, so three sources spelled three ways collapse into one
 honest table:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">t1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>country <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Czechia"</span>, <span class="st">"South Korea"</span><span class="op">)</span>, gdp <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span>
@@ -166,7 +166,7 @@ honest table:</p>
 <h2 id="historical-data-dissolved-countries">Historical data: dissolved countries<a class="anchor" aria-label="anchor" href="#historical-data-dissolved-countries"></a>
 </h2>
 <p>Historical panels bring a nastier failure mode: dissolved entities.
-Most are silently unmatched — but some are silently <em>mis</em>matched.
+Most are silently unmatched, but some are silently <em>mis</em>matched.
 countrycode resolves <code>"USSR"</code> to Russia’s <code>RUS</code>,
 so Soviet-era totals quietly become Russian totals. The
 <code>historical</code> column in the report above flags both cases, and
@@ -189,7 +189,7 @@ successor, dated):</p>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> Czechoslovakia Czechoslovakia      <span style="text-decoration: underline;">1</span>993 SVK   Slovakia</span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> France         <span style="color: #BB0000;">NA</span>                    <span style="color: #BB0000;">NA</span> FRA   France</span></span></code></pre></div>
 <p><code>"West Germany"</code> is the instructive case: it resolves to
-<code>DEU</code> and is <em>not</em> flagged — correctly so, because the
+<code>DEU</code> and is <em>not</em> flagged, correctly so, because the
 Federal Republic never dissolved. It absorbed the GDR in 1990 and simply
 continued, so <code>DEU</code> really is the right answer. The crosswalk
 is curated rather than a blanket rule that anything old-sounding gets
@@ -240,7 +240,7 @@ simply do not know), extend the override table:</p>
 <div class="section level2">
 <h2 id="point-data-onto-the-spine">Point data onto the spine<a class="anchor" aria-label="anchor" href="#point-data-onto-the-spine"></a>
 </h2>
-<p>Not all data comes keyed on names — sometimes all you have is
+<p>Not all data comes keyed on names; sometimes all you have is
 coordinates (events, weather stations, survey sites).
 <code><a href="../reference/locate_country.html">locate_country()</a></code> runs a point-in-polygon lookup and tags
 each point with the country that contains it, so point data joins the

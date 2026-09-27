@@ -37,10 +37,11 @@ assigned – see below), `status`, `from`, `to` and geometry. Two further
 CShapes columns are passed through when the installed version supplies
 them, since they answer the questions this verb is usually asked:
 
-- `owner` – the `gwcode` of the sovereign a dependency belonged to, and
-  `NA` for a sovereign state. This is the column that makes
-  `dependencies = TRUE` legible: without it a colony and its metropole
-  are two unrelated rows.
+- `owner` – the `gwcode` of the sovereign a dependency belonged to; a
+  sovereign state carries its own `gwcode` here. This is the column that
+  makes `dependencies = TRUE` legible: without it a colony and its
+  metropole are two unrelated rows. `owner != gwcode` picks out the
+  dependencies.
 
 - `capname` – the capital's name at that date.
 
@@ -53,9 +54,17 @@ decides what its own table holds, so check with
 ISO 3166 was first published in 1974 and never covered colonies, so a
 historical map cannot be keyed on `iso3c`. CShapes uses
 **Gleditsch-Ward** codes, which is why `gwcode` is the key here and
-`iso3c` is a best-effort extra: it is `NA` for every entity that never
-had an ISO code (French West Africa, the Gold Coast, the USSR before
-1974). Join historical data on `gwcode`, not on `iso3c`, and use
+`iso3c` is a best-effort extra, read off the GW code: the modern code of
+the state that holds it. So it is `NA` for an entity with no modern
+counterpart (the German Democratic Republic, Czechoslovakia, Yugoslavia,
+the two Yemens), and also where
+[historical_codes](https://pursuitofdatascience.github.io/countryatlas/reference/historical_codes.md)
+says the modern state did not exist yet – GW give the USSR and Russia
+one code, but the 1980 polygon is the Soviet Union, so it carries `NA`
+rather than `"RUS"`. A colony carries the code of the state it became:
+CShapes names the 1950 Gold Coast "Ghana" and it comes back as `"GHA"`,
+with `status` saying it was a colony. Join historical data on `gwcode`,
+not on `iso3c`, and use
 [`convert_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/convert_country.md)`(to = "gwn")`
 to get there from a modern code.
 

@@ -43,7 +43,9 @@ index_to(data, value, base_year, to = 100, suffix = "_index")
 ## Value
 
 `data` with an index column added. The column is `NA` for any country
-whose series does not cover `base_year` (see the note there).
+whose series does not cover `base_year` (see the note there). A negative
+base-year value is indexed as it is, so that country's index runs
+opposite to its series.
 
 ## Examples
 

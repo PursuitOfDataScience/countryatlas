@@ -32,7 +32,8 @@ bivariate_map(
 
 - dim:
 
-  Bivariate dimension (2 or 3, default 3).
+  Bivariate dimension: classes per variable, 2, 3 (default) or 4. A 4 x
+  4 map needs a palette that has one, such as `"GrPink2"`.
 
 - projection:
 

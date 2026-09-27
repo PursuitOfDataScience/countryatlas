@@ -67,7 +67,7 @@ class, because GDP per capita is strongly right-skewed and the top of
 the range is one country. A map like that is technically correct and
 communicates nothing. Quantiles put roughly 38 countries in each class.
 
-You do not need the comparison to get the report — any *classified*
+You do not need the comparison to get the report: any *classified*
 [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
 will produce it. (A continuous colourbar has no classes, so asking there
 returns nothing and says why.)
@@ -178,10 +178,10 @@ projection_info()[, c("projection", "property", "equal_area", "conformal")]
 ```
 
 For a choropleth the honest choice is **equal-area**, because the eye
-reads coloured area as quantity — a projection that inflates Greenland
-makes Greenland’s value look more important than it is. Equal Earth is
-the package default and the recommendation (Šavrič, Patterson & Jenny
-2019).
+reads coloured area as quantity, and a projection that inflates
+Greenland makes Greenland’s value look more important than it is. Equal
+Earth is the package default and the recommendation (Šavrič, Patterson &
+Jenny 2019).
 
 ``` r
 
@@ -212,8 +212,8 @@ tissot_map("equal_earth")
 ![Tissot indicatrices on Equal Earth: ellipses shear but hold constant
 area.](honest-maps_files/figure-html/tissot-ee-1.png)
 
-Mercator keeps every circle round — it is conformal, so local shapes are
-right — and grows them without limit toward the poles. Equal Earth keeps
+Mercator keeps every circle round (it is conformal, so local shapes are
+right) and grows them without limit toward the poles. Equal Earth keeps
 every circle’s *area* and shears the shapes instead. Neither is wrong;
 they are answers to different questions, and only one of them belongs
 under a choropleth.
@@ -258,9 +258,9 @@ the plot itself and the classification report, that is most of a methods
 note.
 
 Finally, `citation("countryatlas")` produces the package citation *and*
-the sources it reconciles — `countrycode`, the World Bank, Natural
-Earth, and the papers behind the methods used here. Citing the join
-layer without the data would be the last dishonest thing a map could do.
+the sources it reconciles: `countrycode`, the World Bank, Natural Earth,
+and the papers behind the methods used here. Citing the join layer
+without the data would be the last dishonest thing a map could do.
 
 ## 6. Where the data comes from, and when
 

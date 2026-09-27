@@ -85,8 +85,9 @@ Otherwise the rate is <code>numerator / denominator</code>.</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A tibble of <code>iso3c</code>, <code>numerator</code>, <code>denominator</code>, <code>rate</code>,
-<code>expected_se</code> (the Poisson standard error of the rate, \(\sqrt{r/d}\)) and
-<code>flagged</code>, sorted with the least reliable first.</p>
+<code>expected_se</code> (the Poisson standard error of the rate, \(\sqrt{r/d}\);
+<code>NA</code>, with a warning, for a negative rate) and <code>flagged</code>, sorted with the
+least reliable first.</p>
 <p>"Least reliable" is ordered on the standard error a <em>single</em> event would
 imply, \(\sqrt{\max(y, 1)}/d\), which is identical to <code>expected_se</code> for
 every row with at least one event. Ordering on <code>expected_se</code> directly put

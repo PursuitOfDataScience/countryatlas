@@ -141,8 +141,8 @@ table.</p>
 <div class="section level2">
 <h2 id="small-multiples">Small multiples<a class="anchor" aria-label="anchor" href="#small-multiples"></a>
 </h2>
-<p><code><a href="../reference/facet_map.html">facet_map()</a></code> splits one choropleth into per-group panels
-— the static counterpart to <code><a href="../reference/animate_world.html">animate_world()</a></code>, for print and
+<p><code><a href="../reference/facet_map.html">facet_map()</a></code> splits one choropleth into per-group panels,
+the static counterpart to <code><a href="../reference/animate_world.html">animate_world()</a></code>, for print and
 side-by-side comparison:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">world_poly</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/attach_geometry.html">attach_geometry</a></span><span class="op">(</span><span class="va">snap</span>, geometry <span class="op">=</span> <span class="st">"polygon"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
@@ -174,12 +174,12 @@ stretched sideways.</p>
 <p>The remaining displays follow the same one-call pattern but require
 optional packages, so they are shown here as code:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Bivariate choropleth (two variables at once) — needs `biscale` + `sf`</span></span>
+<code class="sourceCode R"><span><span class="co"># Bivariate choropleth (two variables at once): needs `biscale` + `sf`</span></span>
 <span><span class="fu"><a href="../reference/world_data.html">world_data</a></span><span class="op">(</span><span class="fl">2020</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>gdp <span class="op">=</span> <span class="st">"NY.GDP.PCAP.KD"</span>, life <span class="op">=</span> <span class="st">"SP.DYN.LE00.IN"</span><span class="op">)</span>,</span>
 <span>           geometry <span class="op">=</span> <span class="st">"sf"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/bivariate_map.html">bivariate_map</a></span><span class="op">(</span><span class="va">gdp</span>, <span class="va">life</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Area-honest cartogram — needs `cartogram` + `sf`</span></span>
+<span><span class="co"># Area-honest cartogram: needs `cartogram` + `sf`</span></span>
 <span><span class="fu"><a href="../reference/world_data.html">world_data</a></span><span class="op">(</span><span class="fl">2020</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>pop <span class="op">=</span> <span class="st">"SP.POP.TOTL"</span><span class="op">)</span>, geometry <span class="op">=</span> <span class="st">"sf"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/cartogram_map.html">cartogram_map</a></span><span class="op">(</span><span class="va">pop</span>, type <span class="op">=</span> <span class="st">"dorling"</span><span class="op">)</span></span>
 <span></span>
@@ -187,15 +187,15 @@ optional packages, so they are shown here as code:</p>
 <span><span class="fu"><a href="../reference/world_data.html">world_data</a></span><span class="op">(</span><span class="fl">2020</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>pop <span class="op">=</span> <span class="st">"SP.POP.TOTL"</span><span class="op">)</span>, geometry <span class="op">=</span> <span class="st">"sf"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/dorling_map.html">dorling_map</a></span><span class="op">(</span><span class="va">pop</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># The fast flow-based cartogram (Gastner-Seguy-More) — needs `cartogramR`</span></span>
+<span><span class="co"># The fast flow-based cartogram (Gastner-Seguy-More): needs `cartogramR`</span></span>
 <span><span class="fu"><a href="../reference/world_data.html">world_data</a></span><span class="op">(</span><span class="fl">2020</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>pop <span class="op">=</span> <span class="st">"SP.POP.TOTL"</span><span class="op">)</span>, geometry <span class="op">=</span> <span class="st">"sf"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/cartogram_map.html">cartogram_map</a></span><span class="op">(</span><span class="va">pop</span>, type <span class="op">=</span> <span class="st">"flow"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Animated choropleth over a year panel — needs `gganimate`</span></span>
+<span><span class="co"># Animated choropleth over a year panel: needs `gganimate`</span></span>
 <span><span class="fu"><a href="../reference/world_data.html">world_data</a></span><span class="op">(</span><span class="fl">2000</span><span class="op">:</span><span class="fl">2020</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>gdp <span class="op">=</span> <span class="st">"NY.GDP.PCAP.KD"</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/animate_world.html">animate_world</a></span><span class="op">(</span><span class="va">gdp</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Interactive choropleth — needs `leaflet`, `ggiraph` or `plotly`</span></span>
+<span><span class="co"># Interactive choropleth: needs `leaflet`, `ggiraph` or `plotly`</span></span>
 <span><span class="fu"><a href="../reference/world_data.html">world_data</a></span><span class="op">(</span><span class="fl">2020</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/interactive_map.html">interactive_map</a></span><span class="op">(</span><span class="va">gdp_per_capita</span>, engine <span class="op">=</span> <span class="st">"plotly"</span><span class="op">)</span></span></code></pre></div>
 </div>
@@ -220,7 +220,7 @@ covers when to reach for it rather than for
 </h2>
 <p>Two lightweight spatial helpers that aren’t choropleths at all.
 <code><a href="../reference/distance_between.html">distance_between()</a></code> answers “how far apart” from the bundled
-<code>country_meta</code> centroids — no <code>sf</code> or network
+<code>country_meta</code> centroids, with no <code>sf</code> or network
 required:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/distance_between.html">distance_between</a></span><span class="op">(</span><span class="st">"France"</span>, <span class="st">"Germany"</span><span class="op">)</span></span>

@@ -75,9 +75,9 @@
 <!-- badges: start -->
 
 <blockquote>
-<p><strong>Country data onto honest maps — joined on ISO codes, never on country names.</strong></p>
+<p><strong>Country data onto honest maps: joined on ISO codes, never on country names.</strong></p>
 </blockquote>
-<p>Join the World Bank’s life-expectancy table to <code>map_data("world")</code> by country name and <strong>37 of 210 countries silently vanish</strong>: nobody spells Czechia, Côte d’Ivoire or <code>"Congo, Dem. Rep."</code> the same way twice. <code>countryatlas</code> makes the ISO code the join key, so nothing goes missing — then draws the map.</p>
+<p>Join the World Bank’s life-expectancy table to <code>map_data("world")</code> by country name and <strong>37 of 210 countries silently vanish</strong>: nobody spells Czechia, Côte d’Ivoire or <code>"Congo, Dem. Rep."</code> the same way twice. <code>countryatlas</code> makes the ISO code the join key, so nothing goes missing, then draws the map.</p>
 <p><img src="reference/figures/README-hook-1.png" alt="Two world choropleths of life expectancy side by side. Joining on country name leaves dozens of countries grey and unfilled; joining with join_world() fills every one of them." width="100%"></p>
 <div class="section level2">
 <h2 id="install">Install<a class="anchor" aria-label="anchor" href="#install"></a>
@@ -90,7 +90,7 @@
 <div class="section level2">
 <h2 id="one-call">One call<a class="anchor" aria-label="anchor" href="#one-call"></a>
 </h2>
-<p><code><a href="reference/world_data.html">world_data()</a></code> fetches the indicator, attaches the geometry and keys the whole thing on <code>iso3c</code> — three worlds (<code>ggplot2</code> maps, <a href="https://github.com/vincentarelbundock/WDI" class="external-link">WDI</a>, <a href="https://github.com/vincentarelbundock/countrycode" class="external-link">countrycode</a>) stitched together in one line.</p>
+<p><code><a href="reference/world_data.html">world_data()</a></code> fetches the indicator, attaches the geometry and keys the whole thing on <code>iso3c</code>: three worlds (<code>ggplot2</code> maps, <a href="https://github.com/vincentarelbundock/WDI" class="external-link">WDI</a>, <a href="https://github.com/vincentarelbundock/countrycode" class="external-link">countrycode</a>) stitched together in one line.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/world_map.html">world_map</a></span><span class="op">(</span><span class="fu"><a href="reference/world_data.html">world_data</a></span><span class="op">(</span><span class="fl">2020</span><span class="op">)</span>, <span class="va">gdp_per_capita</span>, style <span class="op">=</span> <span class="st">"quantile"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="reference/figures/README-hero-1.png" alt="World choropleth of GDP per capita in 2020, shaded in five quantile bins." width="100%"></p>
@@ -140,7 +140,7 @@
 <div class="section level2">
 <h2 id="nothing-goes-missing-quietly">Nothing goes missing quietly<a class="anchor" aria-label="anchor" href="#nothing-goes-missing-quietly"></a>
 </h2>
-<p><code><a href="reference/check_country_match.html">check_country_match()</a></code> reports before you join — including the entities <code>countrycode</code> resolves <em>wrongly</em> rather than not at all.</p>
+<p><code><a href="reference/check_country_match.html">check_country_match()</a></code> reports before you join, including the entities <code>countrycode</code> resolves <em>wrongly</em> rather than not at all.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/check_country_match.html">check_country_match</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"USA"</span>, <span class="st">"Cote d'Ivoire"</span>, <span class="st">"USSR"</span>, <span class="st">"Wakanda"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; # A tibble: 4 × 5</span></span>
@@ -211,21 +211,21 @@
 </tr>
 <tr>
 <td colspan="2">
-<img src="reference/figures/README-g-tile.png" alt="Equal-area tile grid, one labelled square per country"><br><sub><code>tile_map(d, gdp_per_capita)</code> — one square per country, so microstates are as visible as Russia</sub>
+<img src="reference/figures/README-g-tile.png" alt="Equal-area tile grid, one labelled square per country"><br><sub><code>tile_map(d, gdp_per_capita)</code>: one square per country, so microstates are as visible as Russia</sub>
 </td>
 </tr>
 <tr>
 <td colspan="2">
-<img src="reference/figures/README-g-facet.png" alt="Small-multiple choropleths of life expectancy in 1990, 2005 and 2020"><br><sub><code>facet_map(panel, life_exp, year, style = “quantile”)</code> — or <code>animate_world(panel, life_exp)</code> for the moving version</sub>
+<img src="reference/figures/README-g-facet.png" alt="Small-multiple choropleths of life expectancy in 1990, 2005 and 2020"><br><sub><code>facet_map(panel, life_exp, year, style = “quantile”)</code>, or <code>animate_world(panel, life_exp)</code> for the moving version</sub>
 </td>
 </tr>
 </table>
-<p><code><a href="reference/interactive_map.html">interactive_map()</a></code> hands the same frame to <strong>plotly</strong>, <strong>ggiraph</strong>, <strong>leaflet</strong> or <strong>ggsql</strong> for a web-ready widget. With <code><a href="reference/as_ggsql_source.html">as_ggsql_source()</a></code> and <code><a href="reference/world_query.html">world_query()</a></code> the drawing happens <em>inside DuckDB</em> — countryatlas reconciles the countries, <a href="https://ggsql.org" class="external-link">ggsql</a> renders them without ggplot2 or <code>sf</code> at runtime.</p>
+<p><code><a href="reference/interactive_map.html">interactive_map()</a></code> hands the same frame to <strong>plotly</strong>, <strong>ggiraph</strong>, <strong>leaflet</strong> or <strong>ggsql</strong> for a web-ready widget. With <code><a href="reference/as_ggsql_source.html">as_ggsql_source()</a></code> and <code><a href="reference/world_query.html">world_query()</a></code> the drawing happens <em>inside DuckDB</em>: countryatlas reconciles the countries and <a href="https://ggsql.org" class="external-link">ggsql</a> renders them without ggplot2 or <code>sf</code> at runtime.</p>
 </div>
 <div class="section level2">
 <h2 id="honest-by-construction">Honest by construction<a class="anchor" aria-label="anchor" href="#honest-by-construction"></a>
 </h2>
-<p>“Honest maps” is in the package description, so the package has to earn it. Four ways a world map misleads, the verb for each — and one more that makes the map admit what it did.</p>
+<p>“Honest maps” is in the package description, so the package has to earn it. Four ways a world map misleads, the verb for each, and one more that makes the map admit what it did.</p>
 <p><strong>Your classification is doing the talking.</strong> Equal-interval breaks put 92% of countries in one class here; quantiles spread them evenly. Same data, same palette, opposite conclusions.</p>
 <p><img src="reference/figures/README-h-classify.png" alt="The same GDP choropleth under quantile, Jenks, equal-interval and pretty breaks; the last two are almost entirely one colour"></p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
@@ -248,15 +248,15 @@
 <table class="table">
 <tr>
 <td width="50%">
-<img src="reference/figures/README-h-tissot-merc.png" alt="Tissot indicatrices on a Mercator map: circles stay round but grow enormously toward the poles"><br><sub><code>tissot_map(“mercator”)</code> — shapes right, areas wildly wrong</sub>
+<img src="reference/figures/README-h-tissot-merc.png" alt="Tissot indicatrices on a Mercator map: circles stay round but grow enormously toward the poles"><br><sub><code>tissot_map(“mercator”)</code>: shapes right, areas wildly wrong</sub>
 </td>
 <td width="50%">
-<img src="reference/figures/README-h-tissot-ee.png" alt="Tissot indicatrices on an Equal Earth map: ellipses shear but hold constant area"><br><sub><code>tissot_map(“equal_earth”)</code> — areas right, shapes sheared</sub>
+<img src="reference/figures/README-h-tissot-ee.png" alt="Tissot indicatrices on an Equal Earth map: ellipses shear but hold constant area"><br><sub><code>tissot_map(“equal_earth”)</code>: areas right, shapes sheared</sub>
 </td>
 </tr>
 <tr>
 <td colspan="2">
-<img src="reference/figures/README-h-projections.png" alt="One choropleth drawn under Equal Earth, Robinson, Winkel tripel and Mercator"><br><sub><code>projection_compare(d, gdp_per_capita)</code> — and <code><a href="reference/projection_info.html">projection_info()</a></code> for which of the thirteen are equal-area</sub>
+<img src="reference/figures/README-h-projections.png" alt="One choropleth drawn under Equal Earth, Robinson, Winkel tripel and Mercator"><br><sub><code>projection_compare(d, gdp_per_capita)</code>, and <code><a href="reference/projection_info.html">projection_info()</a></code> for which of the thirteen are equal-area</sub>
 </td>
 </tr>
 </table>
@@ -269,7 +269,7 @@
 <img src="reference/figures/README-h-coverage.png" alt="Map of which countries report CO2 per capita and which do not"><br><sub><code>coverage_map(d, co2_per_capita)</code></sub>
 </td>
 </tr></table>
-<p><strong>A rate over eleven thousand people should not shout as loudly as one over a billion.</strong> Value-by-alpha spends opacity on the denominator, so small-population countries recede — the cartogram’s answer to the same problem, without distorting the geometry.</p>
+<p><strong>A rate over eleven thousand people should not shout as loudly as one over a billion.</strong> Value-by-alpha spends opacity on the denominator, so small-population countries recede: the cartogram’s answer to the same problem, without distorting the geometry.</p>
 <p align="center">
 <img src="reference/figures/README-h-alpha.png" width="62%" alt="Value-by-alpha map: GDP per capita in colour, population as opacity, over a dark background"></p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
@@ -296,7 +296,7 @@
 <table class="table">
 <tr>
 <td width="50%">
-<img src="reference/figures/README-r-history.png" alt="World choropleth drawn on 1950 sovereign-state borders; most of Africa is absent because it was not yet independent"><br><sub><code>attach_geometry(d, year = 1950)</code> — 1950 borders, via CShapes. Africa is nearly empty because in 1950 almost none of it was sovereign; pass <code>dependencies = TRUE</code> for the colonies.</sub>
+<img src="reference/figures/README-r-history.png" alt="World choropleth drawn on 1950 sovereign-state borders; most of Africa is absent because it was not yet independent"><br><sub><code>attach_geometry(d, year = 1950)</code>: 1950 borders, via CShapes. Africa is nearly empty because in 1950 almost none of it was sovereign; pass <code>dependencies = TRUE</code> for the colonies.</sub>
 </td>
 <td width="50%">
 <img src="reference/figures/README-r-lisa.png" alt="Map of LISA clusters: high-high, low-low and spatial outliers"><br><sub><code>lisa_map(d, gdp_per_capita, weights = country_weights(“knn”))</code></sub>
@@ -304,7 +304,7 @@
 </tr>
 <tr>
 <td>
-<img src="reference/figures/README-r-grid.png" alt="Gridded cartogram: one square per fixed number of people"><br><sub><code>gridded_cartogram(d, population)</code> — one cell per N people, countable</sub>
+<img src="reference/figures/README-r-grid.png" alt="Gridded cartogram: one square per fixed number of people"><br><sub><code>gridded_cartogram(d, population)</code>: one cell per N people, countable</sub>
 </td>
 <td>
 <img src="reference/figures/README-h-alpha.png" alt="Value-by-alpha map"><br><sub><code>value_by_alpha_map(d, gdp_per_capita, population)</code></sub>
@@ -312,7 +312,7 @@
 </tr>
 <tr>
 <td colspan="2">
-<img src="reference/figures/README-r-od.png" alt="Origin-destination small multiples: one panel per origin"><br><sub><code>od_map(flows, from, to, value)</code> — where each origin sends, when <code><a href="reference/flow_map.html">flow_map()</a></code> would be spaghetti</sub>
+<img src="reference/figures/README-r-od.png" alt="Origin-destination small multiples: one panel per origin"><br><sub><code>od_map(flows, from, to, value)</code>: where each origin sends, when <code><a href="reference/flow_map.html">flow_map()</a></code> would be spaghetti</sub>
 </td>
 </tr>
 </table>
@@ -336,7 +336,7 @@
 <span><span class="co">#&gt;       scheme         i   n n_excluded</span></span>
 <span><span class="co">#&gt; 1 contiguity 0.6073182 142         49</span></span>
 <span><span class="co">#&gt; 2        knn 0.4720522 189          2</span></span></code></pre></div>
-<p><strong>Any provider, one shape.</strong> <code><a href="reference/register_country_source.html">register_country_source()</a></code> takes a fetch function and a name; <code><a href="reference/fetch_indicator.html">fetch_indicator()</a></code> and <code><a href="reference/compare_sources.html">compare_sources()</a></code> do the rest — including telling you where two providers disagree.</p>
+<p><strong>Any provider, one shape.</strong> <code><a href="reference/register_country_source.html">register_country_source()</a></code> takes a fetch function and a name; <code><a href="reference/fetch_indicator.html">fetch_indicator()</a></code> and <code><a href="reference/compare_sources.html">compare_sources()</a></code> do the rest, including telling you where two providers disagree.</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/country_sources.html">country_sources</a></span><span class="op">(</span><span class="op">)</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"source"</span>, <span class="st">"meta"</span><span class="op">)</span><span class="op">]</span></span>
 <span><span class="co">#&gt; # A tibble: 5 × 2</span></span>

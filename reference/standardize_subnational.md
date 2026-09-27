@@ -52,10 +52,10 @@ Two things resolve, and it is worth being blunt about how little that
 is.
 
 A `region` value that is *already* an ISO 3166-2 code (`"DE-BY"`,
-`"US-CA"`) passes through, provided its country prefix matches the
-country the row gives – these codes are unique only within a country,
-which is why `country` is required. A mismatch is reported and left as
-`NA`.
+`"US-CA"`) passes through, upper-cased and trimmed, provided its country
+prefix matches the country the row gives – these codes are unique only
+within a country, which is why `country` is required. A mismatch is
+reported and left as `NA`.
 
 A region *name* resolves only through the optional `regions` package's
 crosswalk, and only when the installed version exposes a name-to-code

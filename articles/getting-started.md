@@ -25,7 +25,7 @@ data_2020 <- attach_geometry(world_snapshot$countries, geometry = "polygon")
 
 No
 [`geom_polygon()`](https://ggplot2.tidyverse.org/reference/geom_polygon.html)
-boilerplate —
+boilerplate;
 [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
 does it:
 
@@ -68,7 +68,7 @@ head(common_indicators)
 #> 6 gni_per_capita         NY.GNP.PCAP.CD GNI per capita (current US$)
 ```
 
-Or search the full World Bank catalogue by name — offline, against
+Or search the full World Bank catalogue by name, offline, against
 `WDI`’s bundled indicator cache:
 
 ``` r
@@ -90,6 +90,6 @@ country_data(2020, c(life_exp = "SP.DYN.LE00.IN", pop = "SP.POP.TOTL"))
 
 ## Next steps
 
-- *Joining your own data* — get a frame keyed on messy names onto a map.
-- *Modern maps with sf & projections* — equal-area, projected maps.
-- *Beyond the choropleth* — bubbles, cartograms, tiles, flows and more.
+- *Joining your own data*: get a frame keyed on messy names onto a map.
+- *Modern maps with sf & projections*: equal-area, projected maps.
+- *Beyond the choropleth*: bubbles, cartograms, tiles, flows and more.

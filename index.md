@@ -1,13 +1,13 @@
 # countryatlas
 
-> **Country data onto honest maps — joined on ISO codes, never on
-> country names.**
+> **Country data onto honest maps: joined on ISO codes, never on country
+> names.**
 
 Join the World Bank’s life-expectancy table to `map_data("world")` by
 country name and **37 of 210 countries silently vanish**: nobody spells
 Czechia, Côte d’Ivoire or `"Congo, Dem. Rep."` the same way twice.
-`countryatlas` makes the ISO code the join key, so nothing goes missing
-— then draws the map.
+`countryatlas` makes the ISO code the join key, so nothing goes missing,
+then draws the map.
 
 ![Two world choropleths of life expectancy side by side. Joining on
 country name leaves dozens of countries grey and unfilled; joining with
@@ -30,7 +30,7 @@ that uses it.
 
 [`world_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_data.md)
 fetches the indicator, attaches the geometry and keys the whole thing on
-`iso3c` — three worlds (`ggplot2` maps,
+`iso3c`: three worlds (`ggplot2` maps,
 [WDI](https://github.com/vincentarelbundock/WDI),
 [countrycode](https://github.com/vincentarelbundock/countrycode))
 stitched together in one line.
@@ -111,7 +111,7 @@ country_join(a, b, country, nation)
 ## Nothing goes missing quietly
 
 [`check_country_match()`](https://pursuitofdatascience.github.io/countryatlas/reference/check_country_match.md)
-reports before you join — including the entities `countrycode` resolves
+reports before you join, including the entities `countrycode` resolves
 *wrongly* rather than not at all.
 
 ``` r
@@ -160,15 +160,15 @@ hands the same frame to **plotly**, **ggiraph**, **leaflet** or
 [`as_ggsql_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/as_ggsql_source.md)
 and
 [`world_query()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_query.md)
-the drawing happens *inside DuckDB* — countryatlas reconciles the
-countries, [ggsql](https://ggsql.org) renders them without ggplot2 or
+the drawing happens *inside DuckDB*: countryatlas reconciles the
+countries and [ggsql](https://ggsql.org) renders them without ggplot2 or
 `sf` at runtime.
 
 ## Honest by construction
 
 “Honest maps” is in the package description, so the package has to earn
-it. Four ways a world map misleads, the verb for each — and one more
-that makes the map admit what it did.
+it. Four ways a world map misleads, the verb for each, and one more that
+makes the map admit what it did.
 
 **Your classification is doing the talking.** Equal-interval breaks put
 92% of countries in one class here; quantiles spread them evenly. Same
@@ -210,7 +210,7 @@ nobody mistakes them for a value, or map availability itself.
 
 **A rate over eleven thousand people should not shout as loudly as one
 over a billion.** Value-by-alpha spends opacity on the denominator, so
-small-population countries recede — the cartogram’s answer to the same
+small-population countries recede: the cartogram’s answer to the same
 problem, without distorting the geometry.
 
 ![Value-by-alpha map: GDP per capita in colour, population as opacity,
@@ -286,7 +286,7 @@ takes a fetch function and a name;
 [`fetch_indicator()`](https://pursuitofdatascience.github.io/countryatlas/reference/fetch_indicator.md)
 and
 [`compare_sources()`](https://pursuitofdatascience.github.io/countryatlas/reference/compare_sources.md)
-do the rest — including telling you where two providers disagree.
+do the rest, including telling you where two providers disagree.
 
 ``` r
 

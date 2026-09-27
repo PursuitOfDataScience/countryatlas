@@ -88,7 +88,8 @@ name to use the numbers programmatically.</p><ul><li><p><code>unmatched</code> �
 code. Empty is the good case.</p></li>
 <li><p><code>na_rates</code> – one row per indicator: <code>n</code> is the number of countries
 <em>considered</em>, <code>n_missing</code> how many of them lack a value, and <code>na_rate</code>
-is <code>n_missing / n</code>.</p></li>
+is <code>n_missing / n</code>. An infinite value counts as lacking one: no map can
+draw it, and <code><a href="coverage_map.html">coverage_map()</a></code> shows it as missing too.</p></li>
 <li><p><code>by_group</code> – one row per group: <code>n_countries</code> is how many countries are
 <em>in that group</em>, and <code>na_rate</code> is the share of those lacking a value.
 The counts sum to <code>n</code>.</p></li>

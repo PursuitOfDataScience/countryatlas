@@ -187,7 +187,7 @@ Six options change the package's behaviour. All are unset by default.
   How long a persistent cache entry stays usable, in seconds. Defaults
   to 30 days. World Bank figures are revised, so an old entry is not
   merely stale on disk – it is a different answer from the one the API
-  would give now.
+  would give now. A single non-negative number; `Inf` for no expiry.
 
 - `countryatlas.cache_max_size`:
 
@@ -195,7 +195,8 @@ Six options change the package's behaviour. All are unset by default.
   past which the least-recently-used entries are dropped. CRAN policy
   allows a package cache under
   [`tools::R_user_dir()`](https://rdrr.io/r/tools/userdir.html) only if
-  its contents are actively managed.
+  its contents are actively managed. A single non-negative number; `Inf`
+  for no cap.
 
 - `countryatlas.workers`:
 

@@ -94,7 +94,7 @@ geometry ourselves:</p>
 <div class="section level2">
 <h2 id="your-first-choropleth">Your first choropleth<a class="anchor" aria-label="anchor" href="#your-first-choropleth"></a>
 </h2>
-<p>No <code><a href="https://ggplot2.tidyverse.org/reference/geom_polygon.html" class="external-link">geom_polygon()</a></code> boilerplate — <code><a href="../reference/world_map.html">world_map()</a></code>
+<p>No <code><a href="https://ggplot2.tidyverse.org/reference/geom_polygon.html" class="external-link">geom_polygon()</a></code> boilerplate; <code><a href="../reference/world_map.html">world_map()</a></code>
 does it:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/world_map.html">world_map</a></span><span class="op">(</span><span class="va">data_2020</span>, <span class="va">gdp_per_capita</span>, style <span class="op">=</span> <span class="st">"quantile"</span>,</span>
@@ -122,7 +122,7 @@ categorical fill reads naturally:</p>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> gdp_per_capita         NY.GDP.PCAP.KD GDP per capita (constant 2015 US$)</span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> gdp_per_capita_current NY.GDP.PCAP.CD GDP per capita (current US$)      </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> gni_per_capita         NY.GNP.PCAP.CD GNI per capita (current US$)</span></span></code></pre></div>
-<p>Or search the full World Bank catalogue by name — offline, against
+<p>Or search the full World Bank catalogue by name, offline, against
 <code>WDI</code>’s bundled indicator cache:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="../reference/wdi_search.html">wdi_search</a></span><span class="op">(</span><span class="st">"renewable energy"</span><span class="op">)</span><span class="op">)</span></span>
@@ -141,13 +141,13 @@ categorical fill reads naturally:</p>
 </h2>
 <ul>
 <li>
-<em>Joining your own data</em> — get a frame keyed on messy names
+<em>Joining your own data</em>: get a frame keyed on messy names
 onto a map.</li>
 <li>
-<em>Modern maps with sf &amp; projections</em> — equal-area,
+<em>Modern maps with sf &amp; projections</em>: equal-area,
 projected maps.</li>
 <li>
-<em>Beyond the choropleth</em> — bubbles, cartograms, tiles, flows
+<em>Beyond the choropleth</em>: bubbles, cartograms, tiles, flows
 and more.</li>
 </ul>
 </div>

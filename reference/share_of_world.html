@@ -79,7 +79,9 @@ is always the world (or the year's) total, never the group's.</p>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p><code>data</code> with a share column added (a proportion in <code>[0, 1]</code>).</p>
+    <p><code>data</code> with a share column added: a proportion in <code>[0, 1]</code> when no
+value is negative. Negative values are the caller's business and are
+summed as they are, so their shares fall outside that range.</p>
     </div>
 
     <div class="section level2">

@@ -101,9 +101,10 @@ regions get <code>NA</code>, never a guess.</p>
 
 <p>Two things resolve, and it is worth being blunt about how little that is.</p>
 <p>A <code>region</code> value that is <em>already</em> an ISO 3166-2 code (<code>"DE-BY"</code>, <code>"US-CA"</code>)
-passes through, provided its country prefix matches the country the row
-gives – these codes are unique only within a country, which is why
-<code>country</code> is required. A mismatch is reported and left as <code>NA</code>.</p>
+passes through, upper-cased and trimmed, provided its country prefix
+matches the country the row gives – these codes are unique only within a
+country, which is why <code>country</code> is required. A mismatch is reported and
+left as <code>NA</code>.</p>
 <p>A region <em>name</em> resolves only through the optional <code>regions</code> package's
 crosswalk, and only when the installed version exposes a name-to-code pair
 this function recognises. As of <code>regions</code> 0.1.8 none of them do:

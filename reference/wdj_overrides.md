@@ -27,7 +27,7 @@ country_overrides(extra = NULL)
   An optional named character vector of additional overrides (names are
   country/region names, values are `iso3c` codes). Merged on top of the
   built-in table, so you can extend or override it, e.g.
-  `wdj_overrides(c(Somaliland = "SOM"))`.
+  `country_overrides(c(Somaliland = "SOM"))`.
 
 ## Value
 

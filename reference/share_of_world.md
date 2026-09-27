@@ -28,7 +28,9 @@ share_of_world(data, value, suffix = "_share")
 
 ## Value
 
-`data` with a share column added (a proportion in `[0, 1]`).
+`data` with a share column added: a proportion in `[0, 1]` when no value
+is negative. Negative values are the caller's business and are summed as
+they are, so their shares fall outside that range.
 
 ## Examples
 

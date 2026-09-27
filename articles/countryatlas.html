@@ -88,23 +88,22 @@ hard: the same country is spelled <code>"US"</code>,
 <code>"United States of America"</code>, and a naïve join treats them as
 different entities. <strong>countryatlas</strong> resolves this friction
 by adopting ISO 3166 codes as a universal join key and by stitching
-together three otherwise disjoint resources — map geometry, World Bank
-development indicators, and a comprehensive country-code crosswalk —
-into a single, map-ready table. This vignette presents the package’s
-design philosophy, its core functional vocabulary, and worked examples
-spanning data assembly, the join engine, diagnostics, reference data,
-analysis helpers and the grammar of honest cartographic displays — the
-companion vignettes take up the remaining map types, projections and
-query interface in detail. All examples run offline against a bundled
-data snapshot.</p>
+together three otherwise disjoint resources (map geometry, World Bank
+development indicators, and a comprehensive country-code crosswalk) into
+a single, map-ready table. This vignette presents the package’s design
+philosophy, its core functional vocabulary, and worked examples spanning
+data assembly, the join engine, diagnostics, reference data, analysis
+helpers and the grammar of honest cartographic displays; the companion
+vignettes take up the remaining map types, projections and query
+interface in detail. All examples run offline against a bundled data
+snapshot.</p>
 </div>
 <div class="section level2">
 <h2 id="introduction">Introduction<a class="anchor" aria-label="anchor" href="#introduction"></a>
 </h2>
 <p>The package rests on a single conviction: <em>if a task does not make
-it easier to get country data onto a map — or to make that map honest —
-it does not belong here</em>. Concretely, three packages are
-combined:</p>
+it easier to get country data onto a map, or to make that map honest, it
+does not belong here</em>. Concretely, three packages are combined:</p>
 <ul>
 <li>
 <strong><code>ggplot2::map_data("world")</code></strong> (or Natural
@@ -122,7 +121,7 @@ possible.</li>
 call</strong>: <code>world_data(2020)</code> returns a tibble ready to
 map. Second, <strong>the ISO code is the spine</strong>: every function
 speaks <code>iso3c</code>/<code>iso2c</code> internally and exposes it,
-so anything the package produces joins to anything else — and to the
+so anything the package produces joins to anything else, and to the
 user’s own data. Third, <strong>no country is lost silently</strong>:
 entities that map backends spell idiosyncratically are <em>matched</em>
 through a curated override table rather than dropped, and unmatched
@@ -259,8 +258,8 @@ ISO codes and classifications:</p>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> Czechia           6 CZE   CZ    Europe    Europe &amp; Central Asia</span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> Kosovo            4 XKX   XK    Europe    Europe &amp; Central Asia</span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> Cote d'Ivoire     7 CIV   CI    Africa    Sub-Saharan Africa</span></span></code></pre></div>
-<p><code><a href="../reference/join_world.html">join_world()</a></code> goes one step further — auto-detecting the
-country column, standardising it and attaching geometry — while
+<p><code><a href="../reference/join_world.html">join_world()</a></code> goes one step further, auto-detecting the
+country column, standardising it and attaching geometry, while
 <code><a href="../reference/country_join.html">country_join()</a></code> reconciles two independent tables that each
 key on country names:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
@@ -310,8 +309,8 @@ and attaches a record of every change:</p>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> population        215         0  0     </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> life_expectancy   215         0  0     </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> co2_per_capita    215        12  0.055<span style="text-decoration: underline;">8</span></span></span></code></pre></div>
-<p>The entities the previous version dropped — Kosovo, Micronesia, the
-Virgin Islands and a dozen others — are now matched:</p>
+<p>The entities the previous version dropped (Kosovo, Micronesia, the
+Virgin Islands and a dozen others) are now matched:</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">dropped</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Kosovo"</span>, <span class="st">"Micronesia"</span>, <span class="st">"Virgin Islands"</span>, <span class="st">"Canary Islands"</span>,</span>
 <span>             <span class="st">"Saint Martin"</span><span class="op">)</span></span>
@@ -326,9 +325,9 @@ Virgin Islands and a dozen others — are now matched:</p>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> MAF   MF    Americas  Latin America &amp; Caribbean</span></span></code></pre></div>
 <p>Dissolved entities get first-class treatment too. The
 <code>historical</code> column of <code><a href="../reference/check_country_match.html">check_country_match()</a></code>
-flags them — including <code>"USSR"</code>, which countrycode silently
+flags them, including <code>"USSR"</code>, which countrycode silently
 resolves to Russia’s <code>RUS</code> (so Soviet-era data becomes
-Russian data without a warning) — and <code><a href="../reference/dissolve_country.html">dissolve_country()</a></code>
+Russian data without a warning), and <code><a href="../reference/dissolve_country.html">dissolve_country()</a></code>
 expands them to their successor states via the curated
 <code>historical_codes</code> crosswalk:</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
@@ -408,7 +407,7 @@ dissolved-entity crosswalk used above).</p>
 </h2>
 <p>Small, in-spirit transforms that keep an analysis from leaving the
 package mid-pipeline. <code><a href="../reference/per_capita.html">per_capita()</a></code> disarms the commonest
-footgun in this data — <em>is this map just a population map?</em> — by
+footgun in this data (<em>is this map just a population map?</em>) by
 normalising a total before it is plotted. Supply the denominator, or
 omit it and the relevant years of <code>SP.POP.TOTL</code> are fetched
 for you:</p>
@@ -475,7 +474,7 @@ the standard comparative moves, each computed per country:</p>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> USA    <span style="text-decoration: underline;">2</span>020   104     0.040<span style="text-decoration: underline;">0</span>      104 </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> USA    <span style="text-decoration: underline;">2</span>021   109     0.048<span style="text-decoration: underline;">1</span>      109</span></span></code></pre></div>
 <p>And <code><a href="../reference/complete_years.html">complete_years()</a></code> fills the panel gaps that would
-otherwise make an animation flicker or a join silently drop years — by
+otherwise make an animation flicker or a join silently drop years, by
 grid completion, carry-forward or linear interpolation
 (<code><a href="../reference/lag_by_country.html">lag_by_country()</a></code> and <code><a href="../reference/lag_by_country.html">diff_by_country()</a></code> round
 out the panel toolkit):</p>
@@ -494,8 +493,8 @@ out the panel toolkit):</p>
 <p>Three questions this data is constantly asked: <em>how unequal is the
 world</em>, <em>what moves together</em>, and <em>are poor countries
 catching up?</em> <code><a href="../reference/gini.html">gini()</a></code> and <code><a href="../reference/theil.html">theil()</a></code> measure
-inequality across countries — weight by population and they describe
-inequality between people; <code><a href="../reference/theil.html">theil()</a></code> decomposes exactly into
+inequality across countries (weight by population and they describe
+inequality between people); <code><a href="../reference/theil.html">theil()</a></code> decomposes exactly into
 between/within components:</p>
 <div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/gini.html">gini</a></span><span class="op">(</span><span class="va">snapshot</span><span class="op">$</span><span class="va">gdp_per_capita</span>, weights <span class="op">=</span> <span class="va">snapshot</span><span class="op">$</span><span class="va">population</span><span class="op">)</span></span>
@@ -529,7 +528,7 @@ speed and half-life) and <code><a href="../reference/sigma_convergence.html">sig
 cross-country dispersion is actually narrowing. And on the spatial side,
 <code><a href="../reference/morans_i.html">morans_i()</a></code> measures whether neighbouring countries have
 similar values, using the package’s own <code><a href="../reference/country_borders.html">country_borders()</a></code>
-adjacency — no <code>spdep</code> needed.</p>
+adjacency, with no <code>spdep</code> needed.</p>
 </div>
 </div>
 <div class="section level2">
@@ -544,9 +543,9 @@ here run without the network. The cache can be cleared with
 <div class="section level2">
 <h2 id="conclusion">Conclusion<a class="anchor" aria-label="anchor" href="#conclusion"></a>
 </h2>
-<p><code>countryatlas</code> keeps its original soul — ISO codes as the
-universal join key, one call to a map-ready table — and extends it into
-a complete toolkit: any indicator and any year span, a modern
+<p><code>countryatlas</code> keeps its original soul (ISO codes as the
+universal join key, one call to a map-ready table) and extends it into a
+complete toolkit: any indicator and any year span, a modern
 <code>sf</code> backend, an exposed join engine for the user’s own data,
 honest diagnostics, curated reference data, analysis helpers, and a full
 vocabulary of projected, area-honest maps.</p>

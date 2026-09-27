@@ -95,7 +95,9 @@ compute the raw rate only.</p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p><code>data</code> with <code>&lt;numerator&gt;_rate</code> and <code>&lt;numerator&gt;_smoothed</code> columns
 added, plus <code>&lt;numerator&gt;_shrinkage</code> – the weight given to the country's own
-rate, between 0 (fully shrunk to the global rate) and 1 (untouched).</p>
+rate, between 0 (fully shrunk to the global rate) and 1 (untouched). A row
+with no finite, positive denominator or with a negative count has no rate:
+all three are <code>NA</code> there, with a warning.</p>
     </div>
     <div class="section level2">
     <h2 id="the-model">The model<a class="anchor" aria-label="anchor" href="#the-model"></a></h2>

@@ -108,7 +108,7 @@ them if you group by `iso3c`.
 
 `"orthographic"` is the one genuinely hemispheric projection: the
 countries on the far side have no image and come back as empty
-geometries (correctly, but
+geometries, and the ones on the horizon are cut there (correctly, but
 [`sf::st_coordinates()`](https://r-spatial.github.io/sf/reference/st_coordinates.html)
 cannot read a column that mixes empty and non-empty – drop them first).
 The other three azimuthal projections (`"azimuthal_equal_area"`,

@@ -184,13 +184,15 @@ lives. Defaults to <code>tools::R_user_dir("countryatlas", "cache")</code>; set 
 <dd><p>How long a persistent cache entry
 stays usable, in seconds. Defaults to 30 days. World Bank figures are
 revised, so an old entry is not merely stale on disk – it is a
-different answer from the one the API would give now.</p></dd>
+different answer from the one the API would give now. A single
+non-negative number; <code>Inf</code> for no expiry.</p></dd>
 
 <dt><code>countryatlas.cache_max_size</code></dt>
 <dd><p>The size cap on the persistent
 cache, in bytes. Defaults to 50 MB, past which the least-recently-used
 entries are dropped. CRAN policy allows a package cache under
-<code><a href="https://rdrr.io/r/tools/userdir.html" class="external-link">tools::R_user_dir()</a></code> only if its contents are actively managed.</p></dd>
+<code><a href="https://rdrr.io/r/tools/userdir.html" class="external-link">tools::R_user_dir()</a></code> only if its contents are actively managed. A single
+non-negative number; <code>Inf</code> for no cap.</p></dd>
 
 <dt><code>countryatlas.workers</code></dt>
 <dd><p>How many processes fetch indicators in

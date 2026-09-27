@@ -7,20 +7,19 @@ hard: the same country is spelled `"US"`, `"U.S."`, `"United States"`
 and `"United States of America"`, and a naïve join treats them as
 different entities. **countryatlas** resolves this friction by adopting
 ISO 3166 codes as a universal join key and by stitching together three
-otherwise disjoint resources — map geometry, World Bank development
-indicators, and a comprehensive country-code crosswalk — into a single,
+otherwise disjoint resources (map geometry, World Bank development
+indicators, and a comprehensive country-code crosswalk) into a single,
 map-ready table. This vignette presents the package’s design philosophy,
 its core functional vocabulary, and worked examples spanning data
 assembly, the join engine, diagnostics, reference data, analysis helpers
-and the grammar of honest cartographic displays — the companion
-vignettes take up the remaining map types, projections and query
-interface in detail. All examples run offline against a bundled data
-snapshot.
+and the grammar of honest cartographic displays; the companion vignettes
+take up the remaining map types, projections and query interface in
+detail. All examples run offline against a bundled data snapshot.
 
 ## Introduction
 
 The package rests on a single conviction: *if a task does not make it
-easier to get country data onto a map — or to make that map honest — it
+easier to get country data onto a map, or to make that map honest, it
 does not belong here*. Concretely, three packages are combined:
 
 - **`ggplot2::map_data("world")`** (or Natural Earth via `sf`) supplies
@@ -33,10 +32,10 @@ does not belong here*. Concretely, three packages are combined:
 Three design commitments follow. First, **the happy path is one call**:
 `world_data(2020)` returns a tibble ready to map. Second, **the ISO code
 is the spine**: every function speaks `iso3c`/`iso2c` internally and
-exposes it, so anything the package produces joins to anything else —
-and to the user’s own data. Third, **no country is lost silently**:
-entities that map backends spell idiosyncratically are *matched* through
-a curated override table rather than dropped, and unmatched values are
+exposes it, so anything the package produces joins to anything else, and
+to the user’s own data. Third, **no country is lost silently**: entities
+that map backends spell idiosyncratically are *matched* through a
+curated override table rather than dropped, and unmatched values are
 reported explicitly.
 
 To keep every example reproducible without a network connection, this
@@ -200,8 +199,8 @@ standardize_country(messy, nation, warn = FALSE)
 ```
 
 [`join_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/join_world.md)
-goes one step further — auto-detecting the country column, standardising
-it and attaching geometry — while
+goes one step further, auto-detecting the country column, standardising
+it and attaching geometry, while
 [`country_join()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_join.md)
 reconciles two independent tables that each key on country names:
 
@@ -266,8 +265,8 @@ audit_coverage(snapshot)$na_rates
 #> 4 co2_per_capita    215        12  0.0558
 ```
 
-The entities the previous version dropped — Kosovo, Micronesia, the
-Virgin Islands and a dozen others — are now matched:
+The entities the previous version dropped (Kosovo, Micronesia, the
+Virgin Islands and a dozen others) are now matched:
 
 ``` r
 
@@ -287,9 +286,9 @@ standardize_country(data.frame(region = dropped), region, warn = FALSE)
 Dissolved entities get first-class treatment too. The `historical`
 column of
 [`check_country_match()`](https://pursuitofdatascience.github.io/countryatlas/reference/check_country_match.md)
-flags them — including `"USSR"`, which countrycode silently resolves to
+flags them, including `"USSR"`, which countrycode silently resolves to
 Russia’s `RUS` (so Soviet-era data becomes Russian data without a
-warning) — and
+warning), and
 [`dissolve_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/dissolve_country.md)
 expands them to their successor states via the curated
 `historical_codes` crosswalk:
@@ -385,8 +384,8 @@ dissolved-entity crosswalk used above).
 Small, in-spirit transforms that keep an analysis from leaving the
 package mid-pipeline.
 [`per_capita()`](https://pursuitofdatascience.github.io/countryatlas/reference/per_capita.md)
-disarms the commonest footgun in this data — *is this map just a
-population map?* — by normalising a total before it is plotted. Supply
+disarms the commonest footgun in this data (*is this map just a
+population map?*) by normalising a total before it is plotted. Supply
 the denominator, or omit it and the relevant years of `SP.POP.TOTL` are
 fetched for you:
 
@@ -472,7 +471,7 @@ panel |>
 And
 [`complete_years()`](https://pursuitofdatascience.github.io/countryatlas/reference/complete_years.md)
 fills the panel gaps that would otherwise make an animation flicker or a
-join silently drop years — by grid completion, carry-forward or linear
+join silently drop years, by grid completion, carry-forward or linear
 interpolation
 ([`lag_by_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/lag_by_country.md)
 and
@@ -498,8 +497,8 @@ world*, *what moves together*, and *are poor countries catching up?*
 [`gini()`](https://pursuitofdatascience.github.io/countryatlas/reference/gini.md)
 and
 [`theil()`](https://pursuitofdatascience.github.io/countryatlas/reference/theil.md)
-measure inequality across countries — weight by population and they
-describe inequality between people;
+measure inequality across countries (weight by population and they
+describe inequality between people);
 [`theil()`](https://pursuitofdatascience.github.io/countryatlas/reference/theil.md)
 decomposes exactly into between/within components:
 
@@ -547,7 +546,7 @@ the spatial side,
 measures whether neighbouring countries have similar values, using the
 package’s own
 [`country_borders()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_borders.md)
-adjacency — no `spdep` needed.
+adjacency, with no `spdep` needed.
 
 ## Performance and offline use
 
@@ -559,8 +558,8 @@ without the network. The cache can be cleared with
 
 ## Conclusion
 
-`countryatlas` keeps its original soul — ISO codes as the universal join
-key, one call to a map-ready table — and extends it into a complete
+`countryatlas` keeps its original soul (ISO codes as the universal join
+key, one call to a map-ready table) and extends it into a complete
 toolkit: any indicator and any year span, a modern `sf` backend, an
 exposed join engine for the user’s own data, honest diagnostics, curated
 reference data, analysis helpers, and a full vocabulary of projected,

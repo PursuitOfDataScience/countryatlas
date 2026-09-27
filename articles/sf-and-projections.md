@@ -2,7 +2,7 @@
 
 The legacy `maps` polygons are an unprojected plate carrée: they badly
 distort area and split Russia, Fiji and New Zealand across the
-antimeridian. The `sf` backend fixes all of this — real projections,
+antimeridian. The `sf` backend fixes all of this: real projections,
 equal-area options, and an antimeridian-safe pipeline. These features
 require the optional `sf` and `rnaturalearth` packages.
 
@@ -23,7 +23,7 @@ world_data(2020, c(gdp = "NY.GDP.PCAP.KD"), geometry = "sf") |>
 [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
 auto-detects the `sf` backend and applies the projection through
 [`ggplot2::coord_sf()`](https://ggplot2.tidyverse.org/reference/ggsf.html).
-Available projections are `"equal_earth"` (the default — equal-area and
+Available projections are `"equal_earth"` (the default: equal-area and
 good-looking), `"robinson"`, `"mollweide"`, `"natural_earth"`,
 `"plate_carree"`, `"mercator"`, `"winkel_tripel"`, `"eckert4"`,
 `"gall_peters"`, `"orthographic"`, `"azimuthal_equal_area"`,
@@ -58,7 +58,7 @@ reader reads coloured area as quantity.
 [`projection_compare()`](https://pursuitofdatascience.github.io/countryatlas/reference/projection_compare.md)
 draws your own data under several at once and
 [`tissot_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/tissot_map.md)
-shows the distortion directly — see the *Honest maps* vignette.
+shows the distortion directly (see the *Honest maps* vignette).
 
 ## The world as a globe
 
@@ -84,7 +84,7 @@ world_data(2020, geometry = "sf") |>
 ```
 
 [`spin_globe()`](https://pursuitofdatascience.github.io/countryatlas/reference/spin_globe.md)
-turns that into a rotating animation — one
+turns that into a rotating animation: one
 [`globe_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/globe_map.md)
 frame per central longitude, assembled into a looping GIF with `gifski`
 (or `magick`):
@@ -99,7 +99,7 @@ spin_globe(world_snapshot$countries, continent, backend = "polygon",
 
 [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md)
 returns projected, region-subset, antimeridian-safe geometry without any
-data — country polygons, label-ready centroids, coastlines, a graticule
+data: country polygons, label-ready centroids, coastlines, a graticule
 or an ocean rectangle:
 
 ``` r
@@ -134,7 +134,7 @@ Pair it with a `projection` suited to the subset
 projections for the Arctic) so the crop stays area-honest.
 
 A box is the one form that clips the shapes themselves, which is what
-you want for a region that is neither a continent nor a group — the
+you want for a region that is neither a continent nor a group, the
 Mediterranean basin, say. Use the `sf` backend for it: that clip is a
 real
 [`sf::st_crop()`](https://r-spatial.github.io/sf/reference/st_crop.html),

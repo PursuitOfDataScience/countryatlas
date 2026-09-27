@@ -91,7 +91,9 @@ a year instead; check with <code>base_year %in% data$year</code> if you need tha
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p><code>data</code> with an index column added. The column is <code>NA</code> for any
-country whose series does not cover <code>base_year</code> (see the note there).</p>
+country whose series does not cover <code>base_year</code> (see the note there). A
+negative base-year value is indexed as it is, so that country's index
+runs opposite to its series.</p>
     </div>
 
     <div class="section level2">

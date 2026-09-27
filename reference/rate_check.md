@@ -35,8 +35,9 @@ rate_check(data, numerator, denominator, min_denominator = NULL, rate = NULL)
 ## Value
 
 A tibble of `iso3c`, `numerator`, `denominator`, `rate`, `expected_se`
-(the Poisson standard error of the rate, \\\sqrt{r/d}\\) and `flagged`,
-sorted with the least reliable first.
+(the Poisson standard error of the rate, \\\sqrt{r/d}\\; `NA`, with a
+warning, for a negative rate) and `flagged`, sorted with the least
+reliable first.
 
 "Least reliable" is ordered on the standard error a *single* event would
 imply, \\\sqrt{\max(y, 1)}/d\\, which is identical to `expected_se` for

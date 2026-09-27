@@ -43,7 +43,9 @@ smooth_rates(
 
 `data` with `<numerator>_rate` and `<numerator>_smoothed` columns added,
 plus `<numerator>_shrinkage` – the weight given to the country's own
-rate, between 0 (fully shrunk to the global rate) and 1 (untouched).
+rate, between 0 (fully shrunk to the global rate) and 1 (untouched). A
+row with no finite, positive denominator or with a negative count has no
+rate: all three are `NA` there, with a warning.
 
 ## The model
 

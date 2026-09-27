@@ -2,8 +2,8 @@
 
 [ggsql](https://ggsql.org) is a grammar of graphics for SQL: you
 describe a plot *inside a SQL query* and it renders in the database
-(DuckDB), returning a web-ready Vega-Lite widget — no ggplot2 or `sf`
-runtime required. The spatial layer this vignette targets
+(DuckDB), returning a web-ready Vega-Lite widget, with no ggplot2 or
+`sf` runtime required. The spatial layer this vignette targets
 (`DRAW spatial`, which reads WKB geometry) arrived in the ggsql *engine*
 at 0.4.0, and `countryatlas` requires the ggsql **R package** at \>=
 0.4.1, the first release that exposes it – which is the version
@@ -15,12 +15,12 @@ but not evaluated.
 
 countryatlas and ggsql fit together cleanly:
 
-- **countryatlas** does the part ggsql’s static bundled world can’t —
+- **countryatlas** does the part ggsql’s static bundled world can’t:
   reconcile messy country names to the ISO spine, repair the entities
   map backends get wrong
   ([`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)),
   and join World Bank indicators onto geometry.
-- **ggsql** does the part countryatlas doesn’t — push the rendering down
+- **ggsql** does the part countryatlas doesn’t: push the rendering down
   into the database and emit Vega-Lite, so the geometry never has to
   come back into R.
 
@@ -29,7 +29,7 @@ So countryatlas becomes the *data layer* and ggsql the *renderer*.
 ## Emit a query (no dependencies)
 
 [`world_query()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_query.md)
-is a pure string builder — it needs nothing installed — so you can see
+is a pure string builder (it needs nothing installed), so you can see
 exactly what will be sent to ggsql:
 
 ``` r
@@ -105,8 +105,8 @@ LABEL title => 'GDP per capita, 2020'
 
 The win is the same as ggsql’s everywhere else: only the rendered result
 leaves the database. For a single world map that is minor, but the
-moment your country panel lives in a warehouse — millions of rows, many
-years — pushing the aggregation and rendering down to where the data
+moment your country panel lives in a warehouse (millions of rows, many
+years), pushing the aggregation and rendering down to where the data
 already is, rather than pulling it into R, is the whole point.
 countryatlas makes sure what you push down is keyed on an honest,
 reconciled ISO spine.

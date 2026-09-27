@@ -36,7 +36,10 @@ convergence_club(data, value, min_size = 2, alpha = 0.05)
 
 A tibble: `iso3c`, `club` (an integer, 1 = highest-level club, `NA` =
 not classified), and the club's `log_t` statistic. The per-club test
-results are attached as the `"countryatlas_clubs"` attribute.
+results are attached as the `"countryatlas_clubs"` attribute. Every
+country in `data` appears: one without a complete series (a missing or
+non-finite value in any year) cannot be tested, so it comes back with
+`club = NA` and a warning naming it.
 
 ## The test
 

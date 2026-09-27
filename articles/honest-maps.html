@@ -132,7 +132,7 @@ single class, because GDP per capita is strongly right-skewed and the
 top of the range is one country. A map like that is technically correct
 and communicates nothing. Quantiles put roughly 38 countries in each
 class.</p>
-<p>You do not need the comparison to get the report — any
+<p>You do not need the comparison to get the report: any
 <em>classified</em> <code><a href="../reference/world_map.html">world_map()</a></code> will produce it. (A
 continuous colourbar has no classes, so asking there returns nothing and
 says why.)</p>
@@ -218,7 +218,7 @@ preserves:</p>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">12</span> north_polar          equal-area  TRUE       FALSE    </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">13</span> south_polar          equal-area  TRUE       FALSE</span></span></code></pre></div>
 <p>For a choropleth the honest choice is <strong>equal-area</strong>,
-because the eye reads coloured area as quantity — a projection that
+because the eye reads coloured area as quantity, and a projection that
 inflates Greenland makes Greenland’s value look more important than it
 is. Equal Earth is the package default and the recommendation (Šavrič,
 Patterson &amp; Jenny 2019).</p>
@@ -236,8 +236,8 @@ to your data.</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/tissot_map.html">tissot_map</a></span><span class="op">(</span><span class="st">"equal_earth"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="honest-maps_files/figure-html/tissot-ee-1.png" class="r-plt" alt="Tissot indicatrices on Equal Earth: ellipses shear but hold constant area." width="672" style="display: block; margin: auto;"></p>
-<p>Mercator keeps every circle round — it is conformal, so local shapes
-are right — and grows them without limit toward the poles. Equal Earth
+<p>Mercator keeps every circle round (it is conformal, so local shapes
+are right) and grows them without limit toward the poles. Equal Earth
 keeps every circle’s <em>area</em> and shears the shapes instead.
 Neither is wrong; they are answers to different questions, and only one
 of them belongs under a choropleth.</p>
@@ -272,7 +272,7 @@ new thing is that you can read it. Paired with
 <code>footnote = "auto"</code> on the plot itself and the classification
 report, that is most of a methods note.</p>
 <p>Finally, <code>citation("countryatlas")</code> produces the package
-citation <em>and</em> the sources it reconciles —
+citation <em>and</em> the sources it reconciles:
 <code>countrycode</code>, the World Bank, Natural Earth, and the papers
 behind the methods used here. Citing the join layer without the data
 would be the last dishonest thing a map could do.</p>
