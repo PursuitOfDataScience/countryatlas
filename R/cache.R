@@ -18,7 +18,7 @@ wdj_cache_dir <- function() {
     # two-element vector gave "the condition has length > 1" -- none of them
     # naming the option. An empty string is still accepted and falls back to
     # session-only caching, as before.
-    check_string(opt, "countryatlas.cache_dir", allow_empty = TRUE)
+    check_string(opt, "countryatlas.cache_dir", allow_empty = TRUE, call = NULL)
     return(opt)
   }
   if (nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_"))) {
@@ -116,8 +116,8 @@ wdj_disk_cache <- function() {
   #
   # cachem is already an unconditional dependency of memoise, so this adds
   # nothing to install.
-  age <- getOption("countryatlas.cache_max_age", 30L * 86400L)
-  size <- getOption("countryatlas.cache_max_size", 50L * 1024L^2)
+  age <- cache_limit_option("countryatlas.cache_max_age", 30L * 86400L)
+  size <- cache_limit_option("countryatlas.cache_max_size", 50L * 1024L^2)
   cache <- tryCatch(
     cachem::cache_disk(dir, max_age = age, max_size = size, evict = "lru",
                        # See WDJ_CACHE_EXT: cachem expires, evicts and resets by
@@ -132,6 +132,27 @@ wdj_disk_cache <- function() {
   if (is.null(cache)) return(NULL)
   prune_legacy_cache(dir)
   cache
+}
+
+# One of the two documented cache limits, validated where it is read, as
+# countryatlas.cache_dir and countryatlas.workers already are. Unchecked, a
+# bad value went straight to cachem::cache_disk(), whose error the tryCatch
+# above turns into "no disk cache" -- so options(countryatlas.cache_max_age =
+# "a") or NA switched persistent caching off and reported "Cannot write to the
+# cache directory", blaming a directory that was fine. A negative age or size
+# was accepted and meant every entry expired or was evicted on write. Inf is
+# the natural "no limit" and is allowed.
+cache_limit_option <- function(name, default) {
+  v <- getOption(name, default)
+  if (!is.numeric(v) || length(v) != 1L || is.na(v) || v < 0) {
+    wdj_abort(c(
+      "{.code options({name})} must be a single non-negative number.",
+      "x" = if (is.function(v) || is.environment(v)) "Got {.cls {class(v)[1]}}."
+            else "Got {.val {v}}.",
+      "i" = "Use {.code Inf} for no limit, or {.code NULL} for the default."
+    ), class = "countryatlas_bad_option", call = NULL)
+  }
+  v
 }
 
 # The extension of this package's cache entries. cachem ages out, evicts and

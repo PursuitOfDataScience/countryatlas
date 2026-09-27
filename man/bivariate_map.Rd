@@ -20,7 +20,8 @@ bivariate_map(
 
 \item{palette}{A \code{biscale} palette name (default \code{"GrPink"}).}
 
-\item{dim}{Bivariate dimension (2 or 3, default 3).}
+\item{dim}{Bivariate dimension: classes per variable, 2, 3 (default) or 4.
+A 4 x 4 map needs a palette that has one, such as \code{"GrPink2"}.}
 
 \item{projection}{Projection; see \code{\link[=world_map]{world_map()}} for the ones available.}
 }

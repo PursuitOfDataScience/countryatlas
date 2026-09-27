@@ -16,7 +16,7 @@
 #' @param extra An optional named character vector of additional overrides
 #'   (names are country/region names, values are `iso3c` codes). Merged on top
 #'   of the built-in table, so you can extend or override it, e.g.
-#'   `wdj_overrides(c(Somaliland = "SOM"))`.
+#'   `country_overrides(c(Somaliland = "SOM"))`.
 #'
 #' @section Accented names and locales:
 #' Every name in this table is plain ASCII, and that is deliberate: ASCII
@@ -66,7 +66,7 @@ wdj_overrides <- function(extra = NULL) {
 }
 
 # The override table itself, with no deprecation notice attached.
-build_overrides <- function(extra = NULL) {
+build_overrides <- function(extra = NULL, call = rlang::caller_env()) {
   base <- c(
     # map_data("world") spellings the legacy code used to drop.
     "Ascension Island" = "SHN",
@@ -111,7 +111,7 @@ build_overrides <- function(extra = NULL) {
         "{.arg extra} must be a fully named character vector.",
         "i" = "Each name is the country string to recognise; each value is the
                {.field iso3c} code to map it to."
-      ))
+      ), call = call)
     }
     # The VALUES were unvalidated, and wdj_to_iso3c() then whitelists every
     # override value as a legitimate code -- so country_overrides(c(Freedonia =
@@ -136,14 +136,14 @@ build_overrides <- function(extra = NULL) {
                alpha-3 code, a user-assigned one like {.val XKX}, or your own
                such as {.val ZZ1}. Anything else would be whitelisted as a
                real code and then joined on."
-      ))
+      ), call = call)
     }
     if (anyNA(extra)) {
       wdj_abort(c(
         "{.arg extra} must not contain {.code NA}.",
         "i" = "An override maps a name TO a code; use a real code, or leave
                the name out and let it resolve to {.code NA} on its own."
-      ))
+      ), call = call)
     }
     base[nms] <- extra
   }

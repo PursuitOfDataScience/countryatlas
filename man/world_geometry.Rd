@@ -69,9 +69,10 @@ Ashmore and Cartier Islands from \code{"medium"} on. They are kept so the land i
 still drawn; drop or \code{\link[=country_overrides]{country_overrides()}} them if you group by \code{iso3c}.
 
 \code{"orthographic"} is the one genuinely hemispheric projection: the countries
-on the far side have no image and come back as empty geometries (correctly,
-but \code{sf::st_coordinates()} cannot read a column that mixes empty and
-non-empty -- drop them first). The other three azimuthal projections
+on the far side have no image and come back as empty geometries, and the
+ones on the horizon are cut there (correctly, but \code{sf::st_coordinates()}
+cannot read a column that mixes empty and non-empty -- drop them first).
+The other three azimuthal projections
 (\code{"azimuthal_equal_area"}, \code{"north_polar"}, \code{"south_polar"}) are Lambert
 equal-area and draw the \emph{whole} globe, the far side stretched around the
 rim rather than dropped, so pass \code{region} if you want a polar view of the

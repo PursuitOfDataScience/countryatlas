@@ -5,7 +5,7 @@
 # ("country.name", "iso2c", "iso3c", "wb", ...).
 wdj_to_iso3c <- function(x, origin = "country.name", custom_match = country_overrides(),
                          call = rlang::caller_env(), arg = "origin") {
-  check_string(origin, arg)
+  check_string(origin, arg, call = call)
   # `origin` was checked and the override table was not, though every value in
   # it lands in the iso3c column -- and the iso3c branch below whitelists those
   # values as valid by construction, so nothing downstream rejects them either.
@@ -35,7 +35,7 @@ wdj_to_iso3c <- function(x, origin = "country.name", custom_match = country_over
       },
       "i" = "Names are the spellings to override, values are {.field iso3c}
              codes -- the shape {.fn country_overrides} returns."
-    ))
+    ), call = call)
   }
   # as.character() on a data frame deparses each *column* into a string, so a
   # frame handed to a verb that wants a country vector came back as the two
@@ -273,9 +273,6 @@ abort_bad_origin <- function(origin, cnd, call = rlang::caller_env(),
   ), call = call, class = "countryatlas_bad_origin")
 }
 
-# Derive a set of attributes from iso3c. `add` may name any countrycode
-# destination; the common shortcuts (iso2c, continent, region) are handled
-# explicitly with fallbacks for codes countrycode does not know.
 # The shortcut names `add` accepts, mapped to countrycode destinations. Lifted
 # out of wdj_derive_from_iso3c() so check_add() validates against exactly the
 # set the derivation understands, rather than a second copy that can drift.
@@ -319,6 +316,9 @@ check_add <- function(add, arg = "add", call = rlang::caller_env()) {
   invisible(add)
 }
 
+# Derive a set of attributes from iso3c. `add` may name any countrycode
+# destination; the common shortcuts (iso2c, continent, region) are handled
+# explicitly with fallbacks for codes countrycode does not know.
 wdj_derive_from_iso3c <- function(iso3c, add) {
   check_add(add)
   out <- tibble::tibble(iso3c = iso3c)

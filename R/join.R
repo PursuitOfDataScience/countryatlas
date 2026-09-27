@@ -121,6 +121,31 @@ join_world <- function(data,
 
   std <- standardize_country(data, !!rlang::sym(col_name), origin = origin,
                              warn = FALSE)
+  # standardize_country() runs with warn = FALSE so the unmatched names are not
+  # reported twice -- check_country_match() above already did -- but that also
+  # switched off its warning about replacing a column the caller never asked
+  # to have replaced: a user's own `region` ("North", "South") came back as
+  # World Bank regions from join_world(), silently, while standardize_country()
+  # on the same frame says so. Said here instead, and only where a value
+  # actually changed: a frame that already carries the package's own
+  # classifications, world_snapshot's included, loses nothing. The country
+  # column itself counts -- detect_country_col() accepts one named `region`.
+  if (isTRUE(warn)) {
+    unasked <- intersect(c("iso2c", "continent", "region"), names(data))
+    changed <- unasked[vapply(unasked, function(nm) {
+      !identical(as.character(data[[nm]]), as.character(std[[nm]]))
+    }, logical(1))]
+    if (length(changed)) {
+      wdj_warn(c(
+        "Overwriting {length(changed)} column{?s} with the standardised
+         classification{?s}: {.val {changed}}.",
+        "i" = "{.fn join_world} adds {.code iso3c}, {.code iso2c},
+               {.code continent} and {.code region}; rename
+               {cli::qty(length(changed))}{?that column/those columns} first to
+               keep {?it/them}."
+      ), class = "countryatlas_unasked_overwrite")
+    }
+  }
   if (geometry == "none") {
     # Identical to the world_data() case: this branch returned before any of
     # the geometry arguments were applied, and `region` is documented as a
@@ -232,9 +257,9 @@ country_join <- function(x, y, by_x, by_y,
     }
   }
   x[[key]] <- wdj_to_key(x[[bx]], origin = origin_x, key = key, side = "`x`",
-                         warn_unresolved = warn)
+                         warn_unresolved = warn, arg = "origin_x")
   y[[key]] <- wdj_to_key(y[[by_]], origin = origin_y, key = key, side = "`y`",
-                         warn_unresolved = warn)
+                         warn_unresolved = warn, arg = "origin_y")
 
   if (warn) {
     warn_key_collapse(x[[bx]], x[[key]], "`x`", bx, key)
@@ -353,7 +378,8 @@ country_join_all <- function(tables, by, origin = "country.name",
   prepped <- lapply(seq_len(n), function(i) {
     tb <- tibble::as_tibble(tables[[i]])
     if (!by[i] %in% names(tb)) {
-      wdj_abort("Column {.val {by[i]}} not found in table {i}.")
+      wdj_abort("Column {.val {by[i]}} not found in table {i}.",
+                call = verb_env())
     }
     # Same silence as country_join(), once per table, and the same exception
     # when the country column is the key column itself.
@@ -366,7 +392,7 @@ country_join_all <- function(tables, by, origin = "country.name",
     }
     tb[[key]] <- wdj_to_key(tb[[by[i]]], origin = origin[i], key = key,
                             side = sprintf("table %d", i),
-                            warn_unresolved = warn)
+                            warn_unresolved = warn, call = verb_env())
     # Same collapse hazard as country_join(), once per table.
     if (warn) {
       warn_key_collapse(tb[[by[i]]], tb[[key]], sprintf("table %d", i),

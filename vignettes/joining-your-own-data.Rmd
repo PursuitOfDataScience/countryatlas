@@ -24,7 +24,7 @@ has_sf <- requireNamespace("sf", quietly = TRUE) &&
 has_maps <- requireNamespace("maps", quietly = TRUE)
 ```
 
-The headline use case: *I have a frame keyed on messy country names — get it on
+The headline use case: *I have a frame keyed on messy country names; get it on
 a map.* The package exposes the same matching machinery it uses internally.
 
 ## Standardise any frame
@@ -66,7 +66,7 @@ country_join(a, b, country, nation)
 ## Reconcile many tables at once
 
 `country_join_all()` generalises this to a whole list of frames: every table is
-reconciled to `iso3c` first, then reduce-joined — three sources spelled three
+reconciled to `iso3c` first, then reduce-joined, so three sources spelled three
 ways collapse into one honest table:
 
 ```{r}
@@ -87,7 +87,7 @@ check_country_match(my_data$nation)
 ## Historical data: dissolved countries
 
 Historical panels bring a nastier failure mode: dissolved entities. Most are
-silently unmatched — but some are silently *mis*matched. countrycode resolves
+silently unmatched, but some are silently *mis*matched. countrycode resolves
 `"USSR"` to Russia's `RUS`, so Soviet-era totals quietly become Russian totals.
 The `historical` column in the report above flags both cases, and
 `dissolve_country()` resolves them to successor states via the curated
@@ -99,7 +99,7 @@ dissolve_country(c("Czechoslovakia", "France"))
 ```
 
 `"West Germany"` is the instructive case: it resolves to `DEU` and is *not*
-flagged — correctly so, because the Federal Republic never dissolved. It
+flagged, correctly so, because the Federal Republic never dissolved. It
 absorbed the GDR in 1990 and simply continued, so `DEU` really is the right
 answer. The crosswalk is curated rather than a blanket rule that anything
 old-sounding gets flagged, so only the entity that actually ceased to exist is
@@ -136,7 +136,7 @@ standardize_country(df, code, origin = "iso2c", warn = FALSE)
 
 ## Point data onto the spine
 
-Not all data comes keyed on names — sometimes all you have is coordinates
+Not all data comes keyed on names; sometimes all you have is coordinates
 (events, weather stations, survey sites). `locate_country()` runs a
 point-in-polygon lookup and tags each point with the country that contains it,
 so point data joins the ISO spine like everything else. It needs the optional

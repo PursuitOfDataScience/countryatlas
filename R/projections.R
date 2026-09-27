@@ -210,6 +210,9 @@ projection_compare <- function(data, fill,
         sf::st_crop(sf::st_transform(src, 4326L), box)
       }))
     }
+    # The one projection with a far side: cut it off first, as world_map()
+    # does, or a country on the horizon projects to a broken ring.
+    if (identical(p, "orthographic")) src <- clip_to_hemisphere(src, 0, ORTHO_LAT0)
     g <- quietly_sf(sf::st_set_crs(sf::st_transform(src, wdj_crs(p)), NA))
     # Each projection lands in its own units and extent -- Mercator's y range is
     # orders of magnitude larger than Equal Earth's -- so at a shared scale
@@ -313,6 +316,12 @@ tissot_map <- function(projection = "equal_earth", spacing = 30,
   keep <- !vapply(polys, is.null, logical(1))
   ind <- sf::st_sf(id = seq_len(sum(keep)),
                    geometry = sf::st_sfc(polys[keep], crs = 4326L))
+  # On the orthographic globe an indicatrix on the far side has no image and
+  # one on the horizon projects to a broken ring; cut them there, as the
+  # basemap is (see clip_to_hemisphere()).
+  if (identical(projection, "orthographic")) {
+    ind <- clip_to_hemisphere(ind, 0, ORTHO_LAT0)
+  }
 
   base <- world_geometry("countries", geometry = "sf", projection = projection)
   ggplot2::ggplot() +

@@ -24,8 +24,10 @@ wdj_crs <- function(projection = "equal_earth", recenter = NULL, lat0 = NULL,
   # surfaced later as coord_sf()'s "crs not found: is it missing?". The central
   # meridian is allowed a full turn either way because spin_globe() sweeps
   # recenter from 0 to just under 360.
-  if (!is.null(recenter)) check_number(recenter, "recenter", lo = -360, hi = 360)
-  if (!is.null(lat0)) check_number(lat0, "lat0", lo = -90, hi = 90)
+  if (!is.null(recenter)) {
+    check_number(recenter, "recenter", lo = -360, hi = 360, call = call)
+  }
+  if (!is.null(lat0)) check_number(lat0, "lat0", lo = -90, hi = 90, call = call)
   lon0 <- recenter %||% 0
   proj4 <- switch(
     projection,
@@ -39,13 +41,19 @@ wdj_crs <- function(projection = "equal_earth", recenter = NULL, lat0 = NULL,
     winkel_tripel        = "+proj=wintri",
     eckert4              = "+proj=eck4",
     gall_peters          = "+proj=cea +lat_ts=45",
-    orthographic         = paste0("+proj=ortho +lat_0=", fmt_num(lat0 %||% 20)),
+    orthographic         = paste0("+proj=ortho +lat_0=", fmt_num(lat0 %||% ORTHO_LAT0)),
     azimuthal_equal_area = paste0("+proj=laea +lat_0=", fmt_num(lat0 %||% 0)),
     north_polar          = "+proj=laea +lat_0=90",
     south_polar          = "+proj=laea +lat_0=-90"
   )
   paste0(proj4, " +lon_0=", fmt_num(lon0), " +datum=WGS84 +units=m +no_defs")
 }
+
+# The default central latitude of "orthographic": the viewpoint every verb that
+# does not take its own `lat` looks from. One constant, because the horizon
+# clip (clip_to_hemisphere()) has to be cut for the same viewpoint the CRS is
+# built for.
+ORTHO_LAT0 <- 20
 
 # The latitude band a projection can actually draw, or NULL for "all of it".
 #
@@ -71,8 +79,8 @@ wdj_lat_limits <- function(projection) {
 # panel.grid, so the graticule is invisible in these maps anyway and skipping
 # it costs nothing. Every other projection keeps the default graticule.
 wdj_coord_sf <- function(projection = "equal_earth", recenter = NULL,
-                         lat0 = NULL) {
-  crs <- wdj_crs(projection, recenter, lat0)
+                         lat0 = NULL, call = rlang::caller_env()) {
+  crs <- wdj_crs(projection, recenter, lat0, call = call)
   ylim <- wdj_lat_limits(projection)
   if (!is.null(ylim)) {
     # Limits are given in lon/lat and converted by coord_sf(), so the clip is
@@ -96,17 +104,119 @@ wdj_coord_sf <- function(projection = "equal_earth", recenter = NULL,
   ggplot2::coord_sf(crs = crs)
 }
 
-# Map a Natural Earth scale word to the package code understood by rnaturalearth.
-# Integer literals, not doubles: rnaturalearth builds the name of its data
-# object by pasting this number ("countries" + 110), and under
-# a negative scipen a double 110 formats as "1.1e+02", so the lookup failed
-# with "'countries1.1e+02' is not an exported object". Integers are immune.
-# `scale` picks a Natural Earth resolution, which only the sf backend fetches;
-# the polygon backend serves one bundled resolution. Both entry points that
-# offer the argument accepted it on the polygon path and ignored it in silence
-# -- and never validated it either, so `scale = 2` returned small polygons and
-# looked like it had worked. Same shape, and same remedy, as the `recenter`
-# notice in get_world_polygons().
+# The part of the Earth an orthographic globe centred on (lon, lat) can show,
+# as a spherical cap just inside the horizon, in lon/lat. Built from its own
+# vertices rather than by buffering a point: sf's geographic buffer goes
+# through s2's cell approximation, which leaves a stepped horizon.
+horizon_cap <- function(lon, lat, radius = 89.9, n = 360L) {
+  d <- radius * pi / 180
+  phi1 <- lat * pi / 180
+  lam1 <- lon * pi / 180
+  az <- seq(0, 2 * pi, length.out = n + 1L)
+  phi <- asin(sin(phi1) * cos(d) + cos(phi1) * sin(d) * cos(az))
+  lam <- lam1 + atan2(sin(az) * sin(d) * cos(phi1),
+                      cos(d) - sin(phi1) * sin(phi))
+  xy <- cbind((lam * 180 / pi + 180) %% 360 - 180, phi * 180 / pi)
+  xy[nrow(xy), ] <- xy[1L, ]
+  sf::st_sfc(sf::st_polygon(list(xy)), crs = sf::st_crs(4326L))
+}
+
+# The polygonal part of every feature, as a MULTIPOLYGON, one feature in and
+# one out. Repair and intersection can both hand back a GEOMETRYCOLLECTION --
+# a polygon plus a sliver of line, which CShapes' historical borders produce
+# -- and st_cast() on one keeps only its first part, which may be the line:
+# "polygons require at least 4 points". st_collection_extract() on the whole
+# column would drop the features with no polygon and misalign the rows.
+polygon_parts <- function(g) {
+  crs <- sf::st_crs(g)
+  out <- lapply(seq_along(g), function(i) {
+    x <- g[i]
+    if (sf::st_is_empty(x)) return(sf::st_multipolygon())
+    if (inherits(x[[1]], "GEOMETRYCOLLECTION")) {
+      x <- suppressWarnings(sf::st_collection_extract(x, "POLYGON"))
+      if (!length(x)) return(sf::st_multipolygon())
+      x <- sf::st_combine(x)
+    }
+    if (!inherits(x[[1]], c("POLYGON", "MULTIPOLYGON"))) {
+      return(sf::st_multipolygon())
+    }
+    suppressWarnings(sf::st_cast(x, "MULTIPOLYGON"))[[1]]
+  })
+  sf::st_sfc(out, crs = crs)
+}
+
+# Clip an sf frame to what an orthographic view centred on (lon, lat) shows,
+# on the sphere, before anything projects it.
+#
+# PROJ has no image for the far hemisphere, and a country straddling the
+# horizon lost its far-side vertices in the transform and kept whatever was
+# left: at lon 120, lat 20 Chad came out as a single point, which grid then
+# refused to draw ("Invalid graphics path") when the plot was printed. The
+# plot built fine, so nothing noticed until it was drawn. 63 of 216 sampled
+# globe_map() viewpoints failed that way, spin_globe(backend = "sf") could not
+# get through a rotation, and the viewpoints that did draw closed every
+# horizon country with a straight chord. Cutting at the horizon first gives
+# each of them a real outline there and leaves the transform nothing to break.
+#
+# Rows are kept -- a country wholly out of view gets an empty geometry -- so a
+# fill scale is trained on the same values from every viewpoint, and coverage
+# counted from the frame is unchanged.
+clip_to_hemisphere <- function(data, lon, lat) {
+  if (!nrow(data) || is.na(sf::st_crs(data))) return(data)
+  # A frame already in an orthographic plane has no far side left to cut --
+  # this function cut it on the way in (attach_geometry(projection =
+  # "orthographic") goes through get_world_sf()) -- and taking it back to
+  # lon/lat is ill-conditioned near the horizon: Russia's two antimeridian
+  # pieces came back a hair apart, so their shared edge crossed on the sphere.
+  if (grepl("+proj=ortho", sf::st_crs(data)$proj4string %||% "", fixed = TRUE)) {
+    return(data)
+  }
+  ll <- quietly_sf(sf::st_transform(data, 4326L))
+  use_s2 <- sf::sf_use_s2()
+  on.exit(quietly_sf(sf::sf_use_s2(use_s2)), add = TRUE)
+  geom <- quietly_sf(suppressWarnings({
+    sf::sf_use_s2(FALSE)
+    sf::st_make_valid(sf::st_geometry(ll))
+  }))
+  # A ring valid in the plane can still be invalid on the sphere, where edges
+  # are great-circle arcs. Natural Earth's 110m Sudan has a near zero-width
+  # spike on its border with the Central African Republic, and its two arcs
+  # cross near the tip ("Loop 0 is not valid: Edge 77 crosses edge 79"); read
+  # unchecked it became its own complement, the whole Earth bar Sudan. Only
+  # the rings the sphere rejects are touched: a 1 km opening in plate carree,
+  # where straight lines are the lines the data means, blunts such a tip and
+  # moves nothing a globe can show.
+  bad <- which(!(quietly_sf({
+    sf::sf_use_s2(TRUE)
+    sf::st_is_valid(geom)
+  }) %in% TRUE))
+  if (length(bad)) {
+    eqc <- "+proj=eqc +lat_ts=0 +lon_0=0 +datum=WGS84 +units=m +no_defs"
+    fixed <- quietly_sf(suppressWarnings({
+      sf::sf_use_s2(FALSE)
+      x <- sf::st_buffer(sf::st_buffer(sf::st_transform(geom[bad], eqc), -1000),
+                         1000)
+      polygon_parts(sf::st_make_valid(sf::st_transform(x, 4326L)))
+    }))
+    geom[bad] <- fixed
+  }
+  # ... and cut on the sphere, where the horizon is simply a circle. Should the
+  # cut itself fail on geometry nothing here anticipated, draw the frame as it
+  # arrived: that is the behaviour this replaced, and a map that could render
+  # before must not become an error.
+  hit <- tryCatch(quietly_sf(suppressWarnings({
+    sf::sf_use_s2(TRUE)
+    sf::st_intersection(geom, horizon_cap(lon, lat))
+  })), error = function(e) NULL)
+  if (is.null(hit)) return(data)
+  out <- sf::st_sfc(rep(list(sf::st_multipolygon()), length(geom)),
+                    crs = sf::st_crs(geom))
+  idx <- attr(hit, "idx")[, 1]
+  if (length(idx)) out[idx] <- polygon_parts(hit)
+  sf::st_geometry(ll) <- out
+  ll
+}
+
 warn_recenter_ignored <- function(recenter, where = "the polygon backend") {
   if (is.null(recenter) || isTRUE(all.equal(as.numeric(recenter), 0))) {
     return(invisible(NULL))
@@ -121,18 +231,26 @@ warn_recenter_ignored <- function(recenter, where = "the polygon backend") {
 
 # `projection` is documented for the sf backend too, and had no notice of its
 # own: the polygon backend returns unprojected long/lat, so asking for
-# "mollweide" looked honoured and changed nothing.
+# "mollweide" looked honoured and changed nothing. `hint` names the argument
+# that projects, which is `backend` rather than `geometry` in bubble_map().
 warn_projection_ignored <- function(projection,
-                                    where = "the polygon backend") {
+                                    where = "the polygon backend",
+                                    hint = 'geometry = "sf"') {
   if (identical(projection, "equal_earth")) return(invisible(NULL))
   wdj_warn(c(
     "{.arg projection} is not supported on {where} and is ignored.",
     "!" = "The polygons are returned in unprojected longitude/latitude.",
-    "i" = 'Use {.code geometry = "sf"} to project.'
+    "i" = "Use {.code {hint}} to project."
   ), class = "countryatlas_projection_ignored")
   invisible(NULL)
 }
 
+# `scale` picks a Natural Earth resolution, which only the sf backend fetches;
+# the polygon backend serves one bundled resolution. Both entry points that
+# offer the argument accepted it on the polygon path and ignored it in silence
+# -- and never validated it either, so `scale = 2` returned small polygons and
+# looked like it had worked. Same shape, and same remedy, as the `recenter`
+# notice in get_world_polygons().
 warn_scale_ignored <- function(scale) {
   if (identical(scale, "small")) return(invisible(NULL))
   wdj_warn(c(
@@ -143,6 +261,11 @@ warn_scale_ignored <- function(scale) {
   invisible(NULL)
 }
 
+# Map a Natural Earth scale word to the package code understood by rnaturalearth.
+# Integer literals, not doubles: rnaturalearth builds the name of its data
+# object by pasting this number ("countries" + 110), and under
+# a negative scipen a double 110 formats as "1.1e+02", so the lookup failed
+# with "'countries1.1e+02' is not an exported object". Integers are immune.
 ne_scale <- function(scale = c("small", "medium", "large"),
                      call = rlang::caller_env()) {
   scale <- check_choice(scale, "scale", c("small", "medium", "large"),
@@ -241,13 +364,38 @@ resolve_region <- function(region, call = rlang::caller_env()) {
   # which is what a typo like "Europ" or "Nowhere" used to produce. (An
   # explicitly-uppercase unknown code is left alone above, deliberately.)
   iso <- wdj_to_iso3c(reg)
+  # A continent or group name is recognised only on its own, so inside a
+  # vector it falls through to name matching and matches nothing. Say that,
+  # rather than calling "Europe" a name that matched no country.
+  named <- region[reg %in% c(continents, groups)]
+  preset_hint <- if (length(named)) {
+    c("i" = "{.val {named}} {cli::qty(length(named))}{?is a continent or group
+             name/are continent or group names}, which {.arg region} accepts
+             only on its own; combine several with
+             {.code c(country_groups(\"EU\")$iso3c, \"NOR\")} and the like.")
+  }
   if (!length(iso) || all(is.na(iso))) {
     wdj_abort(c(
       "{.arg region} matched no countries: {.val {region}}.",
       "i" = "Give a continent ({.val {continents}}), a group name (see
              {.fn country_groups}), {.field iso3c} codes, country names, or a
-             {.code c(xmin, ymin, xmax, ymax)} bounding box."
+             {.code c(xmin, ymin, xmax, ymax)} bounding box.",
+      preset_hint
     ), call = call)
+  }
+  # Only *every* name failing was reported, so one typo in a vector left that
+  # country out of the map in silence: region = c("France", "Germny") drew
+  # France alone. resolve_region_codes() drops the NA, which is right -- an NA
+  # code selects nothing -- but the caller has to hear which names it was.
+  bad <- region[is.na(iso)]
+  if (length(bad)) {
+    wdj_warn(c(
+      "{length(bad)} value{?s} in {.arg region} matched no country and
+       {?is/are} left out:",
+      "*" = "{.val {utils::head(bad, 8)}}",
+      if (length(named)) preset_hint else
+        c("i" = "See {.fn check_country_match} for suggestions.")
+    ), call = call, class = "countryatlas_region_unmatched")
   }
   iso
 }
@@ -311,7 +459,7 @@ clear_geometry_cache <- function() {
 }
 
 get_world_polygons <- function(region = NULL, overrides = country_overrides(),
-                               recenter = NULL) {
+                               recenter = NULL, call = rlang::caller_env()) {
   # The polygon backend cannot recentre: it hands back lon/lat vertices, and
   # shifting them means re-splitting every ring at the new antimeridian, which
   # is what sf::st_break_antimeridian() does on the other backend. `recenter`
@@ -322,7 +470,7 @@ get_world_polygons <- function(region = NULL, overrides = country_overrides(),
   # what the backend cannot do, and name the one that can.
   warn_recenter_ignored(recenter)
   md <- world_polygons(overrides)
-  iso <- resolve_region_codes(region)
+  iso <- resolve_region_codes(region, call = call)
   if (is.null(iso)) return(md)
   if (inherits(iso, "wdj_bbox")) {
     bb <- unclass(iso)
@@ -347,7 +495,8 @@ get_world_polygons <- function(region = NULL, overrides = country_overrides(),
 
 # --- sf backend (rnaturalearth) -----------------------------------------------
 
-build_world_sf <- function(scale = "small", overrides = country_overrides()) {
+build_world_sf <- function(scale = "small", overrides = country_overrides(),
+                           call = rlang::caller_env()) {
   need_pkg(c("sf", "rnaturalearth", "rnaturalearthdata"),
            "for the sf geometry backend")
   # The 10m data lives in rnaturalearthhires, which is not on CRAN. Left
@@ -359,7 +508,7 @@ build_world_sf <- function(scale = "small", overrides = country_overrides()) {
       '{.code scale = "large"} (10m) needs the {.pkg rnaturalearthhires} package.',
       "i" = "It is not on CRAN; install it with {.code install.packages(\"rnaturalearthhires\", repos = \"https://ropensci.r-universe.dev\")}.",
       "i" = 'Or use {.code scale = "medium"} (50m), which needs nothing extra.'
-    ))
+    ), call = call)
   }
   ne <- rnaturalearth::ne_countries(scale = ne_scale(scale), returnclass = "sf")
   # iso_a3 is -99 / NA for France, Norway, Kosovo, ... so fall back to
@@ -388,7 +537,8 @@ build_world_sf <- function(scale = "small", overrides = country_overrides()) {
 
 get_world_sf <- function(scale = "small", region = NULL,
                          projection = "equal_earth", recenter = NULL,
-                         project = TRUE, overrides = country_overrides()) {
+                         project = TRUE, overrides = country_overrides(),
+                         call = rlang::caller_env()) {
   need_pkg("sf", "for the sf geometry backend")
   # Validated here rather than only in ne_scale() below, because the cache key
   # is built from `scale` first: a length-2 value vectorised paste0() into a
@@ -396,20 +546,21 @@ get_world_sf <- function(scale = "small", region = NULL,
   # "wrong arguments for subsetting an environment" -- naming neither the
   # argument nor the package. A typo or a number did reach ne_scale() and error
   # properly; only the multi-value case escaped.
-  scale <- check_choice(scale, "scale", c("small", "medium", "large"))
+  scale <- check_choice(scale, "scale", c("small", "medium", "large"),
+                        call = call)
   # Cache the default-overrides geometry (the common case); a custom override
   # set rebuilds uncached so the caller's overrides actually take effect.
   if (identical(overrides, build_overrides())) {
     key <- paste0("scale_", scale)
     if (is.null(.world_sf_cache[[key]])) {
-      .world_sf_cache[[key]] <- build_world_sf(scale, overrides)
+      .world_sf_cache[[key]] <- build_world_sf(scale, overrides, call = call)
     }
     ne <- .world_sf_cache[[key]]
   } else {
-    ne <- build_world_sf(scale, overrides)
+    ne <- build_world_sf(scale, overrides, call = call)
   }
 
-  iso <- resolve_region_codes(region)
+  iso <- resolve_region_codes(region, call = call)
   if (!is.null(iso)) {
     if (inherits(iso, "wdj_bbox")) {
       bb <- unclass(iso)
@@ -439,8 +590,17 @@ get_world_sf <- function(scale = "small", region = NULL,
   # printed on a plain attach_geometry(geometry = "sf"). quietly_sf() muffles
   # them and redirects the stream, so neither the console nor the caller's
   # message handlers see them.
+  #
+  # `recenter` is checked here, where it is first used, rather than only in
+  # wdj_crs() further down: 500 reached sf and failed as "polygons require at
+  # least 4 points". The cut takes the meridian folded into [-180, 180), since
+  # 360 and -360 (both legal, both meaning 0) failed the same way.
+  if (!is.null(recenter)) {
+    check_number(recenter, "recenter", lo = -360, hi = 360, call = call)
+  }
+  lon0 <- ((recenter %||% 0) + 180) %% 360 - 180
   ne <- quietly_sf(suppressWarnings(
-    tryCatch(sf::st_break_antimeridian(ne, lon_0 = recenter %||% 0),
+    tryCatch(sf::st_break_antimeridian(ne, lon_0 = lon0),
              error = function(e) ne)
   ))
   # st_break_antimeridian() runs an st_intersection internally, which collapses
@@ -452,7 +612,11 @@ get_world_sf <- function(scale = "small", region = NULL,
   # one-part MULTIPOLYGON, the coordinates are untouched.
   ne <- suppressWarnings(sf::st_cast(ne, "MULTIPOLYGON", warn = FALSE))
   if (isTRUE(project)) {
-    ne <- sf::st_transform(ne, crs = wdj_crs(projection, recenter))
+    # Cut at the horizon before projecting: see clip_to_hemisphere().
+    if (identical(projection, "orthographic")) {
+      ne <- clip_to_hemisphere(ne, recenter %||% 0, ORTHO_LAT0)
+    }
+    ne <- sf::st_transform(ne, crs = wdj_crs(projection, recenter, call = call))
   }
   ne
 }
@@ -511,9 +675,10 @@ get_world_sf <- function(scale = "small", region = NULL,
 #'   still drawn; drop or [country_overrides()] them if you group by `iso3c`.
 #'
 #'   `"orthographic"` is the one genuinely hemispheric projection: the countries
-#'   on the far side have no image and come back as empty geometries (correctly,
-#'   but `sf::st_coordinates()` cannot read a column that mixes empty and
-#'   non-empty -- drop them first). The other three azimuthal projections
+#'   on the far side have no image and come back as empty geometries, and the
+#'   ones on the horizon are cut there (correctly, but `sf::st_coordinates()`
+#'   cannot read a column that mixes empty and non-empty -- drop them first).
+#'   The other three azimuthal projections
 #'   (`"azimuthal_equal_area"`, `"north_polar"`, `"south_polar"`) are Lambert
 #'   equal-area and draw the *whole* globe, the far side stretched around the
 #'   rim rather than dropped, so pass `region` if you want a polar view of the
@@ -776,6 +941,7 @@ warn_no_geometry_match <- function(keys, geom_keys, by,
   ), call = call)
   invisible(NULL)
 }
+
 #' Attach geometry to a country-level table
 #'
 #' The bridge between a one-row-per-country table (e.g. from [country_data()])
@@ -927,6 +1093,30 @@ attach_geometry <- function(data,
   data <- tibble::as_tibble(data)
 
   if (geometry == "polygon") {
+    # The polygon backend's four positional columns ARE the geometry: `long`
+    # and `lat` are the vertices, `group` says which ring each one belongs to
+    # and `order` their sequence. A caller's column of one of those names -- a
+    # capital's `lat`, a treatment `group` -- won the join below, because a
+    # shared name keeps the caller's version, so the geometry's own column was
+    # dropped and every map drawn from the result was nonsense: a two-value
+    # `group` drew the whole world as three polygons, and a `lat` column left
+    # 98,165 of 99,338 vertices with no latitude. has_map_geometry() above
+    # catches only a frame carrying all of long/lat/group. Refused rather than
+    # dropped, because the column is the caller's data and this verb hands the
+    # frame back.
+    clash <- intersect(c("long", "lat", "group", "order"), names(data))
+    if (length(clash)) {
+      wdj_abort(c(
+        "{.arg data} has {cli::qty(length(clash))}{?a column/columns} named
+         {.field {clash}}, which the polygon backend uses for its own
+         coordinates.",
+        "x" = "Joining would replace the map geometry with
+               {cli::qty(length(clash))}{?that column/those columns}.",
+        "i" = "Rename {cli::qty(length(clash))}{?it/them} first, e.g.
+               {.code dplyr::rename(data, {clash[1]}_value = {clash[1]})}, or
+               use {.code geometry = \"sf\"}."
+      ), class = "countryatlas_geometry_column_clash")
+    }
     warn_scale_ignored(scale)
     warn_projection_ignored(projection)
     poly <- get_world_polygons(region, overrides = overrides,

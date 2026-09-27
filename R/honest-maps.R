@@ -306,6 +306,10 @@ value_by_alpha_map <- function(data, value, equalize,
   # This verb has its own copies of both arguments rather than passing them
   # through, so it needs its own notices.
   if (!is_sf(data)) warn_projection_ignored(projection)
+  # Validated here, as world_map() does, and before the notice: unchecked, a bad
+  # value was first reported as ignored and then refused by an internal helper
+  # the error named ("Error in `compute_breaks()`").
+  check_number(n_bins, "n_bins", lo = 2, hi = .Machine$integer.max)
   if (!identical(as.numeric(n_bins), 5) && identical(style, "continuous")) {
     wdj_warn(c(
       "{.arg n_bins} does not apply to {.code style = \"continuous\"} and is ignored.",
@@ -327,8 +331,9 @@ value_by_alpha_map <- function(data, value, equalize,
     transform,
     # Population spans five orders of magnitude, so on a linear scale China and
     # India are opaque and every other country is a smudge. Rank is the default
-    # because it keeps the whole opacity range in play.
-    rank     = dplyr::percent_rank(eq),
+    # because it keeps the whole opacity range in play. Ranked once per
+    # country: see unit_percent_rank().
+    rank     = unit_percent_rank(eq, unit_ids(data)),
     log10    = { v <- log10(pmax(eq, 0) + 1); rescale01(v) },
     identity = rescale01(eq)
   )

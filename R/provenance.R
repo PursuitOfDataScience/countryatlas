@@ -181,13 +181,6 @@ print.countryatlas_provenance <- function(x, ...) {
 }
 
 
-# Attach provenance to a plot built outside world_map().
-#
-# world_map() records this inline, but ten other map verbs assemble their own
-# ggplot and so carried nothing -- while map_provenance() documented itself as
-# reading "any plot the package's map verbs produced". A partial implementation
-# of a provenance feature is worse than none, because the gap is invisible until
-# someone relies on it.
 # Restate a derived map's provenance in the caller's terms.
 #
 # coverage_map(), classify_compare(), lisa_map() and od_map() all draw through
@@ -201,17 +194,30 @@ print.countryatlas_provenance <- function(x, ...) {
 # computed honestly from the caller's column. Two coverage claims on one object,
 # in the verb whose whole purpose is honest missingness. Restate the fill name
 # and recompute the coverage against the column the caller actually asked about.
-restate_provenance <- function(p, data, value_name) {
+#
+# `shown` is for the verb whose drawn column is sparser than the caller's:
+# lisa_map() colours only the countries the weights connect, so an island with
+# a value is drawn as no-data. Recounting on the value alone put 189 countries
+# in map_provenance() under a caption, computed from what was drawn, that said
+# 142 -- the same two-claims contradiction, the other way round.
+restate_provenance <- function(p, data, value_name, shown = NULL) {
   prov <- attr(p, "countryatlas_provenance")
   if (is.null(prov)) return(p)
   prov$fill <- value_name
   if (!is.null(value_name) && value_name %in% names(data)) {
-    prov$coverage <- na_coverage(data, value_name)
+    prov$coverage <- na_coverage(data, value_name, shown = shown)
   }
   attr(p, "countryatlas_provenance") <- prov
   p
 }
 
+# Attach provenance to a plot built outside world_map().
+#
+# world_map() records this inline, but ten other map verbs assemble their own
+# ggplot and so carried nothing -- while map_provenance() documented itself as
+# reading "any plot the package's map verbs produced". A partial implementation
+# of a provenance feature is worse than none, because the gap is invisible until
+# someone relies on it.
 wdj_provenance <- function(p, data, fill, backend, projection = NA_character_,
                            style = NA_character_, extra = list()) {
   cov <- if (!is.null(fill) && fill %in% names(data)) {

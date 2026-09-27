@@ -487,10 +487,13 @@ test_that("smooth_rates shrinks small denominators and leaves large ones", {
 })
 
 test_that("an unusable deflator or PPP factor gives NA, not Inf", {
-  d0 <- deflate(data.frame(iso3c = "A", year = 2000:2001, g = c(1, 2),
-                           d = c(0, 1)), g, base_year = 2001, deflator = d)
   # Dividing by a zero index produced Inf, which then propagated silently into
-  # every scale and summary downstream.
+  # every scale and summary downstream. The NA it gives instead is reported,
+  # as to_ppp()'s is below.
+  expect_warning(
+    d0 <- deflate(data.frame(iso3c = "A", year = 2000:2001, g = c(1, 2),
+                             d = c(0, 1)), g, base_year = 2001, deflator = d),
+    class = "countryatlas_unusable_rows")
   expect_false(any(is.infinite(d0$g_real)))
   expect_true(is.na(d0$g_real[1]))
   # And an unusable factor now says so, rather than handing back a blank

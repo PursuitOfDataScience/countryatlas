@@ -41,18 +41,18 @@ same country is spelled `"US"`, `"U.S."`, `"United States"` and
 `"United States of America"`, and a naïve join treats them as different
 entities. **countryatlas** resolves this friction by adopting ISO 3166 codes as
 a universal join key and by stitching together three otherwise disjoint
-resources — map geometry, World Bank development indicators, and a comprehensive
-country-code crosswalk — into a single, map-ready table. This vignette presents
+resources (map geometry, World Bank development indicators, and a comprehensive
+country-code crosswalk) into a single, map-ready table. This vignette presents
 the package's design philosophy, its core functional vocabulary, and worked
 examples spanning data assembly, the join engine, diagnostics, reference data,
-analysis helpers and the grammar of honest cartographic displays — the
+analysis helpers and the grammar of honest cartographic displays; the
 companion vignettes take up the remaining map types, projections and query
 interface in detail. All examples run offline against a bundled data snapshot.
 
 # Introduction
 
 The package rests on a single conviction: *if a task does not make it easier to
-get country data onto a map — or to make that map honest — it does not belong
+get country data onto a map, or to make that map honest, it does not belong
 here*. Concretely, three packages are combined:
 
 * **`ggplot2::map_data("world")`** (or Natural Earth via `sf`) supplies polygon
@@ -64,7 +64,7 @@ here*. Concretely, three packages are combined:
 Three design commitments follow. First, **the happy path is one call**:
 `world_data(2020)` returns a tibble ready to map. Second, **the ISO code is the
 spine**: every function speaks `iso3c`/`iso2c` internally and exposes it, so
-anything the package produces joins to anything else — and to the user's own
+anything the package produces joins to anything else, and to the user's own
 data. Third, **no country is lost silently**: entities that map backends spell
 idiosyncratically are *matched* through a curated override table rather than
 dropped, and unmatched values are reported explicitly.
@@ -176,8 +176,8 @@ messy <- data.frame(
 standardize_country(messy, nation, warn = FALSE)
 ```
 
-`join_world()` goes one step further — auto-detecting the country column,
-standardising it and attaching geometry — while `country_join()` reconciles two
+`join_world()` goes one step further, auto-detecting the country column,
+standardising it and attaching geometry, while `country_join()` reconciles two
 independent tables that each key on country names:
 
 ```{r}
@@ -207,8 +207,8 @@ repair_country_names(c("Brzil", "Germny", "United States"), verbose = FALSE)
 audit_coverage(snapshot)$na_rates
 ```
 
-The entities the previous version dropped — Kosovo, Micronesia, the Virgin
-Islands and a dozen others — are now matched:
+The entities the previous version dropped (Kosovo, Micronesia, the Virgin
+Islands and a dozen others) are now matched:
 
 ```{r}
 dropped <- c("Kosovo", "Micronesia", "Virgin Islands", "Canary Islands",
@@ -217,9 +217,9 @@ standardize_country(data.frame(region = dropped), region, warn = FALSE)
 ```
 
 Dissolved entities get first-class treatment too. The `historical` column of
-`check_country_match()` flags them — including `"USSR"`, which countrycode
+`check_country_match()` flags them, including `"USSR"`, which countrycode
 silently resolves to Russia's `RUS` (so Soviet-era data becomes Russian data
-without a warning) — and `dissolve_country()` expands them to their successor
+without a warning), and `dissolve_country()` expands them to their successor
 states via the curated `historical_codes` crosswalk:
 
 ```{r}
@@ -261,8 +261,8 @@ above).
 # Analysis helpers
 
 Small, in-spirit transforms that keep an analysis from leaving the package
-mid-pipeline. `per_capita()` disarms the commonest footgun in this data — *is
-this map just a population map?* — by normalising a total before it is plotted.
+mid-pipeline. `per_capita()` disarms the commonest footgun in this data (*is
+this map just a population map?*) by normalising a total before it is plotted.
 Supply the denominator, or omit it and the relevant years of `SP.POP.TOTL` are
 fetched for you:
 
@@ -303,7 +303,7 @@ panel |>
 ```
 
 And `complete_years()` fills the panel gaps that would otherwise make an
-animation flicker or a join silently drop years — by grid completion,
+animation flicker or a join silently drop years, by grid completion,
 carry-forward or linear interpolation (`lag_by_country()` and
 `diff_by_country()` round out the panel toolkit):
 
@@ -316,8 +316,8 @@ complete_years(patchy, 2019:2021, method = "linear")
 
 Three questions this data is constantly asked: *how unequal is the world*,
 *what moves together*, and *are poor countries catching up?* `gini()` and
-`theil()` measure inequality across countries — weight by population and they
-describe inequality between people; `theil()` decomposes exactly into
+`theil()` measure inequality across countries (weight by population and they
+describe inequality between people); `theil()` decomposes exactly into
 between/within components:
 
 ```{r}
@@ -339,7 +339,7 @@ regression (returning the implied convergence speed and half-life) and
 `sigma_convergence()` tracks whether cross-country dispersion is actually
 narrowing. And on the spatial side, `morans_i()` measures whether neighbouring
 countries have similar values, using the package's own `country_borders()`
-adjacency — no `spdep` needed.
+adjacency, with no `spdep` needed.
 
 # Performance and offline use
 
@@ -350,8 +350,8 @@ cache can be cleared with `clear_wdi_cache()`.
 
 # Conclusion
 
-`countryatlas` keeps its original soul — ISO codes as the universal join key,
-one call to a map-ready table — and extends it into a complete toolkit: any
+`countryatlas` keeps its original soul (ISO codes as the universal join key,
+one call to a map-ready table) and extends it into a complete toolkit: any
 indicator and any year span, a modern `sf` backend, an exposed join engine for
 the user's own data, honest diagnostics, curated reference data, analysis
 helpers, and a full vocabulary of projected, area-honest maps.

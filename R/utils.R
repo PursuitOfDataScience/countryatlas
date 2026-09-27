@@ -9,6 +9,14 @@ wdj_abort <- function(message, ..., call = rlang::caller_env(), class = NULL,
                  class = c(class, "countryatlas_error"))
 }
 
+# The frame of the verb a closure was written in, for `call =`. An error raised
+# from a tryCatch() handler or an lapply() function written inline in a verb
+# took the default caller_env(), the closure's own frame, so it was headed
+# "Error in `value[[3L]]()`" (tryCatch's internal name for its handler) or
+# "Error in `FUN()`" instead of naming the verb. The closure's enclosure is the
+# verb's frame, so this holds only for a closure defined in the verb's body.
+verb_env <- function(env = rlang::caller_env()) parent.env(env)
+
 wdj_warn <- function(message, ..., class = NULL, .envir = rlang::caller_env()) {
   cli::cli_warn(message, ..., .envir = .envir,
                 class = c(class, "countryatlas_warning"))
@@ -41,13 +49,6 @@ has_pkg <- function(pkg) {
 # caller is not about to call; use has_pkg() when the next line calls pkg::fun().
 pkg_installed <- function(pkg) nzchar(system.file(package = pkg))
 
-# Resolve country identifiers to whichever code system is the join key.
-#
-# iso3c stays the default everywhere, and goes through wdj_to_iso3c() so it
-# keeps the override table and the Kosovo special case. The COW and
-# Gleditsch-Ward alternates exist for historical work, where ISO 3166 simply
-# does not reach: it was first published in 1974 and never covered colonies.
-# Those go straight to countrycode, which maintains the crosswalks.
 # Three verbs take column names as strings -- interpolate_missing(value),
 # complete_years(value) and audit_coverage(indicator) -- while the nine verbs
 # around them take a bare column through tidy eval. Writing the bare column
@@ -55,7 +56,10 @@ pkg_installed <- function(pkg) nzchar(system.file(package = pkg))
 # neither the argument nor the string it wanted. Only reached once evaluation
 # has already failed, so a legitimate expression is never intercepted; and only
 # a bare symbol (or c() of symbols) is claimed, so a real error still surfaces.
-abort_bare_column <- function(expr, arg, cnd, call = rlang::caller_env()) {
+# Every caller raises it from the tryCatch() handler around that evaluation,
+# hence verb_env() for the call.
+abort_bare_column <- function(expr, arg, cnd,
+                              call = verb_env(rlang::caller_env())) {
   bare <- is.symbol(expr) ||
     (is.call(expr) && identical(expr[[1L]], quote(c)) && length(expr) > 1L &&
        all(vapply(as.list(expr)[-1L], is.symbol, logical(1))))
@@ -135,10 +139,19 @@ wdj_origin_hint <- function(bad, origin) {
   NULL
 }
 
+# Resolve country identifiers to whichever code system is the join key.
+#
+# iso3c stays the default everywhere, and goes through wdj_to_iso3c() so it
+# keeps the override table and the Kosovo special case. The COW and
+# Gleditsch-Ward alternates exist for historical work, where ISO 3166 simply
+# does not reach: it was first published in 1974 and never covered colonies.
+# Those go straight to countrycode, which maintains the crosswalks.
 wdj_to_key <- function(x, origin = "country.name", key = "iso3c",
                        custom_match = country_overrides(), side = NULL,
-                       warn_unresolved = FALSE) {
-  iso <- wdj_to_iso3c(x, origin = origin, custom_match = custom_match)
+                       warn_unresolved = FALSE, arg = "origin",
+                       call = rlang::caller_env()) {
+  iso <- wdj_to_iso3c(x, origin = origin, custom_match = custom_match,
+                      call = call, arg = arg)
   # Two different failures, and they need different sentences. This one is "the
   # name is not a country I know" -- reported here rather than by the caller
   # because only here are the two distinguishable: on an alternate key an
@@ -282,24 +295,6 @@ check_number <- function(x, arg, lo = -Inf, hi = Inf,
   invisible(x)
 }
 
-# world_map()/globe_map() handed `palette` and the label strings straight to
-# viridisLite and ggplot2. A length-2 `palette` reached a bare switch() and came
-# back as base R's "EXPR must be a length 1 vector"; a numeric one was accepted
-# without a word; and a length-2 `title`/`legend` was accepted too, after which
-# ggplot2 drew both strings over each other. (Only `na_label` truncates to its
-# first element, and that is by design -- there is one NA key.) world_query()
-# validates the two of these four it takes, `palette` and `title`, so this closes
-# the gap between the two entry points. Labels are length-checked but not
-# type-checked -- ggplot2 renders `title = 2024` happily and rejecting that would
-# be gratuitous -- whereas `palette` is documented as a *name*, so it has to be a
-# single string.
-# An engine or backend that cannot honour an argument has to say so rather
-# than accept it and draw something else. The polygon backend does this for
-# `scale` / `projection` / `recenter`; the alternative engines did not, and
-# quietly dropped whole groups of ggplot2-specific arguments.
-# `cli::qty()` keys the agreement markers explicitly: {.arg {ignored}} is an
-# interpolation, so anything after it would otherwise agree with the wrong
-# number.
 # Engines that assemble their own plot take `...` and can do nothing with it.
 # Report the names the caller actually used, falling back to a position for an
 # unnamed one, so the message points at their code rather than at ours.
@@ -344,15 +339,6 @@ warn_all_na_result <- function(data, val_name, new_col, needs,
   invisible(NULL)
 }
 
-# Refuse an argument the verb sets itself.
-#
-# coverage_map(), classify_compare(), lisa_map() and od_map() draw through
-# world_map() and pass `style`/`legend` themselves, so a caller supplying either
-# through `...` got base R's "formal argument \"style\" matched by multiple
-# actual arguments" -- naming neither the verb nor the reservation, while their
-# help pages advertise `...` as "Passed to world_map()" with no exclusion and
-# ?projection_compare next door offers `style` as an example of what to pass.
-# Same treatment geom_country_labels() was given for the same class.
 # ifelse() derives its result from `test`, so on a zero-row frame neither branch
 # is ever evaluated and it hands back `logical(0)` -- a logical column where the
 # verb promises a numeric one. `if (!any(usable))` is also TRUE for logical(0),
@@ -424,6 +410,15 @@ gg_plot_data <- function(p) {
   p$data
 }
 
+# Refuse an argument the verb sets itself.
+#
+# coverage_map(), classify_compare(), lisa_map() and od_map() draw through
+# world_map() and pass `style`/`legend` themselves, so a caller supplying either
+# through `...` got base R's "formal argument \"style\" matched by multiple
+# actual arguments" -- naming neither the verb nor the reservation, while their
+# help pages advertise `...` as "Passed to world_map()" with no exclusion and
+# ?projection_compare next door offers `style` as an example of what to pass.
+# Same treatment geom_country_labels() was given for the same class.
 refuse_reserved_dots <- function(dots, reserved, verb,
                                  call = rlang::caller_env()) {
   hit <- intersect(reserved, names(dots))
@@ -436,6 +431,13 @@ refuse_reserved_dots <- function(dots, reserved, verb,
   ), call = call, class = "countryatlas_reserved_dots")
 }
 
+# An engine or backend that cannot honour an argument has to say so rather
+# than accept it and draw something else. The polygon backend does this for
+# `scale` / `projection` / `recenter`; the alternative engines did not, and
+# quietly dropped whole groups of ggplot2-specific arguments.
+# `cli::qty()` keys the agreement markers explicitly: {.arg {ignored}} is an
+# interpolation, so anything after it would otherwise agree with the wrong
+# number.
 warn_engine_ignored <- function(ignored, engine, alternative) {
   if (!length(ignored)) return(invisible(NULL))
   wdj_warn(c(
@@ -447,6 +449,17 @@ warn_engine_ignored <- function(ignored, engine, alternative) {
   invisible(NULL)
 }
 
+# world_map()/globe_map() handed `palette` and the label strings straight to
+# viridisLite and ggplot2. A length-2 `palette` reached a bare switch() and came
+# back as base R's "EXPR must be a length 1 vector"; a numeric one was accepted
+# without a word; and a length-2 `title`/`legend` was accepted too, after which
+# ggplot2 drew both strings over each other. (Only `na_label` truncates to its
+# first element, and that is by design -- there is one NA key.) world_query()
+# validates the two of these four it takes, `palette` and `title`, so this closes
+# the gap between the two entry points. Labels are length-checked but not
+# type-checked -- ggplot2 renders `title = 2024` happily and rejecting that would
+# be gratuitous -- whereas `palette` is documented as a *name*, so it has to be a
+# single string.
 check_label_args <- function(palette = NULL, title = NULL, legend = NULL,
                              na_label = NULL, call = rlang::caller_env()) {
   if (!is.null(palette)) check_string(palette, "palette", call = call)
@@ -515,12 +528,6 @@ check_limits_cores <- function() {
   nzchar(val) && !(ascii_lower(trimws(val)) %in% c("false", "f", "0", "no"))
 }
 
-# Decide how many workers to use. Honours options(countryatlas.workers=) and
-# falls back to all-but-one available core, capped at the work size.
-# Scalar-string validator, the character counterpart of check_number(). The
-# string builders sprintf() their arguments, and sprintf() vectorises silently:
-# a length-2 value duplicated a whole query clause, a length-0 one made the
-# clause vanish, and NA became the literal text "NA".
 # match.arg() reports R's anonymous "'arg' should be one of ..." -- naming
 # neither the argument the caller passed nor the function they called. It does
 # so *everywhere*, not just in helpers: the message is hard-coded, so calling it
@@ -608,57 +615,6 @@ check_top_n <- function(x, arg = "top_n", call = rlang::caller_env()) {
   invisible(x)
 }
 
-# One row per country, without collapsing the countries that have no code.
-# dplyr::distinct() treats NA as a value, so de-duplicating on iso3c alone folds
-# every uncoded row into a single one: audit_coverage() named one unmatched
-# country out of four (and divided every na_rate by the wrong n), while
-# rate_check() and world_table() quietly returned three rows for a five-row
-# input. Coded rows de-duplicate on the code; uncoded ones are not duplicates of
-# each other, so they de-duplicate on whatever else identifies them -- which
-# still keeps the polygon backend from counting one country once per vertex.
-# The earliest row per unit, chosen explicitly rather than by position.
-# distinct(.keep_all = TRUE) keeps whichever row comes *first in the frame* --
-# the earliest year only if the caller happened to sort by year. Shuffle the
-# same panel and rate_check() returned a different numerator for France,
-# world_map() drew a different year, and nothing said so. Survivors keep their
-# original relative order so nothing downstream sees a reordered frame.
-#
-# order() on a factor sorts by level index, not by the label, so a factored
-# `year` (read.csv(stringsAsFactors = TRUE), or one factored for plotting) with
-# levels 2002 < 2001 < 2000 would hand back the *latest* year while the caller
-# was promised the earliest. Compare years as numbers where they are numbers,
-# and fall back to the labels where they are not.
-# The sortable form of a `year` column. dplyr::arrange() and order() on a
-# factor sort by LEVEL INDEX, not by the label, and a year column arrives as a
-# factor more often than it looks: read.csv(stringsAsFactors = TRUE), several
-# importers, and any deliberate factor(year) for plotting. A panel whose levels
-# were c("2003", "2001", "2000", "2002") was therefore ordered 2003, 2001,
-# 2000, 2002, and every verb that reads a *neighbouring* row read the wrong
-# neighbour: lag_by_country() took the value from the wrong year and
-# growth_rate() reported -0.75 where the series had doubled, with nothing said.
-# Characters are coerced too, so a panel of "1999", "2000" sorts numerically
-# rather than lexicographically. A column that is not numeric at all is handed
-# back untouched, so a genuinely categorical period label still sorts by the
-# order its own type defines. earliest_per_unit() below carried this coercion
-# already; the seven arrange() sites that read neighbouring rows did not.
-# The grouping key for a per-country verb, and why iso3c alone is not it.
-#
-# `dplyr::group_by()` puts every NA in ONE group, so a panel carrying two rows
-# whose iso3c did not resolve was treated as one country: growth_rate() reported
-# the change from one unmatched row to the next -- 899% between two unrelated
-# countries -- and lag_by_country(), diff_by_country(), index_to() and
-# interpolate_missing() read across them the same way. Silently, and after
-# standardize_country() had already warned that those names did not match, so
-# the frame reaching these verbs is exactly the one a user is most likely to
-# have.
-#
-# Fall back to whatever does identify the row, in the same c("country",
-# "group") order distinct_countries() uses for its uncoded branch -- so an
-# appended aggregate row (no iso3c, `country = "World"`) still groups as one
-# series, which is what its owner meant. Where nothing identifies a row, give
-# it a key of its own: a verb that reads a neighbouring row must not read
-# across two unknown countries. Fallback keys carry the column they came from,
-# so a label can never collide with a real iso3c or with another column's.
 # A key that identifies nothing. `""` is not NA and every is.na() guard misses
 # it, but read.csv() without na.strings = "" gives a blank for every empty cell
 # and standardize_country("") already resolves to iso3c = NA -- so a blank code
@@ -699,6 +655,24 @@ unit_label <- function(df) {
   out
 }
 
+# The grouping key for a per-country verb, and why iso3c alone is not it.
+#
+# `dplyr::group_by()` puts every NA in ONE group, so a panel carrying two rows
+# whose iso3c did not resolve was treated as one country: growth_rate() reported
+# the change from one unmatched row to the next -- 899% between two unrelated
+# countries -- and lag_by_country(), diff_by_country(), index_to() and
+# interpolate_missing() read across them the same way. Silently, and after
+# standardize_country() had already warned that those names did not match, so
+# the frame reaching these verbs is exactly the one a user is most likely to
+# have.
+#
+# Fall back to whatever does identify the row, in the same c("country",
+# "group") order distinct_countries() uses for its uncoded branch -- so an
+# appended aggregate row (no iso3c, `country = "World"`) still groups as one
+# series, which is what its owner meant. Where nothing identifies a row, give
+# it a key of its own: a verb that reads a neighbouring row must not read
+# across two unknown countries. Fallback keys carry the column they came from,
+# so a label can never collide with a real iso3c or with another column's.
 unit_key <- function(df) {
   key <- as.character(df$iso3c)
   miss <- blank_key(key)
@@ -724,6 +698,19 @@ group_by_unit <- function(df) {
   dplyr::group_by(df, .data$.wdj_unit)
 }
 
+# The sortable form of a `year` column. dplyr::arrange() and order() on a
+# factor sort by LEVEL INDEX, not by the label, and a year column arrives as a
+# factor more often than it looks: read.csv(stringsAsFactors = TRUE), several
+# importers, and any deliberate factor(year) for plotting. A panel whose levels
+# were c("2003", "2001", "2000", "2002") was therefore ordered 2003, 2001,
+# 2000, 2002, and every verb that reads a *neighbouring* row read the wrong
+# neighbour: lag_by_country() took the value from the wrong year and
+# growth_rate() reported -0.75 where the series had doubled, with nothing said.
+# Characters are coerced too, so a panel of "1999", "2000" sorts numerically
+# rather than lexicographically. A column that is not numeric at all is handed
+# back untouched, so a genuinely categorical period label still sorts by the
+# order its own type defines. earliest_per_unit() below carried this coercion
+# already; the seven arrange() sites that read neighbouring rows did not.
 year_sort_key <- function(x) {
   chr <- if (is.factor(x)) as.character(x) else x
   if (is.character(chr)) {
@@ -738,6 +725,18 @@ year_sort_key <- function(x) {
   x
 }
 
+# The earliest row per unit, chosen explicitly rather than by position.
+# distinct(.keep_all = TRUE) keeps whichever row comes *first in the frame* --
+# the earliest year only if the caller happened to sort by year. Shuffle the
+# same panel and rate_check() returned a different numerator for France,
+# world_map() drew a different year, and nothing said so. Survivors keep their
+# original relative order so nothing downstream sees a reordered frame.
+#
+# order() on a factor sorts by level index, not by the label, so a factored
+# `year` (read.csv(stringsAsFactors = TRUE), or one factored for plotting) with
+# levels 2002 < 2001 < 2000 would hand back the *latest* year while the caller
+# was promised the earliest. Compare years as numbers where they are numbers,
+# and fall back to the labels where they are not.
 earliest_per_unit <- function(df, unit) {
   if (!nrow(df)) return(df)
   if (!"year" %in% names(df)) {
@@ -749,6 +748,14 @@ earliest_per_unit <- function(df, unit) {
   df[sort(keep), , drop = FALSE]
 }
 
+# One row per country, without collapsing the countries that have no code.
+# dplyr::distinct() treats NA as a value, so de-duplicating on iso3c alone folds
+# every uncoded row into a single one: audit_coverage() named one unmatched
+# country out of four (and divided every na_rate by the wrong n), while
+# rate_check() and world_table() quietly returned three rows for a five-row
+# input. Coded rows de-duplicate on the code; uncoded ones are not duplicates of
+# each other, so they de-duplicate on whatever else identifies them -- which
+# still keeps the polygon backend from counting one country once per vertex.
 distinct_countries <- function(df, arg = "data") {
   if (!"iso3c" %in% names(df)) return(df)
   # Collapsing to one row per country is for repeated *geometry* rows, not for
@@ -792,6 +799,10 @@ distinct_countries <- function(df, arg = "data") {
   dplyr::bind_rows(coded, unc)
 }
 
+# Scalar-string validator, the character counterpart of check_number(). The
+# string builders sprintf() their arguments, and sprintf() vectorises silently:
+# a length-2 value duplicated a whole query clause, a length-0 one made the
+# clause vanish, and NA became the literal text "NA".
 check_string <- function(x, arg, allow_empty = FALSE,
                          call = rlang::caller_env()) {
   if (!is.character(x) || length(x) != 1L || is.na(x)) {
@@ -1026,6 +1037,7 @@ check_map_geometry <- function(data, call = rlang::caller_env()) {
   }
   invisible(TRUE)
 }
+
 # ASCII-only case folding. toupper()/tolower() follow LC_CTYPE, and in Turkish,
 # Azeri and Crimean Tatar locales "i" and "I" are not each other's case pair:
 # toupper("idn") is "IDN" in C but "\u0130DN" (dotted capital I) there, and
@@ -1048,6 +1060,8 @@ ascii_lower <- function(x) {
 }
 
 
+# Decide how many workers to use. Honours options(countryatlas.workers=) and
+# falls back to all-but-one available core, capped at the work size.
 wdj_workers <- function(n_tasks = Inf) {
   opt <- getOption("countryatlas.workers", NULL)
   if (!is.null(opt)) {
@@ -1062,7 +1076,7 @@ wdj_workers <- function(n_tasks = Inf) {
         "{.code options(countryatlas.workers)} must be a single finite number.",
         "x" = if (length(n) != 1L) "Got {length(n)} values."
               else "Got {.val {opt}}."
-      ))
+      ), call = NULL)
     }
     # A number below one is still clamped rather than rejected: that never
     # caused the failure above, and the existing contract is only that the
@@ -1117,7 +1131,7 @@ wdj_lapply <- function(X, FUN, ..., parallel = TRUE, workers = NULL) {
     # own message got interpolated. A FUN failing with "bad json {\"a\": 1}"
     # reported "Could not evaluate cli `{}` expression: `\"a\"`" and the real
     # failure was gone. Interpolating the value passes it through verbatim.
-    wdj_abort(c("Parallel computation failed.", "x" = "{msg}"))
+    wdj_abort(c("Parallel computation failed.", "x" = "{msg}"), call = NULL)
   }
   res
 }
@@ -1131,10 +1145,17 @@ validate_years <- function(year, lo = 1960L,
   if (!is.numeric(year)) {
     wdj_abort("{.arg year} must be numeric, not {.cls {class(year)}}.", call = call)
   }
-  year <- as.integer(round(year))
   if (anyNA(year)) {
     wdj_abort("{.arg year} must not contain missing values.", call = call)
   }
+  # Before as.integer(), which turns an infinity into NA with base R's "NAs
+  # introduced by coercion to integer range" -- so year = Inf leaked that
+  # warning and was then told it contained missing values, which it did not.
+  if (!all(is.finite(year))) {
+    wdj_abort(c("{.arg year} must be finite.",
+                "x" = "Got {.val {year[!is.finite(year)]}}."), call = call)
+  }
+  year <- as.integer(round(year))
   this_year <- as.integer(format(Sys.Date(), "%Y"))
   # `lo` is a parameter because the 1960 floor is the *World Bank's*, not a
   # property of a year. fetch_indicator() and compare_sources() are the generic

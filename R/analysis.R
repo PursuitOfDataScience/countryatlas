@@ -549,11 +549,11 @@ wdj_interp_linear <- function(x, y) {
 #' @param type `"yoy"` (default, period-over-period) or `"cagr"` (compound
 #'   annual growth rate vs. the first non-`NA` year).
 #'   `"cagr"` needs a positive ratio at both ends, so a negative value gives
-#'   `NA` for that row (with a warning) and a non-positive base year gives `NA`
-#'   for that country; a value of exactly `0` is a legitimate annualised -100%.
-#'   `"yoy"` is a plain ratio change and is defined for negative values, but
-#'   not after a zero: a change from `0` has no ratio, so that row is `NA`
-#'   (with a warning) rather than `Inf`.
+#'   `NA` for that row and a non-positive or infinite base year gives `NA`
+#'   for that country, each with a warning; a value of exactly `0` is a
+#'   legitimate annualised -100%. `"yoy"` is a plain ratio change and is defined for
+#'   negative values, but not after a zero or an infinity: neither has a
+#'   ratio, so that row is `NA` (with a warning) rather than `Inf` or -100%.
 #' @param suffix Suffix for the new column (default `"_growth"`).
 #'
 #' @return `data` with a growth-rate column added (a proportion, so 0.03 = 3%).
@@ -585,6 +585,9 @@ growth_rate <- function(data, value, type = c("yoy", "cagr"),
     group_by_unit() %>%
     dplyr::arrange(year_sort_key(.data$year), .by_group = TRUE)
   n_zero <- 0L
+  n_inf <- 0L
+  inf_base <- character(0)
+  zero_base <- character(0)
   out <- if (type == "yoy") {
     # A change from zero has no ratio: 5 after 0 divided to Inf and 0 after 0
     # to NaN, both in silence. "cagr" refuses a non-positive base for the same
@@ -592,19 +595,27 @@ growth_rate <- function(data, value, type = c("yoy", "cagr"),
     # for a zero denominator rather than let an infinity run into every scale
     # and summary downstream: a map of the column drew the country as
     # no-data while its value read as the largest growth in the table.
+    # An infinite previous value has no ratio either: anything finite over it
+    # is 0, so the row after an Inf came back as -1 -- a confident -100% for a
+    # series that simply went on -- while the Inf row itself reads Inf, which
+    # is honest. Same NA as after a zero, reported alongside it.
     out <- dplyr::mutate(
       out,
       .wdj_prev = dplyr::lag(.data[[val_name]]),
-      "{new_col}" := num_ifelse(!is.na(.data$.wdj_prev) & .data$.wdj_prev != 0,
+      "{new_col}" := num_ifelse(is.finite(.data$.wdj_prev) & .data$.wdj_prev != 0,
                                 .data[[val_name]] / .data$.wdj_prev - 1)
     )
     n_zero <- sum(!is.na(out$.wdj_prev) & out$.wdj_prev == 0 &
                     !is.na(out[[val_name]]))
+    n_inf <- sum(is.infinite(out$.wdj_prev) & !is.na(out[[val_name]]))
     out$.wdj_prev <- NULL
     out
   } else {
-    dplyr::mutate(
+    out <- dplyr::mutate(
       out,
+      .wdj_inf_base = is.infinite(
+        .data[[val_name]][which(!is.na(.data[[val_name]]))[1]]),
+      .wdj_zero_base = .data[[val_name]][which(!is.na(.data[[val_name]]))[1]] == 0,
       "{new_col}" := {
         base_i <- which(!is.na(.data[[val_name]]))[1]
         v0 <- .data[[val_name]][base_i]; y0 <- .data$year[base_i]
@@ -617,21 +628,64 @@ growth_rate <- function(data, value, type = c("yoy", "cagr"),
         # both correct and the informative answer for a series that went to
         # nothing. A non-positive base stays NA as before -- there is no ratio
         # to take.
-        ifelse(n > 0 & !is.na(v0) & v0 > 0 & !is.na(.data[[val_name]]) &
+        # is.finite(v0), not !is.na(): an infinite base put every later year
+        # at (x / Inf)^(1/n) - 1 = -1, an annualised -100% for a country whose
+        # series had only started with a division by zero.
+        ifelse(n > 0 & is.finite(v0) & v0 > 0 & !is.na(.data[[val_name]]) &
                  .data[[val_name]] >= 0,
                (.data[[val_name]] / v0)^(1 / n) - 1, NA_real_)
       }
     )
+    inf_base <- sort(unique(unit_label(out[out$.wdj_inf_base %in% TRUE, ,
+                                           drop = FALSE])))
+    zero_base <- sort(unique(unit_label(out[out$.wdj_zero_base %in% TRUE, ,
+                                            drop = FALSE])))
+    out$.wdj_inf_base <- NULL
+    out$.wdj_zero_base <- NULL
+    out
   }
   out <- wdj_return_frame(na_where_no_year(out, new_col))
-  if (type == "cagr") warn_cagr_negative(out, val_name, new_col)
+  if (type == "cagr") {
+    warn_cagr_negative(out, val_name, new_col, skip = c(inf_base, zero_base))
+  }
+  if (n_inf) {
+    wdj_warn(c(
+      "{n_inf} row{?s} follow{?s/} an infinite {.field {val_name}}, so
+       {.field {new_col}} is {.val {NA}} there.",
+      "i" = "Nothing finite has a ratio to an infinity; it would read as a
+             growth of -100%."
+    ), class = "countryatlas_infinite_base")
+  }
+  if (length(inf_base)) {
+    wdj_warn(c(
+      "{length(inf_base)} countr{?y/ies} start{?s/} from an infinite
+       {.field {val_name}}, so {.field {new_col}} is {.val {NA}} for
+       {cli::qty(length(inf_base))}{?it/them}:",
+      "*" = "{.val {utils::head(inf_base, 8)}}",
+      "i" = "A compound rate needs a finite base; an infinity is usually a
+             division by zero upstream."
+    ), class = "countryatlas_infinite_base")
+  }
+  # A zero base is the same NA for the whole country, and it was the one
+  # unusable base that said nothing (a negative one is reported with the
+  # negative rows, an infinite one above) -- or, when it was every country's,
+  # was blamed on the series being too short.
+  if (length(zero_base)) {
+    wdj_warn(c(
+      "{length(zero_base)} countr{?y/ies} start{?s/} from a zero
+       {.field {val_name}}, so {.field {new_col}} is {.val {NA}} for
+       {cli::qty(length(zero_base))}{?it/them}:",
+      "*" = "{.val {utils::head(zero_base, 8)}}",
+      "i" = "A compound rate needs a positive base year."
+    ), class = "countryatlas_zero_base")
+  }
   if (n_zero) {
     wdj_warn(c(
       "{n_zero} row{?s} follow{?s/} a zero {.field {val_name}}, so
        {.field {new_col}} is {.val {NA}} there.",
       "i" = "A change from zero has no ratio; it would divide to {.val {Inf}}."
     ), class = "countryatlas_zero_base")
-  } else {
+  } else if (!n_inf && !length(inf_base) && !length(zero_base)) {
     # Only when zeros are not the reason: "needs two years for the same
     # country" is the wrong diagnosis for a series that has them.
     warn_all_na_result(out, val_name, new_col,
@@ -659,10 +713,13 @@ na_where_no_year <- function(out, new_col) {
 # warns via warn_all_na_result() when *every* row comes back NA. Only the
 # partial case was mute, which is the case a real series actually hits: a
 # deficit, a net flow or a balance dipping below zero for a single year.
-warn_cagr_negative <- function(out, val_name, new_col,
+warn_cagr_negative <- function(out, val_name, new_col, skip = character(0),
                                call = rlang::caller_env()) {
   v <- out[[val_name]]
-  n_bad <- sum(!is.na(v) & v < 0 & is.na(out[[new_col]]))
+  # `skip`: countries whose base year was unusable. Their rows are NA for that
+  # reason, and reported with it; counting them here said it twice.
+  own <- !unit_label(out) %in% skip
+  n_bad <- sum(own & !is.na(v) & v < 0 & is.na(out[[new_col]]))
   if (!n_bad) return(invisible(out))
   # Silent when nothing resolved at all: warn_all_na_result() covers that case
   # and says something more useful about it.
@@ -695,7 +752,9 @@ warn_cagr_negative <- function(out, val_name, new_col,
 #' @param suffix Suffix for the new column (default `"_index"`).
 #'
 #' @return `data` with an index column added. The column is `NA` for any
-#'   country whose series does not cover `base_year` (see the note there).
+#'   country whose series does not cover `base_year` (see the note there). A
+#'   negative base-year value is indexed as it is, so that country's index
+#'   runs opposite to its series.
 #' @export
 #' @examples
 #' df <- data.frame(iso3c = "USA", year = 2000:2002, gdp = c(50, 55, 60))
@@ -835,10 +894,10 @@ correlate_indicators <- function(data, ..., method = c("pearson", "spearman"),
       if (length(miss)) {
         wdj_abort(
           "Column{cli::qty(length(miss))}{?s} {.val {miss}} not found in {.arg data}.",
-          call = rlang::caller_env(5))
+          call = verb_env())
       }
       wdj_abort(c("Could not select the indicator columns from {.arg data}.",
-                  "x" = "{conditionMessage(e)}"), call = rlang::caller_env(5))
+                  "x" = "{conditionMessage(e)}"), call = verb_env())
     })
   } else {
     num <- names(data)[vapply(data, is.numeric, logical(1))]
@@ -1553,7 +1612,9 @@ theil <- function(x, weights = NULL, groups = NULL, na.rm = TRUE) {
 #' @param value The value column (unquoted).
 #' @param suffix Suffix for the new column (default `"_share"`).
 #'
-#' @return `data` with a share column added (a proportion in `[0, 1]`).
+#' @return `data` with a share column added: a proportion in `[0, 1]` when no
+#'   value is negative. Negative values are the caller's business and are
+#'   summed as they are, so their shares fall outside that range.
 #' @export
 #' @examples
 #' df <- data.frame(iso3c = c("USA", "CHN"), co2 = c(5, 10))

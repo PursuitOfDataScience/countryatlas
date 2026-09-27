@@ -2,18 +2,6 @@
 # that shipped silently (a wrong number, a wrong count, a crash at print time
 # or a deleted file) and states the contract the fix restores.
 
-# A tiny polygon-backend frame: one unit square per country, far enough apart
-# not to touch. world_map() and friends only need long/lat/group, so this
-# exercises the drawing and counting paths without the `maps` package.
-toy_polygons <- function(values) {
-  iso <- names(values)
-  do.call(rbind, lapply(seq_along(iso), function(i) {
-    data.frame(long = c(0, 1, 1, 0) + 3 * i, lat = c(0, 0, 1, 1),
-               group = i, order = 1:4, iso3c = iso[i], v = values[[i]],
-               stringsAsFactors = FALSE)
-  }))
-}
-
 # --- analysis.R ---------------------------------------------------------------
 
 test_that("growth_rate(type = 'yoy') gives NA, not Inf, after a zero", {
@@ -133,11 +121,15 @@ test_that("convergence_club() does not depend on row order", {
   base <- convergence_club(panel, y)
   shuffled <- convergence_club(panel[sample(nrow(panel)), ], y)
   expect_equal(as.data.frame(shuffled), as.data.frame(base))
-  # The first country lacking the first year used to put that year last.
+  # The first country lacking the first year used to put that year last. That
+  # country has no complete series, so it comes back unclassified and says so.
   p2 <- panel[!(panel$iso3c == "A1" & panel$year == 2000), ]
   p3 <- rbind(p2[p2$iso3c != "A1", ], p2[p2$iso3c == "A1", ])
-  expect_equal(as.data.frame(convergence_club(p2, y)),
-               as.data.frame(convergence_club(p3, y)))
+  expect_warning(o2 <- convergence_club(p2, y),
+                 class = "countryatlas_incomplete_series")
+  expect_warning(o3 <- convergence_club(p3, y),
+                 class = "countryatlas_incomplete_series")
+  expect_equal(as.data.frame(o2), as.data.frame(o3))
 })
 
 test_that("smooth_rates() estimates one prior per year of a panel", {

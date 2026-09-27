@@ -486,7 +486,7 @@ vsup_cols <- function(option = "viridis") {
 }
 
 vsup_fill <- function(value, uncertainty, n_bins = 4, n_uncertainty = 3,
-                      option = "viridis", suppress = 0.85) {
+                      option = "viridis", suppress = 0.85, unit = NULL) {
   ok <- is.finite(value) & is.finite(uncertainty)
   v_rank <- rep(NA_real_, length(value))
   u_rank <- rep(NA_real_, length(value))
@@ -495,9 +495,11 @@ vsup_fill <- function(value, uncertainty, n_bins = 4, n_uncertainty = 3,
     # `world_snapshot`'s GDP per capita a linear stretch put 174 of 191
     # countries in the bottom bin and left most of the palette unused, which
     # defeats the entire point of a 2-D palette. Ranking also matches the
-    # quantile default the rest of the package uses for choropleths.
-    v_rank[ok] <- dplyr::percent_rank(value[ok])
-    u_rank[ok] <- dplyr::percent_rank(uncertainty[ok])
+    # quantile default the rest of the package uses for choropleths, and like
+    # those breaks it is taken once per country (`unit`), not once per
+    # polygon vertex: see unit_percent_rank().
+    v_rank[ok] <- unit_percent_rank(value[ok], unit[ok])
+    u_rank[ok] <- unit_percent_rank(uncertainty[ok], unit[ok])
     # percent_rank() is (rank - 1)/(n - 1), so it is NaN when exactly one row
     # is usable -- and cut() then gave NA, the row got no colour, and the map
     # drew a country whose value and uncertainty were both present as though

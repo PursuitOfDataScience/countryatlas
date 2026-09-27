@@ -25,7 +25,9 @@ a year instead; check with \code{base_year \%in\% data$year} if you need that.}
 }
 \value{
 \code{data} with an index column added. The column is \code{NA} for any
-country whose series does not cover \code{base_year} (see the note there).
+country whose series does not cover \code{base_year} (see the note there). A
+negative base-year value is indexed as it is, so that country's index
+runs opposite to its series.
 }
 \description{
 Rescales a value column so the chosen base year equals \code{to} (100 by default),

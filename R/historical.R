@@ -43,8 +43,15 @@ historical_aliases <- function() {
 }
 
 # Normalise free-text names for alias lookup.
+#
+# [\h\v], the package's Unicode whitespace class (see wdj_to_iso3c()), not
+# trimws()'s ASCII default or TRE's \s: a non-breaking space from a web paste
+# survived both, the alias missed, and "USSR<nbsp>" fell through to
+# countrycode, which resolves it to Russia alone -- the silent mis-resolution
+# dissolve_country() and check_country_match() exist to catch.
 normalize_historical <- function(x) {
-  ascii_lower(gsub("\\s+", " ", trimws(as.character(x))))
+  x <- trimws(as.character(x), whitespace = "[\\h\\v]")
+  ascii_lower(gsub("[\\h\\v]+", " ", x, perl = TRUE))
 }
 
 #' Resolve dissolved entities to their successor states

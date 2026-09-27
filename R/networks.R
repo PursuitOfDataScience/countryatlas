@@ -289,6 +289,23 @@ od_map <- function(data, from, to, weight = NULL, origin = "country.name",
   # with an NA panel and ggplot2 drew an extra, empty facet for them.
   world_iso <- unique(stats::na.omit(
     world_geometry("countries", geometry = "polygon")$iso3c))
+  # The basemap does not carry every code: Hong Kong, Macao, Tuvalu, the
+  # British Virgin Islands and Gibraltar have no polygon on this backend. A
+  # flow to one of them had nowhere to be drawn and vanished from its panel --
+  # China's largest destination, Hong Kong, simply absent from China's map,
+  # with nothing said. Name them, as bubble_map() names the countries it has
+  # no centroid for.
+  sent <- m[panels, , drop = FALSE]
+  undrawn <- setdiff(colnames(sent)[colSums(sent > 0) > 0], world_iso)
+  if (length(undrawn)) {
+    wdj_warn(c(
+      "{length(undrawn)} countr{?y/ies} with flow {?has/have} no polygon on
+       the basemap and {?is/are} not drawn:",
+      "*" = "{.val {undrawn}}",
+      "i" = "The flow is still in {.fn flow_matrix} and
+             {.fn country_network}; only the map cannot show it."
+    ), class = "countryatlas_no_geometry")
+  }
   long <- dplyr::bind_rows(lapply(seq_along(panels), function(i) {
     row <- m[panels[i], ]
     flow <- unname(row[match(world_iso, names(row))])

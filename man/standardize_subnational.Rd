@@ -39,9 +39,10 @@ on a real key instead of on spelling.
 Two things resolve, and it is worth being blunt about how little that is.
 
 A \code{region} value that is \emph{already} an ISO 3166-2 code (\code{"DE-BY"}, \code{"US-CA"})
-passes through, provided its country prefix matches the country the row
-gives -- these codes are unique only within a country, which is why
-\code{country} is required. A mismatch is reported and left as \code{NA}.
+passes through, upper-cased and trimmed, provided its country prefix
+matches the country the row gives -- these codes are unique only within a
+country, which is why \code{country} is required. A mismatch is reported and
+left as \code{NA}.
 
 A region \emph{name} resolves only through the optional \code{regions} package's
 crosswalk, and only when the installed version exposes a name-to-code pair

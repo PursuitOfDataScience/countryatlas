@@ -23,8 +23,9 @@
 #'   Otherwise the rate is `numerator / denominator`.
 #'
 #' @return A tibble of `iso3c`, `numerator`, `denominator`, `rate`,
-#'   `expected_se` (the Poisson standard error of the rate, \eqn{\sqrt{r/d}}) and
-#'   `flagged`, sorted with the least reliable first.
+#'   `expected_se` (the Poisson standard error of the rate, \eqn{\sqrt{r/d}};
+#'   `NA`, with a warning, for a negative rate) and `flagged`, sorted with the
+#'   least reliable first.
 #'
 #'   "Least reliable" is ordered on the standard error a *single* event would
 #'   imply, \eqn{\sqrt{\max(y, 1)}/d}, which is identical to `expected_se` for
@@ -109,7 +110,13 @@ rate_check <- function(data, numerator, denominator, min_denominator = NULL,
     # Poisson SE of a rate: the count's variance is its mean, so the rate's SE
     # is sqrt(rate / denominator). It is the compact statement of why a small
     # denominator is untrustworthy.
-    expected_se = num_ifelse(is.finite(r) & is.finite(den) & den > 0,
+    #
+    # NA, not 0, for a negative rate. pmax(r, 0) turned one into an SE of
+    # exactly 0 -- the most precise-looking value the column can hold -- for
+    # a count the Poisson model has no meaning for at all.
+    # pmax() still inside: ifelse() evaluates the whole `yes` vector, so a
+    # bare sqrt() of the negative rows leaked base R's "NaNs produced".
+    expected_se = num_ifelse(is.finite(r) & r >= 0 & is.finite(den) & den > 0,
                              sqrt(pmax(r, 0) / den)),
     # `is.finite(den) & den < thr` yields FALSE, not NA, for a non-finite
     # denominator, because R short-circuits `FALSE & NA` to FALSE. With *no*
@@ -128,6 +135,15 @@ rate_check <- function(data, numerator, denominator, min_denominator = NULL,
     }
   )
   attr(out, "min_denominator") <- thr
+  n_neg <- sum(is.finite(r) & r < 0)
+  if (n_neg) {
+    wdj_warn(c(
+      "{n_neg} rate{?s} {?is/are} negative, so {.field expected_se} is
+       {.val {NA}} there.",
+      "i" = "The Poisson standard error describes a count, and a count cannot
+             be negative."
+    ), class = "countryatlas_negative_count")
+  }
   # Order on the SE a *single* event would imply, not on expected_se itself.
   # expected_se is sqrt(y)/d, which collapses to exactly 0 when the count is
   # 0 -- so in a table documented as "least reliable first", a country with 0
@@ -159,7 +175,9 @@ rate_check <- function(data, numerator, denominator, min_denominator = NULL,
 #'
 #' @return `data` with `<numerator>_rate` and `<numerator>_smoothed` columns
 #'   added, plus `<numerator>_shrinkage` -- the weight given to the country's own
-#'   rate, between 0 (fully shrunk to the global rate) and 1 (untouched).
+#'   rate, between 0 (fully shrunk to the global rate) and 1 (untouched). A row
+#'   with no finite, positive denominator or with a negative count has no rate:
+#'   all three are `NA` there, with a warning.
 #'
 #' @section The model:
 #' A Poisson-gamma model: counts \eqn{y_i \sim \mathrm{Poisson}(d_i \theta_i)}
@@ -196,7 +214,15 @@ smooth_rates <- function(data, numerator, denominator,
 
   num <- data[[num_name]]
   den <- data[[den_name]]
-  ok <- is.finite(num) & is.finite(den) & den > 0
+  # A count cannot be negative, and the Poisson-gamma model below is defined
+  # only for counts: one negative numerator drove the pooled rate and the
+  # excess variance off their domain, and on a three-country frame every
+  # `_shrinkage` came back 1.03 -- outside the [0, 1] the help promises -- so
+  # every rate was pushed *away* from the global one. Such a row is as
+  # unusable as one with no denominator, and is reported beside it.
+  neg <- is.finite(num) & num < 0
+  bad_den <- !(is.finite(den) & den > 0)
+  ok <- is.finite(num) & !bad_den & !neg
   raw <- num_ifelse(ok, num / den)
 
   rate_col <- paste0(num_name, "_rate")
@@ -208,18 +234,31 @@ smooth_rates <- function(data, numerator, denominator,
   # computation that ran rather than one with nothing to work with.
   # length() first: !any(logical(0)) is TRUE, so a zero-row frame was told
   # it had nothing usable rather than simply having nothing.
-  if (length(ok) && !any(ok)) {
+  #
+  # Counted on the denominator alone. The count was `!ok`, which also took in
+  # every row whose *numerator* was missing, so "3 rows have no finite,
+  # positive pop" could describe rows whose pop was fine. A missing count is
+  # missing data and gives an NA rate on its own, as NA does anywhere.
+  if (length(bad_den) && all(bad_den)) {
     wdj_warn(c(
       "No usable {.arg denominator}, so there are no rates to smooth.",
       "i" = "A rate needs a finite, positive denominator; {.field {rate_col}}
              and {.field {sm_col}} are {.val {NA}} throughout."
     ), class = "countryatlas_no_rates")
-  } else if (any(!ok)) {
+  } else if (any(bad_den)) {
     wdj_warn(c(
-      "{sum(!ok)} row{?s} ha{?s/ve} no finite, positive {.field {den_name}},
-       so the rate there is {.val {NA}}.",
+      "{sum(bad_den)} row{?s} ha{?s/ve} no finite, positive
+       {.field {den_name}}, so the rate there is {.val {NA}}.",
       "i" = "Those rows take no part in the smoothing either."
     ), class = "countryatlas_unusable_rows")
+  }
+  if (any(neg & !bad_den)) {
+    wdj_warn(c(
+      "{sum(neg & !bad_den)} row{?s} ha{?s/ve} a negative {.field {num_name}},
+       so the rate there is {.val {NA}}.",
+      "i" = "A rate is a count over a denominator, and a count cannot be
+             negative; those rows take no part in the smoothing."
+    ), class = "countryatlas_negative_count")
   }
   data[[rate_col]] <- raw
 
@@ -285,8 +324,11 @@ smooth_rates <- function(data, numerator, denominator,
 eb_prior <- function(frame, num_name, den_name, fallback) {
   pooled <- if ("iso3c" %in% names(frame)) {
     pd <- distinct_countries(tibble::as_tibble(sf_drop(frame)))
-    pok <- is.finite(pd[[num_name]]) & is.finite(pd[[den_name]]) &
-      pd[[den_name]] > 0
+    # The same rows smooth_rates() calls usable, negative counts out: this
+    # filter was its own copy, so a negative numerator the caller had been
+    # told takes "no part in the smoothing" still set the prior.
+    pok <- is.finite(pd[[num_name]]) & pd[[num_name]] >= 0 &
+      is.finite(pd[[den_name]]) & pd[[den_name]] > 0
     list(y = pd[[num_name]][pok], d = pd[[den_name]][pok])
   } else {
     fallback
@@ -428,6 +470,24 @@ deflate <- function(data, value, base_year, deflator = NULL,
         NA_real_)
     ) %>%
     dplyr::ungroup()
+  # The same unusable index in any other year gives NA for that row, which was
+  # silent where to_ppp() and per_capita() report it. Only rows whose country
+  # has a base: the countries named above are NA throughout, and said so.
+  new <- paste0(val_name, suffix)
+  unusable <- is.finite(out$.wdj_base) & out$.wdj_base != 0 &
+    !(is.finite(out[[defl_name]]) & out[[defl_name]] != 0)
+  if (any(unusable)) {
+    wdj_warn(c(
+      if (rlang::quo_is_null(defl_q)) {
+        "{sum(unusable)} row{?s} ha{?s/ve} no usable World Bank deflator, so
+         {.field {new}} is {.val {NA}} there."
+      } else {
+        "{sum(unusable)} row{?s} ha{?s/ve} no usable {.field {defl_name}}, so
+         {.field {new}} is {.val {NA}} there."
+      },
+      "i" = "A zero, infinite or missing index cannot rebase a value."
+    ), class = "countryatlas_unusable_rows")
+  }
   out$.wdj_base <- NULL
   # group_by_unit() rather than iso3c: the base-year deflator is read from
   # within the group, so two rows whose iso3c did not resolve were rebased
@@ -534,7 +594,10 @@ to_ppp <- function(data, value, factor = NULL, suffix = "_ppp") {
 #'
 #' @return A tibble: `iso3c`, `club` (an integer, 1 = highest-level club, `NA` =
 #'   not classified), and the club's `log_t` statistic. The per-club test results
-#'   are attached as the `"countryatlas_clubs"` attribute.
+#'   are attached as the `"countryatlas_clubs"` attribute. Every country in
+#'   `data` appears: one without a complete series (a missing or non-finite
+#'   value in any year) cannot be tested, so it comes back with `club = NA` and
+#'   a warning naming it.
 #'
 #' @section The test:
 #' For each country form the relative transition path
@@ -578,6 +641,13 @@ convergence_club <- function(data, value, min_size = 2, alpha = 0.05) {
   min_size <- as.integer(min_size)
 
   df <- tibble::as_tibble(sf_drop(data))[, c("iso3c", "year", val_name)]
+  # Every country the caller supplied, before the filters below. The log-t test
+  # needs a balanced panel, so a country with even one missing or non-finite
+  # year cannot be classified -- but it used to vanish from the result
+  # altogether, while `club = NA` is documented as "not classified" and the
+  # help promises leftovers come back that way. The same panel with one gap in
+  # one country returned nine rows for ten countries and said nothing.
+  all_iso <- unique(as.character(df$iso3c[!is.na(df$iso3c)]))
   df <- df[!is.na(df$iso3c) & !is.na(df$year) & is.finite(df[[val_name]]), ]
   # pivot_wider() collapses a repeated country-year into a list-column, and the
   # as.matrix() below then died with base R's "invalid 'type' (list) of
@@ -614,6 +684,17 @@ convergence_club <- function(data, value, min_size = 2, alpha = 0.05) {
       "i" = "Got {nrow(wide)}; the log-t test needs a balanced panel.",
       "*" = "Try {.fn complete_years} first, or narrow the year range."
     ))
+  }
+  incomplete <- sort(setdiff(all_iso, as.character(wide$iso3c)))
+  if (length(incomplete)) {
+    wdj_warn(c(
+      "{length(incomplete)} countr{?y/ies} {?lacks/lack} a complete series and
+       {?is/are} returned unclassified ({.code club = NA}):",
+      "*" = "{.val {utils::head(incomplete, 8)}}",
+      "i" = "The log-t test needs every year for every country it compares.
+             {.fn complete_years} and {.fn interpolate_missing} fill gaps, or
+             narrow the year range."
+    ), class = "countryatlas_incomplete_series")
   }
   y <- as.matrix(wide[, -1, drop = FALSE])
   rownames(y) <- wide$iso3c
@@ -664,7 +745,9 @@ convergence_club <- function(data, value, min_size = 2, alpha = 0.05) {
     remaining <- setdiff(remaining, members)
   }
 
-  out <- tibble::tibble(iso3c = names(clubs), club = unname(clubs))
+  out <- tibble::tibble(
+    iso3c = c(names(clubs), incomplete),
+    club = c(unname(clubs), rep(NA_integer_, length(incomplete))))
   st <- if (length(stats_out)) dplyr::bind_rows(stats_out) else
     tibble::tibble(club = integer(0), n = integer(0), log_t = numeric(0))
   out <- dplyr::left_join(out, st[, c("club", "log_t")], by = "club")

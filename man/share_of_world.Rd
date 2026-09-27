@@ -14,7 +14,9 @@ share_of_world(data, value, suffix = "_share")
 \item{suffix}{Suffix for the new column (default \code{"_share"}).}
 }
 \value{
-\code{data} with a share column added (a proportion in \verb{[0, 1]}).
+\code{data} with a share column added: a proportion in \verb{[0, 1]} when no
+value is negative. Negative values are the caller's business and are
+summed as they are, so their shares fall outside that range.
 }
 \description{
 Adds a column giving each country's value as a share of the (year's) world

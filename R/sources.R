@@ -315,7 +315,7 @@ fetch_indicator <- function(source, indicator, countries = NULL, years = NULL,
                    {.code indicator}, {.code countries} and {.code years}. See
                    the {.strong fetch contract} in
                    {.help countryatlas::register_country_source}."
-          ))
+          ), call = verb_env())
         }
         # "{msg}", not msg: a bullet is a cli template, so a brace in the
         # provider's own message would be interpolated (the same trap
@@ -326,7 +326,7 @@ fetch_indicator <- function(source, indicator, countries = NULL, years = NULL,
           "i" = "The failure is the source's own, not
                  {.pkg countryatlas}'s. {.fn country_sources} lists what is
                  registered."
-        ))
+        ), call = verb_env())
       })
   }
   if (!is.data.frame(out)) {
@@ -573,6 +573,16 @@ compare_sources <- function(indicator, sources = c("wdi", "owid"), year,
   if (length(sources) < 2L) {
     wdj_abort("{.arg sources} must name at least two sources to compare.")
   }
+  # A repeated name made two columns called the same thing, which the join
+  # suffixed apart, and the comparison then died on vctrs' "Columns `wdi` and
+  # `wdi` don't exist" -- naming columns, not the argument that caused them.
+  if (!is.character(sources) || anyNA(sources) || anyDuplicated(sources)) {
+    wdj_abort(c(
+      "{.arg sources} must be distinct source names.",
+      "x" = "Got {.val {sources}}.",
+      "i" = "{.fn country_sources} lists what is registered."
+    ))
+  }
   codes <- if (!is.null(names(indicator))) {
     missing_src <- setdiff(sources, names(indicator))
     if (length(missing_src)) {
@@ -611,7 +621,10 @@ compare_sources <- function(indicator, sources = c("wdi", "owid"), year,
       # A source that renamed the column: take the first non-key numeric one.
       num <- names(d)[vapply(d, is.numeric, logical(1))]
       num <- setdiff(num, c("year"))
-      if (!length(num)) wdj_abort("Source {.val {s}} returned no numeric column.")
+      if (!length(num)) {
+        wdj_abort("Source {.val {s}} returned no numeric column.",
+                  call = verb_env())
+      }
       d[[s]] <- d[[num[1]]]
     }
     # A row whose key did not resolve is not a country to compare, and
@@ -646,9 +659,31 @@ compare_sources <- function(indicator, sources = c("wdi", "owid"), year,
   # there is none, so every column in `sources` is already a number and
   # as.matrix() cannot produce a character matrix. (Reading the abs() below in
   # isolation suggests otherwise -- the guard is 20 lines up, not here.)
+  #
+  if (!nrow(out)) {
+    wdj_warn("No source returned data for {.val {year}}, so there is nothing
+              to compare.", class = "countryatlas_no_data")
+  }
   mat <- as.matrix(out[, sources, drop = FALSE])
+  # An infinite value is not a figure to compare. It made the relative
+  # difference NaN, which `disagrees` read as agreement, while `n_sources`
+  # counted it as a value. It stays in its column, where it is visible, and
+  # is left out of the comparison, which says so.
+  for (s in sources) {
+    inf <- is.infinite(mat[, s])
+    if (any(inf)) {
+      wdj_warn(c(
+        "Source {.val {s}} returned an infinite value for
+         {sum(inf)} countr{?y/ies}, left out of the comparison:",
+        "*" = "{.val {utils::head(out$iso3c[inf], 8)}}"
+      ), class = "countryatlas_infinite_value")
+      mat[inf, s] <- NA_real_
+    }
+  }
   out$n_sources <- rowSums(!is.na(mat))
-  rng <- t(apply(mat, 1, function(r) {
+  # apply() over no rows returns a bare logical(0), which t() made a 1 x 0
+  # matrix, and `rng[, 1]` then died on "subscript out of bounds".
+  rng <- if (!nrow(mat)) matrix(NA_real_, 0L, 2L) else t(apply(mat, 1, function(r) {
     r <- r[!is.na(r)]
     if (length(r) < 2L) return(c(NA_real_, NA_real_))
     c(min(r), max(r))
@@ -661,7 +696,9 @@ compare_sources <- function(indicator, sources = c("wdi", "owid"), year,
 
   pairs <- utils::combn(sources, 2, simplify = FALSE)
   summ <- dplyr::bind_rows(lapply(pairs, function(pp) {
-    a <- out[[pp[1]]]; b <- out[[pp[2]]]
+    # From `mat`, where an infinity is already missing; `out` has since been
+    # reordered, which a pair of columns taken together does not mind.
+    a <- mat[, pp[1]]; b <- mat[, pp[2]]
     ok <- !is.na(a) & !is.na(b)
     # Pairwise, like every other column in this table. It used to read the
     # row-wise `out$disagrees`, which is the spread across *all* sources: with
@@ -746,10 +783,11 @@ fetch_owid <- function(indicator, countries = NULL, years = NULL, ...) {
         "x" = "{.pkg owidR} returned an empty result for {.val {indicator[[i]]}}.",
         "i" = "This is a connectivity or chart-slug problem, not a data problem.
                Check the slug at {.url https://ourworldindata.org/charts}."
-      ))
+      ), call = verb_env())
     }
     adapter_reshape(tibble::as_tibble(got), nms[[i]], entity_col = "entity",
-                    year_col = "year", countries = countries, years = years)
+                    year_col = "year", countries = countries, years = years,
+                    call = verb_env())
   })
   Reduce(function(a, b) dplyr::full_join(a, b, by = c("iso3c", "year"),
                                          na_matches = "never"), frames)
@@ -771,7 +809,7 @@ fetch_eurostat <- function(indicator, countries = NULL, years = NULL, ...) {
     }
     adapter_reshape(raw, nms[[i]], entity_col = "geo", year_col = "year",
                     value_col = "values", countries = countries, years = years,
-                    origin = "eurostat")
+                    origin = "eurostat", call = verb_env())
   })
   Reduce(function(a, b) dplyr::full_join(a, b, by = c("iso3c", "year"),
                                          na_matches = "never"), frames)
@@ -792,7 +830,8 @@ fetch_oecd <- function(indicator, countries = NULL, years = NULL, ...) {
     ent <- if ("LOCATION" %in% names(raw)) "LOCATION" else "REF_AREA"
     adapter_reshape(raw, nms[[i]], entity_col = ent, year_col = "year",
                     value_col = if ("ObsValue" %in% names(raw)) "ObsValue" else "obsValue",
-                    countries = countries, years = years, origin = "iso3c")
+                    countries = countries, years = years, origin = "iso3c",
+                    call = verb_env())
   })
   Reduce(function(a, b) dplyr::full_join(a, b, by = c("iso3c", "year"),
                                          na_matches = "never"), frames)
@@ -824,7 +863,7 @@ fetch_comtrade <- function(indicator, countries = NULL, years = NULL, ...) {
       "The installed {.pkg comtradr} does not export {.fun ct_get_data}.",
       "i" = "Update {.pkg comtradr}, or fetch the data yourself and use
              {.fn register_country_source}."
-    ))
+    ), call = verb_env())
   )
   frames <- lapply(seq_along(indicator), function(i) {
     raw <- tibble::as_tibble(ct_get_data(
@@ -842,7 +881,7 @@ fetch_comtrade <- function(indicator, countries = NULL, years = NULL, ...) {
     # "subscript out of bounds" instead of naming the real problem.
     if (is.na(ent) || is.na(val) || is.na(yr)) {
       wdj_abort(c("comtradr returned an unexpected shape.",
-                  "i" = "Columns were {.val {names(raw)}}."))
+                  "i" = "Columns were {.val {names(raw)}}."), call = verb_env())
     }
     # read_year(), like the other two adapters: comtradr's `period` is a
     # bare year for annual data but YYYYMM for monthly, which `...` can select
@@ -851,7 +890,7 @@ fetch_comtrade <- function(indicator, countries = NULL, years = NULL, ...) {
     raw$year <- read_year(raw[[yr]], "Comtrade")
     adapter_reshape(raw, nms[[i]], entity_col = ent, year_col = "year",
                     value_col = val, countries = countries, years = years,
-                    origin = "iso3c")
+                    origin = "iso3c", call = verb_env())
   })
   Reduce(function(a, b) dplyr::full_join(a, b, by = c("iso3c", "year"),
                                          na_matches = "never"), frames)
@@ -861,7 +900,8 @@ fetch_comtrade <- function(indicator, countries = NULL, years = NULL, ...) {
 # iso3c, pick the value column, subset, and name the result after the indicator.
 adapter_reshape <- function(raw, out_name, entity_col, year_col,
                             value_col = NULL, countries = NULL, years = NULL,
-                            origin = "country.name") {
+                            origin = "country.name",
+                            call = rlang::caller_env()) {
   # Some clients answer a failed request with an empty frame and a message
   # rather than an error -- owidR returns a blank data.table and prints "site
   # may be down" -- which then surfaced here as the baffling "no numeric value
@@ -873,11 +913,11 @@ adapter_reshape <- function(raw, out_name, entity_col, year_col,
              indicator code is wrong. Some clients report a failed download as
              an empty result rather than an error.",
       "*" = "Check connectivity and the indicator code, then retry."
-    ))
+    ), call = call)
   }
   if (!entity_col %in% names(raw)) {
     wdj_abort(c("Expected an entity column {.field {entity_col}}.",
-                "i" = "Columns were {.val {names(raw)}}."))
+                "i" = "Columns were {.val {names(raw)}}."), call = call)
   }
   # Checked like the entity and value columns beside it, and before the value
   # auto-detection below, which excludes the year BY NAME: with year_col absent
@@ -888,12 +928,14 @@ adapter_reshape <- function(raw, out_name, entity_col, year_col,
   # shape -- the same thing the value-column check below reports.
   if (!year_col %in% names(raw)) {
     wdj_abort(c("Expected a year column {.field {year_col}}.",
-                "i" = "Columns were {.val {names(raw)}}."))
+                "i" = "Columns were {.val {names(raw)}}."), call = call)
   }
   value_col <- value_col %||% {
     num <- names(raw)[vapply(raw, is.numeric, logical(1))]
     num <- setdiff(num, year_col)
-    if (!length(num)) wdj_abort("No numeric value column found in the response.")
+    if (!length(num)) {
+      wdj_abort("No numeric value column found in the response.", call = call)
+    }
     num[1]
   }
   # The auto-detected branch above can only name a column that exists, but
@@ -904,7 +946,7 @@ adapter_reshape <- function(raw, out_name, entity_col, year_col,
   # with a recycling error that named neither the provider nor the column.
   if (!value_col %in% names(raw)) {
     wdj_abort(c("Expected a value column {.field {value_col}}.",
-                "i" = "Columns were {.val {names(raw)}}."))
+                "i" = "Columns were {.val {names(raw)}}."), call = call)
   }
   # suppressWarnings deliberately: every OWID/Eurostat response carries
   # aggregate rows ("World", "EU27", "High-income countries") that are not
@@ -960,7 +1002,7 @@ adapter_reshape <- function(raw, out_name, entity_col, year_col,
       "i" = "Either {.field {entity_col}} is not the entity column, or the
              provider has changed how it names them. Pass {.arg origin} if they
              are codes rather than names."
-    ), class = "countryatlas_no_entities")
+    ), class = "countryatlas_no_entities", call = call)
   }
   if (!is.null(countries)) out <- out[out$iso3c %in% countries, ]
   if (!is.null(years)) out <- out[is.na(out$year) | out$year %in% years, ]
@@ -1004,8 +1046,6 @@ fetch_wdi_source <- function(indicator, countries = NULL, years = NULL, ...) {
   out
 }
 
-# Registered at load so the built-ins are present without the user doing
-# anything. .onLoad lives in countryatlas-package.R and calls this.
 # Drop a source's memoised answers. Keys are "<source>\r<hash>", the source
 # name kept in plaintext exactly so it can be matched here.
 drop_source_memo <- function(source) {
@@ -1017,6 +1057,8 @@ drop_source_memo <- function(source) {
   invisible(NULL)
 }
 
+# Registered at load so the built-ins are present without the user doing
+# anything. .onLoad lives in countryatlas-package.R and calls this.
 register_builtin_sources <- function() {
   register_country_source(
     "wdi", fetch_wdi_source,

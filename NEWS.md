@@ -2,7 +2,7 @@
 
 The whole of the roadmap tracked in
 [#19](https://github.com/PursuitOfDataScience/countryatlas/issues/19), in one
-release. 45 new exports and two new datasets take the package from "join World
+release. 46 new exports and two new datasets take the package from "join World
 Bank data to a map" to "join *anyone's* data, to the map as it was in 1950, and
 say honestly what the picture does and does not support".
 
@@ -182,6 +182,159 @@ existing code: `world_map(projection = "mercator")` now produces a different
 
 ## Bug fixes
 
+* **`globe_map()` built globes it could not draw.** On the default `sf`
+  backend, 63 of 216 sampled viewpoints (29%) failed when the plot was
+  printed, with grid's "Invalid graphics path": a country on the horizon lost
+  its far-side vertices in the orthographic transform and kept whatever was
+  left (at lon 120, lat 20 Chad became a single point). The plot object built
+  fine, so nothing noticed until it was drawn, and a 60-frame
+  `spin_globe(backend = "sf")` could not get through one rotation. The
+  viewpoints that did draw closed every horizon country with a straight chord.
+  Geometry is now cut at the horizon on the sphere before it is projected, in
+  `globe_map()`, `world_map(projection = "orthographic")` on either engine,
+  `world_geometry()`, `projection_compare()` and `tissot_map()`, CShapes'
+  historical borders included; every sampled viewpoint draws,
+  and the colour scale and coverage are the same from every side.
+* **Countries with no data vanished from `animate_world()` and got their own
+  panel in `facet_map(facet = year)`.** `attach_geometry()` gives a country
+  the data does not cover an `NA` year, so it belonged to no frame: the
+  animation never drew it (gganimate warned twice while dropping it) and the
+  small multiples drew it in an extra panel labelled `NA`. It is now drawn,
+  as no data, in every period.
+* **`value_by_alpha_map()` and the value-suppressing palette ranked polygon
+  vertices, not countries.** The polygon backend repeats a country's values
+  down every vertex of its outline, so the default `transform = "rank"`
+  weighted each country by how complex the outlines below it are: Chile, at
+  the 69th percentile of countries by population, was drawn at the 30th, and
+  the mean opacity error across 210 countries was 0.25. `world_map(uncertainty
+  = )` ranked the same way and put 101 of 189 countries in the wrong value x
+  uncertainty cell. Both now rank one value per country, as the quantile
+  breaks always have.
+* **`attach_geometry()` let a column of the caller's replace the map
+  geometry.** A shared name keeps the caller's version, so a `group`, `lat`,
+  `long` or `order` column (a treatment group, a capital's latitude) displaced
+  the polygon backend's own, and every map drawn from the result was nonsense:
+  a two-value `group` drew the world as three polygons. That is now refused,
+  naming the column; the `sf` backend is unaffected.
+* **`historical_geometry()` gave the Soviet Union Russia's code.** Gleditsch
+  and Ward use one code for both, so the 1980 USSR came back as `iso3c =
+  "RUS"` and `attach_geometry(year = 1980)` painted all fifteen republics with
+  Russia's value, the anachronism `audit_time_coverage()` reports as
+  `"before_existence"`. A code now stays `NA` until `historical_codes` says
+  the state existed. `?historical_geometry` also said `owner` is `NA` for a
+  sovereign state (it is the state's own code) and named the Gold Coast as an
+  entity with no code (CShapes calls it Ghana and it carries `"GHA"`).
+* **A non-breaking space turned the USSR into Russia.** The historical-name
+  lookup trimmed only ASCII whitespace, so `"USSR"` pasted from a web page
+  missed its alias and fell through to countrycode, which resolves it to
+  Russia alone: `dissolve_country()` returned one row instead of fifteen,
+  `check_country_match()` did not flag it historical, and
+  `country_timeline()` answered for Russia.
+* **`lisa_map()` reported two different coverages.** Its caption counted the
+  countries it coloured while `map_provenance()` counted every country with a
+  value, including the ones the weights could not connect, which are drawn as
+  no-data: 142 against 189 on the bundled snapshot. Provenance now counts
+  what is drawn.
+* **`od_map()` dropped flows the basemap cannot draw without saying so.**
+  Hong Kong, Macao, Tuvalu, the British Virgin Islands and Gibraltar have no
+  polygon on the polygon backend, so China's largest destination simply
+  vanished from China's panel. They are now named in a warning.
+* **`convergence_club()` dropped countries without a complete series.** A
+  country with one missing year disappeared from the result altogether; it
+  now comes back as `club = NA`, the documented "not classified", with a
+  warning naming it.
+* **`smooth_rates()` let a negative count into its model.** The pooled rate
+  and excess variance went off their domain, every `_shrinkage` came back
+  above 1 (the help promises 0 to 1) and rates were pushed away from the
+  global one. A negative count is now unusable and reported. The
+  unusable-denominator warning also counted rows whose *numerator* was
+  missing; it counts denominators only. `rate_check()` reported a standard
+  error of exactly 0 for a negative rate and now gives `NA`, with a warning.
+* **`world_map(uncertainty = , n_bins = )` said `n_bins` was ignored while
+  using it**, for the value classes of the palette. The notice is gone there;
+  `n_uncertainty` without `uncertainty`, which really does nothing, now says
+  so instead.
+* **`join_world()` replaced a caller's `region`, `continent` or `iso2c`
+  column in silence**, where `standardize_country()` warns. It now warns too,
+  when a value actually changes.
+* **One unmatched name in a `region` vector was dropped in silence.**
+  `region = c("France", "Germny")` drew France alone; the name that matched
+  nothing is now reported, and a continent or group name inside a vector,
+  which `region` accepts only on its own, is explained rather than called a
+  failed match.
+* **`growth_rate()` read the row after an infinity as -100%.** Anything
+  finite over `Inf` is 0, so `type = "yoy"` gave -1 after an infinite value
+  and `type = "cagr"` gave -1 for every year of a series starting at one.
+  Both are `NA` now, with a warning.
+* **`audit_coverage()` counted an infinite value as present**, while
+  `coverage_map()`, which both help pages call the same report as a map,
+  shows it as missing. It counts as missing in both now.
+* **`world_map(engine = "tmap", style = "binned")` drew pretty breaks.** The
+  ggplot2 engine draws `n_bins` equal intervals; the tmap engine now does too.
+* **A blank `iso3c` was reported as an excluded country** by `morans_i()`,
+  `gearys_c()` and the other spatial statistics, inflating `n_excluded`.
+* **A custom weights frame naming one link twice kept only the last weight.**
+  It is now refused, with advice to sum repeated flows first.
+* **`standardize_subnational()` refused a lowercase or padded ISO 3166-2
+  code** (`"de-by"`, `"DE-BY "`), under a message promising case-insensitive
+  matching. Codes are upper-cased and trimmed first.
+* **A bad `countryatlas.cache_max_age` or `countryatlas.cache_max_size` was
+  blamed on the cache directory.** `"a"` or `NA` switched persistent caching
+  off with "Cannot write to the cache directory"; a negative value was
+  accepted. Both options are now validated when read, naming the option.
+* **`bivariate_map()` did not validate `dim`**, so `"a"`, `NA`, `c(2, 3)` or
+  `2.5` failed in base R or in biscale; a custom biscale palette also turned
+  the provenance `style` into one string per colour.
+* **`interactive_map()` crashed on a fill with nothing to scale.** The
+  leaflet engine died on "Wasn't able to determine range of domain" for an
+  all-missing numeric column, and the mapgl engine refused an all-missing
+  column and failed on a constant one or one with a single country's value
+  ("`values` and `stops` must have the same length"). Such a map now draws
+  as no-data, as the ggplot2 engines always did.
+* **`interactive_map(engine = "plotly", projection = "orthographic")` failed
+  inside plotly** ("number of columns of matrices must match"), whose
+  converter cannot take an orthographic view. It now says so and names the
+  engines that can.
+* **`country_factsheet()` misreported neighbours it had not computed.** With
+  the lookup unavailable (no `sf`), France's sheet blamed the 110m basemap for
+  "excluding" Andorra and Monaco, and Andorra's said "None found". The sheet
+  now says the neighbours were not computed, and why.
+* `?share_of_world` promised a proportion in `[0, 1]` and `?index_to` said
+  nothing about a negative base year; both now say what a negative value
+  does.
+* `compare_sources()` names a source listed twice rather than failing on
+  duplicated column names, and a non-finite `year` passed to `world_data()` or
+  `country_data()` is refused as such rather than leaking a coercion warning.
+* **`cartogram_map()` and `dorling_map()` failed in the orthographic
+  projection**, inside cartogram ("all sizes are missing and/or
+  non-positive"), because the far side's vertices were dropped rather than
+  cut at the horizon. They now draw the visible hemisphere. A contiguous
+  cartogram in Winkel Tripel also failed when printed, on a graticule the
+  theme never shows.
+* **`growth_rate(type = "cagr")` gave a country with a zero base year `NA`
+  without saying so**, and when that was every country, blamed the series for
+  being shorter than two years. It now names them.
+* **`deflate()` left a row `NA` in silence** when its year's index was zero,
+  infinite or missing, where `to_ppp()` and `per_capita()` report the same
+  thing. It now says how many rows.
+* **`compare_sources()` crashed on a year no source covers**, with base R's
+  "subscript out of bounds"; it now returns the empty comparison with a
+  warning. An infinite value made the relative difference `NaN`, which
+  `disagrees` counted as agreement; it is left out of the comparison and
+  named.
+* **`recenter = 360` or `-360` failed on the `sf` backend** with sf's
+  "polygons require at least 4 points", as did an out-of-range value such as
+  `500`, which is now refused by name before any geometry is touched.
+* **`bubble_map()` ignored `projection` on its default polygon backend
+  without saying so**, as `world_map()` already reports; it now names
+  `backend = "sf"` as the way to project.
+* **Errors named functions the caller never called.** A bare column passed
+  to one of the string-taking arguments was reported as "Error in
+  `value[[3L]]()`" (a `tryCatch()` handler), a missing column in
+  `country_join_all()` as "Error in `FUN()`", and a bad `origin`, weights
+  matrix, `scale`, `region`, `footnote` or override table under an internal
+  helper's name such as `wdj_to_iso3c()` or `weights_custom()`. Each now names
+  the verb. A bad global option is reported without a call.
 * **The on-disk cache could delete files it had not written.** With
   `options(countryatlas.cache_dir = )` pointed at a folder that held anything
   else, the first cached fetch deleted every file in it without an `.rds`

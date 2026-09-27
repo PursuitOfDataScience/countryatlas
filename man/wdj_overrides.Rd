@@ -13,7 +13,7 @@ country_overrides(extra = NULL)
 \item{extra}{An optional named character vector of additional overrides
 (names are country/region names, values are \code{iso3c} codes). Merged on top
 of the built-in table, so you can extend or override it, e.g.
-\code{wdj_overrides(c(Somaliland = "SOM"))}.}
+\code{country_overrides(c(Somaliland = "SOM"))}.}
 }
 \value{
 A named character vector suitable for \code{countrycode(custom_match=)}.

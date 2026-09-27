@@ -28,7 +28,8 @@ name to use the numbers programmatically.
 code. Empty is the good case.
 \item \code{na_rates} -- one row per indicator: \code{n} is the number of countries
 \emph{considered}, \code{n_missing} how many of them lack a value, and \code{na_rate}
-is \code{n_missing / n}.
+is \code{n_missing / n}. An infinite value counts as lacking one: no map can
+draw it, and \code{\link[=coverage_map]{coverage_map()}} shows it as missing too.
 \item \code{by_group} -- one row per group: \code{n_countries} is how many countries are
 \emph{in that group}, and \code{na_rate} is the share of those lacking a value.
 The counts sum to \code{n}.

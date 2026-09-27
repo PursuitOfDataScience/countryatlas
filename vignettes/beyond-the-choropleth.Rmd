@@ -86,7 +86,7 @@ flow_map(od, from, to, weight)
 
 ## Small multiples
 
-`facet_map()` splits one choropleth into per-group panels — the static
+`facet_map()` splits one choropleth into per-group panels, the static
 counterpart to `animate_world()`, for print and side-by-side comparison:
 
 ```{r eval = has_maps, fig.height = 5, fig.alt = "Small multiples: one GDP per capita choropleth panel per continent."}
@@ -118,12 +118,12 @@ The remaining displays follow the same one-call pattern but require optional
 packages, so they are shown here as code:
 
 ```{r eval = FALSE}
-# Bivariate choropleth (two variables at once) — needs `biscale` + `sf`
+# Bivariate choropleth (two variables at once): needs `biscale` + `sf`
 world_data(2020, c(gdp = "NY.GDP.PCAP.KD", life = "SP.DYN.LE00.IN"),
            geometry = "sf") |>
   bivariate_map(gdp, life)
 
-# Area-honest cartogram — needs `cartogram` + `sf`
+# Area-honest cartogram: needs `cartogram` + `sf`
 world_data(2020, c(pop = "SP.POP.TOTL"), geometry = "sf") |>
   cartogram_map(pop, type = "dorling")
 
@@ -131,15 +131,15 @@ world_data(2020, c(pop = "SP.POP.TOTL"), geometry = "sf") |>
 world_data(2020, c(pop = "SP.POP.TOTL"), geometry = "sf") |>
   dorling_map(pop, k = 4)
 
-# The fast flow-based cartogram (Gastner-Seguy-More) — needs `cartogramR`
+# The fast flow-based cartogram (Gastner-Seguy-More): needs `cartogramR`
 world_data(2020, c(pop = "SP.POP.TOTL"), geometry = "sf") |>
   cartogram_map(pop, type = "flow")
 
-# Animated choropleth over a year panel — needs `gganimate`
+# Animated choropleth over a year panel: needs `gganimate`
 world_data(2000:2020, c(gdp = "NY.GDP.PCAP.KD")) |>
   animate_world(gdp)
 
-# Interactive choropleth — needs `leaflet`, `ggiraph` or `plotly`
+# Interactive choropleth: needs `leaflet`, `ggiraph` or `plotly`
 world_data(2020) |>
   interactive_map(gdp_per_capita, engine = "plotly")
 ```
@@ -163,7 +163,7 @@ for it rather than for `cartogram_map()`.
 
 Two lightweight spatial helpers that aren't choropleths at all.
 `distance_between()` answers "how far apart" from the bundled `country_meta`
-centroids — no `sf` or network required:
+centroids, with no `sf` or network required:
 
 ```{r}
 distance_between("France", "Germany")

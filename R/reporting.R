@@ -63,20 +63,30 @@ country_factsheet <- function(x, indicators = NULL, origin = "country.name") {
   gtbl <- countryatlas::country_groups_tbl
   groups_tbl <- tibble::tibble(group = sort(gtbl$group[gtbl$iso3c == iso]))
 
-  nb <- tryCatch(neighbors(iso, origin = "iso3c"),
-                 error = function(e) NULL)
+  # A failed lookup is kept, not just swallowed: without `sf` there are no
+  # neighbours to report at all, and the empty table then read as a finding --
+  # France's sheet blamed the 110m basemap for "excluding" Andorra and Monaco,
+  # and Andorra's said "None found", when nothing had been computed.
+  nb_failed <- NULL
+  nb <- tryCatch(neighbors(iso, origin = "iso3c"), error = function(e) {
+    nb_failed <<- conditionMessage(e)
+    NULL
+  })
   neighbours_tbl <- if (is.null(nb)) {
     tibble::tibble(iso3c = character(0), country = character(0))
   } else {
     tibble::tibble(iso3c = nb$neighbor, country = nb$neighbor_country)
   }
+  attr(neighbours_tbl, "countryatlas_unavailable") <- nb_failed
   # neighbors() works off the default 110m polygons, which have none at all for
   # the European microstates: they contribute no rows to country_borders(), so
   # the five of them come back with zero neighbours and their five neighbours
   # come back short. Printing a bare "Land neighbours (8)" for France states a
   # count that is simply wrong, so say what is missing where it is missing.
   attr(neighbours_tbl, "countryatlas_microstate_note") <-
-    if (iso %in% WDJ_MICROSTATES) {
+    if (!is.null(nb_failed)) {
+      NULL
+    } else if (iso %in% WDJ_MICROSTATES) {
       TRUE
     } else if (iso %in% names(WDJ_MICROSTATE_NEIGHBOURS)) {
       setdiff(WDJ_MICROSTATE_NEIGHBOURS[[iso]], neighbours_tbl$iso3c)
@@ -142,7 +152,13 @@ print.countryatlas_factsheet <- function(x, ...) {
     cli::cli_text("{paste(x$groups$group, collapse = ', ')}")
   }
   note <- attr(x$neighbours, "countryatlas_microstate_note")
-  if (nrow(x$neighbours)) {
+  unavailable <- attr(x$neighbours, "countryatlas_unavailable")
+  if (!is.null(unavailable)) {
+    cli::cli_h3("Land neighbours")
+    # First line only: the condition may carry a multi-line install hint.
+    why <- strsplit(unavailable, "\n", fixed = TRUE)[[1]][1]
+    cli::cli_text(cli::col_grey("Not computed: {why}"))
+  } else if (nrow(x$neighbours)) {
     cli::cli_h3("Land neighbours ({nrow(x$neighbours)})")
     cli::cli_text("{paste(x$neighbours$country, collapse = ', ')}")
   } else if (isTRUE(note)) {

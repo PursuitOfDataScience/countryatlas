@@ -23,7 +23,7 @@ has_globe <- requireNamespace("maps", quietly = TRUE) &&
 
 The legacy `maps` polygons are an unprojected plate carrée: they badly distort
 area and split Russia, Fiji and New Zealand across the antimeridian. The `sf`
-backend fixes all of this — real projections, equal-area options, and an
+backend fixes all of this: real projections, equal-area options, and an
 antimeridian-safe pipeline. These features require the optional `sf` and
 `rnaturalearth` packages.
 
@@ -40,7 +40,7 @@ world_data(2020, c(gdp = "NY.GDP.PCAP.KD"), geometry = "sf") |>
 ```
 
 `world_map()` auto-detects the `sf` backend and applies the projection through
-`ggplot2::coord_sf()`. Available projections are `"equal_earth"` (the default —
+`ggplot2::coord_sf()`. Available projections are `"equal_earth"` (the default:
 equal-area and good-looking), `"robinson"`, `"mollweide"`, `"natural_earth"`,
 `"plate_carree"`, `"mercator"`, `"winkel_tripel"`, `"eckert4"`, `"gall_peters"`,
 `"orthographic"`, `"azimuthal_equal_area"`, `"north_polar"` and `"south_polar"`.
@@ -54,8 +54,8 @@ projection_info()[, c("projection", "property", "equal_area")]
 
 For a choropleth the equal-area ones are the honest choice, because the reader
 reads coloured area as quantity. `projection_compare()` draws your own data
-under several at once and `tissot_map()` shows the distortion directly — see
-the *Honest maps* vignette.
+under several at once and `tissot_map()` shows the distortion directly (see
+the *Honest maps* vignette).
 
 ## The world as a globe
 
@@ -74,7 +74,7 @@ world_data(2020, geometry = "sf") |>
   globe_map(gdp_per_capita, lon = 10, lat = 30)
 ```
 
-`spin_globe()` turns that into a rotating animation — one `globe_map()` frame per
+`spin_globe()` turns that into a rotating animation: one `globe_map()` frame per
 central longitude, assembled into a looping GIF with `gifski` (or `magick`):
 
 ```{r eval = FALSE}
@@ -85,7 +85,7 @@ spin_globe(world_snapshot$countries, continent, backend = "polygon",
 ## Just the canvas
 
 `world_geometry()` returns projected, region-subset, antimeridian-safe geometry
-without any data — country polygons, label-ready centroids, coastlines, a
+without any data: country polygons, label-ready centroids, coastlines, a
 graticule or an ocean rectangle:
 
 ```{r eval = has_sf, fig.alt = "Africa drawn on its own under an Equal Earth projection."}
@@ -118,7 +118,7 @@ world_geometry("countries", geometry = "sf", recenter = 150)
 continent, the polar projections for the Arctic) so the crop stays area-honest.
 
 A box is the one form that clips the shapes themselves, which is what you want
-for a region that is neither a continent nor a group — the Mediterranean basin,
+for a region that is neither a continent nor a group, the Mediterranean basin,
 say. Use the `sf` backend for it: that clip is a real `sf::st_crop()`, whereas
 the polygon backend can only drop the vertices outside the box and warns that a
 country crossing the edge comes back with an approximate outline.

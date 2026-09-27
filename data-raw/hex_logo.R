@@ -1,6 +1,6 @@
 # Hex sticker for countryatlas -> man/figures/logo.png
 #
-# The sticker is drawn by the package itself — every element is a real
+# The sticker is drawn by the package itself: every element is a real
 # package capability, not clip art:
 #
 #   * an orthographic globe built with the package's own projection
@@ -11,10 +11,10 @@
 #     (`world_map()` / `choropleth` vocabulary; viridis is the package's
 #     default fill scale, grey-slate = honest "no data"),
 #   * amber population spikes rising radially off the horizon from
-#     `world_geometry("centroids")` — the `spike_map()` idiom for totals,
+#     `world_geometry("centroids")`, the `spike_map()` idiom for totals,
 #     extruded in true 3-D (tip = surface point scaled by 1 + h, so spikes
 #     foreshorten toward the disc centre exactly as a globe would show them),
-#   * a five-swatch viridis strip under the wordmark — the binned map legend.
+#   * a five-swatch viridis strip under the wordmark: the binned map legend.
 #
 # Regenerate from the package root with sf + rnaturalearth(+data) available:
 #   Rscript data-raw/hex_logo.R

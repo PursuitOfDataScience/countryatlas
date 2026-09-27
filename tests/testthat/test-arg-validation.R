@@ -326,20 +326,23 @@ test_that("convert_country's to/from must be single strings", {
 
 test_that("origin is validated once, for every function that resolves names", {
   # Checked in wdj_to_iso3c(), the shared internal, so all of these are covered
-  # by one guard. The message says `origin` even where the formal is `origin_x`,
-  # which is the trade-off for fixing them at a single site.
+  # by one guard. The message names the caller's own argument, `origin_x`
+  # included; it used to say `origin` there.
   df <- data.frame(c = "France")
   for (b in list(character(0), c("country.name", "iso3c"), NA)) {
     # Assert our own condition class: countrycode's message for a length-2
     # origin also contains "`origin`", so a text match alone would still pass
     # with the guard removed.
-    for (call in list(
-      function() standardize_country(df, c, origin = b),
-      function() country_join(data.frame(a = "France"), data.frame(b = "France"),
-                              a, b, origin_x = b),
-      function() distance_between("France", "Spain", origin = b))) {
-      expect_error(call(), "`origin`")
-      expect_error(call(), class = "countryatlas_error")
+    cases <- list(
+      list(function() standardize_country(df, c, origin = b), "`origin`"),
+      list(function() country_join(data.frame(a = "France"),
+                                   data.frame(b = "France"),
+                                   a, b, origin_x = b), "`origin_x`"),
+      list(function() distance_between("France", "Spain", origin = b),
+           "`origin`"))
+    for (cs in cases) {
+      expect_error(cs[[1]](), cs[[2]])
+      expect_error(cs[[1]](), class = "countryatlas_error")
     }
   }
   expect_equal(nrow(standardize_country(df, c)), 1L)

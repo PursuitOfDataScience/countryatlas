@@ -33,9 +33,10 @@
 #' Two things resolve, and it is worth being blunt about how little that is.
 #'
 #' A `region` value that is *already* an ISO 3166-2 code (`"DE-BY"`, `"US-CA"`)
-#' passes through, provided its country prefix matches the country the row
-#' gives -- these codes are unique only within a country, which is why
-#' `country` is required. A mismatch is reported and left as `NA`.
+#' passes through, upper-cased and trimmed, provided its country prefix
+#' matches the country the row gives -- these codes are unique only within a
+#' country, which is why `country` is required. A mismatch is reported and
+#' left as `NA`.
 #'
 #' A region *name* resolves only through the optional `regions` package's
 #' crosswalk, and only when the installed version exposes a name-to-code pair
@@ -137,14 +138,21 @@ subnational_lookup <- function(region, iso3c) {
   # returned iso3c = "DEU" with iso_3166_2 = "US-CA", a self-contradictory row,
   # silently. A mismatch resolves to NA, which is this function's documented
   # contract -- "NA rather than a plausible-looking wrong code".
-  looks_code <- grepl("^[A-Z]{2}-[A-Z0-9]{1,3}$", region)
-  prefix <- toupper(substr(region, 1L, 2L))
+  #
+  # Case and padding are normalised first, as wdj_to_iso3c() does for a
+  # country code: "de-by", "DE-BY " and a non-breaking-space-led " DE-HE"
+  # all failed the pattern and came back NA -- under a message promising that
+  # "case-insensitive ISO 3166-2 ... code matches will resolve". ascii_upper(),
+  # not toupper(), for the Turkish-locale reason given at its definition.
+  code <- ascii_upper(trimws(region, whitespace = "[\\h\\v]"))
+  looks_code <- !is.na(code) & grepl("^[A-Z]{2}-[A-Z0-9]{1,3}$", code)
+  prefix <- substr(code, 1L, 2L)
   expect <- suppressWarnings(convert_country(iso3c, "iso2c", from = "iso3c",
                                              warn = FALSE))
   # A row whose country did not resolve has nothing to check against, so the
   # code is taken at face value there rather than thrown away.
-  belongs <- looks_code & (is.na(expect) | prefix == toupper(expect))
-  out[belongs] <- region[belongs]
+  belongs <- looks_code & (is.na(expect) | prefix == ascii_upper(expect))
+  out[belongs] <- code[belongs]
   wrong <- looks_code & !belongs
   if (any(wrong)) {
     wdj_warn(c(
@@ -303,6 +311,7 @@ unmatched_keys <- function(data_keys, geom_keys) {
   k <- unique(as.character(data_keys))
   setdiff(k[!is.na(k)], as.character(geom_keys))
 }
+
 #' Map subnational data
 #'
 #' A choropleth below the country level, joining your data to NUTS geometry on

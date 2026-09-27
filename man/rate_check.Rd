@@ -21,8 +21,9 @@ Otherwise the rate is \code{numerator / denominator}.}
 }
 \value{
 A tibble of \code{iso3c}, \code{numerator}, \code{denominator}, \code{rate},
-\code{expected_se} (the Poisson standard error of the rate, \eqn{\sqrt{r/d}}) and
-\code{flagged}, sorted with the least reliable first.
+\code{expected_se} (the Poisson standard error of the rate, \eqn{\sqrt{r/d}};
+\code{NA}, with a warning, for a negative rate) and \code{flagged}, sorted with the
+least reliable first.
 
 "Least reliable" is ordered on the standard error a \emph{single} event would
 imply, \eqn{\sqrt{\max(y, 1)}/d}, which is identical to \code{expected_se} for

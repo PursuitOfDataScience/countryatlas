@@ -172,14 +172,14 @@ depend on the locale; `?country_overrides` documents this.
 
 ## Notes
 
-* Examples: of the 99 documented topics with an `\examples{}` block, 48 run
-  unconditionally, 40 use `\donttest{}` and 13 use `\dontrun{}` (two topics use
-  both). 30 of the 40 `\donttest{}` topics are guarded with
+* Examples: of the 100 documented topics with an `\examples{}` block, 49 run
+  unconditionally, 40 use `\donttest{}` and 12 use `\dontrun{}` (one topic,
+  `globe_map()`, uses both). 30 of the 40 `\donttest{}` topics are guarded with
   `requireNamespace()` so they skip rather than fail when an optional package
   is absent; the other ten need no optional package -- `country_weights`,
-  `gearys_c`, `getis_ord`, `local_morans`, `morans_i` and `spatial_lag` run off
-  the bundled `country_meta` centroids, `gridded_cartogram` and `tile_map` off
-  `world_tiles`, and `country_data` / `wdi_search` degrade without a
+  `gearys_c`, `getis_ord`, `local_morans`, `morans_i`, `spatial_lag` and
+  `gridded_cartogram` run off the bundled `country_meta` centroids, `tile_map`
+  off `world_tiles`, and `country_data` / `wdi_search` degrade without a
   connection.
 * No example needs the network to succeed, verified by running the full check
   behind a blackhole proxy. `?world_data` and `?country_data` do call the World
@@ -187,10 +187,10 @@ depend on the locale; `?country_overrides` documents this.
   rather than an error. `?wdi_search` searches `WDI`'s bundled indicator list
   and needs no connection at all. Everything else runs from the bundled
   `world_snapshot` / `world_tiles` data.
-* Example timings on the maintainer's machine: about 63s for all 99 together
-  under `--run-donttest`, well inside CRAN's per-example limit; the check step
-  reports `checking examples ... [63s/67s] OK`.
-* `\dontrun{}` is left on 13 topics, in each case because the code genuinely
+* Example timings on the maintainer's machine: about 62s for all of them
+  together under `--run-donttest`, well inside CRAN's per-example limit; the
+  check step reports `checking examples with --run-donttest ... [62s/65s] OK`.
+* `\dontrun{}` is left on 12 topics, in each case because the code genuinely
   cannot be executed in a check -- the five source adapters and
   `add_indicator()` / `compare_sources()` / `fetch_indicator()` need a live
   provider, `historical_geometry()` / `nuts_geometry()` / `subnational_map()`
@@ -201,7 +201,6 @@ depend on the locale; `?country_overrides` documents this.
   * `as_ggsql_source()` -- the function itself needs only `DBI` + `duckdb` (or
     `nanoarrow` for `format = "arrow"`), but its example goes on to execute the
     query, so it needs a DuckDB connection and `ggsql` as well.
-  * `spin_globe()` -- renders 60 frames and writes a GIF via `gifski`/`magick`.
   * `clear_wdi_cache(disk = TRUE)` -- deletes files on disk; the safe
     in-session form of the call is a live example.
 

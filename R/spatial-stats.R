@@ -202,7 +202,7 @@ weights_contiguity <- function(countries, scale) {
 # centroid for a handful of small territories and no row at all for Kosovo (see
 # ?distance_between), so say which countries dropped out rather than returning a
 # quietly smaller matrix.
-weights_centroids <- function(countries) {
+weights_centroids <- function(countries, call = rlang::caller_env()) {
   meta <- countryatlas::country_meta[, c("iso3c", "centroid_lon", "centroid_lat")]
   meta <- meta[!is.na(meta$centroid_lon) & !is.na(meta$centroid_lat), ]
   if (!is.null(countries)) {
@@ -220,7 +220,8 @@ weights_centroids <- function(countries) {
   }
   meta <- meta[order(meta$iso3c), ]
   if (nrow(meta) < 2L) {
-    wdj_abort("Need at least 2 countries with centroids to build weights.")
+    wdj_abort("Need at least 2 countries with centroids to build weights.",
+              call = call)
   }
   meta
 }
@@ -235,16 +236,16 @@ weights_distance_matrix <- function(meta) {
   matrix(d, n, n, dimnames = list(meta$iso3c, meta$iso3c))
 }
 
-weights_knn <- function(countries, k) {
-  check_number(k, "k", lo = 1, hi = .Machine$integer.max)
+weights_knn <- function(countries, k, call = rlang::caller_env()) {
+  check_number(k, "k", lo = 1, hi = .Machine$integer.max, call = call)
   k <- as.integer(k)
-  meta <- weights_centroids(countries)
+  meta <- weights_centroids(countries, call = call)
   n <- nrow(meta)
   if (k >= n) {
     wdj_abort(c(
       "{.arg k} must be smaller than the number of countries.",
       "x" = "Got k = {k} with {n} {cli::qty(n)}countr{?y/ies}."
-    ))
+    ), call = call)
   }
   d <- weights_distance_matrix(meta)
   diag(d) <- Inf                       # a country is not its own neighbour
@@ -255,28 +256,31 @@ weights_knn <- function(countries, k) {
   list(m = m, n_links = sum(m > 0), degree = rowSums(m))
 }
 
-weights_distance <- function(countries, cutoff_km) {
+weights_distance <- function(countries, cutoff_km, call = rlang::caller_env()) {
   if (is.null(cutoff_km)) {
-    wdj_abort('{.arg cutoff_km} is required for {.code type = "distance"}.')
+    wdj_abort('{.arg cutoff_km} is required for {.code type = "distance"}.',
+              call = call)
   }
-  check_number(cutoff_km, "cutoff_km", lo = 0)
-  meta <- weights_centroids(countries)
+  check_number(cutoff_km, "cutoff_km", lo = 0, call = call)
+  meta <- weights_centroids(countries, call = call)
   d <- weights_distance_matrix(meta)
   m <- (d <= cutoff_km) * 1
   diag(m) <- 0
   list(m = m, n_links = sum(m > 0) / 2, degree = rowSums(m))
 }
 
-weights_custom <- function(w, countries) {
+weights_custom <- function(w, countries, call = rlang::caller_env()) {
   if (is.null(w)) {
-    wdj_abort('{.arg w} is required for {.code type = "custom"}.')
+    wdj_abort('{.arg w} is required for {.code type = "custom"}.', call = call)
   }
   if (is.matrix(w)) {
     if (is.null(rownames(w)) || is.null(colnames(w))) {
-      wdj_abort("A custom weights matrix must have {.field iso3c} row and column names.")
+      wdj_abort("A custom weights matrix must have {.field iso3c} row and column names.",
+                call = call)
     }
     if (!identical(rownames(w), colnames(w))) {
-      wdj_abort("A custom weights matrix must have identical row and column names.")
+      wdj_abort("A custom weights matrix must have identical row and column names.",
+                call = call)
     }
     # Neither of these was checked, and each leaked a bare base-R error from
     # somewhere downstream: a character matrix reached rowSums() as "'x' must be
@@ -287,14 +291,14 @@ weights_custom <- function(w, countries) {
         "A custom weights matrix must be numeric, not {.cls {class(w[1])}}.",
         "i" = "Weights are link strengths: {.val {0}}/{.val {1}} for a plain
                adjacency, or any non-negative number."
-      ))
+      ), call = call)
     }
     if (anyNA(w)) {
       wdj_abort(c(
         "A custom weights matrix must not contain {.val NA}.",
         "x" = "{sum(is.na(w))} entr{?y/ies} {?is/are} missing.",
         "i" = "Use {.val {0}} for {.emph not a neighbour}."
-      ))
+      ), call = call)
     }
     # The type message just above promises "any non-negative number", and
     # nothing enforced it. Row standardisation divides by the row sum, so a
@@ -312,14 +316,14 @@ weights_custom <- function(w, countries) {
         "A custom weights matrix must be finite.",
         "x" = "{sum(!is.finite(w))} entr{?y/ies} {?is/are} infinite.",
         "i" = "Use a large finite number if one link really should dominate."
-      ))
+      ), call = call)
     }
     if (any(w < 0)) {
       wdj_abort(c(
         "A custom weights matrix must be non-negative.",
         "x" = "{sum(w < 0)} entr{?y/ies} {?is/are} negative.",
         "i" = "Use {.val {0}} for {.emph not a neighbour}."
-      ))
+      ), call = call)
     }
     m <- w
     storage.mode(m) <- "double"
@@ -336,13 +340,15 @@ weights_custom <- function(w, countries) {
         "x" = "{.val {unique(rn[duplicated(rn)])}} after ignoring case and
                surrounding spaces.",
         "i" = "Give each country one row and one column."
-      ))
+      ), call = call)
     }
     dimnames(m) <- list(rn, rn)
   } else if (is.data.frame(w)) {
-    check_cols(w, c("iso3c", "neighbor"), arg = "w")
+    check_cols(w, c("iso3c", "neighbor"), arg = "w", call = call)
     val <- if ("weight" %in% names(w)) w$weight else rep(1, nrow(w))
-    if (!is.numeric(val)) wdj_abort("{.field weight} must be numeric.")
+    if (!is.numeric(val)) {
+      wdj_abort("{.field weight} must be numeric.", call = call)
+    }
     # An NA endpoint reached the matrix assignment below as base R's "NAs are
     # not allowed in subscripted assignments"; an NA weight was accepted and
     # turned every statistic built on it into a silent NA.
@@ -352,14 +358,14 @@ weights_custom <- function(w, countries) {
         "{.field iso3c} and {.field neighbor} must not contain {.val NA}.",
         "x" = "{bad} row{?s} {?is/are} missing an endpoint.",
         "i" = "A link needs both ends; drop those rows."
-      ))
+      ), call = call)
     }
     if (anyNA(val)) {
       wdj_abort(c(
         "{.field weight} must not contain {.val NA}.",
         "x" = "{sum(is.na(val))} weight{?s} {?is/are} missing.",
         "i" = "Use {.val {0}} for {.emph not a neighbour}, or drop the row."
-      ))
+      ), call = call)
     }
     # The same two checks as the matrix branch above, for the same reasons.
     if (any(!is.finite(val))) {
@@ -367,18 +373,35 @@ weights_custom <- function(w, countries) {
         "{.field weight} must be finite.",
         "x" = "{sum(!is.finite(val))} weight{?s} {?is/are} infinite.",
         "i" = "Use a large finite number if one link really should dominate."
-      ))
+      ), call = call)
     }
     if (any(val < 0)) {
       wdj_abort(c(
         "{.field weight} must be non-negative.",
         "x" = "{sum(val < 0)} weight{?s} {?is/are} negative.",
         "i" = "Use {.val {0}} for {.emph not a neighbour}, or drop the row."
-      ))
+      ), call = call)
     }
     # Normalised like the matrix branch above, for the same reason.
     from <- norm_weight_code(w$iso3c)
     to <- norm_weight_code(w$neighbor)
+    # The matrix assignment below keeps the *last* weight for a repeated
+    # link, so two rows for FRA -> DEU (weights 1 and 5) came out as 5 with
+    # the 1 discarded unannounced. The matrix branch refuses a country named
+    # twice; a link named twice is the same ambiguity -- summed trade flows
+    # and a stray duplicate need different answers, and only the caller
+    # knows which this is.
+    dup <- duplicated(data.frame(from, to))
+    if (any(dup)) {
+      pairs <- unique(paste(from[dup], "->", to[dup]))
+      wdj_abort(c(
+        "{.arg w} lists {length(pairs)} link{?s} more than once:",
+        "*" = "{.val {utils::head(pairs, 6)}}",
+        "i" = "Give each link one row: sum repeated flows first, e.g. with
+               {.code dplyr::summarise(w, weight = sum(weight),
+               .by = c(iso3c, neighbor))}."
+      ), class = "countryatlas_duplicate_links", call = call)
+    }
     iso <- sort(unique(c(from, to)))
     m <- matrix(0, length(iso), length(iso), dimnames = list(iso, iso))
     m[cbind(from, to)] <- val
@@ -388,11 +411,14 @@ weights_custom <- function(w, countries) {
       "x" = "Got {.cls {class(w)[1]}}.",
       "i" = "A long frame needs {.field iso3c}, {.field neighbor} and optionally
              {.field weight}."
-    ))
+    ), call = call)
   }
   if (!is.null(countries)) {
     keep <- intersect(rownames(m), countries)
-    if (length(keep) < 2L) wdj_abort("Fewer than 2 of {.arg countries} appear in {.arg w}.")
+    if (length(keep) < 2L) {
+      wdj_abort("Fewer than 2 of {.arg countries} appear in {.arg w}.",
+                call = call)
+    }
     m <- m[keep, keep, drop = FALSE]
   }
   diag(m) <- 0
@@ -408,10 +434,6 @@ norm_weight_code <- function(x) {
 
 # --- align a weights object to a data frame -------------------------------------
 #
-# Every statistic below needs the same thing: one value per country, the weights
-# subset to the countries that have both a value and a row in the matrix, and a
-# report of who fell out. Doing it once keeps morans_i()'s exclusion accounting
-# consistent across all of them.
 # Moran's I, Geary's C and the Getis-Ord/local variants all divide by the
 # cross-sectional variance, so a constant column makes them 0/0. They returned
 # NaN -- and getis_ord's z-score Inf -- with nothing said, which for a
@@ -429,6 +451,10 @@ zero_variance <- function(x, val_name, call = rlang::caller_env()) {
   TRUE
 }
 
+# Every statistic below needs the same thing: one value per country, the weights
+# subset to the countries that have both a value and a row in the matrix, and a
+# report of who fell out. Doing it once keeps morans_i()'s exclusion accounting
+# consistent across all of them.
 align_weights <- function(data, val_name, weights, scale = "small",
                           call = rlang::caller_env()) {
   if (!"iso3c" %in% names(data)) {
@@ -442,7 +468,11 @@ align_weights <- function(data, val_name, weights, scale = "small",
   # 0.29 depending only on row order, with nothing said. The shared helper
   # takes the earliest year deterministically and warns that it had to choose.
   df <- distinct_countries(tibble::as_tibble(sf_drop(data)))
-  df <- df[!is.na(df$iso3c) & is.finite(df[[val_name]]), ]
+  # blank_key(), not is.na(): a blank code identifies no country either, and
+  # it reached the weights lookup as the "country" "" -- which no weights
+  # matrix names, so it was reported in `excluded` and counted in
+  # `n_excluded` as though an island had been dropped.
+  df <- df[!blank_key(df$iso3c) & is.finite(df[[val_name]]), ]
 
   if (is.null(weights)) weights <- country_weights("contiguity", scale = scale)
   if (!inherits(weights, "countryatlas_weights")) {
@@ -678,7 +708,10 @@ lisa_map <- function(data, value, weights = NULL, n_perm = 999, alpha = 0.05,
       )
   )
   attr(p, "countryatlas_lisa") <- lisa
-  restate_provenance(p, data, val_name)
+  # Shown means "has a cluster", not "has a value": a country the weights
+  # cannot connect keeps its value and is drawn as no-data.
+  restate_provenance(p, data, val_name,
+                     shown = !is.na(data[[".wdj_cluster"]]))
 }
 
 #' Geary's C (spatial autocorrelation)

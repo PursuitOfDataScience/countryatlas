@@ -30,7 +30,7 @@ knitr::opts_chunk$set(
 [![Lifecycle: stable](https://img.shields.io/badge/lifecycle-stable-brightgreen.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable)
 <!-- badges: end -->
 
-> **Country data onto honest maps — joined on ISO codes, never on country names.**
+> **Country data onto honest maps: joined on ISO codes, never on country names.**
 
 ```{r counts, include = FALSE}
 # The two frames the figure draws, plus the counts quoted in the sentence
@@ -66,7 +66,7 @@ n_lost <- length(setdiff(iso_filled, name_filled))
 Join the World Bank's life-expectancy table to `map_data("world")` by country
 name and **`r n_lost` of `r n_total` countries silently vanish**: nobody spells
 Czechia, Côte d'Ivoire or `"Congo, Dem. Rep."` the same way twice.
-`countryatlas` makes the ISO code the join key, so nothing goes missing — then
+`countryatlas` makes the ISO code the join key, so nothing goes missing, then
 draws the map.
 
 ```{r hook, echo = FALSE, fig.height = 2.6, fig.width = 9, fig.alt = "Two world choropleths of life expectancy side by side. Joining on country name leaves dozens of countries grey and unfilled; joining with join_world() fills every one of them."}
@@ -90,7 +90,7 @@ The base install is light. Every heavy spatial dependency (`sf`, `cartogram`,
 ## One call
 
 `world_data()` fetches the indicator, attaches the geometry and keys the whole
-thing on `iso3c` — three worlds (`ggplot2` maps, [WDI][wdi], [countrycode][cc])
+thing on `iso3c`: three worlds (`ggplot2` maps, [WDI][wdi], [countrycode][cc])
 stitched together in one line.
 
 ```{r hero, fig.height = 4.2, fig.width = 9, fig.alt = "World choropleth of GDP per capita in 2020, shaded in five quantile bins."}
@@ -133,7 +133,7 @@ country_join(a, b, country, nation)
 
 ## Nothing goes missing quietly
 
-`check_country_match()` reports before you join — including the entities
+`check_country_match()` reports before you join, including the entities
 `countrycode` resolves *wrongly* rather than not at all.
 
 ```{r check}
@@ -248,23 +248,23 @@ thumb("r-grid", gridded_cartogram(snap, population, cells = 600))
 <td align="center"><img src="man/figures/README-g-spin.gif" width="55%" alt="A globe coloured by continent, spinning through one full rotation"><br><sub><code>spin_globe(d, continent, style = "categorical")</code></sub></td>
 </tr>
 <tr>
-<td colspan="2"><img src="man/figures/README-g-tile.png" alt="Equal-area tile grid, one labelled square per country"><br><sub><code>tile_map(d, gdp_per_capita)</code> — one square per country, so microstates are as visible as Russia</sub></td>
+<td colspan="2"><img src="man/figures/README-g-tile.png" alt="Equal-area tile grid, one labelled square per country"><br><sub><code>tile_map(d, gdp_per_capita)</code>: one square per country, so microstates are as visible as Russia</sub></td>
 </tr>
 <tr>
-<td colspan="2"><img src="man/figures/README-g-facet.png" alt="Small-multiple choropleths of life expectancy in 1990, 2005 and 2020"><br><sub><code>facet_map(panel, life_exp, year, style = "quantile")</code> — or <code>animate_world(panel, life_exp)</code> for the moving version</sub></td>
+<td colspan="2"><img src="man/figures/README-g-facet.png" alt="Small-multiple choropleths of life expectancy in 1990, 2005 and 2020"><br><sub><code>facet_map(panel, life_exp, year, style = "quantile")</code>, or <code>animate_world(panel, life_exp)</code> for the moving version</sub></td>
 </tr>
 </table>
 ```
 
 `interactive_map()` hands the same frame to **plotly**, **ggiraph**,
 **leaflet** or **ggsql** for a web-ready widget. With `as_ggsql_source()` and
-`world_query()` the drawing happens *inside DuckDB* — countryatlas reconciles
-the countries, [ggsql][ggsql] renders them without ggplot2 or `sf` at runtime.
+`world_query()` the drawing happens *inside DuckDB*: countryatlas reconciles
+the countries and [ggsql][ggsql] renders them without ggplot2 or `sf` at runtime.
 
 ## Honest by construction
 
 "Honest maps" is in the package description, so the package has to earn it.
-Four ways a world map misleads, the verb for each — and one more that makes the
+Four ways a world map misleads, the verb for each, and one more that makes the
 map admit what it did.
 
 **Your classification is doing the talking.** Equal-interval breaks put 92% of
@@ -287,11 +287,11 @@ doing to your data.
 ```{=html}
 <table>
 <tr>
-<td width="50%"><img src="man/figures/README-h-tissot-merc.png" alt="Tissot indicatrices on a Mercator map: circles stay round but grow enormously toward the poles"><br><sub><code>tissot_map("mercator")</code> — shapes right, areas wildly wrong</sub></td>
-<td width="50%"><img src="man/figures/README-h-tissot-ee.png" alt="Tissot indicatrices on an Equal Earth map: ellipses shear but hold constant area"><br><sub><code>tissot_map("equal_earth")</code> — areas right, shapes sheared</sub></td>
+<td width="50%"><img src="man/figures/README-h-tissot-merc.png" alt="Tissot indicatrices on a Mercator map: circles stay round but grow enormously toward the poles"><br><sub><code>tissot_map("mercator")</code>: shapes right, areas wildly wrong</sub></td>
+<td width="50%"><img src="man/figures/README-h-tissot-ee.png" alt="Tissot indicatrices on an Equal Earth map: ellipses shear but hold constant area"><br><sub><code>tissot_map("equal_earth")</code>: areas right, shapes sheared</sub></td>
 </tr>
 <tr>
-<td colspan="2"><img src="man/figures/README-h-projections.png" alt="One choropleth drawn under Equal Earth, Robinson, Winkel tripel and Mercator"><br><sub><code>projection_compare(d, gdp_per_capita)</code> — and <code>projection_info()</code> for which of the thirteen are equal-area</sub></td>
+<td colspan="2"><img src="man/figures/README-h-projections.png" alt="One choropleth drawn under Equal Earth, Robinson, Winkel tripel and Mercator"><br><sub><code>projection_compare(d, gdp_per_capita)</code>, and <code>projection_info()</code> for which of the thirteen are equal-area</sub></td>
 </tr>
 </table>
 ```
@@ -310,7 +310,7 @@ mistakes them for a value, or map availability itself.
 
 **A rate over eleven thousand people should not shout as loudly as one over a
 billion.** Value-by-alpha spends opacity on the denominator, so small-population
-countries recede — the cartogram's answer to the same problem, without
+countries recede: the cartogram's answer to the same problem, without
 distorting the geometry.
 
 ```{=html}
@@ -337,15 +337,15 @@ The ISO spine is not only the World Bank's, and not only 2024's.
 ```{=html}
 <table>
 <tr>
-<td width="50%"><img src="man/figures/README-r-history.png" alt="World choropleth drawn on 1950 sovereign-state borders; most of Africa is absent because it was not yet independent"><br><sub><code>attach_geometry(d, year = 1950)</code> — 1950 borders, via CShapes. Africa is nearly empty because in 1950 almost none of it was sovereign; pass <code>dependencies = TRUE</code> for the colonies.</sub></td>
+<td width="50%"><img src="man/figures/README-r-history.png" alt="World choropleth drawn on 1950 sovereign-state borders; most of Africa is absent because it was not yet independent"><br><sub><code>attach_geometry(d, year = 1950)</code>: 1950 borders, via CShapes. Africa is nearly empty because in 1950 almost none of it was sovereign; pass <code>dependencies = TRUE</code> for the colonies.</sub></td>
 <td width="50%"><img src="man/figures/README-r-lisa.png" alt="Map of LISA clusters: high-high, low-low and spatial outliers"><br><sub><code>lisa_map(d, gdp_per_capita, weights = country_weights("knn"))</code></sub></td>
 </tr>
 <tr>
-<td><img src="man/figures/README-r-grid.png" alt="Gridded cartogram: one square per fixed number of people"><br><sub><code>gridded_cartogram(d, population)</code> — one cell per N people, countable</sub></td>
+<td><img src="man/figures/README-r-grid.png" alt="Gridded cartogram: one square per fixed number of people"><br><sub><code>gridded_cartogram(d, population)</code>: one cell per N people, countable</sub></td>
 <td><img src="man/figures/README-h-alpha.png" alt="Value-by-alpha map"><br><sub><code>value_by_alpha_map(d, gdp_per_capita, population)</code></sub></td>
 </tr>
 <tr>
-<td colspan="2"><img src="man/figures/README-r-od.png" alt="Origin-destination small multiples: one panel per origin"><br><sub><code>od_map(flows, from, to, value)</code> — where each origin sends, when <code>flow_map()</code> would be spaghetti</sub></td>
+<td colspan="2"><img src="man/figures/README-r-od.png" alt="Origin-destination small multiples: one panel per origin"><br><sub><code>od_map(flows, from, to, value)</code>: where each origin sends, when <code>flow_map()</code> would be spaghetti</sub></td>
 </tr>
 </table>
 ```
@@ -375,7 +375,7 @@ rbind(
 ```
 
 **Any provider, one shape.** `register_country_source()` takes a fetch function
-and a name; `fetch_indicator()` and `compare_sources()` do the rest — including
+and a name; `fetch_indicator()` and `compare_sources()` do the rest, including
 telling you where two providers disagree.
 
 ```{r sources}

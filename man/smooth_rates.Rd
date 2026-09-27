@@ -25,7 +25,9 @@ compute the raw rate only.}
 \value{
 \code{data} with \verb{<numerator>_rate} and \verb{<numerator>_smoothed} columns
 added, plus \verb{<numerator>_shrinkage} -- the weight given to the country's own
-rate, between 0 (fully shrunk to the global rate) and 1 (untouched).
+rate, between 0 (fully shrunk to the global rate) and 1 (untouched). A row
+with no finite, positive denominator or with a negative count has no rate:
+all three are \code{NA} there, with a warning.
 }
 \description{
 Empirical-Bayes smoothing: a rate computed over a small denominator is pulled

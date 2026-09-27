@@ -102,7 +102,8 @@ check_country_match <- function(x,
 #'     code. Empty is the good case.
 #'   * `na_rates` -- one row per indicator: `n` is the number of countries
 #'     *considered*, `n_missing` how many of them lack a value, and `na_rate`
-#'     is `n_missing / n`.
+#'     is `n_missing / n`. An infinite value counts as lacking one: no map can
+#'     draw it, and [coverage_map()] shows it as missing too.
 #'   * `by_group` -- one row per group: `n_countries` is how many countries are
 #'     *in that group*, and `na_rate` is the share of those lacking a value.
 #'     The counts sum to `n`.
@@ -165,6 +166,10 @@ audit_coverage <- function(data,
   } else {
     check_cols(data, indicator)
   }
+  # has_value(), not is.na(): an infinity is not NA, so it counted as present
+  # here while coverage_map() -- "the same thing as a map" by both help pages
+  # -- painted it Missing, as every map verb draws it. One audit, two answers.
+  lacking <- function(v) !has_value(v)
   na_rates <- tibble::tibble(
     indicator = indicator,
     n = nrow(data),
@@ -172,9 +177,9 @@ audit_coverage <- function(data,
     # came out as named vectors and `a$na_rates$na_rate` handed back
     # c(gdp = 0.1) rather than 0.1. Same treatment country_network() gives
     # rowSums() for the same reason.
-    n_missing = unname(vapply(indicator, function(i) sum(is.na(data[[i]])),
+    n_missing = unname(vapply(indicator, function(i) sum(lacking(data[[i]])),
                               integer(1))),
-    na_rate = unname(vapply(indicator, function(i) mean(is.na(data[[i]])),
+    na_rate = unname(vapply(indicator, function(i) mean(lacking(data[[i]])),
                             numeric(1)))
   )
 
@@ -191,7 +196,7 @@ audit_coverage <- function(data,
       dplyr::summarise(
         n_countries = dplyr::n(),
         indicator = focus,
-        na_rate = mean(is.na(.data[[focus]])),
+        na_rate = mean(lacking(.data[[focus]])),
         .groups = "drop"
       ) %>%
       dplyr::arrange(dplyr::desc(.data$na_rate))

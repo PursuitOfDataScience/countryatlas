@@ -200,14 +200,7 @@ audit_time_coverage <- function(data, quiet = FALSE) {
                  drop = FALSE]
   dis <- stats::setNames(ended$dissolved[!duplicated(ended$iso3c_hist)],
                          ended$iso3c_hist[!duplicated(ended$iso3c_hist)])
-  # A successor state must not carry data before its predecessor dissolved --
-  # but only where the successor was genuinely created then. A continuation was
-  # not, so testing its data against that year says nothing. Where a country
-  # succeeds several entities, the earliest date wins.
-  succ <- hc[hc$relation == "succession", , drop = FALSE]
-  succ <- succ[!succ$iso3c %in% still_here, , drop = FALSE]
-  born <- if (nrow(succ)) tapply(succ$dissolved, succ$iso3c, min) else
-    stats::setNames(numeric(0), character(0))
+  born <- successor_born_years(hc)
 
   df$dissolved_in <- unname(dis[df$iso3c])
   df$born_in <- unname(born[df$iso3c])
@@ -257,6 +250,21 @@ audit_time_coverage <- function(data, quiet = FALSE) {
   out
 }
 
+# The year each successor state came into existence, by the crosswalk: a
+# successor must not carry data (or a code) before its predecessor dissolved --
+# but only where it was genuinely created then. A continuation was not, so
+# testing it against that year says nothing. Where a country succeeds several
+# entities, the earliest date wins. Named by iso3c. Shared by
+# audit_time_coverage() and historical_geometry(), which must agree about when
+# a country began.
+successor_born_years <- function(hc = countryatlas::historical_codes) {
+  still_here <- unique(hc$iso3c[hc$relation == "continuation"])
+  succ <- hc[hc$relation == "succession", , drop = FALSE]
+  succ <- succ[!is.na(succ$iso3c) & !succ$iso3c %in% still_here, , drop = FALSE]
+  if (!nrow(succ)) return(stats::setNames(numeric(0), character(0)))
+  tapply(succ$dissolved, succ$iso3c, min)
+}
+
 #' Historical country boundaries
 #'
 #' Country polygons as they were, from CShapes 2.0 (Schvitz et al. 2022), which
@@ -276,10 +284,11 @@ audit_time_coverage <- function(data, quiet = FALSE) {
 #'   assigned -- see below), `status`, `from`, `to` and geometry. Two further
 #'   CShapes columns are passed through when the installed version supplies
 #'   them, since they answer the questions this verb is usually asked:
-#'   * `owner` -- the `gwcode` of the sovereign a dependency belonged to, and
-#'     `NA` for a sovereign state. This is the column that makes
-#'     `dependencies = TRUE` legible: without it a colony and its metropole are
-#'     two unrelated rows.
+#'   * `owner` -- the `gwcode` of the sovereign a dependency belonged to; a
+#'     sovereign state carries its own `gwcode` here. This is the column that
+#'     makes `dependencies = TRUE` legible: without it a colony and its
+#'     metropole are two unrelated rows. `owner != gwcode` picks out the
+#'     dependencies.
 #'   * `capname` -- the capital's name at that date.
 #'
 #'   Both were returned but undocumented. Neither is guaranteed: `cshapes`
@@ -290,8 +299,14 @@ audit_time_coverage <- function(data, quiet = FALSE) {
 #' ISO 3166 was first published in 1974 and never covered colonies, so a
 #' historical map cannot be keyed on `iso3c`. CShapes uses **Gleditsch-Ward**
 #' codes, which is why `gwcode` is the key here and `iso3c` is a best-effort
-#' extra: it is `NA` for every entity that never had an ISO code (French West
-#' Africa, the Gold Coast, the USSR before 1974). Join historical data on
+#' extra, read off the GW code: the modern code of the state that holds it.
+#' So it is `NA` for an entity with no modern counterpart (the German
+#' Democratic Republic, Czechoslovakia, Yugoslavia, the two Yemens), and also
+#' where [historical_codes] says the modern state did not exist yet -- GW give
+#' the USSR and Russia one code, but the 1980 polygon is the Soviet Union, so
+#' it carries `NA` rather than `"RUS"`. A colony carries the code of the state
+#' it became: CShapes names the 1950 Gold Coast "Ghana" and it comes back as
+#' `"GHA"`, with `status` saying it was a colony. Join historical data on
 #' `gwcode`, not on `iso3c`, and use [convert_country()]`(to = "gwn")` to get
 #' there from a modern code.
 #'
@@ -353,6 +368,19 @@ historical_geometry <- function(year, dependencies = FALSE,
   # provided, but gwcode is the one that is actually complete.
   g$iso3c <- suppressWarnings(
     countrycode::countrycode(g$gwcode, "gwn", "iso3c", warn = FALSE))
+  # A GW code can outlive the state that held it. Gleditsch-Ward give the USSR
+  # and Russia one code, 365, so the crosswalk labelled the 1980 Soviet Union
+  # "RUS" -- and attach_geometry(year = 1980) painted all fifteen republics
+  # with Russia's value, the very anachronism audit_time_coverage() flags as
+  # "before_existence", because the package's own historical_codes records
+  # Russia as one of fifteen *successors*, born in 1991. Czechoslovakia,
+  # Yugoslavia and the GDR already came back NA; a code for a state the
+  # crosswalk says did not exist yet goes the same way.
+  born <- successor_born_years()
+  yr <- as.integer(format(when, "%Y"))
+  early <- !is.na(g$iso3c) & g$iso3c %in% names(born)
+  early[early] <- yr < born[g$iso3c[early]]
+  g$iso3c[early] <- NA_character_
   keep <- intersect(c("gwcode", "country", "iso3c", "status", "owner",
                       "capname", "from", "to"), names(g))
   g <- g[, c(keep, attr(g, "sf_column"))]

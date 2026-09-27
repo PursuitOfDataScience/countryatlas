@@ -20,7 +20,10 @@ are returned as club \code{NA}.}
 \value{
 A tibble: \code{iso3c}, \code{club} (an integer, 1 = highest-level club, \code{NA} =
 not classified), and the club's \code{log_t} statistic. The per-club test results
-are attached as the \code{"countryatlas_clubs"} attribute.
+are attached as the \code{"countryatlas_clubs"} attribute. Every country in
+\code{data} appears: one without a complete series (a missing or non-finite
+value in any year) cannot be tested, so it comes back with \code{club = NA} and
+a warning naming it.
 }
 \description{
 Countries do not all converge to one steady state; they converge in groups.

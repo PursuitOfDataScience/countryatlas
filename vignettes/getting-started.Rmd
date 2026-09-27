@@ -43,7 +43,7 @@ data_2020 <- attach_geometry(world_snapshot$countries, geometry = "polygon")
 
 ## Your first choropleth
 
-No `geom_polygon()` boilerplate — `world_map()` does it:
+No `geom_polygon()` boilerplate; `world_map()` does it:
 
 ```{r eval = has_maps, fig.alt = "World choropleth of GDP per capita in quantile bins."}
 world_map(data_2020, gdp_per_capita, style = "quantile",
@@ -66,7 +66,7 @@ columns), or browse the bundled catalogue:
 head(common_indicators)
 ```
 
-Or search the full World Bank catalogue by name — offline, against `WDI`'s
+Or search the full World Bank catalogue by name, offline, against `WDI`'s
 bundled indicator cache:
 
 ```{r}
@@ -79,6 +79,6 @@ country_data(2020, c(life_exp = "SP.DYN.LE00.IN", pop = "SP.POP.TOTL"))
 
 ## Next steps
 
-* *Joining your own data* — get a frame keyed on messy names onto a map.
-* *Modern maps with sf & projections* — equal-area, projected maps.
-* *Beyond the choropleth* — bubbles, cartograms, tiles, flows and more.
+* *Joining your own data*: get a frame keyed on messy names onto a map.
+* *Modern maps with sf & projections*: equal-area, projected maps.
+* *Beyond the choropleth*: bubbles, cartograms, tiles, flows and more.

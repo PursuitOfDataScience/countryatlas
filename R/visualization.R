@@ -42,16 +42,42 @@ without_panel_warning <- function(expr) {
     countryatlas_panel = function(w) invokeRestart("muffleWarning"))
 }
 
+# Draw the countries that have no time value in every period.
+#
+# attach_geometry() returns the whole basemap, and a country the data does not
+# cover carries NA in every data column -- its `year` included. A static map
+# draws it in na.value, which is the point of returning it. Split by time, it
+# belonged to no period: animate_world() drew it in no frame at all, so the
+# countries with no data vanished rather than showing grey (gganimate warned
+# "NAs introduced by coercion" twice while dropping them), and
+# facet_map(facet = year) gave them a panel of their own, labelled NA. Copy
+# those rows into every period present. Coverage is counted once per country,
+# so the copies do not change it.
+spread_undated <- function(data, col) {
+  t <- data[[col]]
+  undated <- is.na(t)
+  periods <- unique(t[!undated])
+  if (!any(undated) || !length(periods)) return(data)
+  add <- data[undated, , drop = FALSE]
+  copies <- lapply(seq_along(periods), function(i) {
+    a <- add
+    a[[col]] <- rep(periods[i], nrow(a))
+    a
+  })
+  parts <- c(list(data[!undated, , drop = FALSE]), copies)
+  if (is_sf(data)) do.call(rbind, parts) else dplyr::bind_rows(parts)
+}
+
 # Is this an sf object?
 is_sf <- function(x) inherits(x, "sf")
 
 # Compute classInt-style breaks; falls back to base quantiles if classInt is
 # unavailable.
-compute_breaks <- function(x, style, n_bins) {
+compute_breaks <- function(x, style, n_bins, call = rlang::caller_env()) {
   # classInt rejects n < 2 with a bare "n less than 2", and an NA got as far as
   # "missing value where TRUE/FALSE needed". The upper bound matters because
   # callers coerce counts with as.integer(), which returns NA past 2^31-1.
-  check_number(n_bins, "n_bins", lo = 2, hi = .Machine$integer.max)
+  check_number(n_bins, "n_bins", lo = 2, hi = .Machine$integer.max, call = call)
   # Truncate to a whole number of bins so the two backends below agree: classInt
   # truncates internally, but the base-quantile fallback would pass a fractional
   # count to seq(length.out = ), giving one break more. The bin count must not
@@ -255,7 +281,11 @@ world_map <- function(data, fill,
   # style = "binned" answered -- n_bins was ignored there too. Compared against
   # the default rather than missing(), matching warn_projection_ignored().
   #
-  if (!identical(as.numeric(n_bins), 5) &&
+  # Except under `uncertainty`, where the value-suppressing palette takes its
+  # value classes from `n_bins` whatever `style` says: the notice fired there
+  # too, telling the caller an argument the map was using had been ignored.
+  unc_given <- !rlang::quo_is_null(rlang::enquo(uncertainty))
+  if (!identical(as.numeric(n_bins), 5) && !unc_given &&
       style %in% c("continuous", "categorical")) {
     wdj_warn(c(
       "{.arg n_bins} does not apply to {.code style = \"{style}\"} and is ignored.",
@@ -264,6 +294,18 @@ world_map <- function(data, fill,
          {.code "quantile"} or {.code "jenks"} to bin.'
       else 'The classes are the values of the fill column.'
     ), class = "countryatlas_n_bins_ignored")
+  }
+  # The converse: `n_uncertainty` belongs to the value-suppressing palette
+  # alone, and without `uncertainty` it was accepted and dropped in silence.
+  # identical() rather than as.numeric(), which would warn on a string before
+  # the notice could say anything.
+  if (!unc_given && !identical(n_uncertainty, 3) &&
+      !identical(n_uncertainty, 3L)) {
+    wdj_warn(c(
+      "{.arg n_uncertainty} applies only with {.arg uncertainty} and is ignored.",
+      "i" = "It sets the uncertainty levels of a value-suppressing palette;
+             pass {.arg uncertainty} to draw one."
+    ), class = "countryatlas_n_uncertainty_ignored")
   }
 
   # A panel drawn as one static map overplots each country's years on top of
@@ -353,7 +395,8 @@ world_map <- function(data, fill,
     vsup <- vsup_fill(data[[fill_name]], data[[unc_name]],
                       n_bins = as.integer(n_bins),
                       n_uncertainty = n_uncertainty,
-                      option = palette %||% "viridis")
+                      option = palette %||% "viridis",
+                      unit = unit_ids(data))
     data[[".wdj_vsup"]] <- factor(
       vsup$label,
       levels = sprintf("v%d / u%d",
@@ -379,6 +422,13 @@ world_map <- function(data, fill,
   fill_mapped <- if (is.null(vsup)) binned$fill else rlang::quo(.data[[".wdj_vsup"]])
 
   na_value <- switch(na_style, grey = "grey85", outline = "white", "grey85")
+  # Cut at the horizon before coord_sf() projects anything: see
+  # clip_to_hemisphere(). After the counting above, which it would not change
+  # anyway (every row is kept), and before the hatch and dispute layers, which
+  # draw from this frame too.
+  if (sf_mode && identical(projection, "orthographic")) {
+    data <- clip_to_hemisphere(data, recenter %||% 0, ORTHO_LAT0)
+  }
   if (sf_mode) {
     p <- ggplot2::ggplot(data) +
       ggplot2::geom_sf(ggplot2::aes(fill = !!fill_mapped),
@@ -469,9 +519,6 @@ world_map <- function(data, fill,
   p
 }
 
-# Countries present vs countries with a value, counted once per country rather
-# than once per polygon vertex (the polygon backend repeats a country's value
-# for every boundary point, so a naive count would report tens of thousands).
 # The column that identifies one drawable unit, most specific first. These
 # frames are de-duplicated before counting or computing breaks, because the
 # polygon backend repeats a country's value down every vertex. Keying on iso3c
@@ -484,6 +531,34 @@ wdj_unit_key <- function(nms) {
   intersect(c("nuts_id", "iso_3166_2", "iso3c", "group"), nms)
 }
 
+# The drawable-unit id of every row (see wdj_unit_key()), or NULL for a frame
+# with no key column.
+unit_ids <- function(data) {
+  key <- wdj_unit_key(names(data))
+  if (!length(key)) return(NULL)
+  as.character(data[[key[1]]])
+}
+
+# percent_rank() over one value per drawable unit, handed back row-aligned.
+# The polygon backend repeats a country's value down every one of its
+# vertices, so a rank over the raw rows weighted each country by how complex
+# its outline is -- the defect apply_binned_fill() de-duplicates away for the
+# quantile breaks. value_by_alpha_map()'s default opacity and the VSUP ramp
+# both ranked the raw rows: Chile, at the 69th percentile of countries by
+# population, drew at the 30th because the countries below it have long
+# coastlines, and 101 of 189 countries landed in the wrong VSUP cell.
+# De-duplicating (unit, value) pairs rather than units keeps every year of a
+# panel in play, as apply_binned_fill() does. Ties share a rank either way, so
+# match() can take the first copy of a value.
+unit_percent_rank <- function(x, unit = NULL) {
+  if (is.null(unit)) return(dplyr::percent_rank(x))
+  xu <- x[!duplicated(data.frame(unit = unit, x = x))]
+  dplyr::percent_rank(xu)[match(x, xu)]
+}
+
+# Countries present vs countries with a value, counted once per country rather
+# than once per polygon vertex (the polygon backend repeats a country's value
+# for every boundary point, so a naive count would report tens of thousands).
 na_coverage <- function(data, fill_name, shown = NULL) {
   df <- tibble::as_tibble(sf_drop(data))
   # `shown` joins the frame before the de-duplication so it survives it: a
@@ -560,12 +635,6 @@ warn_infinite_fill <- function(data, fill_name) {
   invisible(NULL)
 }
 
-# A frame that already carries centroid_lon/centroid_lat -- the output of
-# world_geometry("centroids"), or anything joined to it -- collided with the
-# join below: dplyr suffixed both sides to .x/.y, and the aes() referring to
-# `.data$centroid_lon` then found no such column, so bubble_map() and
-# spike_map() failed outright on their own centroid table. The bundled columns
-# are the authority here, so drop the incoming ones.
 # A great circle from Tokyo to Los Angeles crosses the Pacific, so its
 # longitudes run ...178, 179, -179, -178... With coord_quickmap() and no
 # wrapping, geom_path() joined those two points literally and drew a horizontal
@@ -618,6 +687,12 @@ split_antimeridian <- function(df, id) {
   out
 }
 
+# A frame that already carries centroid_lon/centroid_lat -- the output of
+# world_geometry("centroids"), or anything joined to it -- collided with the
+# join below: dplyr suffixed both sides to .x/.y, and the aes() referring to
+# `.data$centroid_lon` then found no such column, so bubble_map() and
+# spike_map() failed outright on their own centroid table. The bundled columns
+# are the authority here, so drop the incoming ones.
 drop_centroid_cols <- function(data) {
   data[, setdiff(names(data), c("centroid_lon", "centroid_lat")), drop = FALSE]
 }
@@ -687,10 +762,10 @@ drop_unusable_sizes <- function(data, col, mark) {
 # Drop sf geometry for counting without requiring sf to be attached.
 sf_drop <- function(x) if (is_sf(x)) sf::st_drop_geometry(x) else x
 
-resolve_footnote <- function(footnote, coverage) {
+resolve_footnote <- function(footnote, coverage, call = rlang::caller_env()) {
   if (is.null(footnote)) return(NULL)
   if (!identical(footnote, "auto")) {
-    check_string(footnote, "footnote")
+    check_string(footnote, "footnote", call = call)
     return(footnote)
   }
   n_total <- coverage$n_total
@@ -862,13 +937,14 @@ auto_fill_scale <- function(vals, name, na_value = "grey85") {
 
 # Choose an appropriate fill scale for the chosen style.
 add_fill_scale <- function(style, palette, n_bins, na_label, legend,
-                           na_value = "grey85", breaks = NULL) {
+                           na_value = "grey85", breaks = NULL,
+                           call = rlang::caller_env()) {
   # "binned" used to hand n_bins to ggplot2 as `n.breaks`, which is only a
   # suggestion: scales::extended_breaks() snaps to round numbers, so n_bins of
   # 5, 6 and 7 all drew five bins and 3 drew four. `n_bins` is documented as
   # "number of bins for binned/quantile/jenks", so it now means the same thing
   # in all three -- the caller passes explicit equal-interval boundaries.
-  check_number(n_bins, "n_bins", lo = 2, hi = .Machine$integer.max)
+  check_number(n_bins, "n_bins", lo = 2, hi = .Machine$integer.max, call = call)
   n_bins <- as.integer(n_bins)
   # scale_*_binned() reads `breaks` as the interior boundaries, so k of them
   # give k + 1 bins; compute_breaks() returns the outer edges too.
@@ -1075,7 +1151,9 @@ bubble_map <- function(data, size, color = NULL, projection = "equal_earth",
         data, quo_arg_name(size_q, "size"), countries$iso3c))))
   }
 
-  # Polygon backend: base map and centroids are both in lon/lat degrees.
+  # Polygon backend: base map and centroids are both in lon/lat degrees, so
+  # `projection` changes nothing here, and it said nothing about that.
+  warn_projection_ignored(projection, hint = 'backend = "sf"')
   data <- drop_centroid_cols(data)
   cent <- world_geometry("centroids", geometry = "polygon")
   pts <- dplyr::left_join(data, cent[, c("iso3c", "centroid_lon", "centroid_lat")],
@@ -1202,7 +1280,8 @@ spike_map <- function(data, height, max_height = 20, width = 1.6,
 #' @param data An `sf` map-ready frame (use `geometry = "sf"`).
 #' @param fill_x,fill_y The two value columns (unquoted).
 #' @param palette A `biscale` palette name (default `"GrPink"`).
-#' @param dim Bivariate dimension (2 or 3, default 3).
+#' @param dim Bivariate dimension: classes per variable, 2, 3 (default) or 4.
+#'   A 4 x 4 map needs a palette that has one, such as `"GrPink2"`.
 #' @param projection Projection; see [world_map()] for the ones available.
 #'
 #' @return A `ggplot` object (the map; combine with `biscale::bi_legend()` for a
@@ -1219,6 +1298,17 @@ spike_map <- function(data, height, max_height = 20, width = 1.6,
 #' }
 bivariate_map <- function(data, fill_x, fill_y, palette = "GrPink", dim = 3,
                           projection = "equal_earth") {
+  # `dim` was the one argument here nothing checked: "a" reached the class
+  # count check below as a string comparison and reported "too few for a
+  # classes", NA died on base R's "missing value where TRUE/FALSE needed",
+  # c(2, 3) on "the condition has length > 1", and 2.5 on biscale's own
+  # wording. biscale's built-in palettes go up to 4 x 4.
+  check_number(dim, "dim", lo = 2, hi = 4)
+  if (dim != round(dim)) {
+    wdj_abort(c("{.arg dim} must be a whole number of classes: 2, 3 or 4.",
+                "x" = "Got {.val {dim}}."))
+  }
+  dim <- as.integer(dim)
   need_pkg("biscale", "for bivariate_map()")
   need_pkg("sf", "for bivariate_map()")
   if (!is_sf(data)) wdj_abort("{.fn bivariate_map} needs an sf frame ({.code geometry = \"sf\"}).")
@@ -1311,7 +1401,12 @@ bivariate_map <- function(data, fill_x, fill_y, palette = "GrPink", dim = 3,
     ))
   }
   wdj_provenance(p, data, x_name, "sf", projection,
-                 style = paste0("bivariate ", dim, "x", dim, " (", palette, ")"),
+                 # biscale also takes a custom palette as a named colour
+                 # vector, which paste0() would have spread into one style
+                 # string per colour.
+                 style = paste0("bivariate ", dim, "x", dim, " (",
+                                if (is.character(palette) && length(palette) == 1L)
+                                  palette else "custom palette", ")"),
                  extra = list(coverage = cov))
 }
 
@@ -1377,6 +1472,17 @@ cartogram_map <- function(data, weight, type = c("contiguous", "dorling",
   check_cols(data, unique(c(w_name, fill_name)))
 
   check_numeric_col(data, w_name)
+  # Cut at the horizon before projecting; see clip_to_hemisphere(). The
+  # orthographic transform drops the far side's vertices, and what was left
+  # failed inside cartogram as "all sizes are missing and/or non-positive"
+  # (Dorling) or "argument must be coercible to non-negative integer"
+  # (contiguous). The far side is out of view rather than missing, so it is
+  # left out of the cartogram but still counted as covered, as on the globe.
+  far <- rep(FALSE, nrow(data))
+  if (identical(projection, "orthographic")) {
+    data <- clip_to_hemisphere(data, 0, ORTHO_LAT0)
+    far <- sf::st_is_empty(data)
+  }
   data <- sf::st_transform(data, wdj_crs(projection))
   # A cartogram can only size a country it has a positive weight for, so the
   # rest have to go. That was happening silently, and provenance was then
@@ -1407,7 +1513,7 @@ cartogram_map <- function(data, weight, type = c("contiguous", "dorling",
              country the weight is missing for."
     ))
   }
-  data <- data[keep, ]
+  data <- data[keep & !far, ]
   # cartogram iterates until `if (meanSizeError < maxSizeError) break`, which on
   # an empty frame compares NA and fails with "missing value where TRUE/FALSE
   # needed". Nothing left to weight is worth saying plainly.
@@ -1433,9 +1539,14 @@ cartogram_map <- function(data, weight, type = c("contiguous", "dorling",
       data
     }
   )
+  # `datum = NA`: no graticule. The theme blanks it anyway, and a graticule
+  # has nothing to say about a distorted map, but ggplot2 still computed one
+  # over the cartogram's bounding box, and at print a contiguous cartogram in
+  # Winkel Tripel died on GEOS's "point array must contain 0 or >1 elements".
   p <- ggplot2::ggplot(carto) +
     ggplot2::geom_sf(ggplot2::aes(fill = .data[[fill_name]]),
                      color = "grey30", linewidth = 0.1) +
+    ggplot2::coord_sf(datum = NA) +
     auto_fill_scale(carto[[fill_name]], fill_name) +
     theme_world_map()
   # Remember what it was weighted by, so cartogram_diagnostics() can check the
@@ -1845,6 +1956,7 @@ animate_world <- function(data, fill, time = year, projection = "equal_earth",
   if (!time_name %in% names(data)) {
     wdj_abort("Time column {.val {time_name}} not found in {.arg data}.")
   }
+  data <- spread_undated(data, time_name)
   p <- without_panel_warning(
     world_map(data, !!fill_q, projection = projection, ...))
   if (has_pkg("gganimate")) {
@@ -1958,9 +2070,29 @@ interactive_map <- function(data, fill, tooltip = NULL,
     m <- mapgl::add_fill_layer(
       m, id = "countryatlas", source = g,
       fill_color = if (is.numeric(g[[fill_name]])) {
-        mapgl::interpolate_palette(data = g, column = fill_name,
-                                   method = "quantile", n = 5,
-                                   palette = viridis_hex)$expression
+        if (!any(is.finite(g[[fill_name]]))) {
+          # Nothing to scale: interpolate_palette() refuses an all-missing
+          # column outright ("No non-missing values found in data_values"),
+          # where the ggplot2 engines draw every country as no-data. So does
+          # this, in interpolate_palette()'s own no-data colour.
+          "grey"
+        } else {
+          # Exactly k colours for k breaks. viridis_hex() floors at two, so a
+          # column with a single distinct value -- a constant, or one country
+          # with data -- got one quantile break and two colours, and mapgl
+          # refused the pair ("`values` and `stops` must have the same
+          # length"). Its note that the quantiles collapsed describes a
+          # legitimate input, and the scale it then builds is right.
+          withCallingHandlers(
+            mapgl::interpolate_palette(
+              data = g, column = fill_name, method = "quantile", n = 5,
+              palette = function(k) grDevices::hcl.colors(k, palette = "viridis")
+            )$expression,
+            warning = function(w) {
+              if (grepl("unique quantiles possible", conditionMessage(w),
+                        fixed = TRUE)) invokeRestart("muffleWarning")
+            })
+        }
       } else {
         # The categories and their colour stops are computed *once* and paired
         # by position. They used to be derived independently from the same
@@ -1977,9 +2109,13 @@ interactive_map <- function(data, fill, tooltip = NULL,
           cats <- unique(as.character(g[[fill_name]]))
           cats <- cats[!is.na(cats)]
           cats <- cats[order(cats, method = "radix")]
-          mapgl::match_expr(column = fill_name, values = cats,
-                            stops = utils::head(viridis_hex(length(cats)),
-                                                length(cats)))
+          # No category at all builds a `match` with no label/output pair,
+          # which MapLibre rejects in the browser; draw the no-data colour,
+          # as the numeric branch does.
+          if (!length(cats)) "grey" else
+            mapgl::match_expr(column = fill_name, values = cats,
+                              stops = utils::head(viridis_hex(length(cats)),
+                                                  length(cats)))
         }
       },
       fill_opacity = 0.85, fill_outline_color = "#33333366",
@@ -1989,6 +2125,17 @@ interactive_map <- function(data, fill, tooltip = NULL,
   }
 
   if (engine == "plotly") {
+    # plotly's converter cannot take an orthographic view: it fails on the
+    # empty geometry of every country beyond the horizon ("number of columns
+    # of matrices must match"), and on the visible hemisphere alone as well.
+    # That was so before the horizon cut existed too. Say which engines can.
+    if (identical(rlang::list2(...)$projection, "orthographic")) {
+      wdj_abort(c(
+        '{.code engine = "plotly"} cannot draw the orthographic projection.',
+        "i" = 'Use {.code engine = "mapgl"}, or {.code globe_map(data, fill,
+               interactive = TRUE)} for a globe you can turn.'
+      ), class = "countryatlas_engine_projection")
+    }
     p <- world_map(data, !!fill_q, ...)
     return(plotly::ggplotly(p))
   }
@@ -2068,13 +2215,22 @@ interactive_map <- function(data, fill, tooltip = NULL,
   # colorFactor() pairs levels with palette stops positionally, and plain
   # sort() consults the collation locale, which would colour the same
   # categories differently on different machines.
-  pal <- if (is.numeric(data[[fill_name]])) {
-    leaflet::colorNumeric("viridis", domain = data[[fill_name]],
+  # A fill with nothing to scale -- every value missing, or infinite and so
+  # set to NA above -- died inside colorNumeric() on "Wasn't able to determine
+  # range of domain", with base R's "no non-missing arguments to min" twice.
+  # The ggplot2 engines draw such a map as all no-data, and so does this: any
+  # domain will do when every value takes na.color, and there is no legend to
+  # draw.
+  vals <- data[[fill_name]]
+  nothing <- if (is.numeric(vals)) !any(is.finite(vals)) else all(is.na(vals))
+  pal <- if (is.numeric(vals)) {
+    leaflet::colorNumeric("viridis", domain = if (nothing) c(0, 1) else vals,
                           na.color = "#dddddd")
   } else {
-    lv <- unique(as.character(data[[fill_name]]))
+    lv <- unique(as.character(vals))
     lv <- lv[!is.na(lv)]
-    leaflet::colorFactor("viridis", levels = lv[order(lv, method = "radix")],
+    leaflet::colorFactor("viridis",
+                         levels = if (nothing) "" else lv[order(lv, method = "radix")],
                          na.color = "#dddddd")
   }
   # Values computed here rather than deferred to leaflet's `~` formulas, which
@@ -2091,14 +2247,15 @@ interactive_map <- function(data, fill, tooltip = NULL,
   #    leaflet. The label is the only thing that needs it, so ask for it.
   check_cols(data, "iso3c")
   shapes <- sf::st_transform(data, 4326L)
-  leaflet::leaflet(shapes) |>
+  m <- leaflet::leaflet(shapes) |>
     leaflet::addPolygons(
       fillColor = pal(shapes[[fill_name]]), weight = 0.5, color = "grey",
       fillOpacity = 0.8,
       label = paste0(shapes$iso3c, ": ", shapes[[tooltip_name]])
-    ) |>
-    leaflet::addLegend(pal = pal, values = shapes[[fill_name]],
-                       title = fill_name)
+    )
+  if (nothing) return(m)
+  leaflet::addLegend(m, pal = pal, values = shapes[[fill_name]],
+                     title = fill_name)
 }
 
 #' Centroid-anchored country labels
@@ -2174,7 +2331,7 @@ geom_country_labels <- function(mapping = NULL, data = NULL, repel = TRUE,
         "i" = 'Attach polygon geometry with
                {.code attach_geometry(data, geometry = "polygon")}, or label an
                sf map with {.code ggplot2::geom_sf_text(aes(label = iso3c))}.'
-      ))
+      ), call = verb_env())
     }
     if (!all(c("long", "lat", "iso3c") %in% names(d))) {
       # Silently empty is right for the *plot's* data (a multi-layer plot may
@@ -2191,7 +2348,7 @@ geom_country_labels <- function(mapping = NULL, data = NULL, repel = TRUE,
                  ({.code geom_country_labels(data = subset(mapdf, iso3c %in% keep))}),
                  or pass a function of the plot data
                  ({.code geom_country_labels(data = ~ subset(.x, continent == "Europe"))}).'
-        ))
+        ), call = verb_env())
       }
       return(d[0, , drop = FALSE])
     }
@@ -2518,7 +2675,11 @@ globe_map <- function(data, fill, lon = 0, lat = 20,
   data <- binned$data
   fill_mapped <- binned$fill
 
-  p <- ggplot2::ggplot(data) +
+  # Drawn from the visible hemisphere only -- see clip_to_hemisphere() for
+  # the 63 of 216 viewpoints that built and then could not be drawn. The
+  # breaks above and the provenance below still see every country, so the
+  # colours mean the same thing from every side of a spinning globe.
+  p <- ggplot2::ggplot(clip_to_hemisphere(data, lon, lat)) +
     ggplot2::geom_sf(ggplot2::aes(fill = !!fill_mapped),
                      color = if (borders) "grey30" else NA, linewidth = 0.1) +
     wdj_coord_sf("orthographic", recenter = lon, lat0 = lat) +
@@ -2663,7 +2824,10 @@ facet_map <- function(data, fill, facet, ncol = NULL, ...) {
   # Faceting a panel by anything else does not -- each continent panel still
   # stacks every year on top of itself -- so there it is exactly right.
   p <- if (identical(facet_name, "year")) {
-    without_panel_warning(world_map(data, !!fill_q, ...))
+    # The countries with no data at all go into every year's panel rather than
+    # a panel labelled NA: see spread_undated(). Faceting by anything else
+    # keeps ggplot2's own NA panel, which there is a real group.
+    without_panel_warning(world_map(spread_undated(data, "year"), !!fill_q, ...))
   } else {
     world_map(data, !!fill_q, ...)
   }
@@ -2982,7 +3146,7 @@ cartogram_diagnostics <- function(x, weight = NULL) {
         "{length(bad)} geometr{?y/ies} {?is/are} invalid: {.val {who}}."
       } else "The geometry engine rejected it: {conditionMessage(e)}",
       "i" = "Repair it with {.code sf::st_make_valid()} first."
-    ), class = "countryatlas_invalid_geometry")
+    ), call = verb_env(), class = "countryatlas_invalid_geometry")
   })
   w <- geom[[w_name]]
   ok <- is.finite(area) & is.finite(w) & w > 0
@@ -3057,16 +3221,17 @@ check_tmap_api <- function(have = getNamespaceExports("tmap"),
 
 world_map_tmap <- function(data, fill_name, style, n_bins, palette, title,
                            legend, na_label, borders, sf_mode,
-                           projection = "equal_earth", recenter = NULL) {
+                           projection = "equal_earth", recenter = NULL,
+                           call = rlang::caller_env()) {
   need_pkg("tmap", 'for world_map(engine = "tmap")')
-  check_tmap_api()
+  check_tmap_api(call = call)
   if (!sf_mode) {
     wdj_abort(c(
       '{.code engine = "tmap"} needs an sf frame.',
       "i" = 'tmap draws sf geometry; build one with
              {.code attach_geometry(data, geometry = "sf")}.',
       "*" = 'The polygon backend is ggplot2-only.'
-    ))
+    ), call = call)
   }
   # tm_scale_intervals() is the *interval* scale, and "cont"/"cat" are not
   # interval styles -- they name different constructors. Passing them through
@@ -3091,8 +3256,13 @@ world_map_tmap <- function(data, fill_name, style, n_bins, palette, title,
                           values = palette %||% "viridis"),
     categorical = tm_scale(tmap::tm_scale_categorical,
                            values = palette %||% "turbo"),
+    # "binned" is equal intervals, as on the ggplot2 engine, where n_bins
+    # equal-width classes replaced ggplot2's round-number n.breaks. This
+    # engine mapped it to tmap's "pretty", so the same call drew different
+    # classes depending on `engine`: 0-20k-40k... bins here against five
+    # equal ones from the data's own range there.
     tm_scale(tmap::tm_scale_intervals,
-      style = switch(style, binned = "pretty", quantile = "quantile",
+      style = switch(style, binned = "equal", quantile = "quantile",
                      jenks = "jenks"),
       n = n_bins, values = palette %||% "viridis")
   )
@@ -3101,7 +3271,17 @@ world_map_tmap <- function(data, fill_name, style, n_bins, palette, title,
   # default, Equal Earth, went unhonoured just as silently as an explicit
   # request. wdj_crs() resolves both and validates the name, and tm_shape()
   # takes the proj4 string it returns.
-  p <- tmap::tm_shape(data, crs = wdj_crs(projection, recenter)) +
+  #
+  # tmap projects with the same PROJ transform coord_sf() does, so an
+  # orthographic view needs the same cut at the horizon: without it four of
+  # six sampled viewpoints failed in tmap's drawing with "Invalid graphics
+  # path". Every row is kept, so the provenance below is unchanged. The CRS is
+  # built first so a bad `recenter` is reported as such before the cut uses it.
+  crs <- wdj_crs(projection, recenter, call = call)
+  if (identical(projection, "orthographic")) {
+    data <- clip_to_hemisphere(data, recenter %||% 0, ORTHO_LAT0)
+  }
+  p <- tmap::tm_shape(data, crs = crs) +
     tmap::tm_polygons(
       fill = fill_name,
       fill.scale = fill_scale,

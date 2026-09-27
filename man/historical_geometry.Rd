@@ -23,10 +23,11 @@ assigned -- see below), \code{status}, \code{from}, \code{to} and geometry. Two 
 CShapes columns are passed through when the installed version supplies
 them, since they answer the questions this verb is usually asked:
 \itemize{
-\item \code{owner} -- the \code{gwcode} of the sovereign a dependency belonged to, and
-\code{NA} for a sovereign state. This is the column that makes
-\code{dependencies = TRUE} legible: without it a colony and its metropole are
-two unrelated rows.
+\item \code{owner} -- the \code{gwcode} of the sovereign a dependency belonged to; a
+sovereign state carries its own \code{gwcode} here. This is the column that
+makes \code{dependencies = TRUE} legible: without it a colony and its
+metropole are two unrelated rows. \code{owner != gwcode} picks out the
+dependencies.
 \item \code{capname} -- the capital's name at that date.
 }
 
@@ -45,8 +46,14 @@ this is the fix.
 ISO 3166 was first published in 1974 and never covered colonies, so a
 historical map cannot be keyed on \code{iso3c}. CShapes uses \strong{Gleditsch-Ward}
 codes, which is why \code{gwcode} is the key here and \code{iso3c} is a best-effort
-extra: it is \code{NA} for every entity that never had an ISO code (French West
-Africa, the Gold Coast, the USSR before 1974). Join historical data on
+extra, read off the GW code: the modern code of the state that holds it.
+So it is \code{NA} for an entity with no modern counterpart (the German
+Democratic Republic, Czechoslovakia, Yugoslavia, the two Yemens), and also
+where \link{historical_codes} says the modern state did not exist yet -- GW give
+the USSR and Russia one code, but the 1980 polygon is the Soviet Union, so
+it carries \code{NA} rather than \code{"RUS"}. A colony carries the code of the state
+it became: CShapes names the 1950 Gold Coast "Ghana" and it comes back as
+\code{"GHA"}, with \code{status} saying it was a colony. Join historical data on
 \code{gwcode}, not on \code{iso3c}, and use \code{\link[=convert_country]{convert_country()}}\code{(to = "gwn")} to get
 there from a modern code.
 }
