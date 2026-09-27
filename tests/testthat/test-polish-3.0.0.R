@@ -333,8 +333,10 @@ test_that("join_world() says when it replaces a column of the caller's", {
   expect_equal(out$region, c("Europe & Central Asia", "Sub-Saharan Africa"))
   expect_no_warning(join_world(d, country, geometry = "none", warn = FALSE))
   # Replacing a column with the values it already holds is not worth a word.
-  expect_no_warning(join_world(countryatlas::world_snapshot$countries,
-                               geometry = "none"),
+  # A frame standardised here, not the bundled snapshot: the snapshot's regions
+  # are the World Bank's as of its build, and countrycode can move a country.
+  std <- standardize_country(d[, c("country", "v")], country, warn = FALSE)
+  expect_no_warning(join_world(std, country, geometry = "none"),
                     class = "countryatlas_unasked_overwrite")
 })
 
@@ -564,6 +566,8 @@ test_that("an error raised by an internal helper names the verb called", {
                "country_join")
   # ...and the argument the caller wrote, not the helper's own `origin`.
   expect_error(country_join(x, x, country, country, origin_y = 1), "origin_y")
+  # The polygon backend needs `maps`, which refuses before `region` is read.
+  skip_if_not_installed("maps")
   expect_equal(header(world_geometry(region = NA)), "world_geometry")
   poly <- suppressWarnings(attach_geometry(snap))
   expect_equal(header(world_map(poly, gdp_per_capita, footnote = 1)), "world_map")
@@ -598,6 +602,7 @@ test_that("recenter = 360 works on the sf backend and 500 is refused by name", {
 })
 
 test_that("bubble_map() says the polygon backend ignores `projection`", {
+  skip_if_not_installed("maps")
   snap <- countryatlas::world_snapshot$countries
   # Five countries have no bundled centroid, which is reported on its own.
   bubbles <- function(...) {

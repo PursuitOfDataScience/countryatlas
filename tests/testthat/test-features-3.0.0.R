@@ -2980,6 +2980,10 @@ test_that("the microstate border gap is named rather than silently counted", {
   # their neighbours report short: France came back with 8 instead of 10, under
   # a heading that stated the count as fact.
   expect_true(all(countryatlas:::WDJ_MICROSTATES %in% country_meta$iso3c))
+  # The note is about neighbours that were computed, which takes sf. Without
+  # it this passed only because a failed lookup was reported as the basemap's
+  # doing; the sheet now says the neighbours were not computed instead.
+  skip_if_no_sf_geometry()
   # cli_fmt(), not capture.output(type = "message"): testthat's reporter has
   # already redirected that stream, so the nested capture comes back empty.
   txt <- function(x) paste(cli::ansi_strip(cli::cli_fmt(print(x))),
@@ -5446,7 +5450,11 @@ test_that("recenter says so instead of being dropped on the polygon backend", {
   # coordinates to recenter = NULL and drew an Atlantic-centred map for someone
   # who had asked for a Pacific-centred one.
   skip_if_no_sf_geometry()
-  snap <- world_snapshot$countries
+  # Without the snapshot's own classification columns: join_world() replaces
+  # them, and says so when a value changes, which countrycode >= 1.9.0 does
+  # for 24 of them (the World Bank's renamed Middle East region). That notice
+  # is not what this test is about.
+  snap <- world_snapshot$countries[, c("iso3c", "country", "gdp_per_capita")]
 
   expect_warning(join_world(snap, recenter = 150),
                  class = "countryatlas_recenter_ignored")
