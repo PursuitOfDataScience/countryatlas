@@ -306,6 +306,16 @@ takes `data` as its second argument. Details under **Breaking changes**.
   CShapes’ historical borders included; every sampled viewpoint draws,
   and the colour scale and coverage are the same from every side.
 
+- **`world_map(na_style = "hatched")` built maps it could not draw where
+  `sf` does not load.** `ggpattern` draws the stripes through
+  `gridpattern`, which clips them with `sf` when the plot is printed.
+  `sf` is always installed alongside, but where its system libraries
+  (udunits, GDAL, GEOS, PROJ) are missing from the library path it
+  cannot be loaded, so the map built fine and then failed on print with
+  “unable to load shared object units.so”. Hatching now checks that `sf`
+  loads and otherwise falls back to grey with a message, as it already
+  did when `ggpattern` is absent.
+
 - **Countries with no data vanished from
   [`animate_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/animate_world.md)
   and got their own panel in `facet_map(facet = year)`.**

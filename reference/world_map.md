@@ -93,8 +93,10 @@ world_map(
 
   How to draw countries with no data: `"grey"` (default), `"hatched"`
   (diagonal hatching via the optional `ggpattern`, unmistakable and
-  greyscale-safe), `"outline"` (white fill, keeping only the border) or
-  `"omit"` (do not draw them at all). See the section below.
+  greyscale-safe; grey, with a message, when `ggpattern` or the `sf` it
+  draws with cannot be loaded), `"outline"` (white fill, keeping only
+  the border) or `"omit"` (do not draw them at all). See the section
+  below.
 
 - footnote:
 
