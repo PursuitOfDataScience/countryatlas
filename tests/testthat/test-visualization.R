@@ -380,13 +380,19 @@ test_that("interactive_map reports a missing geometry the same way on every engi
   }
   skip_if_not_installed("maps")
   mapdf <- attach_geometry(snap, geometry = "polygon")
-  for (eng in c("plotly", "ggiraph", "leaflet")) {
+  for (eng in c("plotly", "ggiraph")) {
     skip_if_not_installed(eng)
     expect_s3_class(interactive_map(mapdf, gdp_per_capita, engine = eng),
                     "htmlwidget")
   }
-  # leaflet's documented leniency: a country-level table is fine there.
+  # leaflet attaches sf geometry itself, to a polygon frame as to a country
+  # table, so it needs the sf backend too. Skipping on leaflet alone ran this
+  # wherever leaflet was installed and sf could not be loaded.
   skip_if_not_installed("leaflet")
+  skip_if_no_sf_geometry()
+  expect_s3_class(interactive_map(mapdf, gdp_per_capita, engine = "leaflet"),
+                  "htmlwidget")
+  # leaflet's documented leniency: a country-level table is fine there.
   expect_s3_class(interactive_map(snap, gdp_per_capita, engine = "leaflet"),
                   "htmlwidget")
 })

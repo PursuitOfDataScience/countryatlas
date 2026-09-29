@@ -57,8 +57,9 @@ both engines. A length-1 \code{NA} leaves the engine's own formatter alone.}
 
 \item{na_style}{How to draw countries with no data: \code{"grey"} (default),
 \code{"hatched"} (diagonal hatching via the optional \code{ggpattern}, unmistakable
-and greyscale-safe), \code{"outline"} (white fill, keeping only the border) or
-\code{"omit"} (do not draw them at all). See the section below.}
+and greyscale-safe; grey, with a message, when \code{ggpattern} or the \code{sf} it
+draws with cannot be loaded), \code{"outline"} (white fill, keeping only the
+border) or \code{"omit"} (do not draw them at all). See the section below.}
 
 \item{footnote}{Optional caption. \code{"auto"} generates a coverage line
 ("174 of 195 countries shown; 21 missing"), so the map cannot quietly

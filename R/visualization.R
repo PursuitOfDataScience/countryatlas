@@ -135,8 +135,9 @@ compute_breaks <- function(x, style, n_bins, call = rlang::caller_env()) {
 #' @param recenter Optional central meridian for the `sf` backend.
 #' @param na_style How to draw countries with no data: `"grey"` (default),
 #'   `"hatched"` (diagonal hatching via the optional `ggpattern`, unmistakable
-#'   and greyscale-safe), `"outline"` (white fill, keeping only the border) or
-#'   `"omit"` (do not draw them at all). See the section below.
+#'   and greyscale-safe; grey, with a message, when `ggpattern` or the `sf` it
+#'   draws with cannot be loaded), `"outline"` (white fill, keeping only the
+#'   border) or `"omit"` (do not draw them at all). See the section below.
 #' @param footnote Optional caption. `"auto"` generates a coverage line
 #'   ("174 of 195 countries shown; 21 missing"), so the map cannot quietly
 #'   overstate what it covers. A string is used verbatim; `NULL` (default) adds
@@ -795,6 +796,22 @@ na_hatch_layer <- function(data, fill_name, sf_mode, borders) {
   }
   nd <- data[!has_value(data[[fill_name]]), , drop = FALSE]
   if (!nrow(nd)) return(NULL)
+  # The stripes are clipped by gridpattern with sf, and only when the map is
+  # drawn. gridpattern imports sf, so sf is always installed here, but
+  # installed is not loadable: where sf's system libraries (udunits, GDAL,
+  # GEOS, PROJ) are not on the library path, world_map() returned a plot that
+  # failed only on print, deep in grid, with "unable to load shared object
+  # units.so". That is how R CMD build died weaving the honest-maps vignette.
+  # Ask now, while falling back is still possible.
+  if (!has_pkg("sf")) {
+    wdj_inform(
+      c("i" = "Package {.pkg sf}, which {.pkg ggpattern} draws its stripes with,
+              cannot be loaded; drawing missing data in grey instead of
+              hatched."),
+      .frequency = "once", .frequency_id = "world_map-no-sf-hatch"
+    )
+    return(NULL)
+  }
   common <- list(
     data = nd, fill = "grey93", pattern = "stripe",
     pattern_fill = "grey55", pattern_colour = NA, pattern_angle = 45,

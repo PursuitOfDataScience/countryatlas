@@ -150,6 +150,7 @@ test_that("na_style = 'omit' drops the no-data countries from the drawn data", {
 
 test_that("na_style = 'hatched' adds a layer when ggpattern is available", {
   skip_if_not_installed("ggpattern")
+  skip_if_not_installed("sf")      # gridpattern draws the stripes with sf
   mapdf <- poly_df()
   plain <- world_map(mapdf, gdp_per_capita, na_style = "grey")
   hatched <- world_map(mapdf, gdp_per_capita, na_style = "hatched")
@@ -167,6 +168,26 @@ test_that("na_style = 'hatched' degrades loudly when ggpattern is missing", {
   rlang::local_options(rlib_message_verbosity = "verbose")
   expect_message(world_map(mapdf, gdp_per_capita, na_style = "hatched"),
                  "ggpattern")
+  p <- suppressMessages(world_map(mapdf, gdp_per_capita, na_style = "hatched"))
+  expect_s3_class(ggplot2::ggplotGrob(p), "gtable")
+  expect_equal(length(p$layers),
+               length(world_map(mapdf, gdp_per_capita)$layers))
+})
+
+test_that("na_style = 'hatched' degrades loudly when sf cannot be loaded", {
+  skip_if_not_installed("ggpattern")
+  mapdf <- poly_df()
+  # gridpattern clips the stripes with sf, but only when the map is drawn.
+  # With sf installed and unloadable (its system libraries off the library
+  # path) the plot built and then failed on print, which is how R CMD build
+  # died weaving the honest-maps vignette. Now it is grey, and says so.
+  testthat::local_mocked_bindings(
+    has_pkg = function(pkg) if (identical(pkg, "sf")) FALSE else
+      isTRUE(requireNamespace(pkg, quietly = TRUE))
+  )
+  rlang::local_options(rlib_message_verbosity = "verbose")
+  expect_message(world_map(mapdf, gdp_per_capita, na_style = "hatched"),
+                 "cannot be loaded")
   p <- suppressMessages(world_map(mapdf, gdp_per_capita, na_style = "hatched"))
   expect_s3_class(ggplot2::ggplotGrob(p), "gtable")
   expect_equal(length(p$layers),
