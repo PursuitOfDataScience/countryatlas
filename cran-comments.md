@@ -1,3 +1,23 @@
+## Resubmission
+
+The first 3.0.0 upload failed the incoming checks with two NOTEs. Both are
+fixed:
+
+* **Possibly misspelled words in DESCRIPTION** (Tissot's, indicatrix,
+  inspectable): the sentence is reworded. The DESCRIPTION spell check run the
+  way the incoming check runs it (aspell, `en_US` with `en_GB`) now reports
+  nothing that 2.0.1 did not already carry.
+* **Overall checktime 12 min > 10 min** on r-devel-windows-x86_64, 503s of it
+  the tests. The 125 slowest tests (cartograms, sweeps over every map verb or
+  projection, full-world renders) now skip on CRAN and still run on every CI
+  leg. On the maintainer's machine the test step of `R CMD check --as-cran`
+  takes 141s, down from 462s.
+
+The WARNING in the released version's results (r-release-windows-x86_64,
+"unable to access index for repository
+https://bioconductor.statistik.tu-dortmund.de/cran/src/contrib") is the check
+machine failing to reach a repository mirror, not an issue in the package.
+
 ## Why this submission
 
 3.0.0 is a major release: 46 new exports, two new datasets, and 26 documented

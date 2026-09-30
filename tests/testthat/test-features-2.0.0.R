@@ -200,6 +200,7 @@ test_that("country_borders finds real neighbours (needs sf)", {
 })
 
 test_that("neighbors looks up a country's borders (needs sf)", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   fra <- neighbors("France")
   expect_true(all(fra$iso3c == "FRA"))
@@ -257,6 +258,7 @@ test_that("neighbors() builds the adjacency once, however many countries", {
 })
 
 test_that("neighbors() is symmetric even though country_borders() is not", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   # neighbors() returns a tibble (iso3c, neighbor, neighbor_country) -- pin the
   # shape too, since the symmetry check depends on reading the right column.

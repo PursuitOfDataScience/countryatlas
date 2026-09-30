@@ -202,6 +202,7 @@ test_that("rank_countries ranks globally unless `within` says otherwise", {
 })
 
 test_that("an incidental group_by() never changes an answer", {
+  skip_slow_on_cran()
   panel <- tibble::tibble(
     iso3c = rep(c("USA", "FRA", "CHN"), each = 4),
     year = rep(2000:2003, 3), region = rep(c("A", "B", "A"), each = 4),

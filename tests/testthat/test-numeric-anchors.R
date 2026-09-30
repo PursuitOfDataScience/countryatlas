@@ -277,6 +277,7 @@ test_that("the log-t statistic matches Phillips & Sul's published formula", {
 })
 
 test_that("morans_i matches an independently built row-standardised statistic", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   got <- morans_i(snap, gdp_per_capita, n_perm = 0)
@@ -483,6 +484,7 @@ test_that("the package never reseeds the caller's RNG", {
 })
 
 test_that("morans_i is reproducible under a seed and leaves i deterministic", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   set.seed(42); a <- morans_i(snap, gdp_per_capita, n_perm = 99)
@@ -502,6 +504,7 @@ test_that("morans_i is reproducible under a seed and leaves i deterministic", {
 })
 
 test_that("n_perm = 0 does not consume the caller's random stream", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   set.seed(1)
@@ -519,6 +522,7 @@ test_that("n_perm = 0 does not consume the caller's random stream", {
 })
 
 test_that("the permutation p-value respects its own floor", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   # p = (exceedances + 1) / (n_perm + 1), so it can never be 0 and never below
@@ -571,6 +575,7 @@ test_that("the theil decomposition adds up, over the grouped subset", {
 })
 
 test_that("Moran's I matches the standard statistic's properties", {
+  skip_slow_on_cran()
   # ?morans_i says no spdep is needed because "at ~200 countries the dense
   # arithmetic is trivial". These are the properties that make that claim
   # checkable without spdep, which is not a dependency.
@@ -617,6 +622,7 @@ test_that("every reversible convert_country destination round-trips", {
 })
 
 test_that("the verbs do not depend on input row order", {
+  skip_slow_on_cran()
   # Anything that sorts, ranks, groups or builds a weight matrix internally can
   # pick up an order dependency without any test noticing.
   snap <- countryatlas::world_snapshot$countries
@@ -1239,6 +1245,7 @@ test_that("beta_convergence() explains an unrecoverable speed on mixed spans", {
 })
 
 test_that("gridded_cartogram() allocates cells exactly and reports the overlap honestly", {
+  skip_slow_on_cran()
   skip_if_not_installed("sf")
   snap <- countryatlas::world_snapshot$countries
 
@@ -1331,6 +1338,7 @@ test_that("great_circle() stays fine-grained where the arc turns fastest", {
 })
 
 test_that("no real country pair produces an uncut longitude jump", {
+  skip_slow_on_cran()
   gc <- countryatlas:::great_circle
   step <- function(g) { d <- abs(diff(g$lon)); max(pmin(d, 360 - d)) }
   m <- countryatlas::country_meta

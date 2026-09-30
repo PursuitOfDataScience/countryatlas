@@ -110,6 +110,7 @@ test_that("plot and geometry verbs return their documented objects", {
 })
 
 test_that("sf-backed verbs return their documented shape", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   expect_s3_class(world_geometry("countries", geometry = "sf"), "sf")
   expect_s3_class(attach_geometry(snap, geometry = "sf"), "sf")
@@ -258,6 +259,7 @@ test_that("the 2.0.0 exports keep their leading argument order", {
 })
 
 test_that("every map verb's provenance names the column the caller asked about", {
+  skip_slow_on_cran()
   # One loop over every verb that carries provenance. The verbs that draw
   # through world_map() with an internal fill -- `.wdj_available`,
   # `.wdj_class`, `.wdj_cluster` -- used to report *that* column, and

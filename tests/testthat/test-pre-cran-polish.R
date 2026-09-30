@@ -377,6 +377,7 @@ test_that("the network-backed examples degrade instead of failing offline", {
 })
 
 test_that("no runnable example calls per_capita without an explicit pop", {
+  skip_slow_on_cran()
   # That path deliberately errors when the World Bank is unreachable, so it must
   # not appear in an example that R CMD check executes.
   skip_if_not(dir.exists("../../man"), "man/ not present (installed package)")
@@ -647,6 +648,7 @@ test_that("EPSG codes and Natural Earth scales are integer literals", {
 })
 
 test_that("the sf paths survive hostile formatting options", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   for (opt in list(list(OutDec = ","), list(scipen = -9),
@@ -734,6 +736,7 @@ test_that("options(countryatlas.workers) is validated", {
 })
 
 test_that("no verb leaves the caller's global state modified", {
+  skip_slow_on_cran()
   # CRAN policy: a package must not change the user's options, working directory
   # or other global settings. The sf backend genuinely has to toggle
   # sf::sf_use_s2() (Natural Earth rings are invalid as spherical geometry) and
@@ -773,6 +776,7 @@ test_that("no verb leaves the caller's global state modified", {
 })
 
 test_that("morans_i touches the RNG only when it permutes", {
+  skip_slow_on_cran()
   # Consuming random numbers is correct for a permutation test -- what would be
   # wrong is calling set.seed() (the package never does) or spending randomness
   # when none was asked for. n_perm = 0 is the deterministic path.
@@ -807,6 +811,7 @@ test_that("morans_i touches the RNG only when it permutes", {
 })
 
 test_that("a correct call to any verb is completely silent", {
+  skip_slow_on_cran()
   # Six warning sites went in during the pre-CRAN work (warn_overwrite, the
   # share_of_world grouping note, flow_map's dropped flows, na_label, the
   # latest/panel conflict, the ggrepel fallback). None of them may fire on a
@@ -853,6 +858,7 @@ test_that("a correct call to any verb is completely silent", {
 })
 
 test_that("the 3.0.0 verbs are silent on a correct call too", {
+  skip_slow_on_cran()
   # Same contract as the block above, extended to the verbs that gained warning
   # sites in this release -- the panel guards, the unstandardised-key guards and
   # the coverage reports. Every one of them must stay quiet on ordinary input,
@@ -879,6 +885,7 @@ test_that("the 3.0.0 verbs are silent on a correct call too", {
 })
 
 test_that("the verbs survive hostile number-formatting options", {
+  skip_slow_on_cran()
   # A comma decimal mark is ordinary in much of the world, and fmt_num() exists
   # so a PROJ string never depends on it. (A *negative* scipen is not covered:
   # it breaks sf and ggplot2 on their own -- st_crs(paste0("EPSG:", 4326))
@@ -916,6 +923,7 @@ test_that("the verbs survive hostile number-formatting options", {
 })
 
 test_that("globalVariables() declares nothing it does not need", {
+  skip_slow_on_cran()
   # The list had grown to 29 names; emptying it and reading what R CMD check
   # reported showed only 7 were load-bearing. The rest were covered by the
   # `.data$x` idiom, which needs no declaration. A stale entry silences the "no
@@ -994,6 +1002,7 @@ test_that("bundled datasets are never referenced bare inside the package", {
 })
 
 test_that("the silence policy reaches every offline verb, not just 39 of them", {
+  skip_slow_on_cran()
   # The two blocks above cover 39 of the 102 exports, and every warning bug
   # found in the pre-CRAN review sat in the gap: the hatched/disputes message
   # (world_map() was covered, but never with those two arguments), the constant

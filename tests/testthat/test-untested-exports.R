@@ -41,6 +41,7 @@ test_that("clear_wdi_cache forgets the memo and can remove the disk cache", {
 })
 
 test_that("animate_world animates or falls back to facets", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   mapdf <- attach_geometry(snap, geometry = "polygon")
   panel <- dplyr::bind_rows(dplyr::mutate(mapdf, year = 2023L),
@@ -63,6 +64,7 @@ test_that("animate_world animates or falls back to facets", {
 })
 
 test_that("cartogram_map builds every type and names a missing column", {
+  skip_slow_on_cran()
   skip_if_not_installed("sf")
   skip_if_not_installed("cartogram")
   skip_if_not_installed("rnaturalearth")
@@ -207,6 +209,7 @@ test_that("a bounding-box region warns on the polygon backend", {
 })
 
 test_that("globe_map(backend = 'sf') builds on every style", {
+  skip_slow_on_cran()
   # This whole branch had no coverage: the only sf-related test in the file ran
   # *when sf was absent*, which is how nine bugs hid in an earlier pass.
   skip_if_no_sf_geometry()

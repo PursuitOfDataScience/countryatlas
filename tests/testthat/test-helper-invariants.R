@@ -13,6 +13,7 @@
 # the same place by a different route should still be caught.
 
 test_that("every verb taking `origin` resolves the same awkward names", {
+  skip_slow_on_cran()
   # NFD accents and a non-breaking space are the two forms that reach a package
   # from a spreadsheet or a web table, and wdj_to_iso3c() handles both -- an
   # NFD second pass that strips combining marks, and a Unicode-aware trim. A
@@ -78,6 +79,7 @@ test_that("every verb taking `origin` resolves the same awkward names", {
 })
 
 test_that("`n_bins` changes the output of every verb that takes it", {
+  skip_slow_on_cran()
   # world_map(engine = "tmap") accepted n_bins, returned before compute_breaks()
   # ever ran, and drew tmap's own default bin count -- while the audit that
   # declared n_bins handled had reasoned about compute_breaks(). Assert the
@@ -152,6 +154,7 @@ test_that("`n_bins` changes the output of every verb that takes it", {
 })
 
 test_that("every column-adding verb honours wdj_return_frame's contract", {
+  skip_slow_on_cran()
   # The contract, stated on wdj_return_frame() itself: an `sf` frame keeps its
   # class -- the map verbs require it, and losing it while the geometry column
   # survived is what made `join_world(geometry = "sf") |> share_of_world() |>

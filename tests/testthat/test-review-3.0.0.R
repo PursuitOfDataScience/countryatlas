@@ -303,6 +303,7 @@ test_that("an infinite fill is counted as missing, and said to be", {
 })
 
 test_that("bubble and spike maps refuse sizes they cannot draw", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   snap <- countryatlas::world_snapshot$countries[, c("iso3c", "population")]
   snap$population[snap$iso3c == "FRA"] <- -1.4e9

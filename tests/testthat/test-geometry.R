@@ -42,6 +42,7 @@ test_that("locate_country tags known capitals", {
 })
 
 test_that("locate_country gives a point the same answer whatever it is with", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   # st_nearest_points()'s pairing argument is `pairwise`; this asked for
   # `by_element`, which sf absorbs into `...` and ignores, so the snap-back
@@ -153,6 +154,7 @@ test_that("country_borders names every endpoint, Kosovo included", {
 })
 
 test_that("world_geometry('coastline') works in every projection", {
+  skip_slow_on_cran()
   # Two Natural Earth rings are invalid once projected, and st_union() (unlike
   # the predicates) refuses them outright: the coastline used to error with
   # "TopologyException: side location conflict" in all but plate_carree.
@@ -265,6 +267,7 @@ test_that("every what value returns a real sf object", {
 })
 
 test_that("the ocean layer actually covers the map", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   earth <- 5.1e14                                  # m^2, Earth's surface
   for (pr in c("equal_earth", "robinson", "mollweide", "eckert4",
@@ -285,6 +288,7 @@ test_that("the ocean layer actually covers the map", {
 })
 
 test_that("ocean refuses the cases it cannot draw, and says why", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   for (pr in c("orthographic", "azimuthal_equal_area", "north_polar",
                "south_polar")) {
@@ -349,6 +353,7 @@ test_that("sf centroid columns are projected units, as documented", {
 })
 
 test_that("no geometry layer is degenerate in any projection", {
+  skip_slow_on_cran()
   # The ocean layer was a 2-point, zero-area polygon in every projection, and
   # nothing caught it: st_bbox() reported the stored extent rather than
   # recomputing it, so every diagnostic looked healthy. Measure the geometry
@@ -452,6 +457,7 @@ test_that("simplify_geometry preserves a homogeneous geometry column", {
 })
 
 test_that("the st_simplify fallback is CRS-independent and honours keep", {
+  skip_slow_on_cran()
   # It used to pass a fixed dTolerance of (1 - keep) * 10000, i.e. metres
   # whatever the CRS: 9 km on a projected frame, which barely simplified
   # anything, and 9000 *degrees* on a lon/lat one, where only
@@ -487,6 +493,7 @@ test_that("the st_simplify fallback is CRS-independent and honours keep", {
 })
 
 test_that("every geometry-returning path keeps a usable geometry column", {
+  skip_slow_on_cran()
   # The invariant broke twice: st_break_antimeridian() downgraded the source
   # column (fixed in get_world_sf), and then simplify_geometry() undid the fix
   # downstream. Check the whole surface rather than the two known sites.
@@ -596,6 +603,7 @@ test_that("a padded region reaches the public callers intact", {
 })
 
 test_that("recentring splits countries at the seam without losing any", {
+  skip_slow_on_cran()
   # Recentring rotates the world so a chosen longitude is the middle, which
   # cuts whatever straddles the new seam. The row count therefore *grows* --
   # Russia and the USA become two pieces at recenter = 180 -- and that is

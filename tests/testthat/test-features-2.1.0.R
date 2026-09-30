@@ -23,6 +23,7 @@ renders <- function(p) {
 # --- Bug: a categorical fill died at print time on a hardcoded viridis_c -------
 
 test_that("cartogram_map and dorling_map accept a categorical fill", {
+  skip_slow_on_cran()
   skip_if_not_installed("cartogram")
   d <- sf_df()
   # Each of these used to reach ggplot2's bare "Discrete value supplied to a
@@ -50,6 +51,7 @@ test_that("auto_fill_scale picks the scale from the column type", {
 # --- Bug: geom_country_labels(data =) collided with the hardcoded data --------
 
 test_that("geom_country_labels takes a data argument", {
+  skip_slow_on_cran()
   mapdf <- poly_df()
   keep <- c("USA", "CHN", "IND", "BRA")
   # "formal argument \"data\" matched by multiple actual arguments" -- `data`
@@ -131,6 +133,7 @@ test_that("morans_i reports the countries it excluded", {
 # --- na_style / footnote / classification_report ------------------------------
 
 test_that("na_style changes how missing countries are drawn", {
+  skip_slow_on_cran()
   mapdf <- poly_df()
   for (ns in c("grey", "hatched", "outline", "omit")) {
     renders(world_map(mapdf, gdp_per_capita, style = "quantile", na_style = ns))
@@ -262,6 +265,7 @@ test_that("coverage_map maps availability", {
 })
 
 test_that("classify_compare reports how unbalanced each method is", {
+  skip_slow_on_cran()
   mapdf <- poly_df()
   # "jenks" falls back to quantile breaks, with a warning, when classInt is
   # absent -- which is the documented degraded path and is exercised under
@@ -305,6 +309,7 @@ test_that("jenks really is jenks when classInt is available", {
 })
 
 test_that("value_by_alpha_map maps the equalising variable to opacity", {
+  skip_slow_on_cran()
   mapdf <- poly_df()
   renders(value_by_alpha_map(mapdf, gdp_per_capita, population))
   renders(value_by_alpha_map(mapdf, gdp_per_capita, population, transform = "log10"))
@@ -340,6 +345,7 @@ test_that("projection_info covers every projection wdj_crs can build", {
 })
 
 test_that("projection_compare draws one panel per projection", {
+  skip_slow_on_cran()
   d <- sf_df()
   p <- projection_compare(d, gdp_per_capita, style = "quantile")
   renders(p)
@@ -449,6 +455,7 @@ test_that("CITATION parses and credits the data sources, not just the package", 
 # --- cartogramR ------------------------------------------------------------------
 
 test_that("cartogram_map(type = 'flow') uses cartogramR", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   skip_if_not_installed("cartogramR")
   d <- sf_df()

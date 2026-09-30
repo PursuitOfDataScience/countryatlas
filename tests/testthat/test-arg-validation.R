@@ -100,6 +100,7 @@ test_that("complete_years rejects a value column that isn't there", {
 })
 
 test_that("morans_i validates n_perm", {
+  skip_slow_on_cran()
   # need_pkg("sf") runs before the scalar check.
   skip_if_no_sf_geometry()
   expect_error(morans_i(snap, gdp_per_capita, n_perm = -5), "`n_perm`")
@@ -135,6 +136,7 @@ test_that("count arguments are bounded so as.integer() cannot make them NA", {
 })
 
 test_that("morans_i bounds n_perm and no longer clamps it redundantly", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   expect_error(morans_i(snap, gdp_per_capita, n_perm = 1e10), "2147483647")
@@ -264,6 +266,7 @@ test_that("a parquet path is quoted as a SQL literal, not interpolated", {
 # source column in place.
 
 test_that("suffix must be a single non-empty string", {
+  skip_slow_on_cran()
   panel <- data.frame(iso3c = rep(c("USA", "FRA"), each = 4),
                       year = rep(2000:2003, 2), g = c(1:4, 10:13),
                       population = 1e6)
@@ -386,6 +389,7 @@ test_that("borders is validated instead of reaching a bare if()", {
 })
 
 test_that("a bad logical no longer silently means FALSE", {
+  skip_slow_on_cran()
   df <- data.frame(iso3c = c("AAA", "BBB", "CCC"), v = c(1, 3, 2))
   for (b in list(NA, character(0), c(TRUE, FALSE), "yes")) {
     expect_error(rank_countries(df, v, desc = b), "`desc`")
@@ -454,6 +458,7 @@ test_that("complete_years rejects a years vector it cannot use", {
 # rest now do too.
 
 test_that("omitting a required argument names that argument", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   snap <- countryatlas::world_snapshot$countries
   mapdf <- attach_geometry(snap, geometry = "polygon")
@@ -536,6 +541,7 @@ test_that("locate_country's documented lon/lat contract matches its code", {
 # (gini), or, worst of all, a plausible-looking result (morans_i).
 
 test_that("a non-numeric value column is rejected by name and type", {
+  skip_slow_on_cran()
   panel <- tibble::tibble(iso3c = rep(c("USA", "FRA"), each = 3),
                           year = rep(2000:2002, 2), g = c(1, 2, 3, 10, 11, 12),
                           region = rep(c("A", "B"), each = 3), population = 1e6)
@@ -771,6 +777,7 @@ test_that("the verbs say when they overwrite a column the caller already had", {
 })
 
 test_that("every numeric bound is pinned at its own edge", {
+  skip_slow_on_cran()
   # A test that rejects -5 where the bound is 0 cannot tell lo = 0 from lo = -1:
   # loosening the bound by one goes undetected. Verified by mutation --
   # tolerance_km's bound survived a 0 -> -1 shift because its only rejection
@@ -869,6 +876,7 @@ test_that("dorling_map rejects k = 0, which cartogram cannot use", {
 })
 
 test_that("a user column named like an internal temp column is harmless", {
+  skip_slow_on_cran()
   # The package builds a few dot-prefixed working columns -- `.wdj_pop`,
   # `.wdj_bin`, `.from_iso`, `.to_iso`, `.id` -- and a user frame is perfectly
   # entitled to carry a column of the same name. Nothing may break, and the
@@ -1197,6 +1205,7 @@ test_that("a custom weights matrix must be non-negative and finite", {
 })
 
 test_that("as_ggsql_source() checks its data and its connection", {
+  skip_slow_on_cran()
   # The data check fires before need_pkg(), so it holds with no DBI installed.
   expect_error(as_ggsql_source(1:5), "must be a data frame",
                class = "countryatlas_error")
@@ -1243,6 +1252,7 @@ test_that("as_ggsql_source() checks its data and its connection", {
 # value supplied to a continuous scale" -- naming neither the argument nor the
 # fix. world_map(d, "value") was affected: the package's most common call.
 test_that("map verbs accept a column named as a string, not only unquoted", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   skip_if_not_installed("ggplot2")
   d <- data.frame(
@@ -1528,6 +1538,7 @@ test_that("a custom weights matrix rejects every unusable entry by name", {
 # ones that draw it, and `n_bins` was inert without a word under the styles that
 # do not bin.
 test_that("world_map reports arguments that do not apply", {
+  skip_slow_on_cran()
   skip_if_not_installed("ggplot2")
   skip_if_not_installed("maps")
   d <- data.frame(iso3c = c("FRA","DEU","ITA","ESP","POL","NLD","BEL","AUT"),
@@ -1561,6 +1572,7 @@ test_that("world_map reports arguments that do not apply", {
 })
 
 test_that("value_by_alpha_map reports the same inert arguments", {
+  skip_slow_on_cran()
   skip_if_not_installed("ggplot2")
   skip_if_not_installed("maps")
   d <- data.frame(iso3c = c("FRA","DEU","ITA","ESP"), value = c(10,20,40,80),
@@ -1620,6 +1632,7 @@ test_that("country_weights reports arguments its scheme does not use", {
 })
 
 test_that("country_weights reports inert arguments for the contiguity scheme too", {
+  skip_slow_on_cran()
   # Separated because contiguity is built from geometry: need_pkg("sf") errors
   # without it, and that error would escape the expect_warning() below.
   skip_if_not_installed("sf")
@@ -1636,6 +1649,7 @@ test_that("country_weights reports inert arguments for the contiguity scheme too
 })
 
 test_that("an orthographic globe draws from every viewpoint", {
+  skip_slow_on_cran()
   skip_if_not_installed("sf")
   skip_if_not_installed("rnaturalearth")
   skip_if_not_installed("ggplot2")
@@ -1665,6 +1679,7 @@ test_that("an orthographic globe draws from every viewpoint", {
 })
 
 test_that("globe_map reports n_bins under a style that does not bin", {
+  skip_slow_on_cran()
   skip_if_not_installed("sf")
   skip_if_not_installed("rnaturalearth")
   d <- data.frame(iso3c = c("FRA","DEU","ITA","ESP"), value = c(1,2,3,4),
@@ -1715,6 +1730,7 @@ test_that("world_query reports arguments its layer does not use", {
 # ascii_lower() for folding, wdj_return_frame() for the return class.
 
 test_that("n_bins is bounded on the tmap hand-off too", {
+  skip_slow_on_cran()
   skip_if_not_installed("sf")
   skip_if_not_installed("rnaturalearth")
   skip_if_not_installed("tmap")
@@ -1824,6 +1840,7 @@ test_that("compare_sources takes the numeric column, whatever else a source retu
 })
 
 test_that("od_map tells `origin` and `origins` apart", {
+  skip_slow_on_cran()
   # One letter apart, adjacent in the signature, and unrelated in meaning.
   # `origin = 3` used to fail inside check_string() talking about a coding
   # scheme; `origins = "iso3c"` used to fail inside country-name matching.

@@ -64,6 +64,7 @@ test_that("breaks are computed once per country, whatever the backend's row coun
 # --- bubble sizing: radius must not be in projected metres --------------------
 
 test_that("bubble_map sizes are comparable across backends", {
+  skip_slow_on_cran()
   skip_poly(); skip_sf()
   size_range <- function(backend) {
     d <- if (backend == "sf") attach_geometry(snap, geometry = "sf") else snap
@@ -104,6 +105,7 @@ test_that("country label centroids land inside their own country", {
 # --- projections: the CRS actually reaches the panel --------------------------
 
 test_that("every projection produces a distinct, finite panel extent", {
+  skip_slow_on_cran()
   skip_sf()
   d <- attach_geometry(snap, geometry = "sf")
   extents <- lapply(countryatlas:::wdj_projections(), function(pr) {
@@ -173,6 +175,7 @@ test_that("flow_map arcs start and end at the right centroids", {
 # --- every map verb renders, not merely builds --------------------------------
 
 test_that("every map verb produces a drawable grob", {
+  skip_slow_on_cran()
   skip_poly()
   mapdf <- attach_geometry(snap, geometry = "polygon")
   verbs <- list(
@@ -195,6 +198,7 @@ test_that("every map verb produces a drawable grob", {
 })
 
 test_that("every sf map verb produces a drawable grob", {
+  skip_slow_on_cran()
   skip_sf()
   d <- attach_geometry(snap, geometry = "sf")
   expect_s3_class(ggplot2::ggplotGrob(world_map(d, gdp_per_capita)), "gtable")

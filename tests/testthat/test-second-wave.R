@@ -223,6 +223,7 @@ test_that("theil shares are NA (not NaN) at perfect equality", {
 # --- Moran's I ------------------------------------------------------------------
 
 test_that("morans_i finds spatial autocorrelation in GDP (needs sf)", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   set.seed(42)
   out <- morans_i(world_snapshot$countries, gdp_per_capita, n_perm = 199)

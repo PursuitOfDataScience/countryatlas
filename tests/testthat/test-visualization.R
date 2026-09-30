@@ -12,6 +12,7 @@ test_that("world_map builds a ggplot for several styles", {
 })
 
 test_that("world_map renders in every documented projection", {
+  skip_slow_on_cran()
   # Regression: winkel_tripel built a CRS fine and st_transform()ed fine, but
   # coord_sf()'s graticule collapsed to a degenerate point under it and GEOS
   # threw "point array must contain 0 or >1 elements" -- so one of the eight
@@ -121,6 +122,7 @@ test_that("bivariate_map builds a ggplot (needs sf + biscale)", {
 })
 
 test_that("interactive_map(engine='ggiraph') accepts a custom tooltip", {
+  skip_slow_on_cran()
   skip_if_not_installed("ggiraph")
   skip_if_not_installed("maps")
   mapdf <- attach_geometry(snap, geometry = "polygon")
@@ -137,6 +139,7 @@ test_that("interactive_map(engine='ggiraph') accepts a custom tooltip", {
 })
 
 test_that("interactive_map(engine='leaflet') accepts a custom tooltip", {
+  skip_slow_on_cran()
   skip_if_not_installed("leaflet")
   skip_if_no_sf_geometry()
   expect_s3_class(interactive_map(snap, gdp_per_capita, engine = "leaflet"), "leaflet")
@@ -282,6 +285,7 @@ test_that("world_map still accepts every documented route to geometry", {
 })
 
 test_that("the country-level plotting verbs keep working without geometry", {
+  skip_slow_on_cran()
   # Pin the asymmetry deliberately: these four attach geometry themselves, so
   # the guard above must not spread to them.
   skip_if_not_installed("maps")
@@ -294,6 +298,7 @@ test_that("the country-level plotting verbs keep working without geometry", {
 })
 
 test_that("a returned plot survives ordinary ggplot2 operations", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   snap <- countryatlas::world_snapshot$countries
   poly <- attach_geometry(snap, geometry = "polygon")
@@ -327,6 +332,7 @@ test_that("a returned plot survives ordinary ggplot2 operations", {
 # already guarded, so this closes the pair.
 
 test_that("the numeric fill styles require a numeric column", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   snap <- countryatlas::world_snapshot$countries
   mapdf <- attach_geometry(snap, geometry = "polygon")
@@ -346,6 +352,7 @@ test_that("the numeric fill styles require a numeric column", {
 })
 
 test_that("the legitimate style/column pairings are untouched", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   snap <- countryatlas::world_snapshot$countries
   mapdf <- attach_geometry(snap, geometry = "polygon")
@@ -366,6 +373,7 @@ test_that("the legitimate style/column pairings are untouched", {
 })
 
 test_that("interactive_map reports a missing geometry the same way on every engine", {
+  skip_slow_on_cran()
   # The ggiraph branch assembles its own ggplot rather than calling world_map(),
   # so it bypassed the geometry check and failed at render time on `.data$long`,
   # while engine = "plotly" reported it properly. leaflet attaches geometry
@@ -398,6 +406,7 @@ test_that("interactive_map reports a missing geometry the same way on every engi
 })
 
 test_that("animate_world validates before handing off to gganimate", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # A three-country panel is enough, and keeps the geometry join small: joining
   # the whole snapshot for three years is ~250k rows and trips dplyr's
@@ -441,6 +450,7 @@ test_that("jenks degrades to quantile breaks when classInt is absent", {
 })
 
 test_that("flow_map says when it cannot place a flow", {
+  skip_slow_on_cran()
   # An unresolvable endpoint has no centroid, so its arc silently vanished --
   # and when nothing resolved, flow_map returned a bare world map with no arc
   # layer at all and no warning. The commonest cause is feeding iso3c codes

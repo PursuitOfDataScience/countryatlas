@@ -74,6 +74,7 @@ test_that("morans_i accepts weights and the scheme changes the answer", {
 })
 
 test_that("local_morans classifies clusters and lisa_map draws them", {
+  skip_slow_on_cran()
   set.seed(1)
   w <- country_weights("knn", k = 5)
   lm1 <- local_morans(snap, gdp_per_capita, weights = w, n_perm = 99)
@@ -285,6 +286,7 @@ test_that("audit_time_coverage catches rows outside a country's existence", {
 })
 
 test_that("historical_geometry draws the world as it was", {
+  skip_slow_on_cran()
   skip_if_not_installed("cshapes")
   skip_if_not_installed("sf")
   g70 <- historical_geometry(1970)
@@ -301,6 +303,7 @@ test_that("historical_geometry draws the world as it was", {
 })
 
 test_that("world_geometry and attach_geometry route year to CShapes", {
+  skip_slow_on_cran()
   skip_if_not_installed("cshapes")
   skip_if_not_installed("sf")
   expect_s3_class(world_geometry("countries", year = 1970), "sf")
@@ -415,6 +418,7 @@ test_that("the VSUP suppresses the value range as uncertainty rises", {
 })
 
 test_that("world_map(uncertainty) draws a VSUP with a complete legend", {
+  skip_slow_on_cran()
   mapdf <- poly_df()
   set.seed(1)
   mapdf$se <- abs(stats::rnorm(nrow(mapdf))) * mapdf$gdp_per_capita * 0.3
@@ -594,6 +598,7 @@ test_that("country_network summarises nodes and edges", {
 })
 
 test_that("od_map draws one panel per origin", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   od <- data.frame(from = rep(c("China", "Germany", "USA"), each = 3),
                    to = c("USA", "Japan", "Brazil", "France", "Italy", "Poland",
@@ -639,6 +644,7 @@ test_that("world_table ranks and formats", {
 # --- cartograms and projections ---------------------------------------------------
 
 test_that("gridded_cartogram allocates exactly the cells requested", {
+  skip_slow_on_cran()
   # The centroid warning is expected and correct here -- a handful of
   # territories have no bundled centroid; it is asserted separately below.
   p <- suppressWarnings(gridded_cartogram(snap, population, cells = 400))
@@ -664,6 +670,7 @@ test_that("gridded_cartogram allocates exactly the cells requested", {
 })
 
 test_that("cartogram_diagnostics measures the residual area error", {
+  skip_slow_on_cran()
   skip_if_not_installed("sf")
   skip_if_not_installed("cartogram")
   skip_if_not_installed("rnaturalearth")
@@ -910,6 +917,7 @@ test_that("convergence_club separates what should separate and joins what should
 # --- provenance is a promise, so it has to hold for every verb ----------------------
 
 test_that("every map verb carries provenance", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   poly <- poly_df()
   # map_provenance() documents itself as reading "any plot the package's map
@@ -945,6 +953,7 @@ test_that("every map verb carries provenance", {
 })
 
 test_that("every sf map verb carries provenance", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   d <- sf_df()
   expect_s3_class(map_provenance(world_map(d, gdp_per_capita)),
@@ -973,6 +982,7 @@ test_that("every sf map verb carries provenance", {
 # --- interactions between world_map()'s new arguments -------------------------------
 
 test_that("the new world_map arguments combine without breaking each other", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   mapdf <- poly_df()
   set.seed(1)
@@ -1185,6 +1195,7 @@ test_that("check_choice accepts the documented default and rejects the rest", {
 })
 
 test_that("wdj_workers honours the contract it documents", {
+  skip_slow_on_cran()
   w <- countryatlas:::wdj_workers
   # Every branch guarantees at least one worker, then min(workers, n_tasks)
   # undid it for zero tasks -- returning 0, which is exactly what `mc.cores`
@@ -1528,6 +1539,7 @@ test_that("bivariate_map counts coverage on both variables", {
 })
 
 test_that("a cartogram reports the world it started from, not the one it kept", {
+  skip_slow_on_cran()
   # A cartogram can only size a country it has a positive weight for, so the
   # rest are dropped -- silently, and provenance was computed on the survivors,
   # so n_total shrank to match. A map of 69 countries out of 175 reported
@@ -1856,6 +1868,7 @@ test_that("counts coerced with as.integer() carry an upper bound", {
 })
 
 test_that("world_map says when it is handed a panel", {
+  skip_slow_on_cran()
   # attach_geometry() joins a panel deliberately -- facet_map() and
   # animate_world() are built on it -- so a multi-year frame reaching a single
   # static map draws each country once per year and lets the last row win,
@@ -2016,6 +2029,7 @@ test_that("tile_map and add_indicator say when the key matches nothing", {
 })
 
 test_that("simplify_geometry and theme_world_map validate their first argument", {
+  skip_slow_on_cran()
   # Both checked their *second* argument carefully and their first not at all.
   # simplify_geometry() reached rmapshaper and leaked "no applicable method for
   # 'ms_simplify' applied to an object of class NULL" -- naming rmapshaper's
@@ -2530,6 +2544,7 @@ test_that("`years` means the same thing for every source", {
 })
 
 test_that("hatching and dispute marks do not discard the projection", {
+  skip_slow_on_cran()
   # ggpattern::geom_sf_pattern() and the geom_sf() inside dispute_layer() each
   # return list(<layer>, <CoordSf>) -- a default coord_sf(crs = NULL) -- and
   # ggplot2's ggplot_add.Coord replaces the plot's coord unconditionally. Added
@@ -2558,6 +2573,7 @@ test_that("hatching and dispute marks do not discard the projection", {
 })
 
 test_that("bubble_map and spike_map count only the countries they can place", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # The bundled centroid table does not cover every code in the codelist, so a
   # point-per-country verb silently loses Hong Kong, Macao, Gibraltar, the
@@ -2595,6 +2611,7 @@ test_that("bubble_map and spike_map count only the countries they can place", {
 })
 
 test_that("n_bins means the same thing in every binned style", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # style = "binned" passed n_bins to ggplot2 as `n.breaks`, which is only a
   # hint: scales::extended_breaks() snaps to round numbers, so n_bins of 5, 6
@@ -2665,6 +2682,7 @@ test_that("a continuous colourbar reports no classes rather than inventing them"
 })
 
 test_that("point verbs tolerate data that already carries centroid columns", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # world_geometry("centroids") output, or anything joined to it, collided with
   # the internal join: dplyr suffixed both sides to .x/.y and the aes() looking
@@ -2682,6 +2700,7 @@ test_that("point verbs tolerate data that already carries centroid columns", {
 })
 
 test_that("flow_map arcs cross the antimeridian instead of the whole map", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # A great circle Tokyo -> Los Angeles runs ...178, 179, -179, -178..., and
   # geom_path() under coord_quickmap() joined those two points literally: every
@@ -2715,6 +2734,7 @@ test_that("flow_map legends carry the caller's weight column name", {
 })
 
 test_that("geom_country_labels accepts a mapping and still honours flag", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # to_centroids() reduced the frame to iso3c/long/lat/flag, so a mapping
   # naming any other column died on "object 'continent' not found" -- the
@@ -2755,6 +2775,7 @@ test_that("geom_country_labels accepts a mapping and still honours flag", {
 })
 
 test_that("animate_world keeps a title the caller asked for", {
+  skip_slow_on_cran()
   skip_if_not_installed("gganimate")
   mapdf <- suppressWarnings(
     attach_geometry(world_snapshot$countries, geometry = "polygon"))
@@ -2770,6 +2791,7 @@ test_that("animate_world keeps a title the caller asked for", {
 })
 
 test_that("every world_map style draws on the tmap engine", {
+  skip_slow_on_cran()
   # tm_scale_intervals() is the *interval* scale and "cont"/"cat" are not
   # interval styles -- they name different constructors. So the default style
   # could not draw at all ('Invalid style...') and a categorical fill warned
@@ -2880,6 +2902,7 @@ test_that("the antimeridian splitter handles the degenerate crossings", {
 })
 
 test_that("every data-bearing map verb carries readable provenance", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # map_provenance() is only useful if the verbs actually attach the attribute,
   # and an early return that skips it is invisible. Sweep them rather than
@@ -2974,6 +2997,7 @@ test_that("a column argument that is not a column says so, in every verb", {
 })
 
 test_that("the microstate border gap is named rather than silently counted", {
+  skip_slow_on_cran()
   # country_borders() computes adjacency from Natural Earth, and the default
   # 110m basemap has no polygon at all for the European microstates. They
   # contribute no rows, so the five of them report zero land neighbours and
@@ -3025,6 +3049,7 @@ test_that("the pinned microstate lists match what the finer basemap shows", {
 })
 
 test_that("a factsheet for a code with no metadata row is still named", {
+  skip_slow_on_cran()
   # `name = first_or_na(row$country) %||% iso` -- but %||% only replaces NULL,
   # and first_or_na() returns NA_character_ when the code has no row in
   # country_meta. The fallback was written and never fired, so Kosovo (XKX,
@@ -3468,6 +3493,7 @@ test_that("sigma_convergence explains an empty or blank series", {
 })
 
 test_that("as_ggsql_source is explicit about who owns the connection", {
+  skip_slow_on_cran()
   # format = "duckdb" hands back a live connection and duckdb keeps its
   # in-memory database alive until the handle is released, but neither @return
   # nor @param said the caller owns it -- while the parquet branch quietly
@@ -3595,6 +3621,7 @@ test_that("smooth_rates and to_ppp say when they had nothing to work with", {
 })
 
 test_that("the weights print method describes every scheme it can build", {
+  skip_slow_on_cran()
   # 16 uncovered lines: the print method's per-scheme description branches were
   # never exercised, so the text a user reads to check they built what they
   # meant was unverified.
@@ -3797,6 +3824,7 @@ test_that("adapter_reshape says when no entity resolved to a country", {
 })
 
 test_that("the adapters read a year from whatever shape the provider sends", {
+  skip_slow_on_cran()
   # `...` forwards to the client, so the caller controls the time column's
   # type: eurostat's time_format = "num" gives a numeric year, "raw" a
   # character one, the default a Date. Reading each with one assumption failed
@@ -3965,6 +3993,7 @@ test_that("fetch_indicator does not trust a source's key_col claim", {
 })
 
 test_that("the numeric-column verbs reject a non-numeric column up front", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # country_network() validates its weight with check_numeric_col(); four verbs
   # shaped exactly like it did not. bubble_map() and flow_map() reached
@@ -4047,6 +4076,7 @@ test_that("rank_countries and share_of_world report a repeated country-year", {
 })
 
 test_that("a wrong `origin` is our error, naming the scheme you meant", {
+  skip_slow_on_cran()
   # `origin` is user-facing on a dozen exported functions -- neighbors(),
   # country_join(), standardize_country(), in_group() -- and check_string()
   # only proved it was a string. An invalid scheme therefore travelled into
@@ -4150,6 +4180,7 @@ test_that("the COW/GW key warning agrees with its own count", {
 })
 
 test_that("interactive_map names dots the engine cannot use", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   g <- world_geometry(geometry = "sf")
   g <- g[g$iso3c %in% c("FRA", "DEU", "ESP", "ITA"), ]
@@ -4290,6 +4321,7 @@ test_that("spatial_lag names the countries its weights exclude", {
 })
 
 test_that("neighbors tells a typo from a country with no land border", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   # Both return zero rows. Only one of them is a mistake, and the function used
   # to be silent about either -- while distance_between() and convert_country()
@@ -5326,6 +5358,7 @@ test_that("convert_country names its own from and to on a bad value", {
 })
 
 test_that("an optional column argument is validated like a required one", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # quo_arg_name() says it covers "every unquoted column argument in the
   # package", and for the *required* ones it did. Thirteen optional ones --
@@ -5553,6 +5586,7 @@ test_that("a verb hands back the class it was given", {
 })
 
 test_that("a caller column named x0/y0/x1/y1 does not break flow_map", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # The arc endpoints are joined in under those names, and a caller who
   # geocoded their own endpoints -- the shape of frame this verb is for -- has
@@ -5578,6 +5612,7 @@ test_that("a caller column named x0/y0/x1/y1 does not break flow_map", {
 })
 
 test_that("a caller column named row or col does not break tile_map", {
+  skip_slow_on_cran()
   # The tile grid supplies `row` and `col`, common enough names that a caller's
   # frame may carry its own. dplyr then suffixed both sides of the join to
   # `.x`/`.y` and aes(.data$col, -.data$row) failed with ggplot2's "Problem
@@ -5605,6 +5640,7 @@ test_that("a caller column named row or col does not break tile_map", {
 })
 
 test_that("a pre-joined centroid column does not break the cartogram", {
+  skip_slow_on_cran()
   # country_meta carries centroid_lon/centroid_lat, so joining it for capitals
   # or area before drawing is ordinary. gridded_cartogram() then joined the
   # centroids again without dropping the caller's, dplyr suffixed both sides to

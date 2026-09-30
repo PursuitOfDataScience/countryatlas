@@ -487,6 +487,7 @@ test_that("every bundled table refers only to known codes", {
 # the documentation would start lying to readers.
 
 test_that("README.Rmd's claims hold", {
+  skip_slow_on_cran()
   # The README is the front page and makes two hard numeric claims, and unlike
   # the vignettes nothing checked either. Its headline figure is computed from
   # a live WDI fetch, so it cannot be pinned offline -- but the *argument* it
@@ -610,6 +611,7 @@ test_that("the dataset help pages' cross-dataset counts match the data", {
 })
 
 test_that("honest-maps.Rmd's claims hold", {
+  skip_slow_on_cran()
   # Added for 3.0.0 and, unlike the three older vignettes, never checked. Its
   # island list named the United Kingdom and Indonesia as dropped by contiguity
   # weights when both keep land borders -- a vignette about maps quietly

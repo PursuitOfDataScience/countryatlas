@@ -510,6 +510,7 @@ test_that("a factsheet says when neighbours could not be computed", {
 })
 
 test_that("the plotly engine refuses the orthographic view by name", {
+  skip_slow_on_cran()
   skip_if_not_installed("plotly")
   skip_if_no_sf_geometry()
   sfd <- suppressWarnings(attach_geometry(countryatlas::world_snapshot$countries,
