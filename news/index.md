@@ -316,6 +316,14 @@ takes `data` as its second argument. Details under **Breaking changes**.
   loads and otherwise falls back to grey with a message, as it already
   did when `ggpattern` is absent.
 
+- **`world_map(na_style = "hatched")` took half a minute to print on the
+  polygon backend.** `ggpattern` clipped a fresh set of stripes to every
+  polygon, and the no-data countries of a world map are many polygons
+  (169 for `co2_per_capita` in `world_snapshot`, most of them islands,
+  plus Antarctica). The stripes are now clipped once, to all of them
+  together: the same map, with the same stripes, prints in about a
+  second.
+
 - **Countries with no data vanished from
   [`animate_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/animate_world.md)
   and got their own panel in `facet_map(facet = year)`.**
