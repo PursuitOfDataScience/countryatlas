@@ -6,6 +6,7 @@
 snap <- countryatlas::world_snapshot$countries
 
 test_that("check_number names the argument and the range", {
+  skip_slow_on_cran()
   cn <- countryatlas:::check_number
   expect_error(cn(NA, "k"), "single finite number")
   expect_error(cn(NA_real_, "k"), class = "countryatlas_error")
@@ -21,6 +22,7 @@ test_that("check_number names the argument and the range", {
 })
 
 test_that("n_bins is validated on every style path", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   mapdf <- attach_geometry(snap, geometry = "polygon")
   # quantile/jenks go through compute_breaks(); binned hands n_bins straight to
@@ -35,6 +37,7 @@ test_that("n_bins is validated on every style path", {
 })
 
 test_that("wdj_crs refuses a latitude PROJ cannot build a CRS from", {
+  skip_slow_on_cran()
   # |lat_0| >= 90 built a string PROJ rejects, and the failure only surfaced
   # later as coord_sf()'s "crs not found: is it missing?".
   expect_error(countryatlas:::wdj_crs("orthographic", lat0 = 200), "`lat0`")
@@ -63,6 +66,7 @@ test_that("globe_map validates lon/lat on both backends", {
 })
 
 test_that("plot scalars that would draw nonsense are rejected", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # A negative max_height silently drew the spikes upside down.
   expect_error(spike_map(snap, population, max_height = -5), "`max_height`")
@@ -77,6 +81,7 @@ test_that("plot scalars that would draw nonsense are rejected", {
 })
 
 test_that("analysis and diagnostic scalars are validated", {
+  skip_slow_on_cran()
   expect_error(repair_country_names("Brzil", threshold = 5), "between 0 and 1")
   expect_error(repair_country_names("Brzil", threshold = NA),
                "single finite number")
@@ -109,6 +114,7 @@ test_that("morans_i validates n_perm", {
 })
 
 test_that("simplify_geometry validates keep", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   g <- world_geometry("countries", geometry = "sf")
   expect_error(simplify_geometry(g, keep = 1.5), "between 0 and 1")
@@ -116,6 +122,7 @@ test_that("simplify_geometry validates keep", {
 })
 
 test_that("count arguments are bounded so as.integer() cannot make them NA", {
+  skip_slow_on_cran()
   # check_number() only required a finite number, but several call sites then
   # coerce with as.integer(), which returns NA past 2^31-1 -- surfacing as
   # "NAs introduced by coercion" or "missing value where TRUE/FALSE needed".
@@ -149,6 +156,7 @@ test_that("morans_i bounds n_perm and no longer clamps it redundantly", {
 })
 
 test_that("simplify_geometry(keep = 0) is rejected on both backends", {
+  skip_slow_on_cran()
   # rmapshaper requires keep > 0, but the st_simplify() fallback silently
   # accepted 0 (dTolerance = 10000), so the same call errored or not depending
   # on which optional package the caller had.
@@ -205,6 +213,7 @@ test_that("the bin count does not depend on whether classInt is installed", {
 # an opaque failure instead of erroring here.
 
 test_that("check_string names the argument and the problem", {
+  skip_slow_on_cran()
   cs <- countryatlas:::check_string
   expect_error(cs(c("a", "b"), "k"), "single string")
   expect_error(cs(c("a", "b"), "k"), "Got 2 values")
@@ -219,6 +228,7 @@ test_that("check_string names the argument and the problem", {
 })
 
 test_that("world_query validates every clause it interpolates", {
+  skip_slow_on_cran()
   for (a in c("source", "draw", "projection", "palette", "transform")) {
     args <- list(quote(gdp)); args[[a]] <- c("x", "y")
     expect_error(do.call(world_query, args), paste0("`", a, "`"))
@@ -309,6 +319,7 @@ test_that("join and grouping keys reject a zero-length value", {
 })
 
 test_that("convert_country's to/from must be single strings", {
+  skip_slow_on_cran()
   # `to %in% names(m)` fed if() directly: a length-0 `to` gave base R's
   # "argument is of length zero" and a length-2 one "the condition has length
   # > 1" -- the R >= 4.2 hard error, and neither named the argument. Asking for
@@ -328,6 +339,7 @@ test_that("convert_country's to/from must be single strings", {
 })
 
 test_that("origin is validated once, for every function that resolves names", {
+  skip_slow_on_cran()
   # Checked in wdj_to_iso3c(), the shared internal, so all of these are covered
   # by one guard. The message names the caller's own argument, `origin_x`
   # included; it used to say `origin` there.
@@ -361,6 +373,7 @@ test_that("origin is validated once, for every function that resolves names", {
 # `na.rm = "yes"` kept the NAs and returned NA.
 
 test_that("check_bool names the argument and what it got", {
+  skip_slow_on_cran()
   cb <- countryatlas:::check_bool
   expect_error(cb(NA, "k"), "must be `TRUE` or `FALSE`")
   expect_error(cb(NA, "k"), "Got NA")
@@ -374,6 +387,7 @@ test_that("check_bool names the argument and what it got", {
 })
 
 test_that("borders is validated instead of reaching a bare if()", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   snap <- countryatlas::world_snapshot$countries
   mapdf <- attach_geometry(snap, geometry = "polygon")
@@ -418,6 +432,7 @@ test_that("a bad logical no longer silently means FALSE", {
 # failure mode in the package, so the lengths must line up.
 
 test_that("weights and groups must line up with x", {
+  skip_slow_on_cran()
   x <- 1:10
   for (w in list(c(1, 2), c(1, 2, 3), rep(1, 11), rep(1, 9))) {
     expect_error(gini(x, weights = w), "`weights`")
@@ -441,6 +456,7 @@ test_that("weights and groups must line up with x", {
 })
 
 test_that("complete_years rejects a years vector it cannot use", {
+  skip_slow_on_cran()
   # as.integer("a") is NA with only base R's coercion warning, and a zero-length
   # `years` silently completed nothing.
   df <- data.frame(iso3c = "A", year = c(2000L, 2002L), g = c(1, 3))
@@ -493,6 +509,7 @@ test_that("omitting a required argument names that argument", {
 # warning, and 2 against 4 recycled cleanly with no warning at all.
 
 test_that("distance_between refuses lengths it would have mis-paired", {
+  skip_slow_on_cran()
   expect_error(distance_between(c("France", "Spain"),
                                 c("Italy", "Germany", "Japan")), "`a`")
   expect_error(distance_between(c("France", "Spain"),
@@ -523,6 +540,7 @@ test_that("distance_between refuses lengths it would have mis-paired", {
 })
 
 test_that("locate_country's documented lon/lat contract matches its code", {
+  skip_slow_on_cran()
   # ?locate_country said lon/lat were "recycled together" while the code has
   # always required equal lengths. The doc now says equal-length; pin the
   # behaviour so the two cannot drift apart again.
@@ -578,6 +596,7 @@ test_that("lagging a categorical column is still allowed", {
 })
 
 test_that("morans_i no longer accepts a factor and returns a number anyway", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   snap$gg <- factor(round(snap$gdp_per_capita))
@@ -608,6 +627,7 @@ test_that("a factor iso3c changes only row order, never a value", {
 })
 
 test_that("world_map()/globe_map() label and palette arguments are checked", {
+  skip_slow_on_cran()
   # These four reached viridisLite and ggplot2 unchecked, so the failures came
   # back in their vocabulary, not the package's: a length-2 `palette` hit a bare
   # switch() and produced "EXPR must be a length 1 vector", and a numeric one was
@@ -641,6 +661,7 @@ test_that("world_map()/globe_map() label and palette arguments are checked", {
 })
 
 test_that("latest= and panel= say which one they are dropping", {
+  skip_slow_on_cran()
   # A year range silently overrode `latest`, while a single year had `latest`
   # silently override `panel` -- opposite precedence, neither announced.
   fake <- function(country, indicator, start, end, extra = FALSE, ...) {
@@ -684,6 +705,7 @@ test_that("latest= and panel= say which one they are dropping", {
 # the frame's shape, so a class-only expectation passes whatever k is.
 
 test_that("locate_country validates tolerance_km", {
+  skip_slow_on_cran()
   # `dkm <= tolerance_km` compares as *strings* when the tolerance is character,
   # and "2650" <= "a" is TRUE, so every unmatched point snapped to its nearest
   # country -- a mid-Pacific point came back as Fiji, inverting the documented
@@ -698,6 +720,7 @@ test_that("locate_country validates tolerance_km", {
 })
 
 test_that("correlate_indicators validates min_n", {
+  skip_slow_on_cran()
   snap <- countryatlas::world_snapshot$countries
   for (bad in list(NA, "a", c(1, 2), -5)) {
     expect_error(correlate_indicators(snap, min_n = bad),
@@ -707,6 +730,7 @@ test_that("correlate_indicators validates min_n", {
 })
 
 test_that("dorling_map validates k and itermax", {
+  skip_slow_on_cran()
   # An sf frame, so the only thing left to reject is the scalar.
   skip_if_no_sf_geometry()
   skip_if_not_installed("cartogram")
@@ -719,6 +743,7 @@ test_that("dorling_map validates k and itermax", {
 })
 
 test_that("a bad argument is reported before any optional-package gate", {
+  skip_slow_on_cran()
   # A mistyped column or an out-of-range scalar is the caller's bug; the message
   # must not depend on which optional packages happen to be installed. With
   # every optional package reported absent, each verb must still name the
@@ -741,6 +766,7 @@ test_that("a bad argument is reported before any optional-package gate", {
 })
 
 test_that("the verbs say when they overwrite a column the caller already had", {
+  skip_slow_on_cran()
   # A user's own `rank`, `percentile` or `<value>_share` column was replaced in
   # silence. Warn rather than error: re-running a verb on its own output is
   # legitimate and idempotent, it just should not be invisible.
@@ -862,6 +888,7 @@ test_that("every numeric bound is pinned at its own edge", {
 })
 
 test_that("dorling_map rejects k = 0, which cartogram cannot use", {
+  skip_slow_on_cran()
   # check_number()'s bounds are inclusive, so lo = 0 admitted a zero that
   # cartogram then reported as "all sizes are missing and/or non-positive" --
   # a validator letting through a value the next layer cannot represent, which
@@ -962,6 +989,7 @@ test_that("a user column named like an internal temp column is harmless", {
 
 
 test_that("unknown-name errors survive a numeric argument", {
+  skip_slow_on_cran()
   # These messages put the pluralisation marker ahead of the value:
   # "Unknown group{?s}: {.val {bad}}". With no quantity set, cli reaches for
   # the most recent interpolation -- and a *numeric* vector there is read as
@@ -1000,6 +1028,7 @@ test_that("unknown-name errors survive a numeric argument", {
 })
 
 test_that("the scalar validators can report a function or environment", {
+  skip_slow_on_cran()
   # These build their message with {.val {x}}, which coerces to character --
   # and that fails outright for a closure ("cannot coerce type 'closure' to
   # vector of type 'character'"). So the validator's own error crashed rather
@@ -1041,6 +1070,7 @@ test_that("the scalar validators can report a function or environment", {
 })
 
 test_that("arguments used before validation still refuse a function cleanly", {
+  skip_slow_on_cran()
   # Sibling of the scalar-validator fix above, but a different mechanism: here
   # the value was *consumed* before any check ran, so the crash came from the
   # consuming call rather than from the message.
@@ -1080,6 +1110,7 @@ test_that("arguments used before validation still refuse a function cleanly", {
 })
 
 test_that("a units value is refused by us, not by the units package", {
+  skip_slow_on_cran()
   # sf's st_area() and st_distance() return units objects, so a threshold
   # computed from geometry and handed to a numeric argument is a natural
   # mistake. is.numeric() is TRUE for one, so it passed the type check, and
@@ -1111,6 +1142,7 @@ test_that("a units value is refused by us, not by the units package", {
 })
 
 test_that("every custom_match entry must be named", {
+  skip_slow_on_cran()
   x <- c("France", "Freedonia", "Germany")
   # Works, and is the shape country_overrides() returns.
   expect_equal(convert_country(x, to = "iso3c", custom_match = c(Freedonia = "FRA")),
@@ -1146,6 +1178,7 @@ test_that("every custom_match entry must be named", {
 })
 
 test_that("a custom weights matrix must be non-negative and finite", {
+  skip_slow_on_cran()
   iso <- c("FRA", "DEU", "ITA", "ESP")
   good <- matrix(0, 4, 4, dimnames = list(iso, iso))
   good[1, 2] <- good[2, 1] <- good[2, 3] <- good[3, 2] <- 1
@@ -1281,6 +1314,7 @@ test_that("map verbs accept a column named as a string, not only unquoted", {
 })
 
 test_that("the string form keeps the legend title the unquoted form gives", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   skip_if_not_installed("ggplot2")
   d <- data.frame(iso3c = c("FRA", "DEU", "ITA"), gdp = c(1, 2, 3),
@@ -1302,6 +1336,7 @@ test_that("the string form keeps the legend title the unquoted form gives", {
 # the same shape -- aggregate_regions(by = region) explained itself while
 # attach_geometry(by = iso3c) did not.
 test_that("string column arguments report a bare column instead of 'not found'", {
+  skip_slow_on_cran()
   d <- data.frame(iso3c = c("FRA", "DEU"), value = 1:2, stringsAsFactors = FALSE)
   expect_error(attach_geometry(d, by = iso3c), class = "countryatlas_bare_column")
   expect_error(subnational_map(d, value, by = nuts_id),
@@ -1369,6 +1404,7 @@ test_that("the unparseable-year warning names its source and lists real values",
 # vctrs_error_subscript_oob -- "Can't select columns that don't exist" --
 # so it was the last unclassed error left at this boundary.
 test_that("correlate_indicators reports a missing column like its siblings", {
+  skip_slow_on_cran()
   d <- data.frame(iso3c = c("FRA", "DEU", "ITA", "ESP"), year = rep(2000, 4),
                   value = c(1, 2, 3, 4), pop = c(6e7, 8e7, 5e7, 4e7),
                   gdp = c(9, 8, 7, 6), txt = letters[1:4], stringsAsFactors = FALSE)
@@ -1390,6 +1426,7 @@ test_that("correlate_indicators reports a missing column like its siblings", {
 })
 
 test_that("locate_country reports a points object with no CRS", {
+  skip_slow_on_cran()
   skip_if_not_installed("sf")
   df <- data.frame(lon = c(2.35, 13.40), lat = c(48.85, 52.52))
   # st_as_sf(coords = ) without `crs` leaves the CRS missing, and the object
@@ -1416,6 +1453,7 @@ test_that("locate_country reports a points object with no CRS", {
 })
 
 test_that("convergence_club on a panel too short for the log-t test finds no clubs", {
+  skip_slow_on_cran()
   # log_t_stat()'s regression window is start:ti with start = max(2, 0.3*ti),
   # so a 2-period panel fits one point and the coefficient table has one row.
   # Both defensive returns there were unexercised; the result must be "no
@@ -1440,6 +1478,7 @@ test_that("convergence_club on a panel too short for the log-t test finds no clu
 # entity and value columns are both checked for existence; the year column was
 # not, and its absence corrupted the value column rather than being reported.
 test_that("adapter_reshape reports a missing year column instead of mangling the value", {
+  skip_slow_on_cran()
   R <- countryatlas:::adapter_reshape
   raw <- data.frame(entity = c("France", "Germany"), yr = c(2000L, 2000L),
                     val = c(1.5, 2.5), stringsAsFactors = FALSE)
@@ -1474,6 +1513,7 @@ test_that("adapter_reshape reports a missing year column instead of mangling the
 # twenty-odd verbs whose frame argument is called that and wrong for the three
 # whose is not.
 test_that("a missing-column error names the argument the caller actually passed", {
+  skip_slow_on_cran()
   expect_error(country_weights("custom", w = data.frame(a = 1, b = 2)),
                "`w`", fixed = TRUE)
   err <- rlang::catch_cnd(country_weights("custom", w = data.frame(a = 1, b = 2)))
@@ -1503,6 +1543,7 @@ test_that("a missing-column error names the argument the caller actually passed"
 })
 
 test_that("a custom weights matrix rejects every unusable entry by name", {
+  skip_slow_on_cran()
   nm <- list(c("FRA", "DEU"), c("FRA", "DEU"))
   mk <- function(v) matrix(v, 2, 2, dimnames = nm)
   expect_error(country_weights("custom", w = matrix(c(0, 1, 1, 0), 2, 2)),
@@ -1601,6 +1642,7 @@ test_that("value_by_alpha_map reports the same inert arguments", {
 # the worst of them, because nearest-neighbour weights come back looking
 # entirely reasonable.
 test_that("country_weights reports arguments its scheme does not use", {
+  skip_slow_on_cran()
   iso <- c("FRA","DEU","ITA","ESP","POL","NLD","BEL","AUT")
   m <- matrix(0, 8, 8, dimnames = list(iso, iso))
   m[1, 2] <- m[2, 1] <- 1
@@ -1700,6 +1742,7 @@ test_that("globe_map reports n_bins under a style that does not bin", {
 # channel. The abort beside it already treats a layer/argument mismatch as
 # worth naming.
 test_that("world_query reports arguments its layer does not use", {
+  skip_slow_on_cran()
   cls <- "countryatlas_layer_args_ignored"
   expect_warning(world_query("value", size = "pop"), class = cls)
   expect_warning(world_query("value", n_bins = 4), class = cls)
@@ -1758,6 +1801,7 @@ test_that("n_bins is bounded on the uncertainty path too", {
 })
 
 test_that("the code-vector entry points standardise their keys", {
+  skip_slow_on_cran()
   # Both took the key verbatim, so a lowercase code matched nothing and the
   # verb blamed its own data: check_dispute_coverage() reported zero tracked
   # territories, and country_weights() blamed the centroid table.
@@ -1793,6 +1837,7 @@ test_that("identifier folding is ASCII everywhere, including scheme names", {
 })
 
 test_that("standardize_subnational normalises its return class", {
+  skip_slow_on_cran()
   # A data.frame in gave a data.frame out and a grouped tibble stayed grouped,
   # while standardize_country() next door normalises.
   out <- suppressMessages(standardize_subnational(
@@ -1806,6 +1851,7 @@ test_that("standardize_subnational normalises its return class", {
 })
 
 test_that("compare_sources takes the numeric column, whatever else a source returns", {
+  skip_slow_on_cran()
   # Reading `as.matrix(out[, sources])` followed by `abs()` suggests a
   # character column could reach abs() and fail with base R's "non-numeric
   # argument to mathematical function". It cannot: the per-source reshape picks

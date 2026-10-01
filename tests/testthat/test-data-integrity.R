@@ -92,6 +92,7 @@ test_that("the data-raw area formula still matches the package's", {
 })
 
 test_that("country_meta centroids still agree with polygon_centroids()", {
+  skip_slow_on_cran()
   # The bundled centroids were built with the same largest-piece rule the live
   # geometry uses; drift between the two would silently change
   # distance_between() / bubble_map() placement.
@@ -169,6 +170,7 @@ test_that("world_tiles places each country near its real position", {
 })
 
 test_that("country_timeline's two directions agree wherever a code exists", {
+  skip_slow_on_cran()
   # It reads historical_codes both ways ("what did the USSR become" and "what
   # was Estonia part of"), so the two readings have to agree. They can only
   # agree where the predecessor has a code: both columns hold iso3c, and ISO
@@ -256,6 +258,7 @@ test_that("the override table maps only to codes the package can resolve", {
 })
 
 test_that("data-raw/ still rebuilds the hand-curated datasets byte for byte", {
+  skip_slow_on_cran()
   # country_groups_history and disputed_territories are curated by hand in
   # data-raw/, so the script is the source of truth and drift can happen in
   # either direction: editing the .rda without the script, or the script
@@ -353,6 +356,7 @@ test_that("the override table is ASCII, so it matches in any locale", {
 })
 
 test_that("map-ready frames are reduced to one row per country everywhere", {
+  skip_slow_on_cran()
   # Natural Earth gives divided countries two rows sharing one iso3c (Cyprus at
   # 110m), and an sf frame has no `group` column -- so code that gated
   # de-duplication on `group` silently double-counted them.
@@ -725,6 +729,7 @@ test_that("the point-lookup example in the vignettes resolves as printed", {
 })
 
 test_that("the row-count and grid-size claims hold", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # countryatlas.Rmd: "not ~99,000 polygon rows"
   n <- nrow(attach_geometry(countryatlas::world_snapshot$countries,
@@ -772,6 +777,7 @@ test_that("the override table fully covers the polygon backend's names", {
 })
 
 test_that("a custom override changes what the sf backend joins", {
+  skip_slow_on_cran()
   # `overrides =` is a documented argument; the sf backend deliberately bypasses
   # its geometry cache for a non-default table, so a custom entry must actually
   # take effect -- and must not leak into a later default call.
@@ -793,6 +799,7 @@ test_that("a custom override changes what the sf backend joins", {
 })
 
 test_that("?attach_geometry's coverage figures match the backends", {
+  skip_slow_on_cran()
   # That section tells a reader which countries are missing from the map and
   # what to do about it, so every number in it is a promise. It said Gibraltar,
   # Hong Kong, Macao, Tuvalu and the British Virgin Islands were "in no backend
@@ -875,6 +882,7 @@ test_that("the bundled tables are referentially consistent", {
 })
 
 test_that("no documented indicator code has been retired upstream", {
+  skip_slow_on_cran()
   # The World Bank retires series: EN.ATM.CO2E.KT and EN.ATM.CO2E.PC were
   # replaced by the AR5 greenhouse-gas series, and `?country_data`'s example went
   # on quoting the dead one, so anyone copying it got a warning and an all-NA

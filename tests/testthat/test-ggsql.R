@@ -38,6 +38,7 @@ test_that("print.ggsql_query prints the query", {
 })
 
 test_that("as_ggsql_source writes a DuckDB table", {
+  skip_slow_on_cran()
   skip_if_not_installed("duckdb")
   skip_if_not_installed("DBI")
   df <- data.frame(iso3c = c("USA", "CAN"), value = c(1, 2))
@@ -49,6 +50,7 @@ test_that("as_ggsql_source writes a DuckDB table", {
 })
 
 test_that("as_ggsql_source writes a Parquet file", {
+  skip_slow_on_cran()
   skip_if_not_installed("duckdb")
   skip_if_not_installed("DBI")
   df <- data.frame(iso3c = c("USA", "CAN"), value = c(1, 2))

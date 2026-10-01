@@ -24,6 +24,7 @@ built <- function(p) ggplot2::ggplot_build(p)
 # --- classification: bins must count countries, not vertices ------------------
 
 test_that("quantile bins hold near-equal numbers of countries on both backends", {
+  skip_slow_on_cran()
   skip_poly()
   for (backend in c("polygon", "sf")) {
     if (backend == "sf") skip_sf()
@@ -39,6 +40,7 @@ test_that("quantile bins hold near-equal numbers of countries on both backends",
 })
 
 test_that("breaks are computed once per country, whatever the backend's row count", {
+  skip_slow_on_cran()
   skip_poly(); skip_sf()
   # The two backends genuinely carry different country sets -- map_data("world")
   # has ~240 regions, Natural Earth 110m has 177 -- so their quantiles differ
@@ -84,6 +86,7 @@ test_that("bubble_map sizes are comparable across backends", {
 # --- centroids: one per country, on the right side of the antimeridian --------
 
 test_that("country label centroids land inside their own country", {
+  skip_slow_on_cran()
   skip_poly()
   mapdf <- attach_geometry(snap, geometry = "polygon")
   cent <- countryatlas:::polygon_centroids(mapdf)
@@ -125,6 +128,7 @@ test_that("every projection produces a distinct, finite panel extent", {
 })
 
 test_that("recenter moves the map rather than being ignored", {
+  skip_slow_on_cran()
   skip_sf()
   d <- attach_geometry(snap, geometry = "sf")
   x0 <- built(world_map(d, life_expectancy))$layout$panel_params[[1]]$x_range
@@ -135,6 +139,7 @@ test_that("recenter moves the map rather than being ignored", {
 # --- na_style: the missing-data colour is the one that was asked for ----------
 
 test_that("na_style controls the fill actually drawn for missing countries", {
+  skip_slow_on_cran()
   skip_poly()
   mapdf <- attach_geometry(snap, geometry = "polygon")
   na_fill <- function(ns) {
@@ -149,6 +154,7 @@ test_that("na_style controls the fill actually drawn for missing countries", {
 # --- tile grid: one square per country, no overplotting -----------------------
 
 test_that("tile_map draws every tile exactly once", {
+  skip_slow_on_cran()
   b <- built(suppressWarnings(tile_map(snap, gdp_per_capita)))
   tiles <- b$data[[1]]
   expect_equal(nrow(tiles), nrow(countryatlas::world_tiles))
@@ -158,6 +164,7 @@ test_that("tile_map draws every tile exactly once", {
 # --- flow arcs: endpoints sit on the endpoints --------------------------------
 
 test_that("flow_map arcs start and end at the right centroids", {
+  skip_slow_on_cran()
   skip_poly()
   od <- data.frame(from = "France", to = "Germany")
   b <- built(flow_map(od, from, to))

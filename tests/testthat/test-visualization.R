@@ -1,6 +1,7 @@
 snap <- countryatlas::world_snapshot$countries
 
 test_that("world_map builds a ggplot for several styles", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   mapdf <- attach_geometry(snap, geometry = "polygon")
   for (style in c("continuous", "binned", "quantile", "categorical")) {
@@ -28,6 +29,7 @@ test_that("world_map renders in every documented projection", {
 })
 
 test_that("na_label renames the discrete legend's NA key", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   mapdf <- attach_geometry(snap, geometry = "polygon")
   labels_of <- function(p) {
@@ -49,6 +51,7 @@ test_that("na_label renames the discrete legend's NA key", {
 })
 
 test_that("bubble_map, tile_map and flow_map build", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   expect_s3_class(suppressWarnings(bubble_map(snap, population)), "ggplot")
   expect_s3_class(suppressWarnings(tile_map(snap, gdp_per_capita)), "ggplot")
@@ -58,6 +61,7 @@ test_that("bubble_map, tile_map and flow_map build", {
 })
 
 test_that("geom_country_labels does not inherit the group aesthetic", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   mapdf <- attach_geometry(snap, geometry = "polygon")
   p <- world_map(mapdf, gdp_per_capita) + geom_country_labels(repel = FALSE)
@@ -102,6 +106,7 @@ test_that("sf-only plots error cleanly without sf", {
 })
 
 test_that("bivariate_map builds a ggplot (needs sf + biscale)", {
+  skip_slow_on_cran()
   # Regression: the fill columns were injected into biscale::bi_class() with
   # `!!sym()`, but bi_class() reads them with as.character(substitute(...)),
   # so every call failed with "the condition has length > 1".
@@ -165,6 +170,7 @@ test_that("dorling_map errors cleanly without sf/cartogram", {
 })
 
 test_that("a Dorling cartogram is area-proportional and does not overlap", {
+  skip_slow_on_cran()
   # Sixteen tests cover this family's validation, package gating, cell counts
   # and denominators -- none of them the two properties that make the output a
   # Dorling cartogram at all. Passing the wrong column, or skipping the
@@ -196,6 +202,7 @@ test_that("a Dorling cartogram is area-proportional and does not overlap", {
 })
 
 test_that("a gridded cartogram keeps countries near where they really are", {
+  skip_slow_on_cran()
   # The grid is only a map if a country's cell tracks its real position; a
   # mis-assignment would draw a plausible-looking grid of the wrong countries.
   skip_if_no_sf_geometry()
@@ -214,6 +221,7 @@ test_that("a gridded cartogram keeps countries near where they really are", {
 })
 
 test_that("dorling_map builds a ggplot (needs sf + cartogram)", {
+  skip_slow_on_cran()
   skip_if_not_installed("sf")
   skip_if_not_installed("cartogram")
   skip_if_not_installed("rnaturalearth")
@@ -251,6 +259,7 @@ test_that("world_map quantile breaks are country-weighted, not vertex-weighted",
 # while computing aesthetics ... Caused by error in `.data$long`".
 
 test_that("world_map rejects a frame with no geometry, at the call", {
+  skip_slow_on_cran()
   snap <- countryatlas::world_snapshot$countries
   expect_error(world_map(snap, gdp_per_capita), "no map geometry")
   expect_error(world_map(snap, gdp_per_capita), class = "countryatlas_error")
@@ -264,6 +273,7 @@ test_that("world_map rejects a frame with no geometry, at the call", {
 })
 
 test_that("world_map still accepts every documented route to geometry", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   snap <- countryatlas::world_snapshot$countries
   poly <- attach_geometry(snap, geometry = "polygon")
@@ -431,6 +441,7 @@ test_that("animate_world validates before handing off to gganimate", {
 })
 
 test_that("jenks degrades to quantile breaks when classInt is absent", {
+  skip_slow_on_cran()
   # A documented fallback that had no test of its own: it surfaced only as an
   # unexplained warning in the Suggests-free check tally.
   skip_if_not_installed("maps")
@@ -480,6 +491,7 @@ test_that("flow_map says when it cannot place a flow", {
 })
 
 test_that("geom_country_labels rejects an sf frame with an actionable message", {
+  skip_slow_on_cran()
   # The layer's own aes(x = long, y = lat) was evaluated against the sf frame,
   # which has neither column, so the failure was rlang's data-pronoun abort:
   # "Column `long` not found in `.data`". The 0-row guard inside label_data()
@@ -497,6 +509,7 @@ test_that("geom_country_labels rejects an sf frame with an actionable message", 
 })
 
 test_that("label placement survives the antimeridian without `group`", {
+  skip_slow_on_cran()
   # polygon_centroids() is exact because `group` identifies each country's
   # pieces and the label goes on the largest. Without it, a plain mean(range())
   # put every country that crosses 180 degrees on the far side of the planet:

@@ -1,17 +1,27 @@
 ## Resubmission
 
-The first 3.0.0 upload failed the incoming checks with two NOTEs. Both are
-fixed:
+This is the second resubmission of 3.0.0. Both earlier uploads were stopped
+by the incoming checks.
 
-* **Possibly misspelled words in DESCRIPTION** (Tissot's, indicatrix,
-  inspectable): the sentence is reworded. The DESCRIPTION spell check run the
-  way the incoming check runs it (aspell, `en_US` with `en_GB`) now reports
-  nothing that 2.0.1 did not already carry.
-* **Overall checktime 12 min > 10 min** on r-devel-windows-x86_64, 503s of it
-  the tests. The 125 slowest tests (cartograms, sweeps over every map verb or
-  projection, full-world renders) now skip on CRAN and still run on every CI
-  leg. On the maintainer's machine the test step of `R CMD check --as-cran`
-  takes 141s, down from 462s.
+* **Overall checktime 12 min > 10 min** on r-devel-windows-x86_64, both
+  times. Skipping the 125 slowest tests on CRAN, the first fix, took the test
+  step there from 503s to 358s and no further: that machine ran the remaining
+  tests 2.5 times slower than the maintainer's does. This upload goes much
+  further.
+  * A performance bug is fixed. A hatched world map, `world_map(na_style =
+    "hatched")` on the polygon backend, took 29s to print because the
+    stripes were clipped separately to each of 169 polygons. They are now
+    clipped once, and the same map prints in about a second. That one map
+    was 56s of the vignettes' time.
+  * CRAN runs only the tests that take under 0.15s each: 454 of 917. All 917
+    still run on every CI leg, which sets `NOT_CRAN=true`.
+  * On the maintainer's machine the test step of `R CMD check --as-cran` is
+    now 38s (462s at the first upload, 141s at the second), the vignette
+    rebuild 50s (104s), and the whole check 4.3 minutes including
+    `--run-donttest`.
+* **Possibly misspelled words in DESCRIPTION** (first upload only: Tissot's,
+  indicatrix, inspectable): the sentence is reworded, and the second upload's
+  pretest no longer reported it.
 
 The WARNING in the released version's results (r-release-windows-x86_64,
 "unable to access index for repository

@@ -93,6 +93,7 @@ test_that("locate_country errors on mismatched lon/lat lengths", {
 })
 
 test_that("locate_country snaps coastal points but leaves open ocean NA", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   # New York sits ~0.5 km outside the coarse 110m US coastline: the default
   # tolerance snaps it to the US, strict mode (tolerance_km = 0) does not.
@@ -103,6 +104,7 @@ test_that("locate_country snaps coastal points but leaves open ocean NA", {
 })
 
 test_that("country_borders returns a tidy edge list", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   edges <- country_borders()
   expect_s3_class(edges, "tbl_df")
@@ -117,12 +119,14 @@ test_that("country_borders returns a tidy edge list", {
 })
 
 test_that("country_borders never lists a country bordering itself", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   edges <- country_borders()
   expect_false(any(edges$iso3c_a == edges$iso3c_b))
 })
 
 test_that("neighbors lists a country's bordering countries", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   nbr <- neighbors("France")
   expect_s3_class(nbr, "tbl_df")
@@ -131,6 +135,7 @@ test_that("neighbors lists a country's bordering countries", {
 })
 
 test_that("neighbors returns zero rows for islands", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   nbr <- neighbors("Japan")
   expect_equal(nrow(nbr), 0)
@@ -145,6 +150,7 @@ test_that("locate_country names Kosovo (XKX has no countrycode row)", {
 })
 
 test_that("country_borders names every endpoint, Kosovo included", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   edges <- country_borders()
   expect_false(anyNA(edges$country_a))
@@ -184,6 +190,7 @@ test_that("world_geometry accepts a bounding-box region on the sf backend", {
 })
 
 test_that("polygon_centroids returns one centroid per iso3c", {
+  skip_slow_on_cran()
   # Bug 3.3: PRT / ESP / BES must each produce ONE row, not multiple.
   skip_if_not_installed("maps")
   poly <- countryatlas:::world_polygons()
@@ -197,6 +204,7 @@ test_that("polygon_centroids returns one centroid per iso3c", {
 })
 
 test_that("attach_geometry threads custom overrides into geometry matching", {
+  skip_slow_on_cran()
   # Regression: world_data(overrides=) / attach_geometry(overrides=) were
   # accepted but silently ignored -- the geometry backend always matched with
   # the default override set. A custom set must now actually take effect.
@@ -231,6 +239,7 @@ test_that("attach_geometry drops rows the backend has no geometry for", {
 })
 
 test_that("sf coverage is monotone in scale, and medium beats small", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   codes <- function(sc) {
     unique(stats::na.omit(countryatlas:::get_world_sf(scale = sc,
@@ -255,6 +264,7 @@ test_that("sf coverage is monotone in scale, and medium beats small", {
 # it. The layer drew nothing, in every projection.
 
 test_that("every what value returns a real sf object", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   for (w in c("countries", "centroids", "coastline", "borders", "graticule",
               "ocean")) {
@@ -308,6 +318,7 @@ test_that("ocean refuses the cases it cannot draw, and says why", {
 })
 
 test_that("only orthographic drops the far side; the Lambert three keep it", {
+  skip_slow_on_cran()
   # ?world_geometry used to call all four azimuthal projections "hemispheric",
   # which is true of "orthographic" (+proj=ortho) alone. The other three are
   # Lambert azimuthal equal-area, which images the whole globe with the far side
@@ -338,6 +349,7 @@ test_that("the ISO-less Natural Earth features are documented", {
 })
 
 test_that("sf centroid columns are projected units, as documented", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   # ?world_geometry now says these are in the returned object's CRS. Pin it, so
   # nobody reads centroid_lon as a longitude by accident.
@@ -379,6 +391,7 @@ test_that("no geometry layer is degenerate in any projection", {
 })
 
 test_that("the countries layer is a homogeneous MULTIPOLYGON column", {
+  skip_slow_on_cran()
   # Natural Earth hands over 177 uniform MULTIPOLYGONs, but
   # st_break_antimeridian() runs an st_intersection internally that collapses a
   # single-part MULTIPOLYGON to a POLYGON -- leaving 148 POLYGON + 29
@@ -412,6 +425,7 @@ test_that("the countries layer is a homogeneous MULTIPOLYGON column", {
 })
 
 test_that("a hemispheric projection leaves the far side empty, not malformed", {
+  skip_slow_on_cran()
   # Orthographic hides half the globe, so those countries have no image. The
   # empty geometries are correct; recorded here so the resulting
   # st_coordinates() limitation is not mistaken for the bug fixed above.
@@ -434,6 +448,7 @@ test_that("a hemispheric projection leaves the far side empty, not malformed", {
 # so the fix applied at the source was undone downstream.
 
 test_that("simplify_geometry preserves a homogeneous geometry column", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   g <- world_geometry("countries", geometry = "sf")
   expect_equal(unique(as.character(sf::st_geometry_type(g))), "MULTIPOLYGON")
@@ -536,6 +551,7 @@ test_that("every geometry-returning path keeps a usable geometry column", {
 })
 
 test_that("resolve_region reads every branch off the same trimmed value", {
+  skip_slow_on_cran()
   # Only the iso3c branch trimmed, so one trailing space produced three
   # different outcomes: "FRA " resolved, "Europe " fell through to name
   # matching and errored, and "EU " was silently taken as a three-letter code
@@ -580,6 +596,7 @@ test_that("resolve_region reads every branch off the same trimmed value", {
 })
 
 test_that("a padded region reaches the public callers intact", {
+  skip_slow_on_cran()
   # resolve_region() is internal; the defect was only visible through the
   # functions that call it, so pin it there too. Without this, the fix is
   # asserted one level below where a user would ever meet it.

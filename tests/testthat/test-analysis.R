@@ -7,6 +7,7 @@ test_that("per_capita divides by a supplied population column", {
 })
 
 test_that("per_capita reports a failed population fetch clearly", {
+  skip_slow_on_cran()
   # Regression: fetch_wdi() degrades to a keys-only tibble when the World Bank
   # fetch fails (a timeout, say), and per_capita() then died on an opaque
   # vctrs error -- "Can't subset columns that don't exist: `.wdj_pop`".
@@ -324,6 +325,7 @@ test_that("aggregating groups that do have data is unchanged", {
 })
 
 test_that("aggregate_regions warns when handed map geometry", {
+  skip_slow_on_cran()
   # The polygon backend expands each country into ~400 vertex rows, so a
   # row-wise sum counts it that many times: for the bundled snapshot a regional
   # total of 497,265 became 280,951,373, silently. It cannot de-duplicate on
@@ -349,6 +351,7 @@ test_that("aggregate_regions warns when handed map geometry", {
 })
 
 test_that("complete_years(value=) does not fill the columns it was not given", {
+  skip_slow_on_cran()
   # `static <- setdiff(names(data), c("year", value))` counted an unlisted
   # numeric column as a static attribute, so it got carry-filled -- naming
   # *fewer* columns in `value` fabricated *more* data, and even method = "none"
@@ -376,6 +379,7 @@ test_that("complete_years(value=) does not fill the columns it was not given", {
 })
 
 test_that("aggregate_regions refuses a weight it would ignore", {
+  skip_slow_on_cran()
   # `weight` is read only by fun = "weighted_mean". Any other fun silently
   # returned the *unweighted* figure -- on European GDP per capita that is
   # 38,323 against a population-weighted 29,896, a 22% error with nothing to

@@ -61,6 +61,7 @@ test_that("custom weights accept a long frame -- non-geographic adjacency", {
 })
 
 test_that("morans_i accepts weights and the scheme changes the answer", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   set.seed(1)
   contig <- morans_i(snap, gdp_per_capita, n_perm = 0)
@@ -93,6 +94,7 @@ test_that("local_morans classifies clusters and lisa_map draws them", {
 })
 
 test_that("gearys_c is centred on 1 and points the other way from Moran", {
+  skip_slow_on_cran()
   set.seed(1)
   w <- country_weights("knn", k = 5)
   g <- gearys_c(snap, gdp_per_capita, weights = w, n_perm = 99)
@@ -126,6 +128,7 @@ test_that("spatial_lag is the neighbour average", {
 })
 
 test_that("a weight scheme that reaches nobody errors clearly", {
+  skip_slow_on_cran()
   one <- snap[snap$iso3c %in% c("JPN", "AUS"), ]
   skip_if_no_sf_geometry()
   expect_error(morans_i(one, gdp_per_capita, n_perm = 0),
@@ -245,6 +248,7 @@ test_that("as_of gives point-in-time membership", {
 })
 
 test_that("as_of accepts dates, years and strings, and rejects the rest", {
+  skip_slow_on_cran()
   expect_equal(nrow(country_groups("EU", as_of = as.Date("2016-06-01"))), 28L)
   expect_equal(nrow(country_groups("EU", as_of = "2016-06-01")), 28L)
   for (bad in list("nope", 42, c(2000, 2001), NA, TRUE)) {
@@ -397,6 +401,7 @@ test_that("check_dispute_coverage reports both directions", {
 })
 
 test_that("world_map(disputes) marks and annotates", {
+  skip_slow_on_cran()
   mapdf <- poly_df()
   plain <- world_map(mapdf, gdp_per_capita)
   marked <- world_map(mapdf, gdp_per_capita, disputes = "mark")
@@ -564,6 +569,7 @@ test_that("flow_matrix accumulates repeated pairs", {
 })
 
 test_that("flow_matrix warns about endpoints it cannot resolve", {
+  skip_slow_on_cran()
   od <- data.frame(from = c("China", "Wakanda"), to = c("USA", "USA"),
                    value = c(1, 2))
   expect_warning(m <- flow_matrix(od, from, to, value), "did not resolve")
@@ -615,6 +621,7 @@ test_that("od_map draws one panel per origin", {
 # --- reporting --------------------------------------------------------------------
 
 test_that("country_factsheet assembles what the package knows", {
+  skip_slow_on_cran()
   fs <- country_factsheet("Brazil")
   expect_s3_class(fs, "countryatlas_factsheet")
   expect_equal(fs$iso3c, "BRA")
@@ -630,6 +637,7 @@ test_that("country_factsheet assembles what the package knows", {
 })
 
 test_that("world_table ranks and formats", {
+  skip_slow_on_cran()
   t1 <- world_table(snap, gdp_per_capita, top_n = 5, engine = "tibble")
   expect_equal(nrow(t1), 5L)
   expect_equal(t1$rank, 1:5)
@@ -687,6 +695,7 @@ test_that("cartogram_diagnostics measures the residual area error", {
 })
 
 test_that("projection_distortion agrees with what each projection claims", {
+  skip_slow_on_cran()
   skip_if_not_installed("sf")
   areal <- function(p) attr(projection_distortion(p, "areal", spacing = 20),
                             "countryatlas_distortion")
@@ -707,6 +716,7 @@ test_that("projection_distortion agrees with what each projection claims", {
 # --- renderers ----------------------------------------------------------------------
 
 test_that("interactive_map gains a mapgl engine", {
+  skip_slow_on_cran()
   skip_if_not_installed("mapgl")
   skip_if_no_sf_geometry()
   d <- sf_df()
@@ -719,6 +729,7 @@ test_that("interactive_map gains a mapgl engine", {
 })
 
 test_that("globe_map(interactive) returns a WebGL globe", {
+  skip_slow_on_cran()
   skip_if_not_installed("mapgl")
   skip_if_no_sf_geometry()
   expect_s3_class(globe_map(sf_df(), gdp_per_capita, interactive = TRUE),
@@ -728,6 +739,7 @@ test_that("globe_map(interactive) returns a WebGL globe", {
 })
 
 test_that("world_map(engine = 'tmap') renders through tmap", {
+  skip_slow_on_cran()
   skip_if_not_installed("tmap")
   skip_if_no_sf_geometry()
   expect_s3_class(world_map(sf_df(), gdp_per_capita, engine = "tmap"), "tmap")
@@ -763,6 +775,7 @@ test_that("country_join can key on COW/Gleditsch-Ward codes", {
 })
 
 test_that("the alternate spine warns about the territories it cannot carry", {
+  skip_slow_on_cran()
   a <- data.frame(country = "Hong Kong", gdp = 1)
   b <- data.frame(nation = "Hong Kong SAR, China", pop = 7)
   # COW/GW cover sovereign states, so a dependency has no code. A two-sided
@@ -827,6 +840,7 @@ test_that("nuts_geometry validates the vintage before reaching the network", {
 # check the arithmetic, not the API.
 
 test_that("the spatial statistics match spdep", {
+  skip_slow_on_cran()
   skip_if_not_installed("spdep")
   w <- country_weights("knn", k = 5)
   al <- countryatlas:::align_weights(snap, "gdp_per_capita", w)
@@ -1004,6 +1018,7 @@ test_that("the new world_map arguments combine without breaking each other", {
 })
 
 test_that("a VSUP on a categorical fill is refused with useful advice", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   mapdf <- poly_df()
   mapdf$se <- 1
@@ -1018,6 +1033,7 @@ test_that("a VSUP on a categorical fill is refused with useful advice", {
 })
 
 test_that("coverage and the classification report count the same countries", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   mapdf <- poly_df()
   for (ns in c("grey", "omit")) {
@@ -1035,6 +1051,7 @@ test_that("coverage and the classification report count the same countries", {
 })
 
 test_that("map_provenance surfaces every field the verbs record", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   mapdf <- poly_df()
   set.seed(1)
@@ -1051,6 +1068,7 @@ test_that("map_provenance surfaces every field the verbs record", {
 })
 
 test_that("printing a subset of a provenance object does not crash", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   pr <- map_provenance(world_map(poly_df(), gdp_per_capita))
   # Subsetting a tibble keeps its class, so the print method still dispatches
@@ -1064,6 +1082,7 @@ test_that("printing a subset of a provenance object does not crash", {
 # --- options are validated where they are read --------------------------------------
 
 test_that("an unrecognised dispute_policy option falls back rather than propagating", {
+  skip_slow_on_cran()
   old <- getOption("countryatlas.dispute_policy")
   withr::defer(options(countryatlas.dispute_policy = old))
   # Every other option the package reads is validated on read; this one was not,
@@ -1080,6 +1099,7 @@ test_that("an unrecognised dispute_policy option falls back rather than propagat
 })
 
 test_that("a bogus dispute_policy cannot reach a map caption", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   old <- getOption("countryatlas.dispute_policy")
   withr::defer(options(countryatlas.dispute_policy = old))
@@ -1153,6 +1173,7 @@ test_that("an alternate-key multi-table join names which table it lost", {
 # --- choice arguments name themselves when rejected ---------------------------------
 
 test_that("a bad projection or scale is reported by name, from any entry point", {
+  skip_slow_on_cran()
   # match.arg() on a variable inside a helper produces R's anonymous
   # "'arg' should be one of ..." -- naming neither the argument nor the function
   # the user actually called. Seventeen exported functions take `projection` and
@@ -1180,6 +1201,7 @@ test_that("a bad projection or scale is reported by name, from any entry point",
 })
 
 test_that("check_choice accepts the documented default and rejects the rest", {
+  skip_slow_on_cran()
   ch <- c("a", "b", "c")
   # A caller that passed nothing hands the whole default vector through, exactly
   # as match.arg() would, and must get the first element.
@@ -1211,6 +1233,7 @@ test_that("wdj_workers honours the contract it documents", {
 })
 
 test_that("wdj_lapply agrees with lapply and preserves order", {
+  skip_slow_on_cran()
   f <- function(i) i^2
   expect_identical(countryatlas:::wdj_lapply(1:6, f, parallel = TRUE),
                    countryatlas:::wdj_lapply(1:6, f, parallel = FALSE))
@@ -1245,6 +1268,7 @@ test_that("every override maps to a code the package recognises", {
 })
 
 test_that("the source adapters validate `indicator` before doing anything else", {
+  skip_slow_on_cran()
   # All four are exported in their own right, so each has to repeat the check
   # fetch_indicator() does at its front door. Before this, fetch_owid(NULL) and
   # its eurostat/oecd siblings returned a silent NULL -- lapply() over an empty
@@ -1351,6 +1375,7 @@ test_that("flow_matrix fill applies only to pairs with no flow", {
 })
 
 test_that("od_map says when a named origin sends no flow", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # Italy appears only as a destination, so it has nothing to draw. Filtering
   # the top-N list silently is what "top N" means; dropping an origin the
@@ -1368,6 +1393,7 @@ test_that("od_map says when a named origin sends no flow", {
 })
 
 test_that("top_n is validated, not just tested for finiteness", {
+  skip_slow_on_cran()
   # check_number() rejects Inf, which is the documented "no limit", so the guard
   # was `if (is.finite(top_n))` alone -- and everything is.finite() rejects then
   # skipped validation entirely. top_n = "5" and NA silently returned every row.
@@ -1451,6 +1477,7 @@ test_that("deflate says which countries have no base-year deflator", {
 })
 
 test_that("value_by_alpha_map keeps opacity absolute", {
+  skip_slow_on_cran()
   # `a` is normalised to [0, 1] by every transform, so the alpha scale is
   # pinned there. Without limits it rescaled to whatever spread the frame
   # happened to have: an equalize column with nothing usable collapsed to a
@@ -1474,6 +1501,7 @@ test_that("value_by_alpha_map keeps opacity absolute", {
 })
 
 test_that("a VSUP counts coverage on both columns, not just the fill", {
+  skip_slow_on_cran()
   # A value-suppressing palette needs a value *and* an uncertainty, so a country
   # with only the first gets no colour. `coverage` counted missing fill values
   # alone, so footnote = "auto" -- the feature whose whole job is to stop a map
@@ -1515,6 +1543,7 @@ test_that("a VSUP counts coverage on both columns, not just the fill", {
 })
 
 test_that("bivariate_map counts coverage on both variables", {
+  skip_slow_on_cran()
   # A bivariate class needs both variables, so a country holding only one is
   # drawn as no-data -- but provenance counted the x column alone and called it
   # shown. Same overstatement the VSUP path made, in a different verb.
@@ -1571,6 +1600,7 @@ test_that("a cartogram reports the world it started from, not the one it kept", 
 })
 
 test_that("gridded_cartogram reports the whole input as its denominator", {
+  skip_slow_on_cran()
   # Two filters drop countries the grid cannot represent -- no positive value,
   # no bundled centroid -- and provenance was computed on whatever survived
   # them, so n_total shrank to match. A grid covering 94 of 215 countries
@@ -1616,6 +1646,7 @@ test_that("coverage does not count an uncoded geometry row as a country", {
 })
 
 test_that("a bare `as_of` year means 1 January of that year", {
+  skip_slow_on_cran()
   # The convention decides the answer at every mid-year accession, and reading
   # `as_of = 2013` as "during 2013" gives the opposite result. Pinned so it
   # cannot drift away from what the documentation now promises.
@@ -1687,6 +1718,7 @@ test_that("weighted_mean returns NA, not NaN, when the weights sum to zero", {
 })
 
 test_that("country_join reports names that reconcile to nothing", {
+  skip_slow_on_cran()
   # Reconciling both sides to a common key is the whole premise, so a name that
   # reconciles to nothing is the failure this verb exists to prevent -- and it
   # was the one join that never said so. wdj_to_key() only speaks up when a
@@ -1820,6 +1852,7 @@ test_that("subnational_map notices regions that match no geometry", {
 })
 
 test_that("projection_info's properties agree with measured distortion", {
+  skip_slow_on_cran()
   # The table is a set of factual claims about thirteen projections, and
   # projection_distortion() can check every one of them from the Jacobian. The
   # separation is two orders of magnitude, so this is a real assertion rather
@@ -1895,6 +1928,7 @@ test_that("world_map says when it is handed a panel", {
 })
 
 test_that("one-row-per-country verbs say when they collapse a panel", {
+  skip_slow_on_cran()
   # Collapsing to one row per country is for repeated *geometry* rows, not for
   # time. Handed a panel these kept whichever row sorted first -- France's 2018
   # value of 10 out of 10/20/30 -- and presented that year as the answer with
@@ -1921,6 +1955,7 @@ test_that("one-row-per-country verbs say when they collapse a panel", {
 })
 
 test_that("a repeated country-year is reported before it corrupts a lag", {
+  skip_slow_on_cran()
   # Every panel verb here reads neighbouring rows. With France's 2019 present
   # twice (20 and 999), lag_by_country() lagged 2020 against the duplicate
   # rather than the real 2019, and diff_by_country() and growth_rate() turned
@@ -1969,6 +2004,7 @@ test_that("complete_years names a non-numeric year column", {
 })
 
 test_that("attach_geometry says when the key matches nothing at all", {
+  skip_slow_on_cran()
   # An unmatched code is ordinary here -- the basemap holds fewer countries than
   # the snapshot, since small states have no polygon at 110m -- so warning about
   # one would be noise. Zero matches is different: lowercase, mixed-case and
@@ -1993,6 +2029,7 @@ test_that("attach_geometry says when the key matches nothing at all", {
 })
 
 test_that("tile_map and add_indicator say when the key matches nothing", {
+  skip_slow_on_cran()
   # Same failure as attach_geometry(): a lowercase or padded iso3c matches
   # nothing, so every tile drew grey and the fetched indicator arrived as a
   # column of pure NA -- which reads as "the provider has no data" rather than
@@ -2058,6 +2095,7 @@ test_that("simplify_geometry and theme_world_map validate their first argument",
 })
 
 test_that("distance_between separates a missing centroid from a bad name", {
+  skip_slow_on_cran()
   # Two reasons for an NA distance, and only one is the documented gap.
   # "Resolved to a country that has no bundled centroid" is expected --
   # ?distance_between says so and country_weights() already reports it -- so it
@@ -2165,6 +2203,7 @@ test_that("the weighted and decomposed paths match their definitions too", {
 })
 
 test_that("tile_map draws one cell per country, panel or not", {
+  skip_slow_on_cran()
   # The grid has exactly one cell per country, so joining a panel to it fanned
   # the cells out -- 239 became 659 overlapping tiles, each country's drawn once
   # per year with the last row winning, silently. The other one-cell-per-country
@@ -2318,6 +2357,7 @@ test_that("complete_years rejects a missing year", {
 })
 
 test_that("wdi_search and spin_globe validate the arguments they were missing", {
+  skip_slow_on_cran()
   # wdi_search() checked `field` and nothing else. A non-string `pattern` went
   # straight into the regex and matched something: wdi_search(1) returned
   # 10,125 rows and wdi_search(NA) the entire catalogue, both silently.
@@ -2344,6 +2384,7 @@ test_that("wdi_search and spin_globe validate the arguments they were missing", 
 })
 
 test_that("custom_match must be a name -> iso3c map", {
+  skip_slow_on_cran()
   # `origin` was checked and the override table was not, though every value in
   # it lands in the iso3c column -- and wdj_to_iso3c()'s iso3c branch
   # whitelists those values as valid by construction, so nothing downstream
@@ -2369,6 +2410,7 @@ test_that("custom_match must be a name -> iso3c map", {
 })
 
 test_that("`add` reports its own problems, not countrycode's", {
+  skip_slow_on_cran()
   # `add` names attributes to derive from iso3c. Unvalidated, its problems came
   # back under somebody else's argument: countrycode's `destination` for an
   # unknown name ("must be ... one of the column names in the conversion
@@ -2400,6 +2442,7 @@ test_that("`add` reports its own problems, not countrycode's", {
 })
 
 test_that("region reports a no-match instead of drawing an empty map", {
+  skip_slow_on_cran()
   # `region` accepts a continent, a group, iso3c codes, country names or a
   # bounding box -- and anything that matched none of those fell through to
   # name-matching, resolved to NA, and produced a silent empty subset. A typo
@@ -2429,6 +2472,7 @@ test_that("region reports a no-match instead of drawing an empty map", {
 })
 
 test_that("world_data validates classify and language before fetching", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # `classify` was filtered with intersect(), which silently dropped anything
   # unrecognised -- so classify = "incomes" added no classification columns and
@@ -2664,6 +2708,7 @@ test_that("n_bins means the same thing in every binned style", {
 })
 
 test_that("a continuous colourbar reports no classes rather than inventing them", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # The fallback was as.factor(vals) -- one "class" per distinct value -- so a
   # continuous fill produced a 189-row report of n = 1 that looked like a
@@ -2721,6 +2766,7 @@ test_that("flow_map arcs cross the antimeridian instead of the whole map", {
 })
 
 test_that("flow_map legends carry the caller's weight column name", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # The internal arc frame's column is literally called `weight`, so ggplot2
   # titled both legends "weight" whatever the user had mapped.
@@ -2844,6 +2890,7 @@ test_that("a failed download is not written to the on-disk cache", {
 })
 
 test_that("register_country_source(cache = ) actually memoises", {
+  skip_slow_on_cran()
   # `cache` was stored in the registry and reported by country_sources(), but
   # nothing ever read it: the documented per-session memoisation never happened
   # and cache = FALSE was equally inert.
@@ -2965,6 +3012,7 @@ test_that("world_table only claims a rank when it ranked something", {
 })
 
 test_that("a column argument that is not a column says so, in every verb", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # quo_arg_name() called rlang::as_name() straight out, so anything that was
   # not a symbol or a string threw rlang's own error -- "Can't convert a double
@@ -3123,6 +3171,7 @@ test_that("subnational frames are counted by region, not collapsed to countries"
 })
 
 test_that("country_join says when standardising collapsed two names into one", {
+  skip_slow_on_cran()
   # wdj_to_key() maps distinct inputs onto one code -- "France" and "FRANCE ",
   # or "Congo" and "Congo-Kinshasa" -- and the join then multiplies the other
   # side's rows. dplyr does not warn: with unique keys on one side that is an
@@ -3156,6 +3205,7 @@ test_that("country_join says when standardising collapsed two names into one", {
 })
 
 test_that("standardize_country says when it clobbers columns you did not ask for", {
+  skip_slow_on_cran()
   # `add` defaults to c("iso3c", "iso2c", "continent", "region"), so the call
   # everyone makes -- standardize_country(d, country), to get iso3c -- also
   # replaced any continent/region/iso2c the caller already had, silently. Eleven
@@ -3188,6 +3238,7 @@ test_that("standardize_country says when it clobbers columns you did not ask for
 })
 
 test_that("the one-row-per-country rule really takes the earliest year", {
+  skip_slow_on_cran()
   # distinct_countries() warns "only the earliest year of each country is
   # used", but the code was distinct(iso3c, .keep_all = TRUE), which keeps
   # whichever row is *first in the frame*. That is the earliest year only if
@@ -3251,6 +3302,7 @@ test_that("the one-row-per-country rule really takes the earliest year", {
 })
 
 test_that("the spatial statistics take a deterministic cross-section of a panel", {
+  skip_slow_on_cran()
   # align_weights() -- shared by morans_i, gearys_c, getis_ord, local_morans,
   # spatial_lag and lisa_map -- reduced to one row per country with a bare
   # distinct(iso3c, .keep_all = TRUE). Handed a panel it kept whichever row
@@ -3364,6 +3416,7 @@ test_that("the coverage caption reads as English at every size", {
 })
 
 test_that("map_provenance carries the denominator, not just the numerator", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # `n_countries` is coverage$n_shown -- the countries actually drawn with a
   # value. The name reads like the map's country total, which is
@@ -3390,6 +3443,7 @@ test_that("map_provenance carries the denominator, not just the numerator", {
 })
 
 test_that("a constant column makes the spatial statistics say so, not return NaN", {
+  skip_slow_on_cran()
   # Moran's I, Geary's C, Getis-Ord and the local variants all divide by the
   # cross-sectional variance, so a column with no variation is 0/0. They
   # returned NaN -- and getis_ord's z-score Inf -- with nothing said, which for
@@ -3460,6 +3514,7 @@ test_that("gini and theil say why they return NA", {
 })
 
 test_that("sigma_convergence explains an empty or blank series", {
+  skip_slow_on_cran()
   # The positive-value filter is documented (`n` counts what survived), but two
   # of its outcomes were not: an all-non-positive column came back as a 0-row
   # tibble, and a year with one country got sigma = NA from sd() -- both in
@@ -3534,6 +3589,7 @@ test_that("as_ggsql_source is explicit about who owns the connection", {
 })
 
 test_that("country_weights validates a custom matrix instead of failing later", {
+  skip_slow_on_cran()
   # weights_custom() checked the row/column names and nothing else, so three
   # kinds of bad input leaked a bare base-R error from somewhere downstream --
   # a character matrix reached rowSums() as "'x' must be numeric", an NA entry
@@ -3585,6 +3641,7 @@ test_that("country_weights validates a custom matrix instead of failing later", 
 })
 
 test_that("smooth_rates and to_ppp say when they had nothing to work with", {
+  skip_slow_on_cran()
   # rate_check() had exactly this bug fixed already -- "returned an all-NA
   # flagged column in silence" -- but its two siblings kept it. With no usable
   # denominator every rate is NA and the smoothed column with it; with no usable
@@ -3659,6 +3716,7 @@ test_that("the weights print method describes every scheme it can build", {
 })
 
 test_that("weights that link nothing say so at construction", {
+  skip_slow_on_cran()
   # An edgeless graph built happily and then failed wherever it was used, as
   # "Not enough connected countries with data" -- an error about the *data*,
   # raised far from the cutoff or the matrix that actually caused it.
@@ -3688,6 +3746,7 @@ test_that("weights that link nothing say so at construction", {
 })
 
 test_that("per_capita gives NA, not Inf, for an unusable population", {
+  skip_slow_on_cran()
   # deflate() and to_ppp() were fixed for this under a test literally called
   # "an unusable deflator or PPP factor gives NA, not Inf", whose comment notes
   # that Inf "propagated silently into every scale and summary downstream".
@@ -3727,6 +3786,7 @@ test_that("per_capita gives NA, not Inf, for an unusable population", {
 })
 
 test_that("tile_map counts only the countries the grid can place", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # The same overstatement bubble_map() and spike_map() had: the bundled grid
   # does not cover every code -- Hong Kong and Macao have snapshot data and no
@@ -3754,6 +3814,7 @@ test_that("tile_map counts only the countries the grid can place", {
 })
 
 test_that("bivariate_map refuses a column it cannot classify", {
+  skip_slow_on_cran()
   # classInt needs two distinct values per axis to cut `dim` classes from. A
   # constant column reached it as classIntervals()'s bare "single unique
   # value" -- a simpleError from a third-party package naming neither the
@@ -3788,6 +3849,7 @@ test_that("bivariate_map refuses a column it cannot classify", {
 })
 
 test_that("adapter_reshape says when no entity resolved to a country", {
+  skip_slow_on_cran()
   # The entity column is resolved with suppressWarnings(), deliberately: every
   # OWID/Eurostat response carries aggregate rows ("World", "EU27") that never
   # resolve, so the per-name warning would fire on every call. The cost is that
@@ -3915,6 +3977,7 @@ test_that("every source path reads the year the same way", {
 })
 
 test_that("a year is read the same way outside the source adapters too", {
+  skip_slow_on_cran()
   # The bare as.integer() assumption was not confined to sources.R. Two more
   # sites took a year from the caller and read it wrong.
   # audit_time_coverage(): a Date year column became day counts
@@ -3964,6 +4027,7 @@ test_that("a factor value column is read as numbers, not level indices", {
 })
 
 test_that("fetch_indicator does not trust a source's key_col claim", {
+  skip_slow_on_cran()
   # key_col = "iso3c" is the source's *claim*, not a guarantee, and this is the
   # public extension point. Trusting it let lowercase codes ("usa") through
   # unchanged, kept a factor a factor, and passed numeric UN M49 codes (840)
@@ -4027,6 +4091,7 @@ test_that("the numeric-column verbs reject a non-numeric column up front", {
 })
 
 test_that("rank_countries and share_of_world report a repeated country-year", {
+  skip_slow_on_cran()
   # interpolate_missing() and complete_years() already report this shape, but
   # the two verbs that *aggregate across* rows did not -- and their output is
   # the harder to reconcile. On a frame with USA-2020 duplicated,
@@ -4114,6 +4179,7 @@ test_that("a wrong `origin` is our error, naming the scheme you meant", {
 })
 
 test_that("a source's key column is a column name, not a coding scheme", {
+  skip_slow_on_cran()
   # key_col is documented as "the country-key column `fetch` returns" and is
   # used to index that column -- but it was also handed to countrycode as
   # `origin`, so the only registrations that worked were ones whose column
@@ -4156,6 +4222,7 @@ test_that("a source's key column is a column name, not a coding scheme", {
 })
 
 test_that("the COW/GW key warning agrees with its own count", {
+  skip_slow_on_cran()
   # `where` sat between the count and `ha{?s/ve}`, so cli keyed the agreement
   # to a length-1 string and every plural read "5 countries ... has".
   msg <- function(n, side) {
@@ -4235,6 +4302,7 @@ test_that('world_table(engine = "tibble") names the title it cannot draw', {
 })
 
 test_that("index_to says base_year is required, as deflate does", {
+  skip_slow_on_cran()
   d <- data.frame(iso3c = c("FRA", "FRA"), year = c(2000L, 2001L),
                   gdp = c(100, 110), defl = c(90, 100))
   # It reached check_number() and gave base R's 'argument "base_year" is
@@ -4257,6 +4325,7 @@ test_that("index_to says base_year is required, as deflate does", {
 })
 
 test_that("every character column argument catches a bare symbol", {
+  skip_slow_on_cran()
   d <- data.frame(iso3c = c("FRA", "DEU", "ESP", "ITA"), year = 2000L,
                   gdp = c(1, 2, 3, 4), region = c("A", "B", "A", "B"))
   # These take strings but sit beside an argument that takes a bare column, so
@@ -4284,6 +4353,7 @@ test_that("every character column argument catches a bare symbol", {
 })
 
 test_that("spatial_lag names the countries its weights exclude", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   w <- country_weights("contiguity")
   islands <- data.frame(
@@ -4350,6 +4420,7 @@ test_that("neighbors tells a typo from a country with no land border", {
 })
 
 test_that("country_timeline reports a name it cannot resolve", {
+  skip_slow_on_cran()
   # It returned a row of NA in silence, where dissolve_country() -- same input
   # shape -- has always warned.
   w <- tryCatch(country_timeline("Nowhereland"), warning = function(x) x)
@@ -4378,6 +4449,7 @@ test_that("country_timeline reports a name it cannot resolve", {
 })
 
 test_that("a panel verb that computes nothing says so", {
+  skip_slow_on_cran()
   cs <- data.frame(iso3c = c("FRA", "DEU", "ESP"), year = 2000L,
                    gdp = c(1, 2, 3))
   # One year per country: there is no earlier value, so the derived column is
@@ -4429,6 +4501,7 @@ test_that("country_network checks top_n before building the network", {
 })
 
 test_that("share_of_world reports a total it cannot use", {
+  skip_slow_on_cran()
   mk <- function(v, y = 2000L) {
     data.frame(iso3c = c("FRA", "DEU", "ESP"), year = y, gdp = v)
   }
@@ -4466,6 +4539,7 @@ test_that("share_of_world reports a total it cannot use", {
 })
 
 test_that("a duplicated column name is named, not left to tibble", {
+  skip_slow_on_cran()
   # read.csv(check.names = FALSE) on a sheet with two `gdp` headers. Ten verbs
   # leaked tibble's ".name_repair" message; per_capita() and to_ppp() silently
   # computed from the first and dropped the second.
@@ -4511,6 +4585,7 @@ test_that("a duplicated column name is named, not left to tibble", {
 })
 
 test_that("the tmap engine names an older tmap instead of failing opaquely", {
+  skip_slow_on_cran()
   # DESCRIPTION pins no version on any Suggests package, so need_pkg("tmap") is
   # satisfied by any tmap -- including a 3.x that exports none of the scale
   # constructors this engine builds with. The capability is checked, not a
@@ -4546,6 +4621,7 @@ test_that("the tmap engine names an older tmap instead of failing opaquely", {
 })
 
 test_that("the tmap engine honours projection and names what it cannot do", {
+  skip_slow_on_cran()
   skip_if_not_installed("tmap")
   skip_if_no_sf_geometry()
   g <- world_geometry(geometry = "sf")
@@ -4589,6 +4665,7 @@ test_that("the tmap engine honours projection and names what it cannot do", {
 })
 
 test_that("globe_map(interactive = TRUE) validates before handing off", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   skip_if_not_installed("mapgl")
   g <- world_geometry(geometry = "sf")
@@ -4609,6 +4686,7 @@ test_that("globe_map(interactive = TRUE) validates before handing off", {
 })
 
 test_that("the tmap engine honours na_label", {
+  skip_slow_on_cran()
   skip_if_not_installed("tmap")
   skip_if_no_sf_geometry()
   g <- world_geometry(geometry = "sf")
@@ -4644,6 +4722,7 @@ test_that("the tmap engine honours na_label", {
 })
 
 test_that("the polygon backend says when it is ignoring projection", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   # `recenter` already warned when it could not be honoured; `projection` was
   # documented for the sf backend but taken and dropped in silence.
@@ -4702,6 +4781,7 @@ test_that('world_data(geometry = "none") still honours region', {
 })
 
 test_that("a multi-value scale is rejected before it becomes a cache key", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   # paste0("scale_", scale) vectorised, so `[[` on the cache environment failed
   # with base R's "wrong arguments for subsetting an environment". The scalar
@@ -4737,6 +4817,7 @@ test_that("the polygon backend says when it is ignoring scale", {
 })
 
 test_that("cartogram_diagnostics names invalid geometry, not s2's loop", {
+  skip_slow_on_cran()
   skip_if_not_installed("sf")
   bow <- sf::st_polygon(list(rbind(c(0, 0), c(2, 2), c(2, 0), c(0, 2), c(0, 0))))
   sq <- function(x0) sf::st_polygon(list(rbind(
@@ -4766,6 +4847,7 @@ test_that("cartogram_diagnostics names invalid geometry, not s2's loop", {
 })
 
 test_that("complete_years keeps sf and gives invented years real geometry", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   iso <- c("USA", "FRA", "DEU", "BRA")
   d <- expand.grid(iso3c = iso, year = 2000:2002, stringsAsFactors = FALSE)
@@ -4798,6 +4880,7 @@ test_that("complete_years keeps sf and gives invented years real geometry", {
 })
 
 test_that("no verb hands back a grouping the caller did not ask for", {
+  skip_slow_on_cran()
   iso <- c("USA", "FRA", "DEU", "BRA")
   d <- expand.grid(iso3c = iso, year = 2000:2002, stringsAsFactors = FALSE)
   for (cc in c("gdp", "pop", "num", "den")) {
@@ -4854,6 +4937,7 @@ test_that("no verb hands back a grouping the caller did not ask for", {
 })
 
 test_that("spatial_lag normalises on both of its branches", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   iso <- c("FRA", "DEU", "ESP", "ITA", "BEL", "NLD")
   d <- expand.grid(iso3c = iso, year = 2000:2002, stringsAsFactors = FALSE)
@@ -4872,6 +4956,7 @@ test_that("spatial_lag normalises on both of its branches", {
 })
 
 test_that('join_world(geometry = "none") still honours region', {
+  skip_slow_on_cran()
   d <- data.frame(country = c("France", "Germany", "Brazil", "China"),
                   gdp = 1:4)
   # Same defect as world_data(): the "none" branch returned before any of the
@@ -4927,6 +5012,7 @@ test_that("standardize_subnational says when it has no usable crosswalk", {
 })
 
 test_that("an unreachable or misshapen GISCO response is named", {
+  skip_slow_on_cran()
   # giscoR answers a failed download with NULL rather than an error, the same
   # shape fetch_owid() guards for owidR. Unguarded it reached sf as "no
   # applicable method for 'st_as_sf' applied to an object of class NULL"; a
@@ -4966,6 +5052,7 @@ test_that("an unreachable or misshapen GISCO response is named", {
 })
 
 test_that("a changed World Bank response shape is named, not called a failure", {
+  skip_slow_on_cran()
   # countrycode() is handed raw$iso2c directly, so a response with neither key
   # raised its own "sourcevar must be a character or numeric vector", which the
   # fetch wrapper relabelled "Could not fetch ... from the World Bank API" --
@@ -4999,6 +5086,7 @@ test_that("a changed World Bank response shape is named, not called a failure", 
 })
 
 test_that("a non-numeric provider response is reported, not silently NA", {
+  skip_slow_on_cran()
   # as.numeric() turns non-numeric text into NA without complaint, so a
   # provider answering with "n/a" or ".." handed back a column of pure NA that
   # reads as "no data for these countries" rather than "not numeric".
@@ -5039,6 +5127,7 @@ test_that("a non-numeric provider response is reported, not silently NA", {
 })
 
 test_that("the provider adapters report the rows they discard", {
+  skip_slow_on_cran()
   # Each adapter ends by keeping one row per country-year -- the contract the
   # joins rely on -- but kept whichever came first and said nothing, so a
   # provider answering with two different values for one country-year handed
@@ -5069,6 +5158,7 @@ test_that("the provider adapters report the rows they discard", {
 })
 
 test_that("a source whose keys collapse warns instead of repeating rows", {
+  skip_slow_on_cran()
   # Standardisation merges keys as well as failing on them: "United States"
   # and "USA" both reach USA, and add_indicator()'s left_join then matches
   # twice, so a two-row frame came back with three rows and one country
@@ -5166,6 +5256,7 @@ test_that("re-registering a source drops its memoised answers", {
 })
 
 test_that("a bare column in a string-taking verb says what to write", {
+  skip_slow_on_cran()
   # Nine of these verbs take a bare column through tidy eval; three take
   # strings -- interpolate_missing(value), complete_years(value) and
   # audit_coverage(indicator). Writing the bare column that works everywhere
@@ -5208,6 +5299,7 @@ test_that("a bare column in a string-taking verb says what to write", {
 })
 
 test_that("a brace in borrowed text does not replace the message", {
+  skip_slow_on_cran()
   # A cli bullet is a template, so text borrowed from somewhere else -- a
   # worker's error, a cache read failure, countrycode's own complaint -- had
   # its braces interpolated. A FUN failing with `bad json {"a": 1}` reported
@@ -5319,6 +5411,7 @@ test_that("compare_sources drops an unparseable year instead of inventing a row"
 })
 
 test_that("convert_country names its own from and to on a bad value", {
+  skip_slow_on_cran()
   # Every scheme other than "country.name" and "iso3c" skips the iso3c hop, so
   # `from` reaches countrycode() directly -- the one call the guard inside
   # wdj_to_iso3c() could not cover -- and was blamed on `origin`, which is not
@@ -5442,6 +5535,7 @@ test_that("interpolate_missing rejects duplicate column names", {
 })
 
 test_that("n_perm = 0 skips the permutation test on all three statistics", {
+  skip_slow_on_cran()
   # morans_i() documented "use 0 to skip the test" and all three validate with
   # lo = 0, so the escape hatch is deliberate -- but local_morans() and
   # gearys_c() documented only "permutations for the pseudo-p-value", leaving
@@ -5476,6 +5570,7 @@ test_that("n_perm = 0 skips the permutation test on all three statistics", {
 })
 
 test_that("recenter says so instead of being dropped on the polygon backend", {
+  skip_slow_on_cran()
   # The polygon backend hands back lon/lat vertices, and recentring them means
   # re-splitting every ring at the new antimeridian -- which is what
   # sf::st_break_antimeridian() does on the other backend. `recenter` was
@@ -5508,6 +5603,7 @@ test_that("recenter says so instead of being dropped on the polygon backend", {
 })
 
 test_that("aggregate_regions handles an sf frame instead of crashing", {
+  skip_slow_on_cran()
   # An sf frame carries one row per country, so the totals are right -- but
   # dplyr's sf-aware summarise() unions the geometries per group, and two of
   # the bundled Natural Earth polygons (SDN, MOZ) are invalid, so this died
@@ -5542,6 +5638,7 @@ test_that("aggregate_regions handles an sf frame instead of crashing", {
 })
 
 test_that("a verb hands back the class it was given", {
+  skip_slow_on_cran()
   # per_capita(), share_of_world() and standardize_country() document their
   # result as "`data` with the requested columns added", and rank_countries()
   # honours that -- but these three ended with as_tibble(), which strips the sf
@@ -5715,6 +5812,7 @@ test_that("world_table says when the value column emptied the table", {
 })
 
 test_that("a data frame is refused where a country vector belongs", {
+  skip_slow_on_cran()
   # as.character() on a data frame deparses each *column* into a string, so
   # neighbors(my_df) came back with the two "countries" `c("USA", "FRA")` and
   # `c(1, 2)` -- silently, because those are just strings that match nothing

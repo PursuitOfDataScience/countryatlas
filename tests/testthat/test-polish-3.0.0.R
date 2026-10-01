@@ -5,6 +5,7 @@
 # --- ranking once per country ------------------------------------------------
 
 test_that("value_by_alpha_map() ranks opacity once per country, not per vertex", {
+  skip_slow_on_cran()
   # FRA has far more vertex rows than the others and the lowest population,
   # so a rank over the raw rows pushed everyone above it up the scale.
   d <- toy_polygons(c(FRA = 1, DEU = 2, ITA = 3, ESP = 4),
@@ -43,6 +44,7 @@ test_that("world_map(uncertainty = ) places each country in its VSUP cell once",
 # --- attach_geometry() ---------------------------------------------------------
 
 test_that("attach_geometry() refuses a column the polygon backend draws with", {
+  skip_slow_on_cran()
   for (col in c("group", "lat", "long", "order")) {
     d <- data.frame(iso3c = c("FRA", "DEU"), value = 1:2)
     d[[col]] <- c(1, 2)
@@ -61,6 +63,7 @@ test_that("attach_geometry() refuses a column the polygon backend draws with", {
 # --- rates.R -------------------------------------------------------------------
 
 test_that("convergence_club() returns a country with a gap as unclassified", {
+  skip_slow_on_cran()
   set.seed(1)
   panel <- expand.grid(iso3c = c(paste0("A", 1:5), paste0("B", 1:5)),
                        year = 2000:2024, stringsAsFactors = FALSE)
@@ -132,6 +135,7 @@ test_that("growth_rate() does not read the row after an infinity as -100%", {
 # --- geometry.R ----------------------------------------------------------------
 
 test_that("a region vector with a name that matches nothing says so", {
+  skip_slow_on_cran()
   expect_warning(iso <- countryatlas:::resolve_region(c("France", "Germny")),
                  class = "countryatlas_region_unmatched")
   expect_equal(stats::na.omit(iso)[[1]], "FRA")
@@ -174,6 +178,7 @@ test_that("a custom weights frame naming one link twice is refused", {
 # --- visualization.R -----------------------------------------------------------
 
 test_that("bivariate_map() validates `dim` before anything else", {
+  skip_slow_on_cran()
   d <- data.frame(iso3c = "FRA", x = 1, y = 1)
   for (bad in list("a", NA, c(2, 3), 5, 1)) {
     expect_error(bivariate_map(d, x, y, dim = bad), "dim")
@@ -188,6 +193,7 @@ test_that("a non-finite year is refused as such, without a coercion warning", {
 })
 
 test_that("the tmap engine draws 'binned' as equal intervals, like ggplot2", {
+  skip_slow_on_cran()
   skip_if_not_installed("tmap")
   skip_if_no_sf_geometry()
   sfd <- suppressWarnings(attach_geometry(countryatlas::world_snapshot$countries,
@@ -205,6 +211,7 @@ test_that("the tmap engine draws 'binned' as equal intervals, like ggplot2", {
 })
 
 test_that("world_map() does not call n_bins ignored when the VSUP uses it", {
+  skip_slow_on_cran()
   d <- toy_polygons(c(FRA = 1, DEU = 2, ITA = 3, ESP = 4, PRT = 5, POL = 6))
   d$se <- c(0.1, 0.5, 0.2, 0.9, 0.3, 0.6)[d$group]
   expect_no_warning(p <- world_map(d, v, uncertainty = se, n_bins = 3))
@@ -217,6 +224,7 @@ test_that("world_map() does not call n_bins ignored when the VSUP uses it", {
 })
 
 test_that("world_map() says n_uncertainty does nothing without uncertainty", {
+  skip_slow_on_cran()
   d <- toy_polygons(c(FRA = 1, DEU = 2, ITA = 3))
   expect_warning(world_map(d, v, n_uncertainty = 5),
                  class = "countryatlas_n_uncertainty_ignored")
@@ -229,6 +237,7 @@ test_that("world_map() says n_uncertainty does nothing without uncertainty", {
 # --- networks.R, time.R, sources.R ---------------------------------------------
 
 test_that("od_map() names a destination the basemap cannot draw", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   od <- data.frame(from = "China", to = c("Hong Kong", "USA", "Japan"),
                    value = c(900, 500, 200))
@@ -301,6 +310,7 @@ test_that("standardize_subnational() normalises an ISO 3166-2 code's case and pa
 })
 
 test_that("a bad cache limit option is named, not blamed on the directory", {
+  skip_slow_on_cran()
   td <- tempfile("cachelim")
   dir.create(td)
   old <- options(countryatlas.cache_dir = td)
@@ -326,6 +336,7 @@ test_that("a bad cache limit option is named, not blamed on the directory", {
 })
 
 test_that("join_world() says when it replaces a column of the caller's", {
+  skip_slow_on_cran()
   d <- data.frame(country = c("France", "Kenya"), region = c("North", "South"),
                   v = 1:2)
   expect_warning(out <- join_world(d, country, geometry = "none"),
@@ -365,6 +376,7 @@ test_that("a non-breaking space does not turn the USSR into Russia", {
 })
 
 test_that("the interactive engines draw a fill with nothing to scale", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   sfd <- suppressWarnings(attach_geometry(countryatlas::world_snapshot$countries,
                                           geometry = "sf"))
@@ -391,6 +403,7 @@ test_that("the interactive engines draw a fill with nothing to scale", {
 })
 
 test_that("an orthographic view can be drawn from any side", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   skip_on_cran()
   sfd <- suppressWarnings(attach_geometry(countryatlas::world_snapshot$countries,
@@ -439,6 +452,7 @@ test_that("an orthographic view can be drawn from any side", {
 })
 
 test_that("countries with no data are drawn in every period, not in an NA one", {
+  skip_slow_on_cran()
   vals <- c(FRA = 1, DEU = 2, ITA = 3)
   d <- toy_polygons(vals)
   d$year <- NA_integer_
@@ -497,6 +511,7 @@ test_that("polygon_parts() keeps one feature per input and only polygons", {
 })
 
 test_that("a factsheet says when neighbours could not be computed", {
+  skip_slow_on_cran()
   local_mocked_bindings(neighbors = function(...) {
     rlang::abort("The package \"sf\" is required.")
   })
@@ -523,6 +538,7 @@ test_that("the plotly engine refuses the orthographic view by name", {
 })
 
 test_that("an error raised inside a verb's own handler names the verb", {
+  skip_slow_on_cran()
   snap <- countryatlas::world_snapshot$countries
   # Raised from a tryCatch() handler or an lapply() function written inline in
   # the verb, these were headed "Error in `value[[3L]]()`" or "Error in `FUN()`".
@@ -547,6 +563,7 @@ test_that("an error raised inside a verb's own handler names the verb", {
 })
 
 test_that("an error raised by an internal helper names the verb called", {
+  skip_slow_on_cran()
   snap <- countryatlas::world_snapshot$countries
   header <- function(expr) {
     e <- tryCatch(expr, error = identity)
@@ -589,6 +606,7 @@ test_that("a bad option is reported without blaming an internal helper", {
 })
 
 test_that("recenter = 360 works on the sf backend and 500 is refused by name", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   # Both reached sf::st_break_antimeridian() unvalidated and failed with
   # "polygons require at least 4 points".
@@ -603,6 +621,7 @@ test_that("recenter = 360 works on the sf backend and 500 is refused by name", {
 })
 
 test_that("bubble_map() says the polygon backend ignores `projection`", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   snap <- countryatlas::world_snapshot$countries
   # Five countries have no bundled centroid, which is reported on its own.

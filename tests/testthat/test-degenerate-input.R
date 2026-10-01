@@ -6,6 +6,7 @@
 snap <- countryatlas::world_snapshot$countries
 
 test_that("beta_convergence reports why it cannot estimate a flat panel", {
+  skip_slow_on_cran()
   # Zero spread in the initial levels makes the predictor constant, so lm()
   # returns an NA coefficient and summary() drops the row -- which used to
   # surface as a bare "subscript out of bounds".
@@ -56,6 +57,7 @@ test_that("zero-variance columns give NA/NaN rather than an error", {
 })
 
 test_that("panel helpers survive duplicate (iso3c, year) rows", {
+  skip_slow_on_cran()
   # Malformed but common; nothing should error. And since every one of these
   # reads neighbouring rows, each now says so rather than quietly lagging
   # against the duplicate -- surviving the input was never the same as being
@@ -105,6 +107,7 @@ test_that("plotting verbs cope with all-NA and all-zero columns", {
 })
 
 test_that("a single-country frame still bins and draws", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   one <- attach_geometry(snap[1, ], geometry = "sf")
   # compute_breaks() widens a single distinct value into a usable interval.
@@ -153,6 +156,7 @@ test_that("complete_years returns 0 rows for a 0-row panel", {
 })
 
 test_that("a 0-row panel still reports a bad argument", {
+  skip_slow_on_cran()
   # The early return must not swallow validation.
   z <- tibble::tibble(iso3c = character(), year = integer(), g = numeric())
   expect_error(complete_years(z, years = "a"), "`years`")
@@ -205,6 +209,7 @@ test_that("the other summarising verbs are honest about no data", {
 # Neither mentions the data. spike_map() already reported this properly.
 
 test_that("bivariate_map says so when no row has both variables", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   skip_if_not_installed("biscale")
   snap <- countryatlas::world_snapshot$countries
@@ -221,6 +226,7 @@ test_that("bivariate_map says so when no row has both variables", {
 })
 
 test_that("cartogram_map says so when nothing has a positive weight", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   skip_if_not_installed("cartogram")
   snap <- countryatlas::world_snapshot$countries
@@ -255,6 +261,7 @@ test_that("the bivariate and cartogram verbs still draw real data", {
 })
 
 test_that("gini/theil refuse an infinity instead of returning a silent NaN", {
+  skip_slow_on_cran()
   # Inf is not NA, so it survived na.rm and the non-positive filter, then made
   # the mean Inf and every share Inf/Inf -- the answer came back NaN with no
   # word. is.na(NaN) is TRUE, so an is.na() assertion could not have caught a
@@ -359,6 +366,7 @@ test_that("the plotting verbs handle an empty frame without leaking", {
 })
 
 test_that("cagr growth is NA-and-loud for a negative value, but keeps -100% for zero", {
+  skip_slow_on_cran()
   # `v0 > 0` guarded the base of the ratio and nothing guarded the current
   # value, so a fractional power of a negative ratio put a bare NaN in the
   # column with nothing said. Every neighbouring measure reports this case --
@@ -426,6 +434,7 @@ test_that("cagr growth is NA-and-loud for a negative value, but keeps -100% for 
 })
 
 test_that("the global G refuses a signed variable instead of ignoring the sign", {
+  skip_slow_on_cran()
   # The general G compares cross-products, so x_i * x_j is unchanged when the
   # whole variable is negated -- g(x) and g(-x) were bit-for-bit identical and
   # the statistic could not distinguish a coldspot pattern from a hotspot one.
@@ -460,6 +469,7 @@ test_that("the global G refuses a signed variable instead of ignoring the sign",
 })
 
 test_that("rate_check's flagged column agrees with its own no-threshold warning", {
+  skip_slow_on_cran()
   # The warning says "`flagged` is `NA` throughout" when no small-denominator
   # threshold can be computed. It was not: `is.finite(den) & den < thr` gives
   # FALSE rather than NA for a non-finite denominator, because R
@@ -538,6 +548,7 @@ test_that("audit_time_coverage's three message paths read correctly", {
 })
 
 test_that("interpolate_missing rejects duplicate column names once", {
+  skip_slow_on_cran()
   # interpolate_missing() carried its own duplicate-name guard that became
   # unreachable when check_panel_unique() grew one; coverage flagged it as
   # never executed and it has been removed. The rejection itself must survive,
@@ -564,6 +575,7 @@ test_that("interpolate_missing rejects duplicate column names once", {
 })
 
 test_that("a top_n past integer range means no limit, not a base R error", {
+  skip_slow_on_cran()
   # `Inf` is the documented "no limit" and both callers gate on
   # is.finite(top_n) to spot it. A *finite* value past integer range passed
   # that gate and then broke on the coercion behind it: as.integer(1e18) is
@@ -710,6 +722,7 @@ test_that("interpolate_missing() keeps a column's class whether or not it has a 
 })
 
 test_that("an unresolved value that is a code under another origin says so", {
+  skip_slow_on_cran()
   # ISO3 under the country.name default is the commonest way to misuse these
   # verbs, and the generic advice (check_country_match()) is useless for a code.
   expect_error(country_factsheet("FRA"), 'origin = "iso3c"')
@@ -737,6 +750,7 @@ test_that("the origin hint reaches the geometry verbs too", {
 })
 
 test_that("a gap in year is reported by the verbs that read neighbouring rows", {
+  skip_slow_on_cran()
   gappy <- data.frame(iso3c = rep("FRA", 4), year = c(2000, 2002, 2005, 2006),
                       value = c(100, 110, 140, 150))
   annual <- data.frame(iso3c = rep("FRA", 4), year = 2000:2003,
@@ -853,6 +867,7 @@ test_that("beta_convergence() drops an infinite value instead of crashing", {
 })
 
 test_that("a character year is refused only where a year is arithmetic", {
+  skip_slow_on_cran()
   iso <- c("FRA", "DEU", "ITA", "ESP", "POL", "PRT")
   d <- expand.grid(iso3c = iso, year = 2000:2019, stringsAsFactors = FALSE)
   d$value <- rep(seq(1000, 6000, length.out = 6), 20) * (1.02^(d$year - 2000))
@@ -882,6 +897,7 @@ test_that("a character year is refused only where a year is arithmetic", {
 })
 
 test_that("an infinite value never silently produces NaN", {
+  skip_slow_on_cran()
   iso <- c("FRA", "DEU", "ITA", "ESP", "POL", "PRT")
   d <- expand.grid(iso3c = iso, year = 2000:2019, stringsAsFactors = FALSE)
   d$value <- rep(seq(1000, 6000, length.out = 6), 20) * (1.02^(d$year - 2000))
@@ -1118,6 +1134,7 @@ test_that("distinct_countries() uses the earliest year for uncoded rows too", {
 })
 
 test_that("a categorical fill's level order does not depend on the locale", {
+  skip_slow_on_cran()
   skip_if_not_installed("sf")
   # Built with escapes: every file in R/ and tests/ here is pure ASCII.
   ring <- intToUtf8(0xC5)
@@ -1180,6 +1197,7 @@ test_that("classification_report rows are in a locale-independent order", {
 })
 
 test_that("the global G is NA with a reason, never a silent NaN", {
+  skip_slow_on_cran()
   snap <- countryatlas::world_snapshot$countries
   W <- suppressWarnings(country_weights("knn", k = 4))
   d <- snap[match(rownames(as.matrix(W)), snap$iso3c), c("iso3c", "gdp_per_capita")]
@@ -1221,6 +1239,7 @@ test_that("the global G is NA with a reason, never a silent NaN", {
 })
 
 test_that("permutation p-values are bounded and reproducible", {
+  skip_slow_on_cran()
   snap <- countryatlas::world_snapshot$countries
   W <- suppressWarnings(country_weights("knn", k = 4))
   d <- snap[match(rownames(as.matrix(W)), snap$iso3c), c("iso3c", "gdp_per_capita")]
@@ -1258,6 +1277,7 @@ test_that("permutation p-values are bounded and reproducible", {
 })
 
 test_that("repair_country_names() reports exactly what it changed", {
+  skip_slow_on_cran()
   # The documented guarantees, as opposed to the one that was withdrawn: a name
   # that already matches is untouched, and every substitution is reported both
   # in the message and in the "repairs" attribute.
@@ -1301,6 +1321,7 @@ test_that("repair_country_names() reports exactly what it changed", {
 })
 
 test_that("a misbehaving custom source is reported as the source's fault", {
+  skip_slow_on_cran()
   env <- countryatlas:::the_sources
   on.exit(suppressWarnings(rm(list = intersect("zz_probe", ls(env)), envir = env)),
           add = TRUE)
@@ -1404,6 +1425,7 @@ test_that("linear interpolation refuses a year it cannot read", {
 # importers, any deliberate factor(year) for plotting), and every verb that
 # reads a *neighbouring* row then read the wrong neighbour -- silently.
 test_that("a factor or character year gives the same answers as a numeric one", {
+  skip_slow_on_cran()
   base <- data.frame(
     iso3c = rep(c("FRA", "DEU"), each = 4), year = rep(2000:2003, 2),
     value = c(10, 20, 40, 80, 5, 10, 20, 40), stringsAsFactors = FALSE)
@@ -1641,6 +1663,7 @@ test_that("blank_key treats missing, empty and whitespace-only alike", {
 })
 
 test_that("the internal unit key never reaches the caller", {
+  skip_slow_on_cran()
   d <- data.frame(iso3c = rep(c("FRA", "DEU", "ITA", "ESP"), each = 3),
                   year = rep(2000:2002, 4),
                   value = c(100, 104, 108, 10, 13, 17, 50, 56, 63, 200, 205, 210),
@@ -1693,6 +1716,7 @@ test_that("the panel guards key on the unit, not on iso3c alone", {
 # it ran in an offline check -- covr put R/subnational.R at 66% while every
 # other file was above 90%. Mocked here so the join logic is actually exercised.
 test_that("subnational_map joins on nuts_id whatever the caller's column is called", {
+  skip_slow_on_cran()
   skip_if_not_installed("sf")
   skip_if_not_installed("ggplot2")
   sq <- function(x) sf::st_polygon(list(cbind(c(x, x+1, x+1, x, x), c(0, 0, 1, 1, 0))))
@@ -1727,6 +1751,7 @@ test_that("subnational_map joins on nuts_id whatever the caller's column is call
 })
 
 test_that("subnational_map draws an all-NA indicator instead of blaming the codes", {
+  skip_slow_on_cran()
   skip_if_not_installed("sf")
   skip_if_not_installed("ggplot2")
   sq <- function(x) sf::st_polygon(list(cbind(c(x, x+1, x+1, x, x), c(0, 0, 1, 1, 0))))
@@ -1799,6 +1824,7 @@ test_that("the historical join reports unreachable entities, not the caller's fr
 # --- fixes from the 3.0.0 pre-release review ---------------------------------
 
 test_that("standardize_subnational honours the country it requires", {
+  skip_slow_on_cran()
   # `iso3c` was passed to the lookup and never read, and the code passthrough
   # accepted any well-formed ISO 3166-2 code: region = "US-CA" with
   # country = "Germany" returned iso3c = "DEU" alongside iso_3166_2 = "US-CA",
@@ -1857,6 +1883,7 @@ test_that("country_codes accepts a raw codelist column a shortcut also maps to",
 })
 
 test_that("cartogram_diagnostics reports having nothing to measure", {
+  skip_slow_on_cran()
   skip_if_not_installed("sf")
   sq <- function(i) sf::st_polygon(list(cbind(c(i, i+1, i+1, i, i),
                                               c(0, 0, 1, 1, 0))))
@@ -1886,6 +1913,7 @@ test_that("country_data does not return the panel shape it warned against", {
 })
 
 test_that("index_to reports an unusable base_year instead of returning all NA", {
+  skip_slow_on_cran()
   # index_to() and deflate() take the same `base_year` and match it the same
   # way, and deflate() closed three paths that index_to() left silent. All
   # three produced an all-NA column -- the failure mode the coverage verbs in

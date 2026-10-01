@@ -106,6 +106,7 @@ test_that("convert_country Kosovo (XKX) fallback works for continent/iso2c", {
 })
 
 test_that("conversion and repair are stable when applied twice", {
+  skip_slow_on_cran()
   messy <- c("Czech Republic", "Korea, Rep.", "Brzil", "Ivory Coast", "Burma",
              "Swaziland", "Macedonia", "Kosovo", "United States", "Xyzzy")
   # The canonical name is a fixed point: naming an already-named vector must not

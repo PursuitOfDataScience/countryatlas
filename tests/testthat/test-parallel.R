@@ -4,6 +4,7 @@
 # either used one indicator or passed parallel = FALSE.
 
 test_that("wdj_workers respects the option, the work size and CRAN's cap", {
+  skip_slow_on_cran()
   wk <- countryatlas:::wdj_workers
   withr_opt <- options(countryatlas.workers = 3)
   expect_equal(wk(100), 3L)
@@ -45,6 +46,7 @@ test_that("wdj_workers respects the option, the work size and CRAN's cap", {
 })
 
 test_that("wdj_lapply gives the same answer forked as serial", {
+  skip_slow_on_cran()
   wl <- countryatlas:::wdj_lapply
   expect_identical(wl(1:6, function(i) i^2, parallel = TRUE),
                    wl(1:6, function(i) i^2, parallel = FALSE))
@@ -61,6 +63,7 @@ test_that("wdj_lapply gives the same answer forked as serial", {
 })
 
 test_that("an error inside a fork is surfaced, not swallowed", {
+  skip_slow_on_cran()
   # mclapply returns a try-error object per failed element rather than raising,
   # so without the check the failure would pass silently downstream.
   # Windows never forks: wdj_lapply() takes the plain lapply() branch there and
@@ -78,6 +81,7 @@ test_that("an error inside a fork is surfaced, not swallowed", {
 })
 
 test_that("a parallel multi-indicator fetch matches the serial one", {
+  skip_slow_on_cran()
   fake_wdi <- function(indicator, start, end, extra = FALSE, language = "en", ...) {
     nm <- names(indicator)[1]
     yrs <- start:end
@@ -146,6 +150,7 @@ test_that("the workers option accepts what it always accepted", {
 })
 
 test_that("a bad workers option names the option instead of failing later", {
+  skip_slow_on_cran()
   # 0 and -3 are deliberately NOT here: they were always clamped to one, which
   # is the documented contract, and they never produced the NA that broke
   # mclapply. Only values that cannot yield a count at all are rejected.

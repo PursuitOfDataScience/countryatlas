@@ -822,9 +822,18 @@ na_hatch_layer <- function(data, fill_name, sf_mode, borders) {
   if (sf_mode) {
     do.call(ggpattern::geom_sf_pattern, common)
   } else {
+    # One shape, its rings as subgroups, not one shape per polygon.
+    # geom_polygon_pattern() clips a fresh set of stripes to every group, and
+    # on the polygon basemap the no-data countries are many groups (169 for
+    # co2_per_capita in world_snapshot, most of them islands, plus a
+    # 4658-vertex Antarctica), so one hatched world map took 29s to print and
+    # the honest-maps vignette spent 56s on it. Clipped once, it takes under
+    # a second. gridpattern buffers the boundary by zero first, which merges
+    # overlapping rings, so an enclave missing alongside its host is still
+    # hatched.
     do.call(ggpattern::geom_polygon_pattern, c(
-      list(mapping = ggplot2::aes(x = .data$long, y = .data$lat,
-                                  group = .data$group)), common
+      list(mapping = ggplot2::aes(x = .data$long, y = .data$lat, group = 1L,
+                                  subgroup = .data$group)), common
     ))
   }
 }

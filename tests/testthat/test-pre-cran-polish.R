@@ -5,6 +5,7 @@
 snap <- countryatlas::world_snapshot$countries
 
 test_that("plotting verbs name a missing column instead of leaking a ggplot2 error", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   mapdf <- attach_geometry(snap, geometry = "polygon")
   expect_error(world_map(mapdf, not_a_column), class = "countryatlas_error")
@@ -41,6 +42,7 @@ test_that("audit_coverage rejects an indicator column that isn't there", {
 })
 
 test_that("a multi-element na_label warns but does not error the legend", {
+  skip_slow_on_cran()
   # There is one NA key, so discrete_na_labels() takes the first element -- that
   # tolerance is deliberate (a length-1 NA means "leave the default formatter
   # alone", and a length > 1 value must not reach a length-1 condition). It used
@@ -120,6 +122,7 @@ test_that(".Rbuildignore excludes the session-local .claude directory", {
 })
 
 test_that('style = "categorical" names the offending numeric column', {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   mapdf <- attach_geometry(snap, geometry = "polygon")
   # ggplot2 used to raise "Continuous value supplied to a discrete scale" at
@@ -293,6 +296,7 @@ test_that("quietly_sf swallows console output but returns the value", {
 })
 
 test_that("the sf happy path prints nothing to the console", {
+  skip_slow_on_cran()
   # st_break_antimeridian() runs on every sf call and emits three notices
   # ("Spherical geometry (s2) switched off/on", plus st_intersection's planar
   # note). Unsilenced, a plain attach_geometry(geometry = "sf") printed them.
@@ -321,6 +325,7 @@ test_that("the sf happy path prints nothing to the console", {
 })
 
 test_that("the sf happy path leaks no message conditions to the caller", {
+  skip_slow_on_cran()
   # A clean console is not enough: redirecting the message *stream* leaves the
   # underlying message() conditions travelling to whatever handler the caller
   # has installed, so purrr::quietly(), capture_messages() or a plain
@@ -404,6 +409,7 @@ test_that("no runnable example calls per_capita without an explicit pop", {
 # were absent.
 
 test_that("interactive_map's ggiraph engine honours tooltip", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   skip_if_not_installed("ggiraph")
   snap <- countryatlas::world_snapshot$countries
@@ -420,6 +426,7 @@ test_that("interactive_map's ggiraph engine honours tooltip", {
 })
 
 test_that("interactive_map's leaflet engine honours tooltip", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   skip_if_not_installed("leaflet")
   skip_if_no_sf_geometry()
@@ -455,6 +462,7 @@ test_that("interactive_map's leaflet engine honours tooltip", {
 })
 
 test_that("country_borders' column order is what the graph recipe assumes", {
+  skip_slow_on_cran()
   # ?country_borders tells users to hand igraph only the two code columns,
   # because graph_from_data_frame() treats the FIRST TWO columns as the edge
   # endpoints -- and here columns 1 and 2 both describe endpoint A, so passing
@@ -479,6 +487,7 @@ test_that("country_borders' column order is what the graph recipe assumes", {
 })
 
 test_that('scale = "large" names the non-CRAN package it needs', {
+  skip_slow_on_cran()
   # The 10m Natural Earth data lives in rnaturalearthhires, which is not on
   # CRAN and not in Suggests. Ungated, rnaturalearth reacts by trying to
   # install it into the user's library and then failing obscurely.
@@ -557,6 +566,7 @@ test_that("an NA country key never joins to geometry", {
 })
 
 test_that("an NA country key never borrows a centroid", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   d <- data.frame(iso3c = c("USA", NA), population = c(10, 99))
   b <- ggplot2::ggplot_build(bubble_map(d, population, backend = "sf"))
@@ -684,6 +694,7 @@ test_that("with_c_numbers restores the caller's options", {
 })
 
 test_that("every option the package reads is documented on the package page", {
+  skip_slow_on_cran()
   # Two of the three were advertised only in NEWS.md -- a changelog, not
   # reference documentation -- so a reader of ?countryatlas had no way to find
   # them. wdj_workers()'s own comment even said "the option is advertised in
@@ -970,6 +981,7 @@ test_that("globalVariables() declares nothing it does not need", {
 })
 
 test_that("bundled datasets are never referenced bare inside the package", {
+  skip_slow_on_cran()
   # A bare `world_tiles` resolves only while the package is *attached*: the
   # lazy-data objects live in the package environment, which is not on a
   # namespace-only lookup path. So `countryatlas::tile_map(...)` in a script with
@@ -1092,6 +1104,7 @@ test_that("the silence policy reaches every offline verb, not just 39 of them", 
 })
 
 test_that("world_map stays silent across the cross-product of its arguments", {
+  skip_slow_on_cran()
   # Coverage of the verb was not coverage of the contract: the hatched/disputes
   # message fired only when `na_style` and `disputes` were passed *together*,
   # and world_map() was already in the silence block -- with neither.

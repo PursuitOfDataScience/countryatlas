@@ -43,6 +43,7 @@ test_that("statistics return their documented shape", {
 })
 
 test_that("panel helpers add the documented column", {
+  skip_slow_on_cran()
   gr <- growth_rate(panel, gdp)
   expect_true("gdp_growth" %in% names(gr))
   # Documented as a proportion, so 0.03 means 3%.
@@ -70,6 +71,7 @@ test_that("panel helpers add the documented column", {
 })
 
 test_that("reference and join verbs return their documented shape", {
+  skip_slow_on_cran()
   expect_named(country_groups("EU"), c("group", "iso3c", "country"))
   expect_type(in_group(c("France", "Japan", "Brazil"), "EU"), "logical")
   expect_length(in_group(c("France", "Japan", "Brazil"), "EU"), 3L)
@@ -142,6 +144,7 @@ test_that("polygon-backed verbs return their documented shape", {
 })
 
 test_that("every convert_country shortcut maps to the scheme its name promises", {
+  skip_slow_on_cran()
   # `calling_code` was mapped to `genc3c` -- an alpha-3 COUNTRY code -- so
   # to = "calling_code" silently returned "FRA" instead of 33. A shortcut whose
   # name promises one thing and returns another is the worst kind of bug, so
@@ -167,6 +170,7 @@ test_that("every convert_country shortcut maps to the scheme its name promises",
 })
 
 test_that("every shortcut in convert_dest_map resolves to a real destination", {
+  skip_slow_on_cran()
   m <- countryatlas:::convert_dest_map()
   cl <- names(countrycode::codelist)
   # Each mapped destination must be a column countrycode actually has.
@@ -181,6 +185,7 @@ test_that("every shortcut in convert_dest_map resolves to a real destination", {
 })
 
 test_that("the 2.0.0 exports keep their leading argument order", {
+  skip_slow_on_cran()
   # Positional calls are the part of an API users cannot see changing. 3.0.0
   # deliberately inserted `data` as geom_country_labels()'s second argument --
   # the one break NEWS records -- and an audit against the installed 2.0.0
@@ -353,6 +358,7 @@ test_that("a perfect regression fit is reported, not leaked from summary.lm", {
 })
 
 test_that("every world_geometry() what returns a column named `geometry`", {
+  skip_slow_on_cran()
   # Two of the six returned `x`: st_as_sf() on a bare sfc names the column
   # after the object, and "coastline" and "ocean" are both built by unioning
   # into one shape. The name is part of the documented return contract, so code

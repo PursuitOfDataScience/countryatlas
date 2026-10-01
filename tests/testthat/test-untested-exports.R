@@ -90,6 +90,7 @@ test_that("cartogram_map builds every type and names a missing column", {
 })
 
 test_that("index_to validates its column and its scalars", {
+  skip_slow_on_cran()
   df <- data.frame(iso3c = "USA", year = 2000:2002, gdp = c(50, 55, 60))
   # Used to fail with a dplyr error from inside mutate().
   expect_error(index_to(df, not_a_column, base_year = 2000), "not found in")
@@ -108,6 +109,7 @@ test_that("index_to validates its column and its scalars", {
 })
 
 test_that("spin_globe renders one frame per central longitude", {
+  skip_slow_on_cran()
   # gifski/magick assemble the GIF and are often unavailable, but the frame
   # loop is the part worth testing: it calls globe_map() once per longitude in
   # a full 0-360 sweep, which is why wdj_crs() must accept a `recenter` beyond
@@ -159,6 +161,7 @@ test_that("spin_globe validates its scalars before rendering anything", {
 })
 
 test_that("join_world auto-detects a code column, and reads it as codes", {
+  skip_slow_on_cran()
   # The fallback comment said "the first column that mostly matches ISO codes",
   # but it tested with origin = "country.name", which does not match most
   # alpha-3 codes ("FRA" and "JPN" fail; "USA" happens to). And a column named
@@ -241,6 +244,7 @@ test_that("globe_map(backend = 'sf') builds on every style", {
 })
 
 test_that("print.countryatlas_coverage prints every section", {
+  skip_slow_on_cran()
   # The method had zero test coverage; each branch depends on a different part
   # of the report being non-empty.
   snap <- countryatlas::world_snapshot$countries
@@ -272,6 +276,7 @@ test_that("print.countryatlas_coverage prints every section", {
 })
 
 test_that("remove_country_source undoes a registration", {
+  skip_slow_on_cran()
   # Registering was permanent for the session, so anything that registered a
   # source -- an example, a test, a scratch script -- left country_sources()
   # reporting different rows for the rest of the session, with no way back.

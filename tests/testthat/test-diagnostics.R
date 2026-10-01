@@ -32,6 +32,7 @@ test_that("audit_coverage summarises missingness", {
 # perturbing the selection metric does fail it.
 
 test_that("the adist fallback is a conservative subset of stringdist", {
+  skip_slow_on_cran()
   skip_if_not_installed("stringdist")
   set.seed(4)
   real <- sample(stats::na.omit(countryatlas::country_meta$country), 120)

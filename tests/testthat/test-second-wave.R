@@ -246,6 +246,7 @@ test_that("morans_i validates input", {
 # --- spike_map ------------------------------------------------------------------
 
 test_that("spike_map builds a ggplot with one triangle per country", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   p <- suppressWarnings(spike_map(world_snapshot$countries, population))
   expect_s3_class(p, "ggplot")
@@ -273,6 +274,7 @@ test_that("convert_country(to = 'name_<lang>') returns localized names", {
 # --- formatted binned legends ---------------------------------------------------
 
 test_that("binned style builds with SI-formatted labels", {
+  skip_slow_on_cran()
   skip_if_not_installed("scales")
   # The shared formatter renders 4e+06 as "4M".
   fmt <- countryatlas:::scales_format()

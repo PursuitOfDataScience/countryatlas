@@ -112,6 +112,7 @@ test_that("the value and rate columns are checked for a number", {
 })
 
 test_that("convergence_club() does not depend on row order", {
+  skip_slow_on_cran()
   set.seed(1)
   panel <- expand.grid(year = 2000:2024,
                        iso3c = c(paste0("A", 1:5), paste0("B", 1:5)),
@@ -169,6 +170,7 @@ test_that("world_table() gives tied values the same rank", {
 })
 
 test_that("gridded_cartogram() words the unusable-value warning for its count", {
+  skip_slow_on_cran()
   g <- countryatlas::world_snapshot$countries
   g$population[g$iso3c == "CHN"] <- Inf
   msgs <- character(0)
@@ -240,6 +242,7 @@ test_that("local_morans() permutes conditionally", {
 # --- geometry.R ---------------------------------------------------------------
 
 test_that("a numeric region must be a well-formed bounding box", {
+  skip_slow_on_cran()
   rr <- countryatlas:::resolve_region
   # These were taken as unknown three-letter codes and drew an empty map.
   expect_error(rr(250), "four numbers", class = "countryatlas_error")
@@ -252,6 +255,7 @@ test_that("a numeric region must be a well-formed bounding box", {
 })
 
 test_that("locate_country() answers zero points with zero rows, silently", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   expect_silent(out <- locate_country(numeric(0), numeric(0)))
   expect_equal(nrow(out), 0L)
@@ -284,6 +288,7 @@ test_that("country_join_all(by = ) names an unquoted column", {
 # --- visualization.R: counting what is drawn -----------------------------------
 
 test_that("an infinite fill is counted as missing, and said to be", {
+  skip_slow_on_cran()
   d <- toy_polygons(c(FRA = Inf, DEU = 2, ITA = 3, ESP = NA))
   expect_warning(p <- world_map(d, v, footnote = "auto"),
                  class = "countryatlas_infinite_fill")
@@ -333,6 +338,7 @@ test_that("bubble and spike maps refuse sizes they cannot draw", {
 })
 
 test_that("flow_map() drops unusable weights before they reach the scales", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   od <- data.frame(from = c("China", "Germany", "United States", "Japan"),
                    to = c("United States", "France", "Mexico", "Brazil"),
@@ -362,6 +368,7 @@ test_that("classify_compare() tolerates a repeated method", {
 # --- sources.R ----------------------------------------------------------------
 
 test_that("compare_sources() leaves unresolved keys out of the comparison", {
+  skip_slow_on_cran()
   register_country_source("rev_a", function(indicator, countries, years, ...) {
     data.frame(iso3c = c("USA", "FRA", "XXA", "XXB"), year = 2020L,
                v = c(1, 2, 3, 4))
@@ -517,6 +524,7 @@ test_that("spatial_lag() on a panel survives one sparse year", {
 })
 
 test_that("od_map() draws a repeated origin once", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   od <- data.frame(from = rep(c("China", "Germany"), each = 2),
                    to = c("United States", "Japan", "France", "Italy"),
@@ -567,6 +575,7 @@ test_that("a character year is refused before a year-keyed join", {
 })
 
 test_that("every fill-drawing verb says when an infinity is drawn as no data", {
+  skip_slow_on_cran()
   d <- toy_polygons(c(FRA = Inf, DEU = 2, ITA = 3))
   d$pop <- c(10, 20, 30)[d$group]
   expect_warning(value_by_alpha_map(d, v, pop),

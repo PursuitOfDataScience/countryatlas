@@ -203,6 +203,12 @@ existing code: `world_map(projection = "mercator")` now produces a different
   then failed on print with "unable to load shared object units.so". Hatching
   now checks that `sf` loads and otherwise falls back to grey with a message,
   as it already did when `ggpattern` is absent.
+* **`world_map(na_style = "hatched")` took half a minute to print on the
+  polygon backend.** `ggpattern` clipped a fresh set of stripes to every
+  polygon, and the no-data countries of a world map are many polygons (169
+  for `co2_per_capita` in `world_snapshot`, most of them islands, plus
+  Antarctica). The stripes are now clipped once, to all of them together:
+  the same map, with the same stripes, prints in about a second.
 * **Countries with no data vanished from `animate_world()` and got their own
   panel in `facet_map(facet = year)`.** `attach_geometry()` gives a country
   the data does not cover an `NA` year, so it belonged to no frame: the

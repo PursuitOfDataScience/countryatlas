@@ -83,6 +83,7 @@ test_that("de-accenting resolves in UTF-8 and never resolves wrongly elsewhere",
 })
 
 test_that("NFD-decomposed accented names resolve, and NFC ones are untouched", {
+  skip_slow_on_cran()
   # The section above covers the *locale* half of the accented-name problem.
   # This is the other half: the same accent can be one precomposed code point
   # (NFC, the form countrycode's tables carry) or a base letter followed by a

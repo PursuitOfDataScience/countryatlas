@@ -36,6 +36,7 @@ test_that("cartogram_map and dorling_map accept a categorical fill", {
 })
 
 test_that("tile_map accepts a categorical fill", {
+  skip_slow_on_cran()
   # The grid cannot place a few snapshot countries; that has its own test.
   renders(suppressWarnings(tile_map(snap, continent)))
   renders(suppressWarnings(tile_map(snap, gdp_per_capita)))
@@ -70,6 +71,7 @@ test_that("geom_country_labels takes a data argument", {
 })
 
 test_that("geom_country_labels labels only the countries it was given", {
+  skip_slow_on_cran()
   mapdf <- poly_df()
   keep <- c("USA", "CHN", "IND", "BRA")
   p <- world_map(mapdf, gdp_per_capita) +
@@ -79,6 +81,7 @@ test_that("geom_country_labels labels only the countries it was given", {
 })
 
 test_that("an explicit data frame without geometry is named, not silently empty", {
+  skip_slow_on_cran()
   mapdf <- poly_df()
   expect_error(
     ggplot2::ggplotGrob(world_map(mapdf, gdp_per_capita) +
@@ -90,6 +93,7 @@ test_that("an explicit data frame without geometry is named, not silently empty"
 # --- Bug: locate_country(points=) leaked a raw sf error -----------------------
 
 test_that("locate_country names a bad points argument", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   expect_error(locate_country(points = data.frame(lon = 1, lat = 1)),
                "must be an .*sf.* POINT object")
@@ -101,6 +105,7 @@ test_that("locate_country names a bad points argument", {
 # --- Bug: world_map(projection = "mercator") drew a sliver over a grey slab ---
 
 test_that("mercator is clipped to a usable latitude band", {
+  skip_slow_on_cran()
   d <- sf_df()
   expect_equal(countryatlas:::wdj_lat_limits("mercator"), c(-85.05113, 85.05113))
   expect_null(countryatlas:::wdj_lat_limits("equal_earth"))
@@ -116,6 +121,7 @@ test_that("mercator is clipped to a usable latitude band", {
 # --- morans_i reports what it dropped ----------------------------------------
 
 test_that("morans_i reports the countries it excluded", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   out <- morans_i(snap, gdp_per_capita, n_perm = 0)
   expect_true(all(c("n_excluded", "excluded") %in% names(out)))
@@ -143,6 +149,7 @@ test_that("na_style changes how missing countries are drawn", {
 })
 
 test_that("na_style = 'omit' drops the no-data countries from the drawn data", {
+  skip_slow_on_cran()
   mapdf <- poly_df()
   kept <- ggplot2::ggplot_build(
     world_map(mapdf, gdp_per_capita, na_style = "omit"))$data[[1]]
@@ -152,6 +159,7 @@ test_that("na_style = 'omit' drops the no-data countries from the drawn data", {
 })
 
 test_that("na_style = 'hatched' adds a layer when ggpattern is available", {
+  skip_slow_on_cran()
   skip_if_not_installed("ggpattern")
   skip_if_not_installed("sf")      # gridpattern draws the stripes with sf
   mapdf <- poly_df()
@@ -160,7 +168,26 @@ test_that("na_style = 'hatched' adds a layer when ggpattern is available", {
   expect_equal(length(hatched$layers), length(plain$layers) + 1L)
 })
 
+test_that("na_style = 'hatched' clips its stripes once, not once per polygon", {
+  skip_slow_on_cran()
+  skip_if_not_installed("ggpattern")
+  skip_if_not_installed("sf")
+  mapdf <- poly_df()
+  # gridpattern clips a fresh set of stripes to every group. One group per
+  # polygon was 169 clips for co2_per_capita's no-data countries, and a world
+  # map took 29s to print; one group, each polygon a subgroup, is one clip.
+  p <- world_map(mapdf, co2_per_capita, na_style = "hatched")
+  i <- which(vapply(p$layers, function(l) inherits(l$geom, "GeomPolygonPattern"),
+                    logical(1)))
+  expect_length(i, 1L)
+  ld <- ggplot2::layer_data(p, i)
+  expect_length(unique(ld$group), 1L)
+  expect_gt(length(unique(ld$subgroup)), 100L)
+  expect_s3_class(ggplot2::ggplotGrob(p), "gtable")
+})
+
 test_that("na_style = 'hatched' degrades loudly when ggpattern is missing", {
+  skip_slow_on_cran()
   mapdf <- poly_df()
   # Asking for hatching and silently getting grey is the one thing worse than
   # not offering hatching, so the fallback announces itself and still draws.
@@ -178,6 +205,7 @@ test_that("na_style = 'hatched' degrades loudly when ggpattern is missing", {
 })
 
 test_that("na_style = 'hatched' degrades loudly when sf cannot be loaded", {
+  skip_slow_on_cran()
   skip_if_not_installed("ggpattern")
   mapdf <- poly_df()
   # gridpattern clips the stripes with sf, but only when the map is drawn.
@@ -198,6 +226,7 @@ test_that("na_style = 'hatched' degrades loudly when sf cannot be loaded", {
 })
 
 test_that("na_style = 'hatched' adds nothing when there is nothing missing", {
+  skip_slow_on_cran()
   mapdf <- poly_df()
   full <- mapdf; full$gdp_per_capita <- 1
   hatched <- world_map(full, gdp_per_capita, na_style = "hatched")
@@ -209,6 +238,7 @@ test_that("na_style = 'hatched' adds nothing when there is nothing missing", {
 })
 
 test_that("footnote = 'auto' states coverage and cannot overstate it", {
+  skip_slow_on_cran()
   mapdf <- poly_df()
   cap <- world_map(mapdf, gdp_per_capita, footnote = "auto")$labels$caption
   expect_match(cap, "countries shown")
@@ -238,6 +268,7 @@ test_that("na_coverage counts countries, not polygon vertices", {
 })
 
 test_that("classification_report counts countries per class", {
+  skip_slow_on_cran()
   mapdf <- poly_df()
   p <- world_map(mapdf, gdp_per_capita, style = "quantile",
                  classification_report = TRUE)
@@ -255,6 +286,7 @@ test_that("classification_report counts countries per class", {
 # --- coverage_map / classify_compare / value_by_alpha_map ---------------------
 
 test_that("coverage_map maps availability", {
+  skip_slow_on_cran()
   mapdf <- poly_df()
   p <- coverage_map(mapdf, gdp_per_capita)
   renders(p)
@@ -368,6 +400,7 @@ test_that("projection_compare rejects the polygon backend rather than ignoring i
 })
 
 test_that("projection_compare leaves the s2 setting as it found it", {
+  skip_slow_on_cran()
   d <- sf_df()
   before <- sf::sf_use_s2()
   invisible(ggplot2::ggplotGrob(projection_compare(d, gdp_per_capita)))
@@ -375,6 +408,7 @@ test_that("projection_compare leaves the s2 setting as it found it", {
 })
 
 test_that("tissot_map draws equal-area circles on an equal-area projection", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   renders(tissot_map("equal_earth"))
   renders(tissot_map("mercator", spacing = 45))
@@ -400,6 +434,7 @@ test_that("the Earth radius is one constant, not three literals", {
 # --- provenance ----------------------------------------------------------------
 
 test_that("map_provenance reports what went into a map", {
+  skip_slow_on_cran()
   mapdf <- poly_df()
   p <- world_map(mapdf, gdp_per_capita, style = "quantile", n_bins = 4,
                  na_style = "outline")

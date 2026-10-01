@@ -41,6 +41,7 @@ test_that("repair_country_names fixes confident misses", {
 })
 
 test_that("convert_country routes overrides through iso3c for all destinations", {
+  skip_slow_on_cran()
   expect_equal(convert_country("Canary Islands", to = "iso3c"), "ESP")
   expect_equal(convert_country("Canary Islands", to = "continent"), "Europe")
   expect_equal(convert_country(c("Japan", "Brazil"), to = "flag"),
@@ -76,6 +77,7 @@ test_that("convert_country routes overrides through iso3c for all destinations",
 })
 
 test_that("convert_country(warn = TRUE) actually warns about misses", {
+  skip_slow_on_cran()
   # It used to be a no-op: every internal countrycode() call is wrapped in
   # suppressWarnings(), so `warn` never reached the user.
   expect_warning(convert_country("Wakanda", to = "continent"),
@@ -146,6 +148,7 @@ test_that("spin_globe needs a gif encoder", {
 })
 
 test_that("polygon centroids are one antimeridian-safe row per iso3c", {
+  skip_slow_on_cran()
   skip_if_not_installed("maps")
   cent <- world_geometry("centroids", geometry = "polygon")
   expect_equal(anyDuplicated(cent$iso3c), 0L)
@@ -188,6 +191,7 @@ test_that("country_borders and neighbors need sf", {
 })
 
 test_that("country_borders finds real neighbours (needs sf)", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   b <- country_borders()
   expect_true(all(c("iso3c_a", "country_a", "iso3c_b", "country_b") %in% names(b)))
@@ -215,6 +219,7 @@ test_that("neighbors looks up a country's borders (needs sf)", {
 # quietly break, so pin them rather than trusting the comment.
 
 test_that("the border adjacency is irreflexive and de-duplicated", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   b <- country_borders()
   expect_gt(nrow(b), 100L)

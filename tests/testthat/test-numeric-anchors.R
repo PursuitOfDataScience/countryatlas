@@ -344,6 +344,7 @@ test_that("quantile breaks are computed per country, not per polygon vertex", {
 })
 
 test_that("world_map wires the de-duplication flag to the right backend", {
+  skip_slow_on_cran()
   # Catches the flag being flipped at the call site, not just inside the helper.
   skip_if_not_installed("maps")
   snap <- countryatlas::world_snapshot$countries
@@ -384,6 +385,7 @@ test_that("the sf backend de-duplicates divided countries before breaking", {
 })
 
 test_that("globe_map's polygon backend also de-duplicates before breaking", {
+  skip_slow_on_cran()
   # globe_map attaches polygon geometry internally, so it needs the same
   # per-country de-duplication world_map does -- and it passes the flag
   # separately, so it needs its own check.
@@ -439,6 +441,7 @@ test_that("gini still matches its analytic references exactly", {
 })
 
 test_that("gini agrees with the pairwise definition it replaced", {
+  skip_slow_on_cran()
   pairwise <- function(x, w = rep(1, length(x))) {
     sw <- sum(w)
     mu <- sum(w * x) / sw
@@ -457,6 +460,7 @@ test_that("gini agrees with the pairwise definition it replaced", {
 })
 
 test_that("gini handles a vector far larger than the country scale", {
+  skip_slow_on_cran()
   # The size that used to kill the session. Keep it well under a second.
   set.seed(11)
   x <- runif(2e5, 1, 1000)
@@ -604,6 +608,7 @@ test_that("Moran's I matches the standard statistic's properties", {
 })
 
 test_that("every reversible convert_country destination round-trips", {
+  skip_slow_on_cran()
   # The package is a code-translation tool, so this is its core invariant: for
   # each destination that countrycode can also read *back*, iso3c -> dest ->
   # iso3c must be the identity wherever both steps resolve.
@@ -673,6 +678,7 @@ test_that("the verbs do not depend on input row order", {
 })
 
 test_that("attach_geometry refuses a frame that already has geometry", {
+  skip_slow_on_cran()
   # Re-attaching joins a one-row-per-vertex frame back onto the vertex table by
   # country, which is N-squared: the bundled snapshot went from 99,338 rows to
   # 310,977,360. The join sets relationship = "many-to-many" -- correct, one
@@ -766,6 +772,7 @@ test_that("gini and theil hit their analytic bounds and are scale free", {
 })
 
 test_that("the spatial statistics satisfy their algebraic identities", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
   d <- snap[!is.na(snap$gdp_per_capita), c("iso3c", "gdp_per_capita")]
@@ -814,6 +821,7 @@ test_that("the spatial statistics satisfy their algebraic identities", {
 })
 
 test_that("getis_ord z-scores are shift invariant, and stay finite for a tight column", {
+  skip_slow_on_cran()
   # Gi* standardises by the spread, so adding a constant to every value cannot
   # change a z-score. The old code computed the spread as
   # sqrt(sum(x^2)/n - mean(x)^2), which subtracts two nearly equal large
@@ -863,6 +871,7 @@ test_that("getis_ord z-scores are shift invariant, and stay finite for a tight c
 })
 
 test_that("ring_area_km2 measures wrapped and encircling rings correctly", {
+  skip_slow_on_cran()
   # Longitudes arrive wrapped into [-180, 180), so a raw edge difference jumps
   # by ~360 at the antimeridian. The two failure modes pointed opposite ways:
   # a ring *crossing* 180 came out 179x too large, and one *encircling* the
@@ -1149,6 +1158,7 @@ test_that("the VSUP contracts the value range as uncertainty rises", {
 })
 
 test_that("local_morans()'s lag column is the neighbour average it documents", {
+  skip_slow_on_cran()
   snap <- countryatlas::world_snapshot$countries
   W <- suppressWarnings(country_weights("knn", k = 4))
   d0 <- snap[match(rownames(as.matrix(W)), snap$iso3c), c("iso3c", "gdp_per_capita")]
@@ -1185,6 +1195,7 @@ test_that("local_morans()'s lag column is the neighbour average it documents", {
 })
 
 test_that("beta_convergence() recovers a known convergence rate", {
+  skip_slow_on_cran()
   # Barro & Sala-i-Martin: log y_T = log y_0 + (1 - exp(-lambda T))(log y* - log y_0),
   # so regressing annualised growth on log y_0 has slope -(1 - exp(-lambda T))/T.
   sim <- function(lambda, span, n = 25, ystar = 4e4) {
@@ -1215,6 +1226,7 @@ test_that("beta_convergence() recovers a known convergence rate", {
 })
 
 test_that("beta_convergence() explains an unrecoverable speed on mixed spans", {
+  skip_slow_on_cran()
   mk <- function(lambda, spans, ystar = 4e4) {
     n <- length(spans)
     y0 <- exp(seq(log(1e3), log(6e4), length.out = n))

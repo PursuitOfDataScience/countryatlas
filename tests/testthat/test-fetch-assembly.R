@@ -255,6 +255,7 @@ test_that("an unusable cache does not turn a good fetch into NAs", {
 # length > 1". None named the option.
 
 test_that("a bad cache_dir option names the option", {
+  skip_slow_on_cran()
   for (v in list(NA, NA_character_, character(0), 42, TRUE,
                  c("/tmp/a", "/tmp/b"))) {
     old <- options(countryatlas.cache_dir = v)
@@ -356,6 +357,7 @@ test_that("the cache directory is honoured when it changes mid-session", {
 })
 
 test_that("a corrupt cache entry is recovered from, not blamed on the API", {
+  skip_slow_on_cran()
   # An interrupted write leaves a truncated or empty .rds. Under
   # memoise::cache_filesystem() that surfaced readRDS()'s own "unknown input
   # format" from inside the fetch, which the package had to catch and explain
@@ -494,6 +496,7 @@ test_that("a memory-only memo is not thrown away by forking", {
 })
 
 test_that("a writable cache still fetches indicators in parallel", {
+  skip_slow_on_cran()
   # The guard above must not cost parallelism on the normal path.
   skip_on_os("windows")
   skip_if_not_installed("parallel")
@@ -528,6 +531,7 @@ test_that("a writable cache still fetches indicators in parallel", {
 })
 
 test_that("a failed indicator still warns when indicators are fetched in parallel", {
+  skip_slow_on_cran()
   # mclapply() brings back a worker's value but not its conditions, so the
   # warning fetch_one_safe() raises used to vanish whenever fetching forked --
   # which is whenever there is more than one indicator, i.e. the default. The
