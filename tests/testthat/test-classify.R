@@ -113,8 +113,11 @@ test_that("a midpoint lands on the centre of a diverging palette", {
   filled <- countryatlas:::hcl_palette(11L, "RdBu", colours = na_centre)
   expect_identical(filled[6], grDevices::hcl.colors(1L, "RdBu"))
   expect_identical(filled[-6], grDevices::hcl.colors(11L, "RdBu")[-6])
-  expect_identical(grDevices::hcl.colors(11L, "RdBu")[6],
-                   grDevices::hcl.colors(1L, "RdBu"))
+  # Where base R does return the centre, it is the colour filled in.
+  base_centre <- grDevices::hcl.colors(11L, "RdBu")[6]
+  if (!is.na(base_centre)) {
+    expect_identical(base_centre, grDevices::hcl.colors(1L, "RdBu"))
+  }
   # Classes: a break is forced at the midpoint, and the classes either side
   # take the two arms.
   q <- world_map(gm, growth, midpoint = 0)
