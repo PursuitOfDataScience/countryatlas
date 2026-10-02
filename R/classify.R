@@ -268,12 +268,27 @@ resolve_palette <- function(palette, midpoint, default = "viridis",
   palette
 }
 
+# grDevices::hcl.colors() with the centre of an odd-length diverging palette
+# filled in. Its trajectory, seq.int(1, by = -2/(n - 1)), should end on 0; with
+# fused multiply-add (arm64, so macOS on Apple silicon) it ends a hair below,
+# i^p is NaN, and the neutral centre comes back NA, which ggplot2 draws as
+# transparent white. hcl.colors(1, palette) is that centre exactly: chroma 0,
+# the palette's light end. `colours` is the generator, for tests.
+hcl_palette <- function(n, palette, colours = grDevices::hcl.colors) {
+  out <- colours(n, palette)
+  mid <- (n + 1L) %/% 2L
+  if (n %% 2L == 1L && n > 1L && is.na(out[mid])) {
+    out[mid] <- colours(1L, palette)
+  }
+  out
+}
+
 # Class colours either side of a midpoint, from the centre of a diverging
 # palette outwards, so the first class above the midpoint and the first below
 # it are equally light whatever the counts on each side.
 diverging_class_colours <- function(n_below, n_above, palette) {
   side <- max(n_below, n_above, 1L)
-  full <- grDevices::hcl.colors(2L * side + 1L, palette)
+  full <- hcl_palette(2L * side + 1L, palette)
   low <- full[seq_len(side)]
   high <- full[side + 1L + seq_len(side)]
   c(utils::tail(low, n_below), utils::head(high, n_above))
@@ -465,7 +480,7 @@ add_fill_scale <- function(style, palette, n_bins, na_label, legend,
     }
     return(do.call(ggplot2::scale_fill_gradientn, c(list(
       name = legend, na.value = na_value,
-      colours = grDevices::hcl.colors(11L, palette), labels = scales_format()),
+      colours = hcl_palette(11L, palette), labels = scales_format()),
       mid)))
   }
   if (style %in% BAR_STYLES) {
@@ -489,7 +504,7 @@ add_fill_scale <- function(style, palette, n_bins, na_label, legend,
     }
     return(do.call(ggplot2::scale_fill_stepsn, c(list(
       name = legend, na.value = na_value,
-      colours = grDevices::hcl.colors(11L, palette),
+      colours = hcl_palette(11L, palette),
       breaks = inner %||% ggplot2::waiver(), labels = scales_format()), mid)))
   }
   labels <- discrete_na_labels(na_label)
@@ -521,5 +536,5 @@ add_fill_scale <- function(style, palette, n_bins, na_label, legend,
   ggplot2::discrete_scale(
     aesthetics = "fill", name = legend, na.value = na_value, labels = labels,
     limits = lv, drop = !fixed,
-    palette = function(n) grDevices::hcl.colors(n, palette))
+    palette = function(n) hcl_palette(n, palette))
 }

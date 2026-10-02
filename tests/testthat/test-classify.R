@@ -99,8 +99,22 @@ test_that("a midpoint lands on the centre of a diverging palette", {
   p <- world_map(gm, growth, style = "continuous", midpoint = 0.5)
   sc <- ggplot2::ggplot_build(p)$plot$scales$get_scales("fill")
   expect_equal(sc$rescale(0.5, sc$get_limits()), 0.5, tolerance = 1e-9)
-  centre <- grDevices::hcl.colors(11L, "RdBu")[6]
+  centre <- countryatlas:::hcl_palette(11L, "RdBu")[6]
+  expect_false(is.na(centre))
   expect_identical(toupper(sc$map(0.5)), toupper(centre))
+  # On arm64 base R returns NA for an odd diverging palette's centre (fused
+  # multiply-add takes the trajectory a hair below zero), which was drawn as
+  # transparent white. The centre is filled with the palette's neutral.
+  na_centre <- function(n, palette) {
+    x <- grDevices::hcl.colors(n, palette)
+    if (n > 1L && n %% 2L == 1L) x[(n + 1L) %/% 2L] <- NA
+    x
+  }
+  filled <- countryatlas:::hcl_palette(11L, "RdBu", colours = na_centre)
+  expect_identical(filled[6], grDevices::hcl.colors(1L, "RdBu"))
+  expect_identical(filled[-6], grDevices::hcl.colors(11L, "RdBu")[-6])
+  expect_identical(grDevices::hcl.colors(11L, "RdBu")[6],
+                   grDevices::hcl.colors(1L, "RdBu"))
   # Classes: a break is forced at the midpoint, and the classes either side
   # take the two arms.
   q <- world_map(gm, growth, midpoint = 0)

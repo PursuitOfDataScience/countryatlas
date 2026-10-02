@@ -874,11 +874,21 @@ test_that("the Earth radius is one constant, not three literals", {
   # not there under `R CMD check`, and the thing worth asserting is that these
   # three all reach for the shared constant, not that one file happens to
   # contain the number once.
-  bodies <- vapply(
-    list(countryatlas:::ring_area_km2, countryatlas:::haversine_km,
-         countryatlas::tissot_map),
-    function(f) paste(deparse(f), collapse = " "), character(1))
-  expect_false(any(grepl("6371", bodies, fixed = TRUE)))
+  fns <- list(countryatlas:::ring_area_km2, countryatlas:::haversine_km,
+              countryatlas::tissot_map)
+  bodies <- vapply(fns, function(f) paste(deparse(f), collapse = " "), character(1))
+  # The numeric literals in each body, not a text search: under covr every
+  # expression is wrapped in a counter whose key carries line numbers of the
+  # collated source, and one of them can contain "6371" by chance.
+  numbers <- function(e) {
+    if (is.numeric(e)) return(e)
+    if (is.call(e) || is.pairlist(e) || is.expression(e)) {
+      return(unlist(lapply(as.list(e), numbers)))
+    }
+    NULL
+  }
+  lits <- unlist(lapply(fns, function(f) numbers(body(f))))
+  expect_false(any(abs(lits - 6371) < 1))
   expect_true(all(grepl("EARTH_RADIUS_KM", bodies, fixed = TRUE)))
 })
 

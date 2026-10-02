@@ -4,9 +4,13 @@ budget <- c(tests = 40, vignettes = 50, check = 270) * scale
 took <- c(tests = NA, vignettes = NA, check = NA)
 
 # CRAN-mode tests: NOT_CRAN unset, so skip_on_cran() skips as it does there.
+# test_dir() rather than test_local(), which sets NOT_CRAN=true itself and so
+# timed the whole suite.
 Sys.unsetenv("NOT_CRAN")
 took[["tests"]] <- system.time(
-  testthat::test_local(".", reporter = "summary", stop_on_failure = TRUE)
+  testthat::test_dir("tests/testthat", package = "countryatlas",
+                     load_package = "source", reporter = "summary",
+                     stop_on_failure = TRUE)
 )[["elapsed"]]
 
 took[["vignettes"]] <- system.time(
