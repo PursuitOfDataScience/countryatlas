@@ -54,9 +54,10 @@ interactive_map(
   [`world_query()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_query.md)
   for `"ggsql"`, and to
   [`mapgl::maplibre()`](https://walker-data.com/mapgl/reference/maplibre.html)
-  for `"mapgl"`. The `"ggiraph"` and `"leaflet"` engines assemble their
-  own map and take no further arguments; they warn rather than ignore
-  what they are given.
+  for `"mapgl"`. The `"ggiraph"` engine assembles its own map and takes
+  world_map()'s classification arguments (`style`, quantile by default,
+  `n_bins`, `palette`, `breaks`, `midpoint`); `"leaflet"` takes none.
+  Both warn rather than ignore what they cannot use.
 
 ## Value
 

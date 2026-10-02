@@ -15,15 +15,21 @@ value_by_alpha_map(
   data,
   value,
   equalize,
-  style = c("quantile", "continuous", "binned", "jenks"),
+  style = c("quantile", "continuous", "binned", "equal", "jenks", "fisher", "headtails",
+    "sd", "fixed"),
   palette = NULL,
   n_bins = 5,
+  breaks = NULL,
+  midpoint = NULL,
   alpha_range = c(0.15, 1),
   transform = c("rank", "log10", "identity"),
   background = "grey20",
   title = NULL,
   legend = NULL,
-  projection = "equal_earth"
+  projection = "equal_earth",
+  footnote = "auto",
+  small_states = c("auto", "none", "dots"),
+  small_area_km2 = 1000
 )
 ```
 
@@ -44,12 +50,14 @@ value_by_alpha_map(
 
 - style:
 
-  Classification for the colour channel (as
-  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)).
+  Classification for the colour channel, as in
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
+  (any of its styles but `"categorical"`).
 
-- palette:
+- palette, breaks, midpoint:
 
-  Optional viridis palette name.
+  As in
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md).
 
 - n_bins:
 
@@ -76,11 +84,25 @@ value_by_alpha_map(
 
 - projection:
 
-  Projection for the `sf` backend.
+  Projection, as in
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md).
+
+- footnote, small_states, small_area_km2:
+
+  As in
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md).
+  A small state drawn as a point takes its opacity from `equalize` too.
 
 ## Value
 
 A `ggplot` object.
+
+## Backend
+
+Either backend, from the frame: an `sf` frame draws through
+[`coord_sf()`](https://ggplot2.tidyverse.org/reference/ggsf.html), a
+polygon frame on the polygon backend, both in `projection` (Equal Earth
+by default).
 
 ## References
 
@@ -102,10 +124,8 @@ and
 ``` r
 # \donttest{
 snap <- countryatlas::world_snapshot$countries
-if (requireNamespace("maps", quietly = TRUE)) {
-  attach_geometry(snap, geometry = "polygon") |>
-    value_by_alpha_map(gdp_per_capita, population)
-}
+attach_geometry(snap, geometry = "polygon") |>
+  value_by_alpha_map(gdp_per_capita, population)
 
 # }
 ```

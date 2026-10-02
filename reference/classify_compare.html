@@ -35,7 +35,18 @@ common GIS default."><meta property="og:image" content="https://pursuitofdatasci
     <li><a class="dropdown-item" href="../articles/beyond-the-choropleth.html">Beyond the choropleth</a></li>
     <li><a class="dropdown-item" href="../articles/honest-maps.html">Honest maps: classification, missingness and distortion</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas-and-ggsql.html">countryatlas and ggsql</a></li>
+    <li><a class="dropdown-item" href="../articles/panels.html">Panels done right</a></li>
+    <li><a class="dropdown-item" href="../articles/data-you-can-trace.html">Data you can trace: sources, vintages and provenance</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas.html">Full introduction (formal)</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>More, on the website</h6></li>
+    <li><a class="dropdown-item" href="../articles/gallery.html">Gallery</a></li>
+    <li><a class="dropdown-item" href="../articles/spatial-statistics.html">Spatial statistics on a world of islands</a></li>
+    <li><a class="dropdown-item" href="../articles/rates-and-small-numbers.html">Rates and small numbers</a></li>
+    <li><a class="dropdown-item" href="../articles/comparative-development.html">The comparative-development toolkit</a></li>
+    <li><a class="dropdown-item" href="../articles/disputed-territories.html">Disputed territories and worldviews</a></li>
+    <li><a class="dropdown-item" href="../articles/flows-networks-subnational.html">Flows, networks and subnational data</a></li>
+    <li><a class="dropdown-item" href="../articles/accessible-maps.html">Accessible and citable maps</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -67,10 +78,11 @@ common GIS default.</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">classify_compare</span><span class="op">(</span></span>
 <span>  <span class="va">data</span>,</span>
 <span>  <span class="va">value</span>,</span>
-<span>  methods <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"quantile"</span>, <span class="st">"jenks"</span>, <span class="st">"equal"</span>, <span class="st">"pretty"</span><span class="op">)</span>,</span>
-<span>  n <span class="op">=</span> <span class="fl">5</span>,</span>
+<span>  methods <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"quantile"</span>, <span class="st">"jenks"</span>, <span class="st">"fisher"</span>, <span class="st">"headtails"</span>, <span class="st">"equal"</span>, <span class="st">"pretty"</span><span class="op">)</span>,</span>
+<span>  n_bins <span class="op">=</span> <span class="fl">5</span>,</span>
 <span>  ncol <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  <span class="va">...</span></span>
+<span>  <span class="va">...</span>,</span>
+<span>  n <span class="op">=</span> <span class="fu">deprecated</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -88,12 +100,15 @@ common GIS default.</p>
 
 <dt id="arg-methods">methods<a class="anchor" aria-label="anchor" href="#arg-methods"></a></dt>
 <dd><p>Classification styles to compare. Any of <code>"quantile"</code>,
-<code>"jenks"</code>, <code>"equal"</code>, <code>"pretty"</code> and <code>"sd"</code>. <code>"jenks"</code> needs the optional
-<code>classInt</code>; without it, it falls back to quantile breaks with a warning.</p></dd>
+<code>"jenks"</code>, <code>"fisher"</code>, <code>"headtails"</code>, <code>"equal"</code>, <code>"pretty"</code> and <code>"sd"</code>,
+with the breaks <code><a href="world_map.html">world_map()</a></code> would draw for each. <code>"jenks"</code> and
+<code>"fisher"</code> need the optional <code>classInt</code>; without it they fall back to
+quantile breaks with a warning.</p></dd>
 
 
-<dt id="arg-n">n<a class="anchor" aria-label="anchor" href="#arg-n"></a></dt>
-<dd><p>Number of classes (default <code>5</code>).</p></dd>
+<dt id="arg-n-bins">n_bins<a class="anchor" aria-label="anchor" href="#arg-n-bins"></a></dt>
+<dd><p>Number of classes (default <code>5</code>), as the map verbs call it;
+<code>"headtails"</code> and <code>"pretty"</code> choose their own.</p></dd>
 
 
 <dt id="arg-ncol">ncol<a class="anchor" aria-label="anchor" href="#arg-ncol"></a></dt>
@@ -103,12 +118,30 @@ common GIS default.</p>
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
 <dd><p>Passed to <code><a href="world_map.html">world_map()</a></code>.</p></dd>
 
+
+<dt id="arg-n">n<a class="anchor" aria-label="anchor" href="#arg-n"></a></dt>
+<dd><p><a href="https://lifecycle.r-lib.org/articles/stages.html#deprecated" class="external-link"><img src="figures/lifecycle-deprecated.svg" alt="[Deprecated]"></a> Use <code>n_bins</code>.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A faceted <code>ggplot</code> object, with the per-method break and class-count
 table attached as the <code>"countryatlas_classification"</code> attribute (and
-readable with <code><a href="map_provenance.html">map_provenance()</a></code>).</p>
+readable with <code><a href="map_provenance.html">map_provenance()</a></code>). Each method's rows also carry three
+measures of fit: <code>gvf</code>, the goodness of variance fit, and <code>tai</code>, the
+tabular accuracy index (both Jenks &amp; Caspall 1971; 1 is a perfect fit),
+and <code>max_class_share</code>, the share of countries in the fullest class.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="no-number-picks-a-classification">No number picks a classification<a class="anchor" aria-label="anchor" href="#no-number-picks-a-classification"></a></h2>
+
+
+<p>GVF and TAI measure how homogeneous the classes are, which is what natural
+breaks optimise; they rate a map that puts most countries in one class
+highly, and they say nothing about how well readers read the map. They are
+reported to inform the choice, never to rank the methods: Brewer &amp; Pickle's
+finding that quantiles read best stands beside them, and
+<code>max_class_share</code> flags the map whose fullest class swallows the rest.</p>
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
@@ -116,6 +149,12 @@ readable with <code><a href="map_provenance.html">map_provenance()</a></code>).<
 epidemiological data on choropleth maps in series. <em>Annals of the
 Association of American Geographers</em> 92(4), 662-681.
 <a href="https://doi.org/10.1111/1467-8306.00310" class="external-link">doi:10.1111/1467-8306.00310</a></p>
+<p>Jenks, G. F. &amp; Caspall, F. C. (1971). Error on choroplethic maps:
+definition, measurement, reduction. <em>Annals of the Association of American
+Geographers</em> 61(2), 217-244. <a href="https://doi.org/10.1111/j.1467-8306.1971.tb00779.x" class="external-link">doi:10.1111/j.1467-8306.1971.tb00779.x</a></p>
+<p>Jiang, B. (2013). Head/tail breaks: a new classification scheme for data
+with a heavy-tailed distribution. <em>The Professional Geographer</em> 65(3),
+482-494. <a href="https://doi.org/10.1080/00330124.2012.700499" class="external-link">doi:10.1080/00330124.2012.700499</a></p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
@@ -126,34 +165,23 @@ Association of American Geographers</em> 92(4), 662-681.
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="va">snap</span> <span class="op">&lt;-</span> <span class="fu">countryatlas</span><span class="fu">::</span><span class="va"><a href="world_snapshot.html">world_snapshot</a></span><span class="op">$</span><span class="va">countries</span></span></span>
-<span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"maps"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
-<span class="r-in"><span>  <span class="va">cmp</span> <span class="op">&lt;-</span> <span class="fu"><a href="attach_geometry.html">attach_geometry</a></span><span class="op">(</span><span class="va">snap</span>, geometry <span class="op">=</span> <span class="st">"polygon"</span><span class="op">)</span> <span class="op">|&gt;</span></span></span>
-<span class="r-in"><span>    <span class="fu">classify_compare</span><span class="op">(</span><span class="va">gdp_per_capita</span><span class="op">)</span></span></span>
-<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">cmp</span>, <span class="st">"countryatlas_classification"</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">}</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 20 × 4</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    method   class                     n   share</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                 <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span> quantile [268.7,1662]             38 0.201  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span> quantile (1662,4594]              38 0.201  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span> quantile (4594,1.029e+04]         37 0.196  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span> quantile (1.029e+04,2.937e+04]    38 0.201  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span> quantile (2.937e+04,2.472e+05]    38 0.201  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span> jenks    [268.7,1.312e+04]       123 0.651  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span> jenks    (1.312e+04,3.484e+04]    37 0.196  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span> jenks    (3.484e+04,6.771e+04]    23 0.122  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span> jenks    (6.771e+04,1.221e+05]     5 0.026<span style="text-decoration: underline;">5</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span> jenks    (1.221e+05,2.472e+05]     1 0.005<span style="text-decoration: underline;">29</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">11</span> equal    [268.7,4.965e+04]       173 0.915  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">12</span> equal    (4.965e+04,9.903e+04]    13 0.068<span style="text-decoration: underline;">8</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">13</span> equal    (9.903e+04,1.484e+05]     2 0.010<span style="text-decoration: underline;">6</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">14</span> equal    (1.484e+05,1.978e+05]     0 0      </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">15</span> equal    (1.978e+05,2.472e+05]     1 0.005<span style="text-decoration: underline;">29</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">16</span> pretty   [0,5e+04]               173 0.915  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">17</span> pretty   (5e+04,1e+05]            13 0.068<span style="text-decoration: underline;">8</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">18</span> pretty   (1e+05,1.5e+05]           2 0.010<span style="text-decoration: underline;">6</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">19</span> pretty   (1.5e+05,2e+05]           0 0      </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">20</span> pretty   (2e+05,2.5e+05]           1 0.005<span style="text-decoration: underline;">29</span></span>
+<span class="r-in"><span><span class="va">cmp</span> <span class="op">&lt;-</span> <span class="fu"><a href="attach_geometry.html">attach_geometry</a></span><span class="op">(</span><span class="va">snap</span>, geometry <span class="op">=</span> <span class="st">"polygon"</span><span class="op">)</span> <span class="op">|&gt;</span></span></span>
+<span class="r-in"><span>  <span class="fu">classify_compare</span><span class="op">(</span><span class="va">gdp_per_capita</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">cmp</span>, <span class="st">"countryatlas_classification"</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 30 × 7</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    method   class              n   share   gvf   tai max_class_share</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>          <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>           <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span> quantile 269 to 1.68K      40 0.201   0.626 0.672           0.201</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span> quantile 1.68K to 4.65K    40 0.201   0.626 0.672           0.201</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span> quantile 4.65K to 10.3K    39 0.196   0.626 0.672           0.201</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span> quantile 10.3K to 30.1K    40 0.201   0.626 0.672           0.201</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span> quantile 30.1K to 247K     40 0.201   0.626 0.672           0.201</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span> jenks    269 to 13.1K     129 0.648   0.958 0.756           0.648</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span> jenks    13.1K to 34.8K    38 0.191   0.958 0.756           0.648</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span> jenks    34.8K to 68.1K    25 0.126   0.958 0.756           0.648</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span> jenks    68.1K to 117K      6 0.030<span style="text-decoration: underline;">2</span>  0.958 0.756           0.648</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span> jenks    117K to 247K       1 0.005<span style="text-decoration: underline;">03</span> 0.958 0.756           0.648</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 20 more rows</span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

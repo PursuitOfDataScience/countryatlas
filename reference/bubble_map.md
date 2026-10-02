@@ -14,7 +14,8 @@ bubble_map(
   projection = "equal_earth",
   backend = c("polygon", "sf"),
   max_size = 18,
-  alpha = 0.7
+  alpha = 0.7,
+  footnote = "auto"
 )
 ```
 
@@ -50,6 +51,12 @@ bubble_map(
 
   Bubble transparency.
 
+- footnote:
+
+  The caption: `"auto"` (default) states the coverage and source, a
+  string is used as given, `FALSE` adds nothing. See
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md).
+
 ## Value
 
 A `ggplot` object.
@@ -59,11 +66,9 @@ A `ggplot` object.
 ``` r
 # \donttest{
 snap <- countryatlas::world_snapshot$countries
-if (requireNamespace("maps", quietly = TRUE)) {
-  bubble_map(snap, population)
-}
-#> Warning: population: 5 countries are not drawn -- no bundled centroid.
-#> • "GIB", "HKG", "MAC", "TUV", and "VGB"
+bubble_map(snap, population)
+#> Warning: population: 1 country is not drawn -- no bundled centroid.
+#> • "GIB"
 #> ℹ They are counted as missing in the caption and in `map_provenance()`.
 
 # }

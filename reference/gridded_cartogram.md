@@ -9,7 +9,15 @@ preserves *countability* – the reader can literally count the cells.
 ## Usage
 
 ``` r
-gridded_cartogram(data, value, cells = 1000, fill = NULL, cell_size = 2.5)
+gridded_cartogram(
+  data,
+  value,
+  cells = 1000,
+  fill = NULL,
+  cell_size = 2.5,
+  projection = "equal_earth",
+  footnote = "auto"
+)
 ```
 
 ## Arguments
@@ -33,7 +41,24 @@ gridded_cartogram(data, value, cells = 1000, fill = NULL, cell_size = 2.5)
 
 - cell_size:
 
-  Grid spacing in degrees (default `2.5`).
+  Grid spacing in degrees of latitude (default `2.5`). On a projected
+  map the cells are laid out in the projection's own units at that
+  ground distance (one degree is about 111 km), so every cell is the
+  same square wherever it stands.
+
+- projection:
+
+  Where the blocks are placed: a projection as in
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
+  (default `"equal_earth"`), or `"none"` for the unprojected grid of
+  3.0.0.
+
+- footnote:
+
+  The caption, as in
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md):
+  `"auto"` (default) states the coverage and source, a string is used as
+  given, `FALSE` adds nothing.
 
 ## Value
 
@@ -41,6 +66,11 @@ A `ggplot` object. The per-country cell allocation is attached as the
 `"countryatlas_cells"` attribute – every placeable country, including
 the ones that rounded to zero cells, so `share` sums to 1 and the
 rounding is fully visible.
+
+## Backend
+
+The cells are laid out from the bundled centroids in `projection` (Equal
+Earth by default), so it needs no geometry backend and no `sf`.
 
 ## Rounding is the whole difficulty
 
@@ -58,13 +88,14 @@ avoidance between countries. That is deliberate – a global packing solve
 would push countries away from where they belong – but it means blocks
 in crowded regions are drawn on top of one another, and a partly hidden
 block cannot be counted or compared. The effect is not marginal: at the
-defaults (`cells = 1000`, `cell_size = 2.5`) about a third of the cells
-overlap a cell of a different country, across some sixty countries, and
-it grows with `cells` – at `cells = 2500` it is roughly two thirds.
+defaults (`cells = 1000`, `cell_size = 2.5`) about two fifths of the
+cells overlap a cell of a different country, across some eighty
+countries, and it grows with `cells` – at `cells = 2500` it is roughly
+70%.
 
 `cell_size` is the lever, because it scales the tiles without moving the
 centroids: dropping it to `1.5` cuts the overlap at `cells = 1000` to
-about a tenth of the cells. Fewer `cells` also helps. Where exact areas
+about a sixth of the cells. Fewer `cells` also helps. Where exact areas
 matter more than geographic position,
 [`dorling_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/dorling_map.md)
 resolves collisions by displacing circles instead.
@@ -81,9 +112,9 @@ resolves collisions by displacing circles instead.
 # \donttest{
 snap <- countryatlas::world_snapshot$countries
 gridded_cartogram(snap, population, cells = 400)
-#> Warning: 5 countries have no bundled centroid and cannot be placed on the grid.
-#> • "GIB", "HKG", "MAC", "TUV", and "VGB"
-#> ℹ Their weight is excluded, so the cells shown cover 99.9% of the total.
+#> Warning: 1 country has no bundled centroid and cannot be placed on the grid.
+#> • "GIB"
+#> ℹ Their weight is excluded, so the cells shown cover 100% of the total.
 
 # }
 ```

@@ -31,7 +31,18 @@ string distance) for misses. Surfaced automatically by join_world()."><meta prop
     <li><a class="dropdown-item" href="../articles/beyond-the-choropleth.html">Beyond the choropleth</a></li>
     <li><a class="dropdown-item" href="../articles/honest-maps.html">Honest maps: classification, missingness and distortion</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas-and-ggsql.html">countryatlas and ggsql</a></li>
+    <li><a class="dropdown-item" href="../articles/panels.html">Panels done right</a></li>
+    <li><a class="dropdown-item" href="../articles/data-you-can-trace.html">Data you can trace: sources, vintages and provenance</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas.html">Full introduction (formal)</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>More, on the website</h6></li>
+    <li><a class="dropdown-item" href="../articles/gallery.html">Gallery</a></li>
+    <li><a class="dropdown-item" href="../articles/spatial-statistics.html">Spatial statistics on a world of islands</a></li>
+    <li><a class="dropdown-item" href="../articles/rates-and-small-numbers.html">Rates and small numbers</a></li>
+    <li><a class="dropdown-item" href="../articles/comparative-development.html">The comparative-development toolkit</a></li>
+    <li><a class="dropdown-item" href="../articles/disputed-territories.html">Disputed territories and worldviews</a></li>
+    <li><a class="dropdown-item" href="../articles/flows-networks-subnational.html">Flows, networks and subnational data</a></li>
+    <li><a class="dropdown-item" href="../articles/accessible-maps.html">Accessible and citable maps</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -61,7 +72,7 @@ string distance) for misses. Surfaced automatically by <code><a href="join_world
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">check_country_match</span><span class="op">(</span></span>
 <span>  <span class="va">x</span>,</span>
 <span>  origin <span class="op">=</span> <span class="st">"country.name"</span>,</span>
-<span>  custom_match <span class="op">=</span> <span class="fu"><a href="wdj_overrides.html">country_overrides</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  custom_match <span class="op">=</span> <span class="fu"><a href="country_overrides.html">country_overrides</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  suggest <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -80,7 +91,7 @@ string distance) for misses. Surfaced automatically by <code><a href="join_world
 
 <dt id="arg-custom-match">custom_match<a class="anchor" aria-label="anchor" href="#arg-custom-match"></a></dt>
 <dd><p>Overrides applied before matching (default
-<code><a href="wdj_overrides.html">country_overrides()</a></code>).</p></dd>
+<code><a href="country_overrides.html">country_overrides()</a></code>).</p></dd>
 
 
 <dt id="arg-suggest">suggest<a class="anchor" aria-label="anchor" href="#arg-suggest"></a></dt>
@@ -91,7 +102,18 @@ string distance) for misses. Surfaced automatically by <code><a href="join_world
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A tibble with columns <code>input</code>, <code>iso3c</code>, <code>matched</code>, <code>historical</code>,
-<code>suggestion</code>.</p>
+<code>method</code> and <code>suggestion</code>. <code>method</code> says how a name was matched, tier by
+tier, each tried only for what is still unmatched: <code>"override"</code> (the
+<code><a href="country_overrides.html">country_overrides()</a></code> table), <code>"regex_en"</code> (countrycode's English
+patterns), <code>"name_de"</code>, <code>"name_es"</code>, <code>"name_fr"</code> and <code>"name_it"</code> (an
+exact match, ignoring case, accents and punctuation, against
+countrycode's German, Spanish, French and Italian names), <code>"cldr"</code> (the
+same against every name, short name and variant in the Unicode CLDR
+tables countrycode carries, in every language), <code>"ambiguous"</code> (a CLDR
+name for more than one country, which is left unmatched) or <code>"none"</code>.
+Exact rather than countrycode's language patterns, which are unanchored
+and matched Somaliland to Somalia. For an <code>origin</code> other than a name it
+is <code>"code"</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -110,19 +132,19 @@ applying the <code>suggestion</code> column automatically.</p></div>
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu">check_country_match</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"USA"</span>, <span class="st">"Cote d'Ivoire"</span>, <span class="st">"Yugoslavia"</span>, <span class="st">"Wakanda"</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 4 × 5</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   input         iso3c matched historical suggestion</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>         <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> USA           USA   TRUE    FALSE      <span style="color: #BB0000;">NA</span>        </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> Cote d'Ivoire CIV   TRUE    FALSE      <span style="color: #BB0000;">NA</span>        </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span> Yugoslavia    <span style="color: #BB0000;">NA</span>    FALSE   TRUE       Yugoslavia</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span> Wakanda       <span style="color: #BB0000;">NA</span>    FALSE   FALSE      Canada    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 4 × 6</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   input         iso3c matched historical method   suggestion</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>         <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> USA           USA   TRUE    FALSE      regex_en <span style="color: #BB0000;">NA</span>        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> Cote d'Ivoire CIV   TRUE    FALSE      regex_en <span style="color: #BB0000;">NA</span>        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span> Yugoslavia    <span style="color: #BB0000;">NA</span>    FALSE   TRUE       none     Yugoslavia</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span> Wakanda       <span style="color: #BB0000;">NA</span>    FALSE   FALSE      none     Canada    </span>
 <span class="r-in"><span><span class="co"># "USSR" matches (to RUS!) but is flagged historical:</span></span></span>
 <span class="r-in"><span><span class="fu">check_country_match</span><span class="op">(</span><span class="st">"USSR"</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 1 × 5</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   input iso3c matched historical suggestion</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> USSR  RUS   TRUE    TRUE       <span style="color: #BB0000;">NA</span>        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 1 × 6</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   input iso3c matched historical method   suggestion</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> USSR  RUS   TRUE    TRUE       regex_en <span style="color: #BB0000;">NA</span>        </span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

@@ -3,9 +3,8 @@
 `countryatlas` exists to kill one recurring source of pain: country
 names never line up across data sources. The package makes ISO codes the
 universal join key and hands you a ready-to-map tibble that stitches
-together map geometry
-([`ggplot2::map_data()`](https://ggplot2.tidyverse.org/reference/map_data.html)
-or Natural Earth `sf`), World Bank indicators
+together map geometry (bundled Natural Earth polygons, or Natural Earth
+`sf`), World Bank indicators
 ([`WDI::WDI()`](https://rdrr.io/pkg/WDI/man/WDI.html)) and the
 [`countrycode::countrycode()`](https://rdrr.io/pkg/countrycode/man/countrycode.html)
 crosswalk.
@@ -54,7 +53,7 @@ and
 
 [`check_country_match()`](https://pursuitofdatascience.github.io/countryatlas/reference/check_country_match.md),
 [`repair_country_names()`](https://pursuitofdatascience.github.io/countryatlas/reference/repair_country_names.md),
-[`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md),
+[`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_overrides.md),
 [`audit_coverage()`](https://pursuitofdatascience.github.io/countryatlas/reference/audit_coverage.md).
 
 ## Reference data
@@ -168,19 +167,18 @@ and the datasets
 
 ## Performance & caching
 
-[`clear_wdi_cache()`](https://pursuitofdatascience.github.io/countryatlas/reference/clear_wdi_cache.md),
 [`clear_country_cache()`](https://pursuitofdatascience.github.io/countryatlas/reference/clear_country_cache.md).
 
 ## Options
 
-Six options change the package's behaviour. All are unset by default.
+Eight options change the package's behaviour. All are unset by default.
 
 - `countryatlas.cache_dir`:
 
-  Where the persistent World Bank cache lives. Defaults to
-  `tools::R_user_dir("countryatlas", "cache")`; set it to `""` for
+  Where the persistent cache lives, one directory per source. Defaults
+  to `tools::R_user_dir("countryatlas", "cache")`; set it to `""` for
   session-only caching. See
-  [`clear_wdi_cache()`](https://pursuitofdatascience.github.io/countryatlas/reference/clear_wdi_cache.md).
+  [`clear_country_cache()`](https://pursuitofdatascience.github.io/countryatlas/reference/clear_country_cache.md).
 
 - `countryatlas.cache_max_age`:
 
@@ -206,12 +204,27 @@ Six options change the package's behaviour. All are unset by default.
   CRAN policy. Must be a single finite number; values below one are
   clamped to one.
 
-- `countryatlas.gdp_compat`:
+- `countryatlas.timeout`:
 
-  Set to `TRUE` to restore the `gdp_per_capita_2015` column that
-  [`world_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_data.md)
-  emitted in 1.0.0. A deprecation shim, off by default, and now warning
-  when used.
+  How long one request to a provider may take, in seconds. Defaults
+  to 60. Every built-in source goes through the same client, so a
+  failing fetch is bounded: at most `countryatlas.retries + 1` requests
+  of this length each, plus the waits between them.
+
+- `countryatlas.retries`:
+
+  How many times a request is retried after a failure worth retrying
+  (HTTP 429, a 5xx, a dropped connection), with exponential backoff and
+  jitter, honouring `Retry-After`. Defaults to 3; a whole number from 0
+  to 10.
+
+- `countryatlas.strict`:
+
+  Set to `TRUE` to make a failed download an error (class
+  `countryatlas_fetch_failed`) instead of a warning and an empty result,
+  for a pipeline that must not continue with data missing. The default,
+  `FALSE`, is what CRAN asks of a package that uses the network: fail
+  gracefully.
 
 - `countryatlas.dispute_policy`:
 
@@ -220,6 +233,13 @@ Six options change the package's behaviour. All are unset by default.
   [`dispute_policy()`](https://pursuitofdatascience.github.io/countryatlas/reference/dispute_policy.md)
   rather than directly, which also reports what the setting does and
   does not change.
+
+- `countryatlas.worldview`:
+
+  A Natural Earth point of view the `sf` backend draws, as the viewing
+  country's ISO code (`"IND"`) or `"ISO"`; unset by default. Set it with
+  `dispute_policy(worldview = )`, which validates it; see
+  [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md).
 
 ## See also
 

@@ -17,7 +17,8 @@ attach_geometry(
   projection = "equal_earth",
   recenter = NULL,
   overrides = country_overrides(),
-  year = NULL
+  year = NULL,
+  worldview = NULL
 )
 ```
 
@@ -33,13 +34,15 @@ attach_geometry(
 
 - geometry:
 
-  `"polygon"` (default) or `"sf"`.
+  `"polygon"` (default: the bundled Natural Earth 1:50m countries) or
+  `"sf"`. `"maps"`, the `maps` package's polygons as drawn before 4.0.0,
+  is deprecated.
 
 - scale:
 
   Natural Earth resolution for the `sf` backend. The polygon backend
-  serves one bundled resolution and warns if asked for another.
-  `"large"` needs the non-CRAN `rnaturalearthhires` package; see
+  draws its one bundled resolution, 1:50m, and warns if asked for
+  `"large"`, which needs the non-CRAN `rnaturalearthhires` package; see
   [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md).
   It also affects which countries are covered at all – see below.
 
@@ -50,18 +53,21 @@ attach_geometry(
 
 - projection, recenter:
 
-  Projection, and optional central meridian, for the `sf` backend (see
+  Projection, and optional central meridian. The `sf` backend projects
+  the geometry here (see
   [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
-  for the projections available). The polygon backend can do neither and
-  warns if asked.
+  for the projections available). The polygon backend returns
+  longitude/latitude, which the map verbs project when they draw, so it
+  warns about `projection`; `recenter` cuts its rings at the new
+  antimeridian.
 
 - overrides:
 
   Name -\> iso3c overrides applied when matching the geometry backend's
   country names (default
-  [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)).
+  [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_overrides.md)).
   Pass a custom set built with
-  [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)
+  [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_overrides.md)
   to add your own.
 
 - year:
@@ -71,6 +77,12 @@ attach_geometry(
   [`historical_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/historical_geometry.md).
   Entities that never had an ISO code cannot match on `iso3c`, so a low
   match rate warns.
+
+- worldview:
+
+  A Natural Earth point of view, as in
+  [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md):
+  the viewing country's ISO code or `"ISO"`. Needs `geometry = "sf"`.
 
 ## Value
 
@@ -96,14 +108,13 @@ rows of `data` with no matching geometry are dropped silently – worth
 checking first when a country you expected is missing from the map.
 Coverage differs by backend and, for `"sf"`, by `scale`, which changes
 *which* countries are present and not merely how detailed they look. Of
-the 215 countries in
+the 216 countries in
 [world_snapshot](https://pursuitofdatascience.github.io/countryatlas/reference/world_snapshot.md),
-`"polygon"` carries 210, `"sf"` with `scale = "small"` (the default,
-110m) carries 169, and `"sf"` with `scale = "medium"` carries 214: the
-110m coastlines omit most small states, so `scale = "medium"` is the fix
-when microstates matter – Hong Kong, Macao, Tuvalu and the British
-Virgin Islands are each in no other backend. Gibraltar alone is in none
-of them.
+`"polygon"` and `"sf"` with `scale = "medium"` carry the same 215,
+because both are Natural Earth 1:50m, while `"sf"` with
+`scale = "small"` (the default, 110m) carries 170: the 110m coastlines
+omit most small states, so use the polygon backend or `scale = "medium"`
+when microstates matter. Gibraltar alone is in none of them.
 
 ## How many rows come back
 
@@ -113,10 +124,10 @@ the backend carries is present, and the ones absent from `data` carry
 than vanish, which is the point – a choropleth that quietly omits the
 countries you have no data for reads as though they did not exist. It
 does mean the result is much larger than `data` and is not something to
-summarise directly: `attach_geometry()` on three countries returns 240
-of them on the polygon backend and 176 on `"sf"`, whatever `data` held.
+summarise directly: `attach_geometry()` on three countries returns 237
+of them on the polygon backend and 175 on `"sf"`, whatever `data` held.
 The row count is larger still: `"polygon"` gives one row per polygon
-*vertex* (about 99,000), and `"sf"` one row per *feature* – usually one
+*vertex* (about 98,000), and `"sf"` one row per *feature* – usually one
 per country, but a divided country appears more than once (Cyprus at
 `scale = "small"`; Cyprus and India at `"medium"`), so an `iso3c` join
 against it can fan out. Summarise `data` before attaching geometry, or
@@ -128,22 +139,20 @@ first.
 ``` r
 # \donttest{
 df <- data.frame(iso3c = c("USA", "CAN"), value = c(1, 2))
-if (requireNamespace("maps", quietly = TRUE)) {
-  attach_geometry(df, geometry = "polygon")
-}
-#> # A tibble: 99,338 × 9
+attach_geometry(df, geometry = "polygon")
+#> # A tibble: 97,812 × 9
 #>     long   lat group order region subregion iso3c iso2c value
-#>    <dbl> <dbl> <dbl> <int> <chr>  <chr>     <chr> <chr> <dbl>
-#>  1 -69.9  12.5     1     1 Aruba  NA        ABW   AW       NA
-#>  2 -69.9  12.4     1     2 Aruba  NA        ABW   AW       NA
-#>  3 -69.9  12.4     1     3 Aruba  NA        ABW   AW       NA
-#>  4 -70.0  12.5     1     4 Aruba  NA        ABW   AW       NA
-#>  5 -70.1  12.5     1     5 Aruba  NA        ABW   AW       NA
-#>  6 -70.1  12.6     1     6 Aruba  NA        ABW   AW       NA
-#>  7 -70.0  12.6     1     7 Aruba  NA        ABW   AW       NA
-#>  8 -70.0  12.6     1     8 Aruba  NA        ABW   AW       NA
-#>  9 -69.9  12.5     1     9 Aruba  NA        ABW   AW       NA
-#> 10 -69.9  12.5     1    10 Aruba  NA        ABW   AW       NA
-#> # ℹ 99,328 more rows
+#>    <dbl> <dbl> <int> <int> <chr>  <chr>     <chr> <chr> <dbl>
+#>  1  131.  42.3     1     1 Russia NA        RUS   RU       NA
+#>  2  131.  42.3     1     2 Russia NA        RUS   RU       NA
+#>  3  131.  42.4     1     3 Russia NA        RUS   RU       NA
+#>  4  131.  42.4     1     4 Russia NA        RUS   RU       NA
+#>  5  131.  42.5     1     5 Russia NA        RUS   RU       NA
+#>  6  131.  42.5     1     6 Russia NA        RUS   RU       NA
+#>  7  131.  42.6     1     7 Russia NA        RUS   RU       NA
+#>  8  131.  42.6     1     8 Russia NA        RUS   RU       NA
+#>  9  131.  42.7     1     9 Russia NA        RUS   RU       NA
+#> 10  130.  42.7     1    10 Russia NA        RUS   RU       NA
+#> # ℹ 97,802 more rows
 # }
 ```

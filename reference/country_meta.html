@@ -27,7 +27,18 @@ scrape together by hand."><meta property="og:image" content="https://pursuitofda
     <li><a class="dropdown-item" href="../articles/beyond-the-choropleth.html">Beyond the choropleth</a></li>
     <li><a class="dropdown-item" href="../articles/honest-maps.html">Honest maps: classification, missingness and distortion</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas-and-ggsql.html">countryatlas and ggsql</a></li>
+    <li><a class="dropdown-item" href="../articles/panels.html">Panels done right</a></li>
+    <li><a class="dropdown-item" href="../articles/data-you-can-trace.html">Data you can trace: sources, vintages and provenance</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas.html">Full introduction (formal)</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>More, on the website</h6></li>
+    <li><a class="dropdown-item" href="../articles/gallery.html">Gallery</a></li>
+    <li><a class="dropdown-item" href="../articles/spatial-statistics.html">Spatial statistics on a world of islands</a></li>
+    <li><a class="dropdown-item" href="../articles/rates-and-small-numbers.html">Rates and small numbers</a></li>
+    <li><a class="dropdown-item" href="../articles/comparative-development.html">The comparative-development toolkit</a></li>
+    <li><a class="dropdown-item" href="../articles/disputed-territories.html">Disputed territories and worldviews</a></li>
+    <li><a class="dropdown-item" href="../articles/flows-networks-subnational.html">Flows, networks and subnational data</a></li>
+    <li><a class="dropdown-item" href="../articles/accessible-maps.html">Accessible and citable maps</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -61,14 +72,23 @@ scrape together by hand.</p>
 <code>country</code>, <code>continent</code>, <code>region</code>, <code>un_region</code>, <code>income</code>, <code>capital</code>,
 <code>capital_lat</code>, <code>capital_lon</code>, <code>centroid_lat</code>, <code>centroid_lon</code>, <code>area_km2</code>,
 <code>currency</code>, <code>tld</code>, <code>landlocked</code>, <code>flag</code>.</p>
-<p>Assembled from <a href="https://rdrr.io/pkg/countrycode/man/codelist.html" class="external-link">countrycode::codelist</a>, so Kosovo (<code>XKX</code>) has no row –
-<code>countrycode</code> has none either. The geometry backends and
-<code><a href="convert_country.html">convert_country()</a></code> do handle it; <code><a href="distance_between.html">distance_between()</a></code>, which reads its
-centroids from here, does not. Ten further territories have a row but no
-centroid or area.</p>
+<p>Assembled from <a href="https://rdrr.io/pkg/countrycode/man/codelist.html" class="external-link">countrycode::codelist</a>, plus a curated row for Kosovo
+(<code>XKX</code>), which <code>countrycode</code> does not carry, so <code><a href="distance_between.html">distance_between()</a></code> and
+the k-nearest-neighbour weights can use it. Centroids and areas come
+from the bundled Natural Earth 1:50m polygons, the ones the polygon
+backend draws, with each country's holes taken out; territories drawn as
+part of their country (French Guiana, Svalbard) take theirs from Natural
+Earth's map units. Three territories have a row but no centroid or area,
+because Natural Earth does not draw them at 1:50m: Bouvet Island,
+Gibraltar and the U.S. Minor Outlying Islands.</p>
+<p><code>income</code> and <code>region</code> are the World Bank's for the current fiscal year
+(the <code>"classification"</code> attribute names it, <code>"FY2027"</code>), from
+<a href="country_classifications.html">country_classifications</a>, so they agree with what <code><a href="world_data.html">world_data()</a></code>
+returns; <code>region</code> falls back to <code>countrycode</code>'s where the World Bank
+lists no region.</p>
 <p><code>country</code> therefore carries the English names from <code>countrycode</code>
 ("South Korea", "Congo - Kinshasa"), which differ from the World Bank's for
-38 of the 215 countries in <a href="world_snapshot.html">world_snapshot</a> ("Korea, Rep.",
+39 of the 216 countries in <a href="world_snapshot.html">world_snapshot</a> ("Korea, Rep.",
 "Congo, Dem. Rep."). Each
 table is faithful to its own source, so join on <code>iso3c</code> and keep whichever
 label you want to display – reconciling the two is what <code><a href="country_join.html">country_join()</a></code>
@@ -76,8 +96,8 @@ is for.</p>
     </div>
     <div class="section level2">
     <h2 id="source">Source<a class="anchor" aria-label="anchor" href="#source"></a></h2>
-    <p>Assembled from <span class="pkg">countrycode</span>, <span class="pkg">WDI</span> metadata and Natural
-Earth geometry.</p>
+    <p>Assembled from <span class="pkg">countrycode</span>, <span class="pkg">WDI</span> metadata (capitals),
+the World Bank's classifications and Natural Earth geometry.</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

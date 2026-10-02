@@ -16,7 +16,8 @@ repair_country_names(
   x,
   threshold = 0.2,
   origin = "country.name",
-  verbose = TRUE
+  quiet = FALSE,
+  verbose = deprecated()
 )
 ```
 
@@ -44,7 +45,7 @@ repair_country_names(
   accepted at the default threshold. Neither metric is uniformly better
   – Jaro-Winkler also repairs `"Maroco"` to Monaco rather than Morocco –
   which is the real reason to check the reported substitutions rather
-  than to trust either. `verbose = TRUE` (the default) prints them, and
+  than to trust either. `quiet = FALSE` (the default) prints them, and
   they are attached as the `"repairs"` attribute for programmatic
   checking.
 
@@ -52,9 +53,17 @@ repair_country_names(
 
   countrycode origin scheme (default `"country.name"`).
 
+- quiet:
+
+  If `TRUE`, do not message the substitutions made (default `FALSE`), as
+  [`audit_time_coverage()`](https://pursuitofdatascience.github.io/countryatlas/reference/audit_time_coverage.md)
+  and
+  [`check_dispute_coverage()`](https://pursuitofdatascience.github.io/countryatlas/reference/check_dispute_coverage.md)
+  say it.
+
 - verbose:
 
-  Whether to message the substitutions made (default `TRUE`).
+  **\[deprecated\]** Use `quiet` (inverted).
 
 ## Value
 

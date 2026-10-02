@@ -38,14 +38,14 @@ applies: this is a documented subset, not every dispute in the world.
 
 ``` r
 check_dispute_coverage(countryatlas::world_snapshot$countries)
-#> ℹ 2 tracked disputed territories appear in the data, of 22 tracked.
+#> ℹ 3 tracked disputed territories appear in the data, of 22 tracked.
 #> • 15 have no ISO code at all and cannot appear in any iso3c-keyed dataset.
 #>   Set a convention with `dispute_policy()` so the map says which one it used.
 #> # A tibble: 22 × 7
 #>    territory         iso3c administered_by claimed_by  status      note  in_data
 #>    <chr>             <chr> <chr>           <chr>       <chr>       <chr> <lgl>  
 #>  1 Western Sahara    ESH   MAR             MAR;SAH     administer… Non-… FALSE  
-#>  2 Kosovo            XKX   XKX             XKX;SRB     partially_… User… FALSE  
+#>  2 Kosovo            XKX   XKX             XKX;SRB     partially_… User… TRUE   
 #>  3 Palestine         PSE   PSE             PSE;ISR     un_observer UN n… TRUE   
 #>  4 Taiwan            TWN   TWN             TWN;CHN     partially_… ISO … FALSE  
 #>  5 Crimea            NA    RUS             UKR;RUS     administer… Anne… FALSE  

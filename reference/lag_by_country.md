@@ -8,9 +8,9 @@ leaks into country B's first row.
 ## Usage
 
 ``` r
-lag_by_country(data, value, n = 1, suffix = NULL)
+lag_by_country(data, value, n = 1, suffix = NULL, by = c("year", "row"))
 
-diff_by_country(data, value, n = 1, suffix = NULL)
+diff_by_country(data, value, n = 1, suffix = NULL, by = c("year", "row"))
 ```
 
 ## Arguments
@@ -25,12 +25,23 @@ diff_by_country(data, value, n = 1, suffix = NULL)
 
 - n:
 
-  Number of periods to lag / difference over (default `1`).
+  Number of years (or, with `by = "row"`, observations) to lag /
+  difference over (default `1`).
 
 - suffix:
 
   Suffix for the new column. Defaults to `"_lag"` / `"_diff"` (with `n`
   appended when `n > 1`, e.g. `"_lag5"`).
+
+- by:
+
+  How "earlier" is found. `"year"` (default) takes the value `n` years
+  earlier for the same country, and `NA` where that year is absent, so a
+  gap in the panel can never pass for a one-year change. `"row"` takes
+  the previous observation, whatever its year – the 3.0.0 behaviour, for
+  a panel that is irregular by design – and warns when the years are not
+  consecutive. A period column whose labels are not years (`"pre-war"`)
+  needs `"row"`.
 
 ## Value
 

@@ -18,7 +18,7 @@ countryatlas and ggsql fit together cleanly:
 - **countryatlas** does the part ggsql’s static bundled world can’t:
   reconcile messy country names to the ISO spine, repair the entities
   map backends get wrong
-  ([`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)),
+  ([`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_overrides.md)),
   and join World Bank indicators onto geometry.
 - **ggsql** does the part countryatlas doesn’t: push the rendering down
   into the database and emit Vega-Lite, so the geometry never has to

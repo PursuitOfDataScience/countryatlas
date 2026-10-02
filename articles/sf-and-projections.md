@@ -1,10 +1,14 @@
 # Modern maps with sf & projections
 
-The legacy `maps` polygons are an unprojected plate carrée: they badly
-distort area and split Russia, Fiji and New Zealand across the
-antimeridian. The `sf` backend fixes all of this: real projections,
-equal-area options, and an antimeridian-safe pipeline. These features
-require the optional `sf` and `rnaturalearth` packages.
+Both backends project. The bundled polygon backend draws in Equal Earth
+by default (through
+[`coord_sf()`](https://ggplot2.tidyverse.org/reference/ggsf.html) when
+`sf` loads, and with the package’s own spherical Equal Earth when it
+does not), and `projection = "none"` gives the unprojected longitude and
+latitude of 3.0.0. The `sf` backend adds the rest: Natural Earth at
+three scales, cropping by bounding box, and an antimeridian-safe
+pipeline for every projection. It requires the optional `sf` and
+`rnaturalearth` packages.
 
 ``` r
 
@@ -65,7 +69,7 @@ shows the distortion directly (see the *Honest maps* vignette).
 [`globe_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/globe_map.md)
 draws an orthographic globe centred on `lon`/`lat`. The default `"sf"`
 backend gives the cleanest limb; the `"polygon"` backend below needs
-only `maps` + `mapproj` (no `sf`):
+only `mapproj` (no `sf`):
 
 ``` r
 

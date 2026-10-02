@@ -20,7 +20,8 @@ country_data(
   classify = c("income", "continent", "region"),
   cache = TRUE,
   language = "en",
-  parallel = TRUE
+  parallel = TRUE,
+  vintage = NULL
 )
 ```
 
@@ -36,7 +37,10 @@ country_data(
 
 - latest:
 
-  Use the most recent non-`NA` value per country (single year).
+  For a single year: `TRUE` takes each indicator's most recent non-`NA`
+  value per country, `"common"` the most recent year in which every
+  indicator is present. Both add an `<indicator>_year` column per
+  indicator; see the section below.
 
 - panel:
 
@@ -61,6 +65,11 @@ country_data(
   memory-only; see
   [`world_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_data.md).
 
+- vintage:
+
+  The release of the World Development Indicators to read; see
+  [`world_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_data.md).
+
 ## Value
 
 A tibble, one row per country (or per country-year for a panel).
@@ -74,6 +83,23 @@ names ("South Korea", "Congo - Kinshasa") – as do
 [`standardize_country()`](https://pursuitofdatascience.github.io/countryatlas/reference/standardize_country.md)
 and the rest of the package. Match on `iso3c`, and relabel with
 `convert_country(iso3c, to = "country")` if you need one consistent set.
+
+## The most recent value, and which year it is from
+
+With `latest = TRUE` each indicator takes its own most recent value, so
+one row can hold GDP from 2023 beside population from 2021. That is
+often what is wanted – the freshest number for each – but dividing one
+by the other mixes years, so every indicator carries an
+`<indicator>_year` column, and
+[`per_capita()`](https://pursuitofdatascience.github.io/countryatlas/reference/per_capita.md),
+[`deflate()`](https://pursuitofdatascience.github.io/countryatlas/reference/deflate.md)
+and
+[`to_ppp()`](https://pursuitofdatascience.github.io/countryatlas/reference/to_ppp.md)
+warn (class `countryatlas_mixed_years`) when the two columns they
+combine come from different years. `latest = "common"` instead takes,
+per country, the most recent year in which every requested indicator is
+present, so the row is internally consistent; a country with no such
+year gets `NA` throughout.
 
 ## Examples
 

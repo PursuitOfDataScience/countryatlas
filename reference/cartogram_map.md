@@ -13,6 +13,7 @@ cartogram_map(
   type = c("contiguous", "dorling", "noncontiguous", "flow"),
   fill = NULL,
   projection = "equal_earth",
+  footnote = "auto",
   ...
 )
 ```
@@ -45,6 +46,13 @@ cartogram_map(
   [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
   for the projections available.
 
+- footnote:
+
+  The caption, as in
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md):
+  `"auto"` (default) states the coverage and source, a string is used as
+  given, `FALSE` adds nothing.
+
 - ...:
 
   Passed to the underlying `cartogram::cartogram_*()` function (e.g.
@@ -69,6 +77,11 @@ contiguous cartograms when `cartogramR` is available.
 Cartograms fail quietly: an under-converged one looks plausible while
 still misrepresenting the areas it exists to make honest. Pass a larger
 `itermax` if the result still looks close to the true map.
+
+## Backend
+
+The `sf` backend only: the `cartogram` package distorts `sf` geometry,
+in `projection` (Equal Earth by default).
 
 ## References
 

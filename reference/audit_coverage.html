@@ -29,7 +29,18 @@ under-covered – so a half-empty map is caught before it is published."><meta p
     <li><a class="dropdown-item" href="../articles/beyond-the-choropleth.html">Beyond the choropleth</a></li>
     <li><a class="dropdown-item" href="../articles/honest-maps.html">Honest maps: classification, missingness and distortion</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas-and-ggsql.html">countryatlas and ggsql</a></li>
+    <li><a class="dropdown-item" href="../articles/panels.html">Panels done right</a></li>
+    <li><a class="dropdown-item" href="../articles/data-you-can-trace.html">Data you can trace: sources, vintages and provenance</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas.html">Full introduction (formal)</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>More, on the website</h6></li>
+    <li><a class="dropdown-item" href="../articles/gallery.html">Gallery</a></li>
+    <li><a class="dropdown-item" href="../articles/spatial-statistics.html">Spatial statistics on a world of islands</a></li>
+    <li><a class="dropdown-item" href="../articles/rates-and-small-numbers.html">Rates and small numbers</a></li>
+    <li><a class="dropdown-item" href="../articles/comparative-development.html">The comparative-development toolkit</a></li>
+    <li><a class="dropdown-item" href="../articles/disputed-territories.html">Disputed territories and worldviews</a></li>
+    <li><a class="dropdown-item" href="../articles/flows-networks-subnational.html">Flows, networks and subnational data</a></li>
+    <li><a class="dropdown-item" href="../articles/accessible-maps.html">Accessible and citable maps</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -97,9 +108,9 @@ The counts sum to <code>n</code>.</p></li>
 counted, not everything present. That is the opposite orientation from
 <code><a href="map_provenance.html">map_provenance()</a></code>, whose <code>n_countries</code> is the numerator (countries drawn
 <em>with</em> a value) and whose <code>n_total</code> is the denominator. The two verbs
-report the same coverage from opposite ends, so on 215 countries with 24
-missing this gives <code>n = 215</code> where <code><a href="map_provenance.html">map_provenance()</a></code> gives
-<code>n_countries = 191</code>.</p>
+report the same coverage from opposite ends, so on 216 countries with 17
+missing this gives <code>n = 216</code> where <code><a href="map_provenance.html">map_provenance()</a></code> gives
+<code>n_countries = 199</code>.</p>
     </div>
 
     <div class="section level2">
@@ -114,23 +125,22 @@ missing this gives <code>n = 215</code> where <code><a href="map_provenance.html
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 4 × 4</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   indicator           n n_missing na_rate</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>           <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> gdp_per_capita    215        24  0.112 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> population        215         0  0     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span> life_expectancy   215         0  0     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span> co2_per_capita    215        12  0.055<span style="text-decoration: underline;">8</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> gdp_per_capita    216        17  0.078<span style="text-decoration: underline;">7</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> population        216         0  0     </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span> life_expectancy   216         0  0     </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span> co2_per_capita    216        13  0.060<span style="text-decoration: underline;">2</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> ── <span style="font-weight: bold;">Coverage by group</span> ──</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 8 × 4</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 7 × 4</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   region                     n_countries indicator      na_rate</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                            <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>            <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> South Asia                           8 gdp_per_capita  0.25  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> East Asia &amp; Pacific                 37 gdp_per_capita  0.216 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span> Middle East &amp; North Africa          21 gdp_per_capita  0.143 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span> Latin America &amp; Caribbean           41 gdp_per_capita  0.097<span style="text-decoration: underline;">6</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">5</span> Europe &amp; Central Asia               56 gdp_per_capita  0.089<span style="text-decoration: underline;">3</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">6</span> Sub-Saharan Africa                  48 gdp_per_capita  0.041<span style="text-decoration: underline;">7</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">7</span> North America                        3 gdp_per_capita  0     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">8</span> <span style="color: #BB0000;">NA</span>                                   1 gdp_per_capita  0     </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> East Asia &amp; Pacific                 37 gdp_per_capita  0.135 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> Middle East &amp; North Africa          21 gdp_per_capita  0.095<span style="text-decoration: underline;">2</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span> Europe &amp; Central Asia               57 gdp_per_capita  0.087<span style="text-decoration: underline;">7</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span> Latin America &amp; Caribbean           42 gdp_per_capita  0.071<span style="text-decoration: underline;">4</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">5</span> Sub-Saharan Africa                  48 gdp_per_capita  0.041<span style="text-decoration: underline;">7</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">6</span> North America                        3 gdp_per_capita  0     </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">7</span> South Asia                           8 gdp_per_capita  0     </span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

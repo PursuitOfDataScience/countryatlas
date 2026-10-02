@@ -45,7 +45,18 @@
     <li><a class="dropdown-item" href="../articles/beyond-the-choropleth.html">Beyond the choropleth</a></li>
     <li><a class="dropdown-item" href="../articles/honest-maps.html">Honest maps: classification, missingness and distortion</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas-and-ggsql.html">countryatlas and ggsql</a></li>
+    <li><a class="dropdown-item" href="../articles/panels.html">Panels done right</a></li>
+    <li><a class="dropdown-item" href="../articles/data-you-can-trace.html">Data you can trace: sources, vintages and provenance</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas.html">Full introduction (formal)</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>More, on the website</h6></li>
+    <li><a class="dropdown-item" href="../articles/gallery.html">Gallery</a></li>
+    <li><a class="dropdown-item" href="../articles/spatial-statistics.html">Spatial statistics on a world of islands</a></li>
+    <li><a class="dropdown-item" href="../articles/rates-and-small-numbers.html">Rates and small numbers</a></li>
+    <li><a class="dropdown-item" href="../articles/comparative-development.html">The comparative-development toolkit</a></li>
+    <li><a class="dropdown-item" href="../articles/disputed-territories.html">Disputed territories and worldviews</a></li>
+    <li><a class="dropdown-item" href="../articles/flows-networks-subnational.html">Flows, networks and subnational data</a></li>
+    <li><a class="dropdown-item" href="../articles/accessible-maps.html">Accessible and citable maps</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -106,8 +117,8 @@ it easier to get country data onto a map, or to make that map honest, it
 does not belong here</em>. Concretely, three packages are combined:</p>
 <ul>
 <li>
-<strong><code>ggplot2::map_data("world")</code></strong> (or Natural
-Earth via <code>sf</code>) supplies polygon geometry,
+<strong>Natural Earth</strong>, bundled at 1:50m (or through
+<code>sf</code> at three scales), supplies polygon geometry,
 i.e. <em>where</em> countries are;</li>
 <li>
 <strong><code>WDI</code></strong> supplies World Bank indicators,
@@ -132,15 +143,15 @@ set of indicators for one recent year.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">snapshot</span> <span class="op">&lt;-</span> <span class="va">world_snapshot</span><span class="op">$</span><span class="va">countries</span></span>
 <span><span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://pillar.r-lib.org/reference/glimpse.html" class="external-link">glimpse</a></span><span class="op">(</span><span class="va">snapshot</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Rows: 215</span></span>
+<span><span class="co">#&gt; Rows: 216</span></span>
 <span><span class="co">#&gt; Columns: 10</span></span>
 <span><span class="co">#&gt; $ iso3c           <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> "AFG"<span style="color: #949494;">, </span>"ALB"<span style="color: #949494;">, </span>"DZA"<span style="color: #949494;">, </span>"ASM"<span style="color: #949494;">, </span>"AND"<span style="color: #949494;">, </span>"AGO"<span style="color: #949494;">, </span>"ATG"<span style="color: #949494;">, </span>"ARG"…</span></span>
 <span><span class="co">#&gt; $ iso2c           <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> "AF"<span style="color: #949494;">, </span>"AL"<span style="color: #949494;">, </span>"DZ"<span style="color: #949494;">, </span>"AS"<span style="color: #949494;">, </span>"AD"<span style="color: #949494;">, </span>"AO"<span style="color: #949494;">, </span>"AG"<span style="color: #949494;">, </span>"AR"<span style="color: #949494;">, </span>"AM"<span style="color: #949494;">, </span>…</span></span>
 <span><span class="co">#&gt; $ country         <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> "Afghanistan"<span style="color: #949494;">, </span>"Albania"<span style="color: #949494;">, </span>"Algeria"<span style="color: #949494;">, </span>"American Samoa"<span style="color: #949494;">,</span>…</span></span>
 <span><span class="co">#&gt; $ continent       <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> "Asia"<span style="color: #949494;">, </span>"Europe"<span style="color: #949494;">, </span>"Africa"<span style="color: #949494;">, </span>"Oceania"<span style="color: #949494;">, </span>"Europe"<span style="color: #949494;">, </span>"Afri…</span></span>
 <span><span class="co">#&gt; $ region          <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> "South Asia"<span style="color: #949494;">, </span>"Europe &amp; Central Asia"<span style="color: #949494;">, </span>"Middle East &amp; …</span></span>
-<span><span class="co">#&gt; $ income          <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> Low income<span style="color: #949494;">, </span>Upper middle income<span style="color: #949494;">, </span>Upper middle income<span style="color: #949494;">, </span>…</span></span>
-<span><span class="co">#&gt; $ gdp_per_capita  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #BB0000;">NA</span><span style="color: #949494;">, </span>6549.234<span style="color: #949494;">, </span>4765.729<span style="color: #949494;">, </span><span style="color: #BB0000;">NA</span><span style="color: #949494;">, </span>41034.527<span style="color: #949494;">, </span>2845.478<span style="color: #949494;">, </span>18350…</span></span>
+<span><span class="co">#&gt; $ income          <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> Low income<span style="color: #949494;">, </span>Upper middle income<span style="color: #949494;">, </span>Lower middle income<span style="color: #949494;">, </span>…</span></span>
+<span><span class="co">#&gt; $ gdp_per_capita  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 374.3767<span style="color: #949494;">, </span>6549.2339<span style="color: #949494;">, </span>4765.7290<span style="color: #949494;">, </span><span style="color: #BB0000;">NA</span><span style="color: #949494;">, </span>41223.9925<span style="color: #949494;">, </span>2798.5…</span></span>
 <span><span class="co">#&gt; $ population      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 42647492<span style="color: #949494;">, </span>2377128<span style="color: #949494;">, </span>46814308<span style="color: #949494;">, </span>46765<span style="color: #949494;">, </span>81938<span style="color: #949494;">, </span>37885849<span style="color: #949494;">, </span>9…</span></span>
 <span><span class="co">#&gt; $ life_expectancy <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 66.28900<span style="color: #949494;">, </span>79.77600<span style="color: #949494;">, </span>76.47500<span style="color: #949494;">, </span>72.99200<span style="color: #949494;">, </span>84.18800<span style="color: #949494;">, </span>64.8…</span></span>
 <span><span class="co">#&gt; $ co2_per_capita  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 0.282980298<span style="color: #949494;">, </span>1.785221494<span style="color: #949494;">, </span>3.980800058<span style="color: #949494;">, </span>0.002138351<span style="color: #949494;">, </span><span style="color: #BB0000;">NA</span>…</span></span></code></pre></div>
@@ -176,13 +187,13 @@ modern <code>"sf"</code> backend with real projections, and
 <h3 id="country_data-and-attach_geometry">
 <code>country_data()</code> and <code>attach_geometry()</code><a class="anchor" aria-label="anchor" href="#country_data-and-attach_geometry"></a>
 </h3>
-<p>For analysis you usually want one tidy row per country, not ~99,000
+<p>For analysis you usually want one tidy row per country, not ~98,000
 polygon vertices. <code><a href="../reference/country_data.html">country_data()</a></code> provides exactly that, and
 geometry is attached only at draw time:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">mapdf</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/attach_geometry.html">attach_geometry</a></span><span class="op">(</span><span class="va">snapshot</span>, geometry <span class="op">=</span> <span class="st">"polygon"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">mapdf</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 99338    15</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 97812    15</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">
@@ -276,23 +287,23 @@ key on country names:</p>
 <h2 id="diagnostics-never-lose-a-country-silently">Diagnostics: never lose a country silently<a class="anchor" aria-label="anchor" href="#diagnostics-never-lose-a-country-silently"></a>
 </h2>
 <p><code><a href="../reference/check_country_match.html">check_country_match()</a></code> is a pre-flight report;
-<code><a href="../reference/wdj_overrides.html">country_overrides()</a></code> is the curated match table that
+<code><a href="../reference/country_overrides.html">country_overrides()</a></code> is the curated match table that
 replaces the old drop-list; and <code><a href="../reference/audit_coverage.html">audit_coverage()</a></code> reports
 missingness before a half-empty map is published.</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/check_country_match.html">check_country_match</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"USA"</span>, <span class="st">"Cote d'Ivoire"</span>, <span class="st">"Yugoslavia"</span>, <span class="st">"Wakanda"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 4 × 5</span></span></span>
-<span><span class="co">#&gt;   input         iso3c matched historical suggestion</span></span>
-<span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>         <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> USA           USA   TRUE    FALSE      <span style="color: #BB0000;">NA</span>        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> Cote d'Ivoire CIV   TRUE    FALSE      <span style="color: #BB0000;">NA</span>        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> Yugoslavia    <span style="color: #BB0000;">NA</span>    FALSE   TRUE       Yugoslavia</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> Wakanda       <span style="color: #BB0000;">NA</span>    FALSE   FALSE      Canada</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 4 × 6</span></span></span>
+<span><span class="co">#&gt;   input         iso3c matched historical method   suggestion</span></span>
+<span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>         <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> USA           USA   TRUE    FALSE      regex_en <span style="color: #BB0000;">NA</span>        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> Cote d'Ivoire CIV   TRUE    FALSE      regex_en <span style="color: #BB0000;">NA</span>        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> Yugoslavia    <span style="color: #BB0000;">NA</span>    FALSE   TRUE       none     Yugoslavia</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> Wakanda       <span style="color: #BB0000;">NA</span>    FALSE   FALSE      none     Canada</span></span></code></pre></div>
 <p><code><a href="../reference/repair_country_names.html">repair_country_names()</a></code> acts on that report: it
 substitutes the closest known country name for confident misses only,
 and attaches a record of every change:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/repair_country_names.html">repair_country_names</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Brzil"</span>, <span class="st">"Germny"</span>, <span class="st">"United States"</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/repair_country_names.html">repair_country_names</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Brzil"</span>, <span class="st">"Germny"</span>, <span class="st">"United States"</span><span class="op">)</span>, quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "Brazil"        "Germany"       "United States"</span></span>
 <span><span class="co">#&gt; attr(,"repairs")</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 2 × 2</span></span></span>
@@ -305,10 +316,10 @@ and attaches a record of every change:</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 4 × 4</span></span></span>
 <span><span class="co">#&gt;   indicator           n n_missing na_rate</span></span>
 <span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>           <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> gdp_per_capita    215        24  0.112 </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> population        215         0  0     </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> life_expectancy   215         0  0     </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> co2_per_capita    215        12  0.055<span style="text-decoration: underline;">8</span></span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> gdp_per_capita    216        17  0.078<span style="text-decoration: underline;">7</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> population        216         0  0     </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> life_expectancy   216         0  0     </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> co2_per_capita    216        13  0.060<span style="text-decoration: underline;">2</span></span></span></code></pre></div>
 <p>The entities the previous version dropped (Kosovo, Micronesia, the
 Virgin Islands and a dozen others) are now matched:</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
@@ -332,11 +343,11 @@ expands them to their successor states via the curated
 <code>historical_codes</code> crosswalk:</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/check_country_match.html">check_country_match</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"USSR"</span>, <span class="st">"Czechoslovakia"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 2 × 5</span></span></span>
-<span><span class="co">#&gt;   input          iso3c matched historical suggestion    </span></span>
-<span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>          <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>         </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> USSR           RUS   TRUE    TRUE       <span style="color: #BB0000;">NA</span>            </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> Czechoslovakia <span style="color: #BB0000;">NA</span>    FALSE   TRUE       Czechoslovakia</span></span>
+<span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 2 × 6</span></span></span>
+<span><span class="co">#&gt;   input          iso3c matched historical method   suggestion    </span></span>
+<span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>          <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>         </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> USSR           RUS   TRUE    TRUE       regex_en <span style="color: #BB0000;">NA</span>            </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> Czechoslovakia <span style="color: #BB0000;">NA</span>    FALSE   TRUE       none     Czechoslovakia</span></span>
 <span><span class="fu"><a href="../reference/dissolve_country.html">dissolve_country</a></span><span class="op">(</span><span class="st">"Yugoslavia"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 7 × 5</span></span></span>
 <span><span class="co">#&gt;   input      historical dissolved iso3c country             </span></span>
@@ -432,25 +443,24 @@ for you:</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 5 × 4</span></span></span>
 <span><span class="co">#&gt;   country     gdp_per_capita  rank percentile</span></span>
 <span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> Bermuda            <span style="text-decoration: underline;">122</span>118.     2      0.995</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> Ireland             <span style="text-decoration: underline;">94</span>475.     4      0.984</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> Luxembourg         <span style="text-decoration: underline;">104</span>147.     3      0.989</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> Bermuda            <span style="text-decoration: underline;">116</span>514.     2      0.995</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> Ireland             <span style="text-decoration: underline;">94</span>475.     4      0.985</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> Luxembourg         <span style="text-decoration: underline;">104</span>147.     3      0.990</span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> Monaco             <span style="text-decoration: underline;">247</span>170.     1      1    </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> Switzerland         <span style="text-decoration: underline;">90</span>067.     5      0.979</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> Switzerland         <span style="text-decoration: underline;">93</span>018.     5      0.980</span></span></code></pre></div>
 <div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">snapshot</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/aggregate_regions.html">aggregate_regions</a></span><span class="op">(</span><span class="va">population</span>, by <span class="op">=</span> <span class="st">"region"</span>, fun <span class="op">=</span> <span class="st">"sum"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 8 × 2</span></span></span>
-<span><span class="co">#&gt;   region                     population</span></span>
-<span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                           <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> East Asia &amp; Pacific        <span style="text-decoration: underline;">2</span>364<span style="text-decoration: underline;">906</span>595</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> Europe &amp; Central Asia       926<span style="text-decoration: underline;">500</span>729</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> Latin America &amp; Caribbean   658<span style="text-decoration: underline;">983</span>093</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> Middle East &amp; North Africa  519<span style="text-decoration: underline;">229</span>480</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> North America               381<span style="text-decoration: underline;">464</span>223</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> South Asia                 <span style="text-decoration: underline;">1</span>971<span style="text-decoration: underline;">301</span>188</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">7</span> Sub-Saharan Africa         <span style="text-decoration: underline;">1</span>291<span style="text-decoration: underline;">044</span>964</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">8</span> <span style="color: #BB0000;">NA</span>                            3<span style="text-decoration: underline;">203</span>295</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 7 × 5</span></span></span>
+<span><span class="co">#&gt;   region                     population n_countries n_reporting coverage</span></span>
+<span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                           <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>       <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>       <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> East Asia &amp; Pacific        <span style="text-decoration: underline;">2</span>364<span style="text-decoration: underline;">906</span>569          37          37        1</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> Europe &amp; Central Asia       928<span style="text-decoration: underline;">398</span>799          57          57        1</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> Latin America &amp; Caribbean   662<span style="text-decoration: underline;">185</span>614          42          42        1</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> Middle East &amp; North Africa  519<span style="text-decoration: underline;">257</span>280          21          21        1</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> North America               381<span style="text-decoration: underline;">330</span>762           3           3        1</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> South Asia                 <span style="text-decoration: underline;">1</span>971<span style="text-decoration: underline;">301</span>188           8           8        1</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">7</span> Sub-Saharan Africa         <span style="text-decoration: underline;">1</span>289<span style="text-decoration: underline;">936</span>286          48          48        1</span></span></code></pre></div>
 <p>For panel data, <code><a href="../reference/growth_rate.html">growth_rate()</a></code> (year-on-year or CAGR),
 <code><a href="../reference/index_to.html">index_to()</a></code> (rebase a series so the base year = 100) and
 <code><a href="../reference/share_of_world.html">share_of_world()</a></code> (share of the year’s world total) cover
@@ -498,15 +508,15 @@ inequality between people); <code><a href="../reference/theil.html">theil()</a><
 between/within components:</p>
 <div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/gini.html">gini</a></span><span class="op">(</span><span class="va">snapshot</span><span class="op">$</span><span class="va">gdp_per_capita</span>, weights <span class="op">=</span> <span class="va">snapshot</span><span class="op">$</span><span class="va">population</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 0.6094909</span></span>
+<span><span class="co">#&gt; [1] 0.6124852</span></span>
 <span><span class="fu"><a href="../reference/theil.html">theil</a></span><span class="op">(</span><span class="va">snapshot</span><span class="op">$</span><span class="va">gdp_per_capita</span>, weights <span class="op">=</span> <span class="va">snapshot</span><span class="op">$</span><span class="va">population</span>,</span>
 <span>      groups <span class="op">=</span> <span class="va">snapshot</span><span class="op">$</span><span class="va">continent</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 3 × 3</span></span></span>
 <span><span class="co">#&gt;   component value share</span></span>
 <span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> total     0.678 1    </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> between   0.310 0.458</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> within    0.368 0.542</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> total     0.686 1    </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> between   0.312 0.455</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> within    0.374 0.545</span></span></code></pre></div>
 <p><code><a href="../reference/correlate_indicators.html">correlate_indicators()</a></code> screens indicator pairs
 (pairwise-complete, with the per-pair <code>n</code> reported so a
 correlation computed on 12 countries cannot masquerade as a world
@@ -516,12 +526,12 @@ fact):</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 6 × 4</span></span></span>
 <span><span class="co">#&gt;   var_x           var_y                  r     n</span></span>
 <span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>           <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>              <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> gdp_per_capita  life_expectancy  0.607     191</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> gdp_per_capita  co2_per_capita   0.435     184</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> life_expectancy co2_per_capita   0.307     203</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> gdp_per_capita  population      -<span style="color: #BB0000;">0.057</span><span style="color: #BB0000; text-decoration: underline;">9</span>    191</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> population      life_expectancy -<span style="color: #BB0000;">0.018</span><span style="color: #BB0000; text-decoration: underline;">8</span>    215</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> population      co2_per_capita   0.006<span style="text-decoration: underline;">60</span>   203</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> gdp_per_capita  life_expectancy  0.607     199</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> life_expectancy co2_per_capita   0.307     203</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> gdp_per_capita  co2_per_capita   0.295     191</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> gdp_per_capita  population      -<span style="color: #BB0000;">0.056</span><span style="color: #BB0000; text-decoration: underline;">7</span>    199</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> population      life_expectancy -<span style="color: #BB0000;">0.019</span><span style="color: #BB0000; text-decoration: underline;">4</span>    216</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> population      co2_per_capita   0.006<span style="text-decoration: underline;">63</span>   203</span></span></code></pre></div>
 <p>For panels, <code><a href="../reference/beta_convergence.html">beta_convergence()</a></code> runs the classic
 growth-on-initial-level regression (returning the implied convergence
 speed and half-life) and <code><a href="../reference/sigma_convergence.html">sigma_convergence()</a></code> tracks whether
@@ -579,21 +589,22 @@ vocabulary of projected, area-honest maps.</p>
 <span><span class="co">#&gt; [1] dplyr_1.2.1        ggplot2_4.0.3      countryatlas_3.0.0</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; loaded via a namespace (and not attached):</span></span>
-<span><span class="co">#&gt;  [1] tidyr_1.3.2        sass_0.4.10        utf8_1.2.6         generics_0.1.4    </span></span>
+<span><span class="co">#&gt;  [1] tidyr_1.3.2        utf8_1.2.6         sass_0.4.10        generics_0.1.4    </span></span>
 <span><span class="co">#&gt;  [5] class_7.3-23       KernSmooth_2.23-26 digest_0.6.39      magrittr_2.0.5    </span></span>
 <span><span class="co">#&gt;  [9] countrycode_1.9.0  evaluate_1.0.5     grid_4.6.1         RColorBrewer_1.1-3</span></span>
-<span><span class="co">#&gt; [13] fastmap_1.2.0      maps_3.4.3         jsonlite_2.0.0     e1071_1.7-17      </span></span>
+<span><span class="co">#&gt; [13] fastmap_1.2.0      jsonlite_2.0.0     e1071_1.7-17       DBI_1.3.0         </span></span>
 <span><span class="co">#&gt; [17] purrr_1.2.2        viridisLite_0.4.3  scales_1.4.0       stringdist_0.9.17 </span></span>
 <span><span class="co">#&gt; [21] textshaping_1.0.5  jquerylib_0.1.4    cli_3.6.6          rlang_1.3.0       </span></span>
-<span><span class="co">#&gt; [25] withr_3.0.3        cachem_1.1.0       yaml_2.3.12        otel_0.2.0        </span></span>
-<span><span class="co">#&gt; [29] parallel_4.6.1     tools_4.6.1        memoise_2.0.1      vctrs_0.7.3       </span></span>
-<span><span class="co">#&gt; [33] R6_2.6.1           proxy_0.4-29       lifecycle_1.0.5    classInt_0.4-11   </span></span>
-<span><span class="co">#&gt; [37] fs_2.1.0           htmlwidgets_1.6.4  ragg_1.5.2         pkgconfig_2.0.3   </span></span>
-<span><span class="co">#&gt; [41] desc_1.4.3         pkgdown_2.2.1      pillar_1.11.1      bslib_0.12.0      </span></span>
-<span><span class="co">#&gt; [45] gtable_0.3.6       glue_1.8.1         systemfonts_1.3.2  xfun_0.61         </span></span>
-<span><span class="co">#&gt; [49] tibble_3.3.1       tidyselect_1.2.1   knitr_1.52         farver_2.1.2      </span></span>
-<span><span class="co">#&gt; [53] htmltools_0.5.9    rmarkdown_2.32     labeling_0.4.3     compiler_4.6.1    </span></span>
-<span><span class="co">#&gt; [57] WDI_2.8.0          S7_0.2.2</span></span></code></pre></div>
+<span><span class="co">#&gt; [25] units_1.0-1        withr_3.0.3        cachem_1.1.0       yaml_2.3.12       </span></span>
+<span><span class="co">#&gt; [29] otel_0.2.0         parallel_4.6.1     tools_4.6.1        memoise_2.0.1     </span></span>
+<span><span class="co">#&gt; [33] vctrs_0.7.3        R6_2.6.1           proxy_0.4-29       lifecycle_1.0.5   </span></span>
+<span><span class="co">#&gt; [37] classInt_0.4-11    fs_2.1.0           htmlwidgets_1.6.4  ragg_1.5.2        </span></span>
+<span><span class="co">#&gt; [41] pkgconfig_2.0.3    desc_1.4.3         pkgdown_2.2.1      pillar_1.11.1     </span></span>
+<span><span class="co">#&gt; [45] bslib_0.12.0       gtable_0.3.6       glue_1.8.1         Rcpp_1.1.2        </span></span>
+<span><span class="co">#&gt; [49] sf_1.1-3           systemfonts_1.3.2  xfun_0.61          tibble_3.3.1      </span></span>
+<span><span class="co">#&gt; [53] tidyselect_1.2.1   knitr_1.52         farver_2.1.2       htmltools_0.5.9   </span></span>
+<span><span class="co">#&gt; [57] labeling_0.4.3     rmarkdown_2.32     compiler_4.6.1     WDI_2.8.0         </span></span>
+<span><span class="co">#&gt; [61] S7_0.2.2</span></span></code></pre></div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

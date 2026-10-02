@@ -42,6 +42,13 @@ coverage_map(data, value, by = NULL, title = NULL, ...)
 
 A `ggplot` object.
 
+## Backend
+
+Either backend, as
+[`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md):
+the frame decides, and both draw in Equal Earth unless `projection` is
+passed on through `...`.
+
 ## See also
 
 [`audit_coverage()`](https://pursuitofdatascience.github.io/countryatlas/reference/audit_coverage.md),
@@ -52,10 +59,8 @@ A `ggplot` object.
 ``` r
 # \donttest{
 snap <- countryatlas::world_snapshot$countries
-if (requireNamespace("maps", quietly = TRUE)) {
-  attach_geometry(snap, geometry = "polygon") |>
-    coverage_map(gdp_per_capita)
-}
+attach_geometry(snap, geometry = "polygon") |>
+  coverage_map(gdp_per_capita)
 
 # }
 ```

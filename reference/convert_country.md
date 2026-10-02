@@ -13,9 +13,10 @@ Gleditsch-Ward, V-Dem, IMF, FAO, FIPS, GAUL).
 convert_country(
   x,
   to = "iso3c",
-  from = "country.name",
+  origin = "country.name",
   custom_match = country_overrides(),
-  warn = TRUE
+  warn = TRUE,
+  from = deprecated()
 )
 ```
 
@@ -33,20 +34,25 @@ convert_country(
   `"name_zh"`, ... – any language in countrycode's CLDR tables), or any
   raw countrycode destination.
 
-- from:
+- origin:
 
-  Origin scheme (default `"country.name"`).
+  Origin scheme (default `"country.name"`), as every other function that
+  reads country identifiers calls it.
 
 - custom_match:
 
   Optional overrides (default
-  [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)).
+  [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_overrides.md)).
 
 - warn:
 
   Whether to warn about inputs that match no country (default `TRUE`). A
   recognised country whose destination value is genuinely missing –
   countrycode has no currency for Kosovo – returns `NA` without warning.
+
+- from:
+
+  **\[deprecated\]** Use `origin`.
 
 ## Value
 

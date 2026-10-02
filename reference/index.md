@@ -43,6 +43,15 @@ where two providers disagree.
   [`fetch_oecd()`](https://pursuitofdatascience.github.io/countryatlas/reference/source_adapters.md)
   [`fetch_comtrade()`](https://pursuitofdatascience.github.io/countryatlas/reference/source_adapters.md)
   : Built-in source adapters
+- [`fetch_sdmx()`](https://pursuitofdatascience.github.io/countryatlas/reference/fetch_sdmx.md)
+  : Read any SDMX statistics service
+- [`source_info()`](https://pursuitofdatascience.github.io/countryatlas/reference/source_info.md)
+  [`` `source_info<-`() ``](https://pursuitofdatascience.github.io/countryatlas/reference/source_info.md)
+  : Where the numbers came from
+- [`wdi_vintages()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdi_vintages.md)
+  : The World Development Indicators releases the archive holds
+- [`compare_vintages()`](https://pursuitofdatascience.github.io/countryatlas/reference/compare_vintages.md)
+  : How much did a World Bank series change between releases?
 - [`clear_country_cache()`](https://pursuitofdatascience.github.io/countryatlas/reference/clear_country_cache.md)
   : Clear the cached downloads
 
@@ -83,8 +92,7 @@ Never lose a country silently.
   : Pre-flight country-match report
 - [`repair_country_names()`](https://pursuitofdatascience.github.io/countryatlas/reference/repair_country_names.md)
   : Auto-repair country names to their closest known match
-- [`wdj_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)
-  [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)
+- [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_overrides.md)
   : Curated country-name overrides (replaces the silent drop-list)
 - [`audit_coverage()`](https://pursuitofdatascience.github.io/countryatlas/reference/audit_coverage.md)
   : Coverage / missingness audit
@@ -99,6 +107,8 @@ Never lose a country silently.
   : Country-group membership
 - [`in_group()`](https://pursuitofdatascience.github.io/countryatlas/reference/in_group.md)
   : Is a country in a group?
+- [`classify_countries()`](https://pursuitofdatascience.github.io/countryatlas/reference/classify_countries.md)
+  : Classify countries as they were classified at the time
 - [`wdi_search()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdi_search.md)
   : Search World Bank indicators
 
@@ -110,6 +120,8 @@ Never lose a country silently.
   : Flag rates computed over tiny denominators
 - [`smooth_rates()`](https://pursuitofdatascience.github.io/countryatlas/reference/smooth_rates.md)
   : Shrink unreliable rates toward the global rate
+- [`rate_funnel()`](https://pursuitofdatascience.github.io/countryatlas/reference/rate_funnel.md)
+  : A funnel plot for rates
 - [`deflate()`](https://pursuitofdatascience.github.io/countryatlas/reference/deflate.md)
   : Convert a money series to constant prices
 - [`to_ppp()`](https://pursuitofdatascience.github.io/countryatlas/reference/to_ppp.md)
@@ -120,6 +132,8 @@ Never lose a country silently.
   : Convergence clubs
 - [`aggregate_regions()`](https://pursuitofdatascience.github.io/countryatlas/reference/aggregate_regions.md)
   : Roll countries up to region / income / continent
+- [`aggregate_groups()`](https://pursuitofdatascience.github.io/countryatlas/reference/aggregate_groups.md)
+  : Aggregate by dated group membership
 - [`rank_countries()`](https://pursuitofdatascience.github.io/countryatlas/reference/rank_countries.md)
   : Add rank, percentile and z-score
 - [`complete_years()`](https://pursuitofdatascience.github.io/countryatlas/reference/complete_years.md)
@@ -143,6 +157,14 @@ Never lose a country silently.
   : Gini coefficient (population-weightable)
 - [`theil()`](https://pursuitofdatascience.github.io/countryatlas/reference/theil.md)
   : Theil index, with between/within decomposition
+- [`inequality()`](https://pursuitofdatascience.github.io/countryatlas/reference/inequality.md)
+  : Inequality, every standard measure at once
+- [`transition_matrix()`](https://pursuitofdatascience.github.io/countryatlas/reference/transition_matrix.md)
+  : Markov transitions between income classes
+- [`spatial_markov()`](https://pursuitofdatascience.github.io/countryatlas/reference/spatial_markov.md)
+  : Markov transitions conditioned on the neighbours
+- [`rank_mobility()`](https://pursuitofdatascience.github.io/countryatlas/reference/rank_mobility.md)
+  : How much did the ranking change?
 
 ## Spatial statistics
 
@@ -154,8 +176,12 @@ other than geography.
   : Spatial weights on the country spine
 - [`morans_i()`](https://pursuitofdatascience.github.io/countryatlas/reference/morans_i.md)
   : Global Moran's I (spatial autocorrelation)
+- [`eb_morans_i()`](https://pursuitofdatascience.github.io/countryatlas/reference/eb_morans_i.md)
+  : Moran's I for rates, not fooled by small denominators
 - [`local_morans()`](https://pursuitofdatascience.github.io/countryatlas/reference/local_morans.md)
   : Local Moran's I (LISA)
+- [`bivariate_lisa()`](https://pursuitofdatascience.github.io/countryatlas/reference/bivariate_lisa.md)
+  : Bivariate local Moran: high X among high Y
 - [`lisa_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/lisa_map.md)
   : Map LISA clusters
 - [`gearys_c()`](https://pursuitofdatascience.github.io/countryatlas/reference/gearys_c.md)
@@ -164,6 +190,8 @@ other than geography.
   : Getis-Ord G statistics (hot spots)
 - [`spatial_lag()`](https://pursuitofdatascience.github.io/countryatlas/reference/spatial_lag.md)
   : The neighbour average, as a column
+- [`join_counts()`](https://pursuitofdatascience.github.io/countryatlas/reference/join_counts.md)
+  : Join counts: do neighbours share a category?
 
 ## Visualization
 
@@ -183,12 +211,16 @@ A full vocabulary of projected, area-honest maps.
   : Spike map (heights at country centroids)
 - [`bivariate_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/bivariate_map.md)
   : Two-variable bivariate choropleth
+- [`ternary_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/ternary_map.md)
+  : Ternary choropleth for three-part compositions
 - [`cartogram_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/cartogram_map.md)
   : Area-honest cartogram
 - [`dorling_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/dorling_map.md)
   : Dorling cartogram (first-class verb)
 - [`tile_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/tile_map.md)
   : Equal-area world tile grid
+- [`tile_trend_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/tile_trend_map.md)
+  : A small line chart for every country, on the tile grid
 - [`flow_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/flow_map.md)
   : Great-circle origin-destination flow map
 - [`animate_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/animate_world.md)
@@ -203,6 +235,10 @@ A full vocabulary of projected, area-honest maps.
   : Centroid-anchored country labels
 - [`theme_world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/theme_world_map.md)
   : A clean theme for world maps
+- [`zoom_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/zoom_map.md)
+  : Zoom a map without losing its projection
+- [`project_lonlat()`](https://pursuitofdatascience.github.io/countryatlas/reference/project_lonlat.md)
+  : Project longitude and latitude onto a countryatlas map
 - [`simplify_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/simplify_geometry.md)
   : Simplify (thin) geometry for faster plotting
 
@@ -227,6 +263,12 @@ is not, and make projection distortion visible rather than asserted.
   : Did the cartogram actually converge?
 - [`map_provenance()`](https://pursuitofdatascience.github.io/countryatlas/reference/map_provenance.md)
   : What went into this map
+- [`map_alt_text()`](https://pursuitofdatascience.github.io/countryatlas/reference/map_alt_text.md)
+  : Describe a map in words, for alt text
+- [`map_citation()`](https://pursuitofdatascience.github.io/countryatlas/reference/map_citation.md)
+  : Cite exactly what a map used
+- [`check_palette()`](https://pursuitofdatascience.github.io/countryatlas/reference/check_palette.md)
+  : Check a map's colours under colour-vision deficiency
 - [`dispute_policy()`](https://pursuitofdatascience.github.io/countryatlas/reference/dispute_policy.md)
   : State which map convention you are using
 - [`check_dispute_coverage()`](https://pursuitofdatascience.github.io/countryatlas/reference/check_dispute_coverage.md)
@@ -273,10 +315,10 @@ Hand curated tables to ggsql for database-side spatial rendering.
 - [`world_query()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_query.md)
   : Emit a ggsql spatial query for a country map
 
-## Performance & caching
+## Deprecated
 
 - [`clear_wdi_cache()`](https://pursuitofdatascience.github.io/countryatlas/reference/clear_wdi_cache.md)
-  : Clear the on-disk / in-memory WDI cache
+  **\[deprecated\]** : Clear the World Bank cache (deprecated)
 
 ## Bundled datasets
 
@@ -294,6 +336,8 @@ Hand curated tables to ggsql for database-side spatial rendering.
   : Historical / dissolved entities and their successor states
 - [`country_groups_history`](https://pursuitofdatascience.github.io/countryatlas/reference/country_groups_history.md)
   : Dated country-group membership
+- [`country_classifications`](https://pursuitofdatascience.github.io/countryatlas/reference/country_classifications.md)
+  : Dated World Bank classifications
 - [`disputed_territories`](https://pursuitofdatascience.github.io/countryatlas/reference/disputed_territories.md)
   : Disputed territories
 

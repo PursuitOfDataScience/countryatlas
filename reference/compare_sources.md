@@ -15,7 +15,8 @@ compare_sources(
   sources = c("wdi", "owid"),
   year,
   countries = NULL,
-  tolerance = 0.05
+  tolerance = 0.05,
+  allow_unit_mismatch = FALSE
 )
 ```
 
@@ -44,12 +45,31 @@ compare_sources(
   Relative difference above which a country counts as a disagreement
   (default `0.05`, i.e. 5%).
 
+- allow_unit_mismatch:
+
+  Compare anyway when the sources state different units (default
+  `FALSE`). See below.
+
 ## Value
 
 A tibble with one row per country: the value from each source,
 `n_sources` (how many reported it), `rel_diff` (max relative spread) and
 `disagrees`. The correlation, coverage and disagreement summary is
-attached as the `"countryatlas_source_summary"` attribute.
+attached as the `"countryatlas_source_summary"` attribute, with each
+source's stated unit.
+
+## Different units are not a disagreement
+
+GDP per capita in constant 2015 US dollars and in current international
+dollars differ for every country, and calling that a disagreement
+between the sources would be wrong. Each fetch records the unit its
+provider states (see
+[`source_info()`](https://pursuitofdatascience.github.io/countryatlas/reference/source_info.md));
+when two of them state different units the comparison is refused with
+class `countryatlas_unit_mismatch`, naming them. Pass
+`allow_unit_mismatch = TRUE` to compare anyway – a ratio that is
+constant across countries can still be worth seeing – and read
+`rel_diff` accordingly. A source that states no unit is not checked.
 
 ## See also
 

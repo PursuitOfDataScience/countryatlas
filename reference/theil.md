@@ -1,15 +1,18 @@
 # Theil index, with between/within decomposition
 
-The Theil T inequality index – less famous than Gini, but it decomposes
+The Theil inequality indices – less famous than Gini, but they decompose
 *exactly* into a between-group and a within-group component, answering
 "how much of world inequality is between continents vs within them?" in
 one call. Weight by population to describe inequality between people
-rather than between country units.
+rather than between country units. `type = "T"` (default) is Theil's T,
+weighted by income shares; `type = "L"` is Theil's L, the mean log
+deviation, weighted by population shares, whose decomposition is
+path-independent.
 
 ## Usage
 
 ``` r
-theil(x, weights = NULL, groups = NULL, na.rm = TRUE)
+theil(x, weights = NULL, groups = NULL, na.rm = TRUE, type = c("T", "L"))
 ```
 
 ## Arguments
@@ -31,12 +34,19 @@ theil(x, weights = NULL, groups = NULL, na.rm = TRUE)
   scalar. A row whose group is missing is dropped along with the rows
   whose value is missing, so the decomposition's `total` is computed
   over the grouped subset and can differ from the ungrouped `theil(x)`.
-  For `world_snapshot`, Puerto Rico has no `region`, which is the whole
-  of the difference there.
 
 - na.rm:
 
   Whether to drop `NA` values (default `TRUE`).
+
+- type:
+
+  `"T"` (default) or `"L"`. T is \\\sum_i s_i (x_i/\mu) \log(x_i/\mu)\\
+  with population shares \\s_i\\; L is \\\sum_i s_i \log(\mu/x_i)\\.
+  Their decompositions differ: T's within-group term weights each group
+  by its share of income, L's by its share of population, which is why
+  L's between and within parts do not depend on the order in which they
+  are taken out.
 
 ## Value
 
@@ -62,12 +72,12 @@ for the more familiar single-number summary, which does not decompose.
 ``` r
 snap <- countryatlas::world_snapshot$countries
 theil(snap$gdp_per_capita, weights = snap$population)
-#> [1] 0.6779156
+#> [1] 0.6858193
 theil(snap$gdp_per_capita, weights = snap$population, groups = snap$continent)
 #> # A tibble: 3 × 3
 #>   component value share
 #>   <chr>     <dbl> <dbl>
-#> 1 total     0.678 1    
-#> 2 between   0.310 0.458
-#> 3 within    0.368 0.542
+#> 1 total     0.686 1    
+#> 2 between   0.312 0.455
+#> 3 within    0.374 0.545
 ```

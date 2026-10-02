@@ -2,9 +2,8 @@
 
 “World data on a map” has many honest forms. A choropleth is only the
 first. The package offers a full vocabulary; this vignette tours the
-ones that need only `maps` – itself a suggested package, so the map
-chunks are skipped when it is absent – and points to the rest, which
-need `sf` or `biscale` as well.
+ones that draw on the bundled polygons, which need nothing installed,
+and points to the rest, which need `sf` or `biscale` as well.
 
 ## Proportional-symbol (bubble) maps
 
@@ -13,7 +12,8 @@ countries. Sized circles at centroids are the right idiom.
 
 ``` r
 
-bubble_map(snap, population)
+bubbles <- suppressWarnings(bubble_map(snap, population))
+bubbles
 ```
 
 ![Bubble map: population drawn as proportional circles at country
@@ -33,30 +33,27 @@ spike_map(snap, population)
 ![Spike map: population drawn as vertical spikes rising from country
 centroids.](beyond-the-choropleth_files/figure-html/unnamed-chunk-3-1.png)
 
-Both verbs place one symbol per country centroid, and the bundled
-centroid table does not cover every code in the codelist. On this
-snapshot five countries with population – Hong Kong, Macao, Gibraltar,
-the British Virgin Islands and Tuvalu – have no centroid and so no
-symbol. Each verb warns and names them, and counts them as missing
-rather than shown:
+Both verbs place one symbol per country centroid, and the basemap does
+not draw every code in the codelist. On this snapshot one country with
+population, Gibraltar, has no polygon at 1:50m and so no symbol. Each
+verb warns and names it, and counts it as missing rather than shown:
 
 ``` r
 
-cov <- attr(suppressWarnings(bubble_map(snap, population)),
-            "countryatlas_provenance")$coverage
+cov <- attr(bubbles, "countryatlas_provenance")$coverage
 unlist(cov[c("n_total", "n_shown", "n_missing")])
 #>   n_total   n_shown n_missing 
-#>       215       210         5
+#>       216       215         1
 cov$missing_iso3c
-#> [1] "GIB" "HKG" "MAC" "TUV" "VGB"
+#> [1] "GIB"
 ```
 
 ## Equal-area tile grids
 
 Give every country the same visual weight so micro-states are visible.
-The bundled grid covers 239 countries – see
+The bundled grid covers 247 countries – see
 [`?world_tiles`](https://pursuitofdatascience.github.io/countryatlas/reference/world_tiles.md)
-for the ten it omits.
+for the three it omits.
 
 ``` r
 
@@ -107,21 +104,19 @@ continent.](beyond-the-choropleth_files/figure-html/unnamed-chunk-7-1.png)
 
 Centroid-anchored labels (names, ISO codes or flag emoji), with
 `ggrepel` collision avoidance when available. Zoom with
-[`coord_quickmap()`](https://ggplot2.tidyverse.org/reference/coord_map.html)
-rather than
-[`coord_cartesian()`](https://ggplot2.tidyverse.org/reference/coord_cartesian.html)
-– both replace the map’s coordinate system, but only the former keeps
-the latitude-dependent aspect ratio that stops Europe coming out
-stretched sideways.
+[`zoom_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/zoom_map.md),
+which takes longitude and latitude limits and keeps the map’s
+projection: adding `coord_quickmap(xlim, ylim)` would replace the
+projection with an unprojected one.
 
 ``` r
 
 mapdf <- attach_geometry(
   dplyr::filter(snap, continent == "Europe"), geometry = "polygon"
 )
-world_map(mapdf, gdp_per_capita) +
-  geom_country_labels(repel = FALSE, size = 2.5) +
-  ggplot2::coord_quickmap(xlim = c(-25, 45), ylim = c(34, 72))
+(world_map(mapdf, gdp_per_capita) +
+   geom_country_labels(repel = FALSE, size = 2.5)) |>
+  zoom_map(xlim = c(-25, 45), ylim = c(34, 72))
 ```
 
 ![Choropleth of Europe with ISO codes labelled at country
@@ -167,20 +162,17 @@ A cartogram equalises a denominator by deforming geometry.
 does it by spending opacity instead, so the world stays recognisable:
 colour carries the value, opacity carries population, and a rate
 computed over a handful of people fades toward the background rather
-than shouting.
+than shouting:
 
 ``` r
 
-mapdf <- attach_geometry(snap, geometry = "polygon")
-value_by_alpha_map(mapdf, gdp_per_capita, population)
+value_by_alpha_map(attach_geometry(snap), gdp_per_capita, population)
 ```
 
-![Value-by-alpha map of GDP per capita weighted by
-population.](beyond-the-choropleth_files/figure-html/unnamed-chunk-10-1.png)
-
-It needs no optional packages. The *Honest maps* vignette covers when to
-reach for it rather than for
-[`cartogram_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/cartogram_map.md).
+It needs no optional packages. The *Honest maps* vignette draws it and
+covers when to reach for it rather than for
+[`cartogram_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/cartogram_map.md);
+the website’s Gallery shows every map type on the same data.
 
 ## Country adjacency and distance
 
@@ -192,7 +184,7 @@ no `sf` or network required:
 ``` r
 
 distance_between("France", "Germany")
-#> [1] 802.3524
+#> [1] 802.3525
 ```
 
 [`country_borders()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_borders.md)

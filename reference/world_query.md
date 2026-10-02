@@ -41,8 +41,12 @@ world_query(
 
 - projection:
 
-  A projection ggsql's `PROJECT TO` understands (e.g. `"equal_earth"`,
-  `"orthographic"`), or `NULL` to omit the clause.
+  A projection: one of the package's own names (see
+  [`projection_info()`](https://pursuitofdatascience.github.io/countryatlas/reference/projection_info.md)),
+  translated to ggsql's where the two differ (`"plate_carree"` becomes
+  `equirectangular`, `"natural_earth"` becomes `natural`,
+  `"azimuthal_equal_area"` becomes `lambert`), or any other name ggsql's
+  `PROJECT TO` understands, passed through. `NULL` omits the clause.
 
 - palette:
 
@@ -86,13 +90,18 @@ A `ggsql_query` string (prints as the formatted query).
 ## Executing the query
 
 Building the string needs nothing installed. *Running* it needs `ggsql`
-\>= 0.4.1, the version that added the `DRAW spatial` clause; older
-`ggsql` releases parse the query and reject that clause. As of August
-2026 that clause has shipped in the ggsql *engine* but not yet in the
-ggsql R package (still 0.3.3), so
+\>= 0.4.1, the version that added the `DRAW spatial` clause and map
+projections; older `ggsql` releases parse the query and reject that
+clause. Projections arrived in the engine at different versions –
+`equal_earth`, the default here, only in 0.5.0 – so the query records
+the version it needs as its `"countryatlas_ggsql_version"` attribute,
+and
 [`interactive_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/interactive_map.md)`(engine = "ggsql")`
-will refuse until the bindings catch up. `PROJECT TO` additionally needs
-a spatial backend – for DuckDB, its `spatial` extension.
+refuses an installed `ggsql` older than that, naming the projection. As
+of October 2026 the ggsql *engine* is at 0.5.2 while the ggsql R package
+on CRAN is still 0.3.3, so execution waits for the bindings to catch up.
+`PROJECT TO` additionally needs a spatial backend – for DuckDB, its
+`spatial` extension.
 
 ## Examples
 

@@ -25,7 +25,9 @@ draws the same data under several methods at once.
 
 ``` r
 
-cmp <- classify_compare(mapdf, gdp_per_capita, ncol = 2)
+cmp <- classify_compare(mapdf, gdp_per_capita,
+                        methods = c("quantile", "jenks", "equal", "pretty"),
+                        ncol = 2)
 cmp
 ```
 
@@ -37,35 +39,35 @@ The picture is only half of it. The counts are attached to the plot:
 ``` r
 
 attr(cmp, "countryatlas_classification")
-#> # A tibble: 20 × 4
-#>    method   class                     n   share
-#>    <chr>    <chr>                 <int>   <dbl>
-#>  1 quantile [268.7,1662]             38 0.201  
-#>  2 quantile (1662,4594]              38 0.201  
-#>  3 quantile (4594,1.029e+04]         37 0.196  
-#>  4 quantile (1.029e+04,2.937e+04]    38 0.201  
-#>  5 quantile (2.937e+04,2.472e+05]    38 0.201  
-#>  6 jenks    [268.7,1.312e+04]       123 0.651  
-#>  7 jenks    (1.312e+04,3.484e+04]    37 0.196  
-#>  8 jenks    (3.484e+04,6.771e+04]    23 0.122  
-#>  9 jenks    (6.771e+04,1.221e+05]     5 0.0265 
-#> 10 jenks    (1.221e+05,2.472e+05]     1 0.00529
-#> 11 equal    [268.7,4.965e+04]       173 0.915  
-#> 12 equal    (4.965e+04,9.903e+04]    13 0.0688 
-#> 13 equal    (9.903e+04,1.484e+05]     2 0.0106 
-#> 14 equal    (1.484e+05,1.978e+05]     0 0      
-#> 15 equal    (1.978e+05,2.472e+05]     1 0.00529
-#> 16 pretty   [0,5e+04]               173 0.915  
-#> 17 pretty   (5e+04,1e+05]            13 0.0688 
-#> 18 pretty   (1e+05,1.5e+05]           2 0.0106 
-#> 19 pretty   (1.5e+05,2e+05]           0 0      
-#> 20 pretty   (2e+05,2.5e+05]           1 0.00529
+#> # A tibble: 20 × 7
+#>    method   class              n   share   gvf   tai max_class_share
+#>    <chr>    <chr>          <int>   <dbl> <dbl> <dbl>           <dbl>
+#>  1 quantile 269 to 1.68K      40 0.201   0.626 0.672           0.201
+#>  2 quantile 1.68K to 4.65K    40 0.201   0.626 0.672           0.201
+#>  3 quantile 4.65K to 10.3K    39 0.196   0.626 0.672           0.201
+#>  4 quantile 10.3K to 30.1K    40 0.201   0.626 0.672           0.201
+#>  5 quantile 30.1K to 247K     40 0.201   0.626 0.672           0.201
+#>  6 jenks    269 to 13.1K     129 0.648   0.958 0.756           0.648
+#>  7 jenks    13.1K to 34.8K    38 0.191   0.958 0.756           0.648
+#>  8 jenks    34.8K to 68.1K    25 0.126   0.958 0.756           0.648
+#>  9 jenks    68.1K to 117K      6 0.0302  0.958 0.756           0.648
+#> 10 jenks    117K to 247K       1 0.00503 0.958 0.756           0.648
+#> 11 equal    269 to 49.6K     181 0.910   0.787 0.433           0.910
+#> 12 equal    49.6K to 99K      15 0.0754  0.787 0.433           0.910
+#> 13 equal    99K to 148K        2 0.0101  0.787 0.433           0.910
+#> 14 equal    148K to 198K       0 0       0.787 0.433           0.910
+#> 15 equal    198K to 247K       1 0.00503 0.787 0.433           0.910
+#> 16 pretty   0 to 50K         181 0.910   0.787 0.433           0.910
+#> 17 pretty   50K to 100K       15 0.0754  0.787 0.433           0.910
+#> 18 pretty   100K to 150K       2 0.0101  0.787 0.433           0.910
+#> 19 pretty   150K to 200K       0 0       0.787 0.433           0.910
+#> 20 pretty   200K to 250K       1 0.00503 0.787 0.433           0.910
 ```
 
 Equal-interval and pretty breaks put over 90% of countries into a single
 class, because GDP per capita is strongly right-skewed and the top of
 the range is one country. A map like that is technically correct and
-communicates nothing. Quantiles put roughly 38 countries in each class.
+communicates nothing. Quantiles put roughly 40 countries in each class.
 
 You do not need the comparison to get the report: any *classified*
 [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
@@ -77,14 +79,14 @@ returns nothing and says why.)
 p <- world_map(mapdf, gdp_per_capita, style = "quantile",
                classification_report = TRUE)
 attr(p, "countryatlas_classification")
-#> # A tibble: 5 × 4
-#>   method   class                     n share
-#>   <chr>    <chr>                 <int> <dbl>
-#> 1 quantile [268.7,1662]             38 0.201
-#> 2 quantile (1662,4594]              38 0.201
-#> 3 quantile (4594,1.029e+04]         37 0.196
-#> 4 quantile (1.029e+04,2.937e+04]    38 0.201
-#> 5 quantile (2.937e+04,2.472e+05]    38 0.201
+#> # A tibble: 5 × 6
+#>   method   class              n share   gvf   tai
+#>   <chr>    <chr>          <int> <dbl> <dbl> <dbl>
+#> 1 quantile 269 to 1.68K      40 0.201 0.626 0.672
+#> 2 quantile 1.68K to 4.65K    40 0.201 0.626 0.672
+#> 3 quantile 4.65K to 10.3K    39 0.196 0.626 0.672
+#> 4 quantile 10.3K to 30.1K    40 0.201 0.626 0.672
+#> 5 quantile 30.1K to 247K     40 0.201 0.626 0.672
 ```
 
 Jenks still earns its place: on a strongly clustered distribution,
@@ -245,11 +247,13 @@ world_map(mapdf, gdp_per_capita, style = "quantile", n_bins = 5,
 #> ── countryatlas map provenance
 #> package: countryatlas 3.0.0 (snapshot 2024)
 #> fill: gdp_per_capita
-#> geometry: polygon backend, coord_quickmap
+#> geometry: polygon backend, equal_earth
 #> classification: quantile, 5 bins
 #> missing data: hatched
-#> coverage: 189 countries shown, 51 missing
-#> breaks: 268.7 | 1662 | 4594 | 10290 | 29370 | 247200
+#> coverage: 199 countries shown, 39 missing
+#> breaks: 268.7 | 1684 | 4655 | 10250 | 30130 | 247200
+#> data: World Bank WDI NY.GDP.PCAP.KD (constant 2015 US$), release 2026-07,
+#> fetched 2026-10-02
 ```
 
 Every field there was already known when the plot was built; the only
@@ -299,12 +303,14 @@ c(`2016` = in_group("United Kingdom", "EU", as_of = 2016),
 
 ## 7. Islands are not missing at random
 
+Land-border contiguity,
 [`morans_i()`](https://pursuitofdatascience.github.io/countryatlas/reference/morans_i.md)’s
-default weights are land-border contiguity, and an island has no land
-border. On the bundled snapshot that silently removes a quarter of the
-countries with data – Japan, Australia, Madagascar, New Zealand, the
-Philippines, Cuba, Sri Lanka, Iceland and every small island state. They
-are not a random quarter.
+default weights before 4.0.0, gives an island no neighbours at all. On
+the bundled snapshot that removes a quarter of the countries with data:
+Japan, Australia, Madagascar, New Zealand, the Philippines, Cuba, Sri
+Lanka, Iceland and every small island state. They are not a random
+quarter, and the default is now the five nearest neighbours, so every
+country with data and a centroid takes part.
 
 Not every island goes, either: the United Kingdom keeps its land border
 with Ireland, and Indonesia keeps its borders with Malaysia, Papua New
@@ -314,15 +320,15 @@ the finished map who dropped out of the statistic.
 ``` r
 
 rbind(
-  contiguity = morans_i(snap, gdp_per_capita, n_perm = 0)[c("i", "n", "n_excluded")],
-  knn = morans_i(snap, gdp_per_capita, n_perm = 0,
-                 weights = country_weights("knn", k = 5))[c("i", "n", "n_excluded")]
+  contiguity = morans_i(snap, gdp_per_capita, n_perm = 0,
+                        weights = country_weights("contiguity"))[c("i", "n", "n_excluded")],
+  knn = morans_i(snap, gdp_per_capita, n_perm = 0)[c("i", "n", "n_excluded")]
 )
 #> # A tibble: 2 × 3
 #>       i     n n_excluded
 #> * <dbl> <int>      <int>
-#> 1 0.607   142         49
-#> 2 0.472   189          2
+#> 1 0.600   146         53
+#> 2 0.452   199          0
 ```
 
 Both numbers are defensible; only one of them is global.

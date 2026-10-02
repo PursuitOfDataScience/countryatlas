@@ -7,7 +7,7 @@ at ~200 countries the dense arithmetic is trivial.
 ## Usage
 
 ``` r
-morans_i(data, value, scale = "small", n_perm = 999, weights = NULL)
+morans_i(data, value, scale = deprecated(), n_perm = 999, weights = NULL)
 ```
 
 ## Arguments
@@ -23,9 +23,10 @@ morans_i(data, value, scale = "small", n_perm = 999, weights = NULL)
 
 - scale:
 
-  Natural Earth resolution for the default contiguity adjacency (see
-  [`country_borders()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_borders.md)).
-  Ignored when `weights` is supplied.
+  **\[deprecated\]** The Natural Earth resolution of the contiguity
+  weights that were the default before 4.0.0. Supplying it still builds
+  them, with a warning; write
+  `weights = country_weights("contiguity", scale = )` instead.
 
 - n_perm:
 
@@ -36,8 +37,9 @@ morans_i(data, value, scale = "small", n_perm = 999, weights = NULL)
 
   A
   [`country_weights()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_weights.md)
-  object. Defaults to land-border contiguity, row-standardised – which
-  excludes every island. See below.
+  object. `NULL` (default) uses `country_weights("knn", k = 5)`,
+  row-standardised, so every country with data and a centroid takes
+  part. See below.
 
 ## Value
 
@@ -51,20 +53,19 @@ is \\1/(n\_{perm}+1)\\) and an `excluded` list-column of the excluded
 
 ## Which countries are left out
 
-The default weights are land-border contiguity, and an island has no
-land border – so any country with no land neighbour *present in `data`*
-drops out entirely. On the bundled
-[world_snapshot](https://pursuitofdatascience.github.io/countryatlas/reference/world_snapshot.md)
-that is around a quarter of the countries with data: Japan, the United
+The default weights are the five nearest neighbours, so every country
+with data and a bundled centroid takes part. Land-border contiguity, the
+default before 4.0.0, is still available and still systematic in what it
+drops: an island has no land border, so any country with no land
+neighbour *present in `data`* leaves the statistic – Japan, the United
 Kingdom, Australia, Indonesia, Madagascar, New Zealand, the Philippines,
-Iceland, Cuba, Sri Lanka and every small island state. The omission is
-systematic rather than random.
+Iceland, Cuba, Sri Lanka and every small island state. On the bundled
+[world_snapshot](https://pursuitofdatascience.github.io/countryatlas/reference/world_snapshot.md)'s
+GDP per capita that changes the answer, not only the sample: see the
+numbers in the example below. `n_excluded` and `excluded` report who is
+left out under either scheme:
 
-`n_excluded` and `excluded` report it, and
-[`country_weights()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_weights.md)
-fixes it – `"knn"` and `"distance"` give every country neighbours:
-
-    morans_i(snap, gdp_per_capita, weights = country_weights("knn", k = 5))
+    morans_i(snap, gdp_per_capita, weights = country_weights("contiguity"))
 
 ## References
 
@@ -91,6 +92,6 @@ morans_i(snap, gdp_per_capita, n_perm = 99,
 #> # A tibble: 1 × 7
 #>       i expected     n n_excluded n_links p_value excluded 
 #>   <dbl>    <dbl> <int>      <int>   <int>   <dbl> <list>   
-#> 1 0.472 -0.00532   189          2     785    0.01 <chr [2]>
+#> 1 0.452 -0.00505   199          0     848    0.01 <chr [0]>
 # }
 ```

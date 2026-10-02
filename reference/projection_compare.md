@@ -22,10 +22,10 @@ projection_compare(
 
 - data:
 
-  An `sf` map-ready frame (projections are an `sf`-backend feature; the
-  polygon backend draws in
-  [`coord_quickmap()`](https://ggplot2.tidyverse.org/reference/coord_map.html)
-  and cannot reproject).
+  An `sf` map-ready frame: the comparison reprojects the geometry
+  itself. To draw one polygon-backend map in another projection, pass
+  `projection` to
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md).
 
 - fill:
 

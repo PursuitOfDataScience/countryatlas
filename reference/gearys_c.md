@@ -26,8 +26,10 @@ gearys_c(data, value, weights = NULL, n_perm = 999)
 
   A
   [`country_weights()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_weights.md)
-  object. Defaults to land-border contiguity, which excludes islands –
-  prefer `country_weights("knn")` for global work.
+  object. `NULL` (default) uses `country_weights("knn", k = 5)`: every
+  country's five nearest neighbours, islands included.
+  `country_weights("contiguity")` gives the land-border default of
+  earlier versions, which leaves every island out.
 
 - n_perm:
 
@@ -72,6 +74,6 @@ gearys_c(snap, gdp_per_capita, weights = country_weights("knn", k = 5),
 #> # A tibble: 1 × 7
 #>       c expected     n n_excluded n_links p_value excluded 
 #>   <dbl>    <dbl> <int>      <int>   <int>   <dbl> <list>   
-#> 1 0.535        1   189          2     785    0.01 <chr [2]>
+#> 1 0.557        1   199          0     848    0.01 <chr [0]>
 # }
 ```

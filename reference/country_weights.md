@@ -8,14 +8,14 @@ Build a reusable neighbour-weights object for
 and
 [`spatial_lag()`](https://pursuitofdatascience.github.io/countryatlas/reference/spatial_lag.md).
 Four schemes, three of which give every country at least one neighbour –
-which land-border contiguity, the historical default, cannot do for an
+which land-border contiguity, the default before 4.0.0, cannot do for an
 island.
 
 ## Usage
 
 ``` r
 country_weights(
-  type = c("contiguity", "knn", "distance", "custom"),
+  type = c("knn", "contiguity", "distance", "custom"),
   countries = NULL,
   k = 5,
   cutoff_km = NULL,
@@ -29,16 +29,17 @@ country_weights(
 
 - type:
 
-  - `"contiguity"` – shared land border, from
-    [`country_borders()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_borders.md).
-    Needs `sf`. Islands get no neighbours; see
-    [`morans_i()`](https://pursuitofdatascience.github.io/countryatlas/reference/morans_i.md)'s
-    note.
+  - `"knn"` (default) – the `k` nearest countries by great-circle
+    centroid distance. Every country gets exactly `k` neighbours,
+    islands included. Needs nothing but the bundled
+    [country_meta](https://pursuitofdatascience.github.io/countryatlas/reference/country_meta.md).
+    It is also what every statistic here uses when `weights` is `NULL`.
 
-    - `"knn"` – the `k` nearest countries by great-circle centroid
-      distance. Every country gets exactly `k` neighbours, islands
-      included. Needs nothing but the bundled
-      [country_meta](https://pursuitofdatascience.github.io/countryatlas/reference/country_meta.md).
+    - `"contiguity"` – shared land border, from
+      [`country_borders()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_borders.md).
+      Needs `sf`. Islands get no neighbours; see
+      [`morans_i()`](https://pursuitofdatascience.github.io/countryatlas/reference/morans_i.md)'s
+      note.
 
     - `"distance"` – every country within `cutoff_km`. Needs nothing.
 
@@ -106,8 +107,8 @@ w
 #> ── countryatlas spatial weights 
 #> scheme: knn -- 4 nearest centroids
 #> style: row-standardised (W)
-#> countries: 239
-#> links: 956
+#> countries: 247
+#> links: 988
 #> isolated: 0
 
 # \donttest{
@@ -117,6 +118,6 @@ morans_i(snap, gdp_per_capita, weights = country_weights("knn", k = 5),
 #> # A tibble: 1 × 7
 #>       i expected     n n_excluded n_links p_value excluded 
 #>   <dbl>    <dbl> <int>      <int>   <int>   <dbl> <list>   
-#> 1 0.472 -0.00532   189          2     785    0.01 <chr [2]>
+#> 1 0.452 -0.00505   199          0     848    0.01 <chr [0]>
 # }
 ```

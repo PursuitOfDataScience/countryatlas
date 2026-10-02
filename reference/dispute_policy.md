@@ -11,7 +11,7 @@ can report it.
 ## Usage
 
 ``` r
-dispute_policy(policy = NULL)
+dispute_policy(policy = NULL, worldview = NULL)
 ```
 
 ## Arguments
@@ -35,6 +35,15 @@ dispute_policy(policy = NULL)
 
   Called with no argument, returns the current policy.
 
+- worldview:
+
+  Optional point of view to draw: the viewing country's ISO alpha-3 code
+  (`"IND"`) or `"ISO"`, one of Natural Earth's 31 published worldviews
+  (see
+  [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md)).
+  Once set, geometry attached on the `sf` backend draws that country's
+  boundaries, and the provenance records it. `NA` clears it.
+
 ## Value
 
 When called with no argument, the policy currently in effect. When
@@ -44,12 +53,14 @@ R's convention for a setter, so
 
 ## What this does and does not do
 
-It records a choice and makes it visible. It does not redraw any
-boundary, and selecting `"de_jure"` will not give you claimed-boundary
-geometry, because the package does not have any – Natural Earth's
-auxiliary claim lines are not bundled. Anyone publishing under an
-institutional convention should verify the shapes against that
-institution's own basemap rather than trusting a setting.
+On its own it records a choice and makes it visible. It does not redraw
+any boundary, and selecting `"de_jure"` gives no claimed-boundary
+geometry, so it warns. With a `worldview` it does change the shapes: the
+`sf` backend draws that country's published view. The package ships no
+worldview of its own beyond Natural Earth's default, and anyone
+publishing under an institutional convention should still verify the
+shapes against that institution's own basemap rather than trusting a
+setting.
 
 ## See also
 

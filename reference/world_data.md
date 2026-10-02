@@ -23,7 +23,8 @@ world_data(
   cache = TRUE,
   language = "en",
   parallel = TRUE,
-  overrides = country_overrides()
+  overrides = country_overrides(),
+  vintage = NULL
 )
 ```
 
@@ -78,8 +79,12 @@ world_data(
 
 - latest:
 
-  If `TRUE`, use the most recent non-`NA` value per country for a
-  single-year request.
+  For a single-year request: `TRUE` takes each indicator's most recent
+  non-`NA` value per country, and `"common"` the most recent year in
+  which *every* requested indicator is present, so arithmetic across
+  them is consistent. Either way each indicator gains an
+  `<indicator>_year` column saying which year its value comes from.
+  `FALSE` (default) pins the requested year.
 
 - cache:
 
@@ -98,7 +103,17 @@ world_data(
 - overrides:
 
   Name -\> iso3c overrides for geometry matching (default
-  [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)).
+  [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_overrides.md)).
+
+- vintage:
+
+  Which release of the World Development Indicators to read: `NULL`
+  (default) for the current one, or an archived release such as
+  `"2024-07"` from the World Bank's WDI Database Archives (see
+  [`wdi_vintages()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdi_vintages.md)).
+  An archived release never changes, so its cache entries never expire.
+  A series the release does not hold warns and names the nearest
+  releases that do.
 
 ## Value
 
@@ -126,30 +141,25 @@ subsetting.
 
 ``` r
 # \donttest{
-# geometry = "polygon", the default, comes from the suggested `maps`
-# package, so guard the call: an example may not assume a Suggests is
-# installed (R CMD check runs \donttest{} blocks, and CRAN has a
-# check flavour with no suggested packages at all).
-if (requireNamespace("maps", quietly = TRUE)) {
-  world_data(2020)
-}
-#> # A tibble: 99,338 × 12
+# geometry = "polygon", the default, is bundled: nothing to install.
+world_data(2020)
+#> # A tibble: 97,812 × 12
 #>     long   lat group order subregion iso3c iso2c country continent region income
-#>    <dbl> <dbl> <dbl> <int> <chr>     <chr> <chr> <chr>   <chr>     <chr>  <fct> 
-#>  1 -69.9  12.5     1     1 NA        ABW   AW    Aruba   Americas  Latin… High …
-#>  2 -69.9  12.4     1     2 NA        ABW   AW    Aruba   Americas  Latin… High …
-#>  3 -69.9  12.4     1     3 NA        ABW   AW    Aruba   Americas  Latin… High …
-#>  4 -70.0  12.5     1     4 NA        ABW   AW    Aruba   Americas  Latin… High …
-#>  5 -70.1  12.5     1     5 NA        ABW   AW    Aruba   Americas  Latin… High …
-#>  6 -70.1  12.6     1     6 NA        ABW   AW    Aruba   Americas  Latin… High …
-#>  7 -70.0  12.6     1     7 NA        ABW   AW    Aruba   Americas  Latin… High …
-#>  8 -70.0  12.6     1     8 NA        ABW   AW    Aruba   Americas  Latin… High …
-#>  9 -69.9  12.5     1     9 NA        ABW   AW    Aruba   Americas  Latin… High …
-#> 10 -69.9  12.5     1    10 NA        ABW   AW    Aruba   Americas  Latin… High …
-#> # ℹ 99,328 more rows
+#>    <dbl> <dbl> <int> <int> <chr>     <chr> <chr> <chr>   <chr>     <chr>  <fct> 
+#>  1  131.  42.3     1     1 NA        RUS   RU    Russia… Europe    Europ… High …
+#>  2  131.  42.3     1     2 NA        RUS   RU    Russia… Europe    Europ… High …
+#>  3  131.  42.4     1     3 NA        RUS   RU    Russia… Europe    Europ… High …
+#>  4  131.  42.4     1     4 NA        RUS   RU    Russia… Europe    Europ… High …
+#>  5  131.  42.5     1     5 NA        RUS   RU    Russia… Europe    Europ… High …
+#>  6  131.  42.5     1     6 NA        RUS   RU    Russia… Europe    Europ… High …
+#>  7  131.  42.6     1     7 NA        RUS   RU    Russia… Europe    Europ… High …
+#>  8  131.  42.6     1     8 NA        RUS   RU    Russia… Europe    Europ… High …
+#>  9  131.  42.7     1     9 NA        RUS   RU    Russia… Europe    Europ… High …
+#> 10  130.  42.7     1    10 NA        RUS   RU    Russia… Europe    Europ… High …
+#> # ℹ 97,802 more rows
 #> # ℹ 1 more variable: gdp_per_capita <dbl>
 
-# geometry = "none" needs nothing beyond the hard dependencies.
+# geometry = "none" returns the country table alone.
 world_data(2020, indicator = c(life_exp = "SP.DYN.LE00.IN"),
            geometry = "none")
 #> # A tibble: 216 × 7

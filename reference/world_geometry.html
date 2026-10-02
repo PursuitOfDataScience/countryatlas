@@ -31,7 +31,18 @@ the plotting functions sit on, exposed for power users."><meta property="og:imag
     <li><a class="dropdown-item" href="../articles/beyond-the-choropleth.html">Beyond the choropleth</a></li>
     <li><a class="dropdown-item" href="../articles/honest-maps.html">Honest maps: classification, missingness and distortion</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas-and-ggsql.html">countryatlas and ggsql</a></li>
+    <li><a class="dropdown-item" href="../articles/panels.html">Panels done right</a></li>
+    <li><a class="dropdown-item" href="../articles/data-you-can-trace.html">Data you can trace: sources, vintages and provenance</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas.html">Full introduction (formal)</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>More, on the website</h6></li>
+    <li><a class="dropdown-item" href="../articles/gallery.html">Gallery</a></li>
+    <li><a class="dropdown-item" href="../articles/spatial-statistics.html">Spatial statistics on a world of islands</a></li>
+    <li><a class="dropdown-item" href="../articles/rates-and-small-numbers.html">Rates and small numbers</a></li>
+    <li><a class="dropdown-item" href="../articles/comparative-development.html">The comparative-development toolkit</a></li>
+    <li><a class="dropdown-item" href="../articles/disputed-territories.html">Disputed territories and worldviews</a></li>
+    <li><a class="dropdown-item" href="../articles/flows-networks-subnational.html">Flows, networks and subnational data</a></li>
+    <li><a class="dropdown-item" href="../articles/accessible-maps.html">Accessible and citable maps</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -65,7 +76,8 @@ the plotting functions sit on, exposed for power users.</p>
 <span>  region <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  projection <span class="op">=</span> <span class="st">"equal_earth"</span>,</span>
 <span>  recenter <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  year <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  year <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  worldview <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -79,13 +91,17 @@ the plotting functions sit on, exposed for power users.</p>
 
 
 <dt id="arg-geometry">geometry<a class="anchor" aria-label="anchor" href="#arg-geometry"></a></dt>
-<dd><p><code>"polygon"</code> (a tibble of <code>long</code>/<code>lat</code>/<code>group</code>) or <code>"sf"</code>.</p></dd>
+<dd><p><code>"polygon"</code> (a tibble of <code>long</code>/<code>lat</code>/<code>group</code>: the bundled
+Natural Earth 1:50m countries, which need no extra package) or <code>"sf"</code>.
+<code>"maps"</code> draws the polygon backend from the <code>maps</code> package as releases
+before 4.0.0 did; it is deprecated.</p></dd>
 
 
 <dt id="arg-scale">scale<a class="anchor" aria-label="anchor" href="#arg-scale"></a></dt>
-<dd><p>Natural Earth resolution for the <code>sf</code> backend. The polygon
-backend serves one bundled resolution and warns if asked for another:
-<code>"small"</code> (110m), <code>"medium"</code> (50m) or <code>"large"</code> (10m). <code>"large"</code>
+<dd><p>Natural Earth resolution for the <code>sf</code> backend:
+<code>"small"</code> (110m), <code>"medium"</code> (50m) or <code>"large"</code> (10m). The polygon
+backend draws its one bundled resolution, 1:50m, and warns if asked for
+<code>"large"</code>. <code>"large"</code>
 additionally needs the <code>rnaturalearthhires</code> package, which is not on CRAN
 (<code>install.packages("rnaturalearthhires", repos =</code>
 <code>"https://ropensci.r-universe.dev")</code>); <code>"small"</code> and <code>"medium"</code> need
@@ -104,19 +120,31 @@ the edge with an approximate outline, so it warns.</p></dd>
 
 <dt id="arg-projection">projection<a class="anchor" aria-label="anchor" href="#arg-projection"></a></dt>
 <dd><p>Projection for the <code>sf</code> backend (see <code><a href="world_map.html">world_map()</a></code>). The
-polygon backend returns unprojected longitude/latitude and warns if asked
-to project.</p></dd>
+polygon backend returns longitude/latitude, which the map verbs project
+when they draw, and warns if asked to project here.</p></dd>
 
 
 <dt id="arg-recenter">recenter<a class="anchor" aria-label="anchor" href="#arg-recenter"></a></dt>
-<dd><p>Optional central meridian (e.g. <code>150</code>) for the <code>sf</code> backend.
-The polygon backend cannot recentre and warns if asked to.</p></dd>
+<dd><p>Optional central meridian (e.g. <code>150</code>). On the polygon
+backend every ring is cut at the new antimeridian and shifted, so the
+longitudes run from <code>recenter - 180</code> to <code>recenter + 180</code>.</p></dd>
 
 
 <dt id="arg-year">year<a class="anchor" aria-label="anchor" href="#arg-year"></a></dt>
 <dd><p>Draw the world as it was in this year, via <code><a href="historical_geometry.html">historical_geometry()</a></code>
 and CShapes (1886-2019). Returns <code>sf</code> keyed on <code>gwcode</code>; only
 <code>what = "countries"</code> is available, and <code>region</code> cannot be combined with it.</p></dd>
+
+
+<dt id="arg-worldview">worldview<a class="anchor" aria-label="anchor" href="#arg-worldview"></a></dt>
+<dd><p>Draw the boundaries as one country's government draws
+them: the viewing country's ISO alpha-3 code (<code>"IND"</code>, <code>"CHN"</code>, ...) or
+<code>"ISO"</code>, for one of the 31 points of view Natural Earth publishes. Needs
+<code>geometry = "sf"</code>; the file is Natural Earth's 1:10m, downloaded once
+(about 5 MB) into the package's cache. <code>NULL</code> (default) is the worldview
+set with <code><a href="dispute_policy.html">dispute_policy()</a></code>, if any, and otherwise Natural Earth's own
+de facto boundaries. The package takes no position: you choose, and
+<code><a href="map_provenance.html">map_provenance()</a></code> records the choice.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -142,7 +170,7 @@ polygon backend returns.</p>
 <p>A few Natural Earth features have no ISO code and so come back with <code>iso3c</code>
 <code>NA</code> – Somaliland at every scale, plus the Indian Ocean Territories and
 Ashmore and Cartier Islands from <code>"medium"</code> on. They are kept so the land is
-still drawn; drop or <code><a href="wdj_overrides.html">country_overrides()</a></code> them if you group by <code>iso3c</code>.</p>
+still drawn; drop or <code><a href="country_overrides.html">country_overrides()</a></code> them if you group by <code>iso3c</code>.</p>
 <p><code>"orthographic"</code> is the one genuinely hemispheric projection: the countries
 on the far side have no image and come back as empty geometries, and the
 ones on the horizon are cut there (correctly, but <code><a href="https://r-spatial.github.io/sf/reference/st_coordinates.html" class="external-link">sf::st_coordinates()</a></code>
@@ -151,7 +179,9 @@ The other three azimuthal projections
 (<code>"azimuthal_equal_area"</code>, <code>"north_polar"</code>, <code>"south_polar"</code>) are Lambert
 equal-area and draw the <em>whole</em> globe, the far side stretched around the
 rim rather than dropped, so pass <code>region</code> if you want a polar view of the
-northern countries alone.</p>
+northern countries alone. <code>"north_polar"</code> leaves out what lies wholly
+south of 60 degrees S (Antarctica), whose pole is its antipode: an empty
+geometry on the sf backend, no rows on the polygon backend.</p>
 <p><code>"ocean"</code> is a whole-globe background rectangle. It is unavailable in all
 four azimuthal projections – <code>"orthographic"</code> has no image for it, and the
 Lambert three cut the globe at the antipode, which collapses the rectangle's
@@ -162,18 +192,16 @@ returning an invisible layer.</p>
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
-<span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"maps"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
-<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu">world_geometry</span><span class="op">(</span><span class="st">"countries"</span>, geometry <span class="op">=</span> <span class="st">"polygon"</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">}</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu">world_geometry</span><span class="op">(</span><span class="st">"countries"</span>, geometry <span class="op">=</span> <span class="st">"polygon"</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 6 × 8</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    long   lat group order region subregion iso3c iso2c</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> -<span style="color: #BB0000;">69.9</span>  12.5     1     1 Aruba  <span style="color: #BB0000;">NA</span>        ABW   AW   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> -<span style="color: #BB0000;">69.9</span>  12.4     1     2 Aruba  <span style="color: #BB0000;">NA</span>        ABW   AW   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span> -<span style="color: #BB0000;">69.9</span>  12.4     1     3 Aruba  <span style="color: #BB0000;">NA</span>        ABW   AW   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span> -<span style="color: #BB0000;">70.0</span>  12.5     1     4 Aruba  <span style="color: #BB0000;">NA</span>        ABW   AW   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">5</span> -<span style="color: #BB0000;">70.1</span>  12.5     1     5 Aruba  <span style="color: #BB0000;">NA</span>        ABW   AW   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">6</span> -<span style="color: #BB0000;">70.1</span>  12.6     1     6 Aruba  <span style="color: #BB0000;">NA</span>        ABW   AW   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span>  131.  42.3     1     1 Russia <span style="color: #BB0000;">NA</span>        RUS   RU   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span>  131.  42.3     1     2 Russia <span style="color: #BB0000;">NA</span>        RUS   RU   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span>  131.  42.4     1     3 Russia <span style="color: #BB0000;">NA</span>        RUS   RU   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span>  131.  42.4     1     4 Russia <span style="color: #BB0000;">NA</span>        RUS   RU   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">5</span>  131.  42.5     1     5 Russia <span style="color: #BB0000;">NA</span>        RUS   RU   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">6</span>  131.  42.5     1     6 Russia <span style="color: #BB0000;">NA</span>        RUS   RU   </span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

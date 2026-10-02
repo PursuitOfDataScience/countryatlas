@@ -11,7 +11,7 @@ for the choropleth equivalent).
 ## Usage
 
 ``` r
-tile_map(data, fill, label = TRUE)
+tile_map(data, fill, label = TRUE, footnote = "auto")
 ```
 
 ## Arguments
@@ -28,6 +28,13 @@ tile_map(data, fill, label = TRUE)
 
   Whether to draw ISO codes on the tiles (default `TRUE`).
 
+- footnote:
+
+  The caption, as in
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md):
+  `"auto"` (default) states the coverage and source, a string is used as
+  given, `FALSE` adds nothing.
+
 ## Value
 
 A `ggplot` object.
@@ -36,19 +43,22 @@ A `ggplot` object.
 
 Every tile in the layout is drawn, taking the scale's `na.value` fill
 where `data` has no row for it. The converse also holds and is quieter:
-`data` rows keyed on one of the 10 countries with no tile are dropped
+`data` rows keyed on one of the 3 countries with no tile are dropped
 without a warning (see
 [world_tiles](https://pursuitofdatascience.github.io/countryatlas/reference/world_tiles.md)
 for which).
+
+## Backend
+
+Drawn on the bundled equal-area tile grid
+([world_tiles](https://pursuitofdatascience.github.io/countryatlas/reference/world_tiles.md)),
+one square per country; no geometry backend is involved.
 
 ## Examples
 
 ``` r
 # \donttest{
 tile_map(countryatlas::world_snapshot$countries, gdp_per_capita)
-#> Warning: gdp_per_capita: 2 countries are not drawn -- no tile in the bundled grid.
-#> • "HKG" and "MAC"
-#> ℹ They are counted as missing in the caption and in `map_provenance()`.
 
 # }
 ```

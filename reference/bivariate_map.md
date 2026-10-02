@@ -12,7 +12,8 @@ bivariate_map(
   fill_y,
   palette = "GrPink",
   dim = 3,
-  projection = "equal_earth"
+  projection = "equal_earth",
+  footnote = "auto"
 )
 ```
 
@@ -41,11 +42,23 @@ bivariate_map(
   [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
   for the ones available.
 
+- footnote:
+
+  The caption, as in
+  [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md):
+  `"auto"` (default) states the coverage and source, a string is used as
+  given, `FALSE` adds nothing.
+
 ## Value
 
 A `ggplot` object (the map; combine with
 [`biscale::bi_legend()`](https://chris-prener.github.io/biscale/reference/bi_legend.html)
 for a standalone legend).
+
+## Backend
+
+The `sf` backend only, since `biscale` classes an `sf` frame; drawn in
+`projection` (Equal Earth by default).
 
 ## Examples
 

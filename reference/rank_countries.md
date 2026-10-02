@@ -33,6 +33,15 @@ rank_countries(data, value, within = NULL, desc = TRUE)
 
 `data` with `rank`, `percentile` and `z_score` columns added.
 
+## Panels
+
+With no `within`, every row is ranked against every other. On a panel
+that pools the years: a country's 2020 and its 2000 compete for the same
+ranks, and `z_score` carries the time trend. So a frame whose `year`
+holds more than one value warns (class `countryatlas_panel`);
+`within = year` ranks countries within each year, which is nearly always
+what is meant.
+
 ## Examples
 
 ``` r

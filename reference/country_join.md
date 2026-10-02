@@ -19,7 +19,8 @@ country_join(
   type = c("left", "inner", "full"),
   suffix = c(".x", ".y"),
   key = c("iso3c", "cowc", "cown", "gwn"),
-  warn = TRUE
+  warn = TRUE,
+  also_by = NULL
 )
 ```
 
@@ -58,9 +59,35 @@ country_join(
   They join to nothing, so a silent reconciliation failure is the one
   thing this verb exists to prevent. Each side is reported separately.
 
+- also_by:
+
+  Key columns to join on besides the country: a character vector of
+  columns present in both tables, or a named one when the names differ
+  (`c(year = "yr")` joins `x$year` to `y$yr`). `NULL` (default) joins on
+  `year` as well whenever both tables have one, and says so;
+  [`character()`](https://rdrr.io/r/base/character.html) joins on the
+  country alone.
+
 ## Value
 
 A tibble joined on a reconciled `iso3c` key.
+
+## Panels
+
+one row per country-year: Two country-year panels are joined
+country-year to country-year: when both tables have a `year` column it
+becomes part of the key, with a message, so France 2019 meets France
+2019 rather than every year of France meeting every other. A panel
+joined to a cross-section (one side has no `year`) repeats the
+cross-section's values across the panel's years, and says that too. Pass
+`also_by` to key on other columns, or `also_by = character()` to join on
+the country alone.
+
+Whatever the keys, a key that appears more than once on *both* sides
+pairs every copy with every copy. dplyr warns about that many-to-many
+join only when it is called from the console, never from inside a
+package, so this verb checks for itself and warns with class
+`countryatlas_many_to_many`, naming the keys.
 
 ## Joining historical data
 

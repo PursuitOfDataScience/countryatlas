@@ -15,8 +15,9 @@ smooth_rates(
   data,
   numerator,
   denominator,
-  method = c("eb", "none"),
-  suffix = "_smoothed"
+  method = c("eb", "local_eb", "none"),
+  suffix = "_smoothed",
+  weights = NULL
 )
 ```
 
@@ -32,12 +33,23 @@ smooth_rates(
 
 - method:
 
-  `"eb"` (default) for empirical-Bayes shrinkage, or `"none"` to compute
-  the raw rate only.
+  `"eb"` (default) shrinks each rate toward the global rate;
+  `"local_eb"` toward its neighbourhood's – its own and its neighbours'
+  pooled rate – so a rate is compared with the places around it rather
+  than the whole world (Marshall 1991; Anselin, Lozano & Koschinsky
+  2006); `"none"` computes the raw rate only.
 
 - suffix:
 
   Suffix for the new columns (default `"_smoothed"`).
+
+- weights:
+
+  For `"local_eb"`: who a country's neighbours are, as a
+  [`country_weights()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_weights.md)
+  object; `NULL` (default) is k-nearest neighbours (k = 5). A country
+  with no usable neighbour has no neighbourhood rate, so it is `NA`,
+  with a warning.
 
 ## Value
 
@@ -63,6 +75,22 @@ evidence of real between-country variation.
 
 On a panel the prior is estimated separately for each `year`, so every
 rate is shrunk toward its own year's global rate and every row is kept.
+
+`"local_eb"` estimates the same two moments in each country's
+neighbourhood (itself and its neighbours): the local rate \\m_i\\ and
+the local between-country variance \\a_i\\, computed from the deviations
+of the neighbourhood's rates from \\m_i\\. It agrees with
+`spdep::EBlocal(geoda = TRUE)` on the same neighbours.
+
+## References
+
+Marshall, R. J. (1991). Mapping disease and mortality rates using
+empirical Bayes estimators. *Journal of the Royal Statistical Society,
+Series C* 40(2), 283-294.
+[doi:10.2307/2347593](https://doi.org/10.2307/2347593)
+
+Anselin, L., Lozano, N. & Koschinsky, J. (2006). Rate transformations
+and smoothing. Spatial Analysis Laboratory, University of Illinois.
 
 ## See also
 

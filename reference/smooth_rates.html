@@ -33,7 +33,18 @@ value_by_alpha_map()'s visual answer."><meta property="og:image" content="https:
     <li><a class="dropdown-item" href="../articles/beyond-the-choropleth.html">Beyond the choropleth</a></li>
     <li><a class="dropdown-item" href="../articles/honest-maps.html">Honest maps: classification, missingness and distortion</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas-and-ggsql.html">countryatlas and ggsql</a></li>
+    <li><a class="dropdown-item" href="../articles/panels.html">Panels done right</a></li>
+    <li><a class="dropdown-item" href="../articles/data-you-can-trace.html">Data you can trace: sources, vintages and provenance</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas.html">Full introduction (formal)</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>More, on the website</h6></li>
+    <li><a class="dropdown-item" href="../articles/gallery.html">Gallery</a></li>
+    <li><a class="dropdown-item" href="../articles/spatial-statistics.html">Spatial statistics on a world of islands</a></li>
+    <li><a class="dropdown-item" href="../articles/rates-and-small-numbers.html">Rates and small numbers</a></li>
+    <li><a class="dropdown-item" href="../articles/comparative-development.html">The comparative-development toolkit</a></li>
+    <li><a class="dropdown-item" href="../articles/disputed-territories.html">Disputed territories and worldviews</a></li>
+    <li><a class="dropdown-item" href="../articles/flows-networks-subnational.html">Flows, networks and subnational data</a></li>
+    <li><a class="dropdown-item" href="../articles/accessible-maps.html">Accessible and citable maps</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -65,8 +76,9 @@ practice in disease mapping, and the statistical counterpart to
 <span>  <span class="va">data</span>,</span>
 <span>  <span class="va">numerator</span>,</span>
 <span>  <span class="va">denominator</span>,</span>
-<span>  method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"eb"</span>, <span class="st">"none"</span><span class="op">)</span>,</span>
-<span>  suffix <span class="op">=</span> <span class="st">"_smoothed"</span></span>
+<span>  method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"eb"</span>, <span class="st">"local_eb"</span>, <span class="st">"none"</span><span class="op">)</span>,</span>
+<span>  suffix <span class="op">=</span> <span class="st">"_smoothed"</span>,</span>
+<span>  weights <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -83,12 +95,22 @@ practice in disease mapping, and the statistical counterpart to
 
 
 <dt id="arg-method">method<a class="anchor" aria-label="anchor" href="#arg-method"></a></dt>
-<dd><p><code>"eb"</code> (default) for empirical-Bayes shrinkage, or <code>"none"</code> to
-compute the raw rate only.</p></dd>
+<dd><p><code>"eb"</code> (default) shrinks each rate toward the global rate;
+<code>"local_eb"</code> toward its neighbourhood's – its own and its neighbours'
+pooled rate – so a rate is compared with the places around it rather
+than the whole world (Marshall 1991; Anselin, Lozano &amp; Koschinsky 2006);
+<code>"none"</code> computes the raw rate only.</p></dd>
 
 
 <dt id="arg-suffix">suffix<a class="anchor" aria-label="anchor" href="#arg-suffix"></a></dt>
 <dd><p>Suffix for the new columns (default <code>"_smoothed"</code>).</p></dd>
+
+
+<dt id="arg-weights">weights<a class="anchor" aria-label="anchor" href="#arg-weights"></a></dt>
+<dd><p>For <code>"local_eb"</code>: who a country's neighbours are, as a
+<code><a href="country_weights.html">country_weights()</a></code> object; <code>NULL</code> (default) is k-nearest neighbours
+(k = 5). A country with no usable neighbour has no neighbourhood rate,
+so it is <code>NA</code>, with a warning.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -114,6 +136,19 @@ every rate shrinks fully to the global mean, which is the right answer:
 the data contain no evidence of real between-country variation.</p>
 <p>On a panel the prior is estimated separately for each <code>year</code>, so every
 rate is shrunk toward its own year's global rate and every row is kept.</p>
+<p><code>"local_eb"</code> estimates the same two moments in each country's neighbourhood
+(itself and its neighbours): the local rate \(m_i\) and the local
+between-country variance \(a_i\), computed from the deviations of the
+neighbourhood's rates from \(m_i\). It agrees with
+<code>spdep::EBlocal(geoda = TRUE)</code> on the same neighbours.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
+    <p>Marshall, R. J. (1991). Mapping disease and mortality rates using empirical
+Bayes estimators. <em>Journal of the Royal Statistical Society, Series C</em>
+40(2), 283-294. <a href="https://doi.org/10.2307/2347593" class="external-link">doi:10.2307/2347593</a></p>
+<p>Anselin, L., Lozano, N. &amp; Koschinsky, J. (2006). Rate transformations and
+smoothing. Spatial Analysis Laboratory, University of Illinois.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

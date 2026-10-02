@@ -79,8 +79,6 @@ A plot-ready frame: polygon tibble, `sf` object, or (for
 rates <- data.frame(country = c("United States", "Brazil", "Kenya"),
                     vaccination_pct = c(0.7, 0.8, 0.6))
 # \donttest{
-if (requireNamespace("maps", quietly = TRUE)) {
-  joined <- join_world(rates, country)
-}
+joined <- join_world(rates, country)
 # }
 ```

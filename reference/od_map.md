@@ -78,9 +78,7 @@ od <- data.frame(
            "Mexico", "Canada", "Japan"),
   value = c(500, 200, 90, 80, 70, 60, 300, 280, 120)
 )
-if (requireNamespace("maps", quietly = TRUE)) {
-  od_map(od, from, to, value, origins = 3)
-}
+od_map(od, from, to, value, origins = 3)
 
 # }
 ```

@@ -20,7 +20,8 @@ country_groups(group = NULL, as_of = NULL)
   One or more group names: any of `"EU"`, `"OECD"`, `"G7"`, `"G20"`,
   `"BRICS"`, `"ASEAN"`, `"EFTA"`, `"Commonwealth"`, `"OPEC"`,
   `"EuroZone"`, `"NATO"`, `"Mercosur"`, `"GCC"`, `"Nordic"`,
-  `"Visegrad"`. If `NULL`, the whole table is returned.
+  `"Visegrad"`, `"SCO"`, `"CPTPP"`, `"RCEP"`, `"EAC"`, `"SADC"`,
+  `"APEC"` and `"ArabLeague"`. If `NULL`, the whole table is returned.
 
 - as_of:
 
@@ -46,12 +47,14 @@ excludes it throughout, and both are wrong:
     "GBR" %in% country_groups("EU", as_of = 2021)$iso3c   # FALSE
 
 [country_groups_history](https://pursuitofdatascience.github.io/countryatlas/reference/country_groups_history.md)
-carries dated membership for twelve groups: EU, EuroZone, NATO, OECD,
-ASEAN, EFTA, GCC, Mercosur, Nordic, Visegrad, BRICS and G7.
+carries dated membership for nineteen groups: EU, EuroZone, NATO, OECD,
+ASEAN, EFTA, GCC, Mercosur, Nordic, Visegrad, BRICS, G7, SCO, CPTPP,
+RCEP, EAC, SADC, APEC and the Arab League, with suspensions as spells of
+their own: Syria is not counted in the Arab League from 2011 to 2023.
 Commonwealth, G20 and OPEC are **not** dated – their histories involve
-suspensions, readmissions and contested dates that would have to be
-sourced case by case, and a fabricated date is worse than an absent one.
-Asking for `as_of` on those warns and falls back to the snapshot.
+suspensions, readmissions and contested dates the sources give unevenly,
+and a fabricated date is worse than an absent one. Asking for `as_of` on
+those warns and falls back to the snapshot.
 
 ## See also
 

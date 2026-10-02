@@ -7,7 +7,13 @@ clusters of **high** values from clusters of **low** ones, which is what
 ## Usage
 
 ``` r
-getis_ord(data, value, weights = NULL, local = TRUE)
+getis_ord(
+  data,
+  value,
+  weights = NULL,
+  local = TRUE,
+  p_adjust = c("fdr", "bonferroni", "holm", "none")
+)
 ```
 
 ## Arguments
@@ -24,8 +30,10 @@ getis_ord(data, value, weights = NULL, local = TRUE)
 
   A
   [`country_weights()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_weights.md)
-  object. Defaults to land-border contiguity, which excludes islands –
-  prefer `country_weights("knn")` for global work.
+  object. `NULL` (default) uses `country_weights("knn", k = 5)`: every
+  country's five nearest neighbours, islands included.
+  `country_weights("contiguity")` gives the land-border default of
+  earlier versions, which leaves every island out.
 
 - local:
 
@@ -38,13 +46,21 @@ getis_ord(data, value, weights = NULL, local = TRUE)
   rather than a number computed outside its domain. \\G_i^\*\\
   standardises and is defined for signed data.
 
+- p_adjust:
+
+  For `local = TRUE`, how to adjust the per-country p-values for
+  multiple testing: `"fdr"` (default), `"bonferroni"`, `"holm"` or
+  `"none"`, as in
+  [`local_morans()`](https://pursuitofdatascience.github.io/countryatlas/reference/local_morans.md).
+  The global form makes one test and takes no adjustment.
+
 ## Value
 
-With `local = TRUE`, a tibble of `iso3c`, `gi_star`, `z_score` and
-`p_value` (two-sided, from the normal approximation), one row per
-country used. With `local = FALSE`, a one-row tibble of `g`, `expected`,
-`n` (countries used – the same count, so the local form returns `n`
-rows) and `n_links` (non-zero weights).
+With `local = TRUE`, a tibble of `iso3c`, `gi_star`, `z_score`,
+`p_value` (two-sided, from the normal approximation) and `p_adjusted`,
+one row per country used. With `local = FALSE`, a one-row tibble of `g`,
+`expected`, `n` (countries used – the same count, so the local form
+returns `n` rows) and `n_links` (non-zero weights).
 
 ## References
 
@@ -63,19 +79,19 @@ use of distance statistics. *Geographical Analysis* 24(3), 189-206.
 # \donttest{
 snap <- countryatlas::world_snapshot$countries
 getis_ord(snap, gdp_per_capita, weights = country_weights("knn", k = 5))
-#> # A tibble: 189 × 4
-#>    iso3c gi_star z_score  p_value
-#>    <chr>   <dbl>   <dbl>    <dbl>
-#>  1 ABW   0.0147    0.453 0.650   
-#>  2 AGO   0.00176  -0.982 0.326   
-#>  3 ALB   0.00517  -0.602 0.547   
-#>  4 AND   0.0435    3.59  0.000332
-#>  5 ARE   0.0221    1.28  0.200   
-#>  6 ARG   0.00720  -0.369 0.712   
-#>  7 ARM   0.00410  -0.706 0.480   
-#>  8 ATG   0.0142    0.362 0.717   
-#>  9 AUS   0.0193    0.922 0.356   
-#> 10 AUT   0.0258    1.66  0.0969  
-#> # ℹ 179 more rows
+#> # A tibble: 199 × 5
+#>    iso3c gi_star z_score  p_value p_adjusted
+#>    <chr>   <dbl>   <dbl>    <dbl>      <dbl>
+#>  1 ABW   0.0139    0.449 0.654        0.850 
+#>  2 AFG   0.00109  -1.07  0.287        0.794 
+#>  3 AGO   0.00162  -1.00  0.316        0.794 
+#>  4 ALB   0.00476  -0.629 0.529        0.831 
+#>  5 AND   0.0408    3.58  0.000337     0.0134
+#>  6 ARE   0.0207    1.26  0.207        0.794 
+#>  7 ARG   0.00672  -0.388 0.698        0.850 
+#>  8 ARM   0.00381  -0.727 0.467        0.802 
+#>  9 ATG   0.0133    0.340 0.734        0.850 
+#> 10 AUS   0.0180    0.898 0.369        0.794 
+#> # ℹ 189 more rows
 # }
 ```

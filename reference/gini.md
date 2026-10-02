@@ -41,7 +41,7 @@ which adds a between/within-group decomposition.
 ``` r
 snap <- countryatlas::world_snapshot$countries
 gini(snap$gdp_per_capita)                          # between countries
-#> [1] 0.635143
+#> [1] 0.637532
 gini(snap$gdp_per_capita, weights = snap$population)  # between people
-#> [1] 0.6094909
+#> [1] 0.6124852
 ```

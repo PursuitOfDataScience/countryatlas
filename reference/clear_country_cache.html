@@ -25,7 +25,18 @@
     <li><a class="dropdown-item" href="../articles/beyond-the-choropleth.html">Beyond the choropleth</a></li>
     <li><a class="dropdown-item" href="../articles/honest-maps.html">Honest maps: classification, missingness and distortion</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas-and-ggsql.html">countryatlas and ggsql</a></li>
+    <li><a class="dropdown-item" href="../articles/panels.html">Panels done right</a></li>
+    <li><a class="dropdown-item" href="../articles/data-you-can-trace.html">Data you can trace: sources, vintages and provenance</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas.html">Full introduction (formal)</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>More, on the website</h6></li>
+    <li><a class="dropdown-item" href="../articles/gallery.html">Gallery</a></li>
+    <li><a class="dropdown-item" href="../articles/spatial-statistics.html">Spatial statistics on a world of islands</a></li>
+    <li><a class="dropdown-item" href="../articles/rates-and-small-numbers.html">Rates and small numbers</a></li>
+    <li><a class="dropdown-item" href="../articles/comparative-development.html">The comparative-development toolkit</a></li>
+    <li><a class="dropdown-item" href="../articles/disputed-territories.html">Disputed territories and worldviews</a></li>
+    <li><a class="dropdown-item" href="../articles/flows-networks-subnational.html">Flows, networks and subnational data</a></li>
+    <li><a class="dropdown-item" href="../articles/accessible-maps.html">Accessible and citable maps</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -58,12 +69,16 @@
 
 <dl><dt id="arg-source">source<a class="anchor" aria-label="anchor" href="#arg-source"></a></dt>
 <dd><p>Which source's cache to clear, or <code>NULL</code> (default) for all.
-Only the World Bank cache is currently persisted to disk; other sources are
-memoised per session.</p></dd>
+The built-in sources persist to disk, one directory each under the cache
+(<code>wdi</code>, <code>wdi-archive</code> for pinned World Bank releases, <code>owid</code>, <code>oecd</code>,
+<code>imf</code>, <code>ilo</code>, <code>eurostat</code>, <code>comtrade</code>); a source you registered yourself is
+memoised for the session only.</p></dd>
 
 
 <dt id="arg-disk">disk<a class="anchor" aria-label="anchor" href="#arg-disk"></a></dt>
-<dd><p>Also delete the on-disk cache (default <code>FALSE</code>).</p></dd>
+<dd><p>Also delete that source's on-disk entries (default <code>FALSE</code>).
+Only the cache's own files are removed, and a directory only when that
+leaves it empty.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -76,11 +91,28 @@ memoised per session.</p></dd>
 
 <p>Called with no <code>source</code>, this also drops the two cached <em>geometry</em> backends:
 the Natural Earth <code>sf</code> layer held per scale (tens of megabytes at
-<code>scale = "medium"</code>) and the memoised <code>map_data("world")</code> tibble (about
-99,000 rows per override set). Those are the largest things the package
+<code>scale = "medium"</code>) and the polygon backend's memoised vertex table (about
+98,000 rows per override set). Those are the largest things the package
 keeps in memory, and in a long-lived process – a Shiny app or a plumber
 API – this is the only way to release them. They rebuild on the next map.</p>
 <p>Naming a <code>source</code> leaves geometry alone, since it is not a data source.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="where-the-cache-lives">Where the cache lives<a class="anchor" aria-label="anchor" href="#where-the-cache-lives"></a></h2>
+
+
+<p>The persistent cache goes in the standard per-user cache location,
+<code>tools::R_user_dir("countryatlas", "cache")</code>. Point it elsewhere with
+<code>options(countryatlas.cache_dir = )</code>, or skip it by passing <code>cache = FALSE</code>
+to <code><a href="world_data.html">world_data()</a></code> or <code><a href="country_data.html">country_data()</a></code>. Under <code>R CMD check</code> the whole cache
+moves to the session temp directory, so a check never writes to the user's
+file space.</p>
+<p>Entries expire: a fetch from a current release is dropped once it is 30
+days old, because providers revise their figures, and past 50 MB per
+source the least-recently-used entries go first. Adjust either with
+<code>options(countryatlas.cache_max_age = )</code> (seconds) and
+<code>options(countryatlas.cache_max_size = )</code> (bytes). A pinned World Bank
+release (<code><a href="wdi_vintages.html">wdi_vintages()</a></code>) never changes, so its entries never expire.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

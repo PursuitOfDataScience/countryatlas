@@ -7,7 +7,14 @@ faceted small-multiple when it is not installed.
 ## Usage
 
 ``` r
-animate_world(data, fill, time = year, projection = "equal_earth", ...)
+animate_world(
+  data,
+  fill,
+  time = year,
+  projection = "equal_earth",
+  breaks_by = c("pooled", "panel"),
+  ...
+)
 ```
 
 ## Arguments
@@ -26,9 +33,17 @@ animate_world(data, fill, time = year, projection = "equal_earth", ...)
 
 - projection:
 
-  Projection for the sf backend. See
+  Projection; see
   [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
   for the projections available.
+
+- breaks_by:
+
+  `"pooled"` (default) classifies every panel together, with one set of
+  breaks, so the same colour means the same value in every panel and the
+  panels can be compared. `"panel"` classifies each panel on its own
+  values – each country's class within its own year – and the legend
+  says so; colours are then comparable as ranks, not as values.
 
 - ...:
 
@@ -38,6 +53,13 @@ animate_world(data, fill, time = year, projection = "equal_earth", ...)
 ## Value
 
 A `gganim` object (if `gganimate` is available) or a faceted `ggplot`.
+
+## Backend
+
+Either backend, as
+[`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md):
+the frame decides, and both draw in `projection` (Equal Earth by
+default).
 
 ## Examples
 

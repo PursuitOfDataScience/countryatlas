@@ -35,7 +35,18 @@ ggsql::ggsql_execute(), or drop the string into a {ggsql} chunk."><meta property
     <li><a class="dropdown-item" href="../articles/beyond-the-choropleth.html">Beyond the choropleth</a></li>
     <li><a class="dropdown-item" href="../articles/honest-maps.html">Honest maps: classification, missingness and distortion</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas-and-ggsql.html">countryatlas and ggsql</a></li>
+    <li><a class="dropdown-item" href="../articles/panels.html">Panels done right</a></li>
+    <li><a class="dropdown-item" href="../articles/data-you-can-trace.html">Data you can trace: sources, vintages and provenance</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas.html">Full introduction (formal)</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>More, on the website</h6></li>
+    <li><a class="dropdown-item" href="../articles/gallery.html">Gallery</a></li>
+    <li><a class="dropdown-item" href="../articles/spatial-statistics.html">Spatial statistics on a world of islands</a></li>
+    <li><a class="dropdown-item" href="../articles/rates-and-small-numbers.html">Rates and small numbers</a></li>
+    <li><a class="dropdown-item" href="../articles/comparative-development.html">The comparative-development toolkit</a></li>
+    <li><a class="dropdown-item" href="../articles/disputed-territories.html">Disputed territories and worldviews</a></li>
+    <li><a class="dropdown-item" href="../articles/flows-networks-subnational.html">Flows, networks and subnational data</a></li>
+    <li><a class="dropdown-item" href="../articles/accessible-maps.html">Accessible and citable maps</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -93,8 +104,12 @@ builder with no dependencies; pair it with <code><a href="as_ggsql_source.html">
 
 
 <dt id="arg-projection">projection<a class="anchor" aria-label="anchor" href="#arg-projection"></a></dt>
-<dd><p>A projection ggsql's <code>PROJECT TO</code> understands (e.g.
-<code>"equal_earth"</code>, <code>"orthographic"</code>), or <code>NULL</code> to omit the clause.</p></dd>
+<dd><p>A projection: one of the package's own names (see
+<code><a href="projection_info.html">projection_info()</a></code>), translated to ggsql's where the two differ
+(<code>"plate_carree"</code> becomes <code>equirectangular</code>, <code>"natural_earth"</code> becomes
+<code>natural</code>, <code>"azimuthal_equal_area"</code> becomes <code>lambert</code>), or any other name
+ggsql's <code>PROJECT TO</code> understands, passed through. <code>NULL</code> omits the
+clause.</p></dd>
 
 
 <dt id="arg-palette">palette<a class="anchor" aria-label="anchor" href="#arg-palette"></a></dt>
@@ -142,12 +157,16 @@ small-multiple panel rendered in the database.</p></dd>
 
 
 <p>Building the string needs nothing installed. <em>Running</em> it needs
-<code>ggsql</code> &gt;= 0.4.1, the version that added the <code>DRAW spatial</code> clause; older
-<code>ggsql</code> releases parse the query and reject that clause. As of August 2026
-that clause has shipped in the ggsql <em>engine</em> but not yet in the ggsql R
-package (still 0.3.3), so <code><a href="interactive_map.html">interactive_map()</a></code><code>(engine = "ggsql")</code> will refuse
-until the bindings catch up. <code>PROJECT TO</code> additionally needs a spatial
-backend – for DuckDB, its <code>spatial</code> extension.</p>
+<code>ggsql</code> &gt;= 0.4.1, the version that added the <code>DRAW spatial</code> clause and map
+projections; older <code>ggsql</code> releases parse the query and reject that clause.
+Projections arrived in the engine at different versions – <code>equal_earth</code>,
+the default here, only in 0.5.0 – so the query records the version it
+needs as its <code>"countryatlas_ggsql_version"</code> attribute, and
+<code><a href="interactive_map.html">interactive_map()</a></code><code>(engine = "ggsql")</code> refuses an installed <code>ggsql</code> older
+than that, naming the projection. As of October 2026 the ggsql <em>engine</em> is
+at 0.5.2 while the ggsql R package on CRAN is still 0.3.3, so execution
+waits for the bindings to catch up. <code>PROJECT TO</code> additionally needs a
+spatial backend – for DuckDB, its <code>spatial</code> extension.</p>
     </div>
 
     <div class="section level2">

@@ -7,7 +7,14 @@ per indicator.
 ## Usage
 
 ``` r
-fetch_indicator(source, indicator, countries = NULL, years = NULL, ...)
+fetch_indicator(
+  source,
+  indicator,
+  countries = NULL,
+  years = NULL,
+  vintage = NULL,
+  ...
+)
 ```
 
 ## Arguments
@@ -31,13 +38,22 @@ fetch_indicator(source, indicator, countries = NULL, years = NULL, ...)
 
   Optional numeric year vector; `NULL` for the provider's default.
 
+- vintage:
+
+  For `source = "wdi"`, the release of the World Development Indicators
+  to read; see
+  [`world_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_data.md).
+  Other sources have no releases to pin and refuse it.
+
 - ...:
 
   Passed to the source's own `fetch` function.
 
 ## Value
 
-A tibble keyed on `iso3c` (and `year`, for a panel).
+A tibble keyed on `iso3c` (and `year`, for a panel), with a record of
+where each indicator column came from; see
+[`source_info()`](https://pursuitofdatascience.github.io/countryatlas/reference/source_info.md).
 
 ## See also
 

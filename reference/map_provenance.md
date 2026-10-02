@@ -55,9 +55,19 @@ map_provenance(x, value = NULL)
 
 A one-row tibble of provenance fields, invisibly printed in a
 human-readable block. Fields: `countryatlas`, `fill`, `backend`,
-`projection`, `style`, `n_bins`, `na_style`, `n_countries`, `n_missing`,
-`n_total`, `uncertainty`, `disputes`, `dispute_policy`, `n_imputed`,
-`breaks`, `missing_iso3c` and `snapshot_year`.
+`projection`, `style`, `modified`, `n_bins`, `na_style`, `n_countries`,
+`n_missing`, `n_total`, `uncertainty`, `disputes`, `dispute_policy`,
+`worldview`, `n_imputed`, `breaks`, `missing_iso3c`, `snapshot_year`,
+and `sources`, the
+[`source_info()`](https://pursuitofdatascience.github.io/countryatlas/reference/source_info.md)
+record of the fill column when the data carried one – which the print
+names: "World Bank WDI NY.GDP.PCAP.KD (constant 2015 US\$), release
+2026-07, fetched 2026-10-01".
+
+`projection` and `style` describe the plot as it is now, read from its
+coordinate system and fill scale: a map given `+ coord_sf(crs = 3035)`
+after the verb drew it reports `"custom"`, and `modified = TRUE` says
+the plot no longer matches what the verb recorded.
 
 The three counts are: `n_countries`, the countries actually drawn with a
 value; `n_missing`, those drawn without one; and `n_total`, the two
@@ -87,19 +97,19 @@ they cover what a methods note needs:
 ``` r
 # \donttest{
 snap <- countryatlas::world_snapshot$countries
-if (requireNamespace("maps", quietly = TRUE)) {
-  p <- attach_geometry(snap, geometry = "polygon") |>
-    world_map(gdp_per_capita, style = "quantile")
-  map_provenance(p)
-}
+p <- attach_geometry(snap, geometry = "polygon") |>
+  world_map(gdp_per_capita, style = "quantile")
+map_provenance(p)
 #> 
 #> ── countryatlas map provenance 
 #> package: countryatlas 3.0.0 (snapshot 2024)
 #> fill: gdp_per_capita
-#> geometry: polygon backend, coord_quickmap
+#> geometry: polygon backend, equal_earth
 #> classification: quantile, 5 bins
 #> missing data: grey
-#> coverage: 189 countries shown, 51 missing
-#> breaks: 268.7 | 1662 | 4594 | 10290 | 29370 | 247200
+#> coverage: 199 countries shown, 39 missing
+#> breaks: 268.7 | 1684 | 4655 | 10250 | 30130 | 247200
+#> data: World Bank WDI NY.GDP.PCAP.KD (constant 2015 US$), release 2026-07,
+#> fetched 2026-10-02
 # }
 ```

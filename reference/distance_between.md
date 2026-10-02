@@ -33,23 +33,17 @@ country that doesn't resolve to a known centroid).
 ## Countries without a bundled centroid
 
 [country_meta](https://pursuitofdatascience.github.io/countryatlas/reference/country_meta.md)
-carries no centroid for a handful of small or dependent territories
-(Bouvet Island, the British Virgin Islands, Gibraltar, Hong Kong, Macao,
-Svalbard and Jan Mayen, Tokelau, Tuvalu, the U.S. Minor Outlying Islands
-and the Aland Islands), and no row at all for Kosovo, because
+carries no centroid for three territories Natural Earth does not draw at
+1:50m (Bouvet Island, Gibraltar and the U.S. Minor Outlying Islands);
+those inputs return `NA` here. Kosovo, which
 [countrycode::codelist](https://rdrr.io/pkg/countrycode/man/codelist.html)
-has none. Those inputs return `NA` here even though the geometry
-backends do map them – so
-[`neighbors()`](https://pursuitofdatascience.github.io/countryatlas/reference/neighbors.md)
-and
-[`country_borders()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_borders.md)
-know about Kosovo while this function does not.
+does not carry, has a curated row with a centroid.
 
 ## Examples
 
 ``` r
 distance_between("France", "Germany")
-#> [1] 802.3524
+#> [1] 802.3525
 distance_between("USA", c("Canada", "Mexico"))
 #> [1] 2184.930 1622.586
 ```

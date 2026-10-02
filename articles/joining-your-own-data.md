@@ -91,15 +91,15 @@ Always inspect what failed to match:
 ``` r
 
 check_country_match(my_data$nation)
-#> # A tibble: 6 × 5
-#>   input         iso3c matched historical suggestion
-#>   <chr>         <chr> <lgl>   <lgl>      <chr>     
-#> 1 U.S.          USA   TRUE    FALSE      NA        
-#> 2 S. Korea      KOR   TRUE    FALSE      NA        
-#> 3 Czechia       CZE   TRUE    FALSE      NA        
-#> 4 Kosovo        XKX   TRUE    FALSE      NA        
-#> 5 Cote d'Ivoire CIV   TRUE    FALSE      NA        
-#> 6 UK            GBR   TRUE    FALSE      NA
+#> # A tibble: 6 × 6
+#>   input         iso3c matched historical method   suggestion
+#>   <chr>         <chr> <lgl>   <lgl>      <chr>    <chr>     
+#> 1 U.S.          USA   TRUE    FALSE      regex_en NA        
+#> 2 S. Korea      KOR   TRUE    FALSE      regex_en NA        
+#> 3 Czechia       CZE   TRUE    FALSE      regex_en NA        
+#> 4 Kosovo        XKX   TRUE    FALSE      override NA        
+#> 5 Cote d'Ivoire CIV   TRUE    FALSE      regex_en NA        
+#> 6 UK            GBR   TRUE    FALSE      regex_en NA
 ```
 
 ## Historical data: dissolved countries
@@ -116,12 +116,12 @@ crosswalk (one row per successor, dated):
 ``` r
 
 check_country_match(c("USSR", "Yugoslavia", "West Germany"))
-#> # A tibble: 3 × 5
-#>   input        iso3c matched historical suggestion
-#>   <chr>        <chr> <lgl>   <lgl>      <chr>     
-#> 1 USSR         RUS   TRUE    TRUE       NA        
-#> 2 Yugoslavia   NA    FALSE   TRUE       Yugoslavia
-#> 3 West Germany DEU   TRUE    FALSE      NA
+#> # A tibble: 3 × 6
+#>   input        iso3c matched historical method   suggestion
+#>   <chr>        <chr> <lgl>   <lgl>      <chr>    <chr>     
+#> 1 USSR         RUS   TRUE    TRUE       regex_en NA        
+#> 2 Yugoslavia   NA    FALSE   TRUE       none     Yugoslavia
+#> 3 West Germany DEU   TRUE    FALSE      regex_en NA
 dissolve_country(c("Czechoslovakia", "France"))
 #> # A tibble: 3 × 5
 #>   input          historical     dissolved iso3c country 

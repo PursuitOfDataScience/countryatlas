@@ -3,11 +3,10 @@
 Encapsulates the choropleth boilerplate and goes beyond a single style.
 Auto-detects the polygon vs `sf` backend, applies
 [`theme_world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/theme_world_map.md),
-and – for `sf` – a real projection via
-[`ggplot2::coord_sf()`](https://ggplot2.tidyverse.org/reference/ggsf.html).
-Binned / quantile / jenks styles are offered because a continuous fill
-on a skewed indicator hides almost all the variation; binning is the
-honest default for choropleths.
+and projects the map (Equal Earth by default). Classes are the default
+because a continuous fill on a skewed indicator hides almost all the
+variation; binning is the honest default for choropleths, and quantiles
+the safe choice for a general audience.
 
 ## Usage
 
@@ -15,21 +14,26 @@ honest default for choropleths.
 world_map(
   data,
   fill,
-  style = c("continuous", "binned", "quantile", "jenks", "categorical"),
+  style = c("quantile", "continuous", "binned", "equal", "jenks", "fisher", "headtails",
+    "sd", "fixed", "categorical"),
   projection = "equal_earth",
   palette = NULL,
   n_bins = 5,
+  breaks = NULL,
+  midpoint = NULL,
   borders = TRUE,
   title = NULL,
   legend = NULL,
   na_label = "No data",
   recenter = NULL,
   na_style = c("grey", "hatched", "outline", "omit"),
-  footnote = NULL,
+  footnote = "auto",
   classification_report = FALSE,
   uncertainty = NULL,
   n_uncertainty = 3,
   disputes = c("ignore", "mark"),
+  small_states = c("auto", "none", "dots"),
+  small_area_km2 = 1000,
   engine = c("ggplot2", "tmap")
 )
 ```
@@ -50,25 +54,58 @@ world_map(
 
 - style:
 
-  `"continuous"` (default), `"binned"`, `"quantile"`, `"jenks"` or
-  `"categorical"`.
+  How the fill is classified: `"quantile"` (default), `"continuous"` (a
+  colourbar), `"binned"` or its alias `"equal"` (equal intervals, drawn
+  as a stepped colourbar), `"jenks"` and `"fisher"` (natural breaks;
+  both need `classInt`), `"headtails"` (Jiang 2013, for heavy-tailed
+  variables such as GDP and population; it chooses its own number of
+  classes), `"sd"` (the mean plus or minus whole and half standard
+  deviations), `"fixed"` (the classes given in `breaks`, which implies
+  it) or `"categorical"` for a discrete column. Pass
+  `style = "continuous"` for the 3.0.0 default.
 
 - projection:
 
-  For the `sf` backend, any of the projections in
-  [`world_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_geometry.md):
+  Any of the projections in
+  [`projection_info()`](https://pursuitofdatascience.github.io/countryatlas/reference/projection_info.md):
   `"equal_earth"` (default), `"robinson"`, `"mollweide"`,
   `"natural_earth"`, `"plate_carree"`, `"mercator"`, `"winkel_tripel"`,
   `"eckert4"`, `"gall_peters"`, `"orthographic"`,
-  `"azimuthal_equal_area"`, `"north_polar"` or `"south_polar"`.
+  `"azimuthal_equal_area"`, `"north_polar"` or `"south_polar"`; or
+  `"none"` for unprojected longitude/latitude, the polygon backend's
+  output before 4.0.0. Both backends project; see *Projections on the
+  polygon backend* below.
 
 - palette:
 
-  Optional palette name passed to the relevant `ggplot2` scale.
+  Optional palette: a viridis option (`"viridis"`, the default,
+  `"magma"`, `"cividis"`, ...) or any base R HCL palette
+  ([`grDevices::hcl.pals()`](https://rdrr.io/r/grDevices/palettes.html)),
+  such as the diverging `"RdBu"`.
 
 - n_bins:
 
-  Number of bins for binned/quantile/jenks styles.
+  Number of classes for the classed styles.
+
+- breaks:
+
+  Fixed class boundaries: a sorted, unique numeric vector of at least
+  two values, for thresholds that mean something (the World Bank's
+  income thresholds) and for maps that must be comparable across years
+  and publications. Implies `style = "fixed"`. Classes close on the
+  left, so `c(1136, 4466)` puts 1,136 in the first class. Values outside
+  the range go in open end classes, labelled `"< 1.14K"` and
+  `">= 4.47K"`, with a warning (class `countryatlas_breaks_open`) unless
+  `breaks` starts with `-Inf` or ends with `Inf`.
+
+- midpoint:
+
+  A value to centre a diverging palette on: zero growth, a target, a
+  threshold. On a colourbar the scale is rescaled so `midpoint` takes
+  the neutral colour; with classes, a break is forced there and the
+  classes either side take the two arms of the palette. The palette
+  defaults to `"RdBu"`; a sequential one is refused (class
+  `countryatlas_palette_not_diverging`).
 
 - borders:
 
@@ -87,7 +124,8 @@ world_map(
 
 - recenter:
 
-  Optional central meridian for the `sf` backend.
+  Optional central meridian (e.g. `150` for a Pacific-centred map), on
+  either backend.
 
 - na_style:
 
@@ -100,10 +138,11 @@ world_map(
 
 - footnote:
 
-  Optional caption. `"auto"` generates a coverage line ("174 of 195
-  countries shown; 21 missing"), so the map cannot quietly overstate
-  what it covers. A string is used verbatim; `NULL` (default) adds
-  nothing.
+  The caption. `"auto"` (default) states the coverage ("174 of 195
+  countries shown; 21 missing") and, where the data carries a
+  [`source_info()`](https://pursuitofdatascience.github.io/countryatlas/reference/source_info.md)
+  record, the source, so the map cannot quietly overstate what it
+  covers. A string is used verbatim; `FALSE` (or `NULL`) adds nothing.
 
 - classification_report:
 
@@ -136,6 +175,21 @@ world_map(
   present in the data and notes the convention in the caption. See
   [`dispute_policy()`](https://pursuitofdatascience.github.io/countryatlas/reference/dispute_policy.md).
 
+- small_states:
+
+  What to do with countries too small to see, or missing from the
+  basemap: `"auto"` (default) draws a country that has a value but no
+  polygon – most small states on the `sf` backend at its default 1:110m
+  – as a filled point at its centroid, on the same fill scale; `"dots"`
+  also adds a point over every country smaller than `small_area_km2`;
+  `"none"` drops them, as 3.0.0 did. The caption counts the points, and
+  names any country with neither a polygon nor a centroid.
+
+- small_area_km2:
+
+  The area under which `small_states = "dots"` adds a point (default
+  `1000` square kilometres).
+
 - engine:
 
   `"ggplot2"` (default) or `"tmap"`. The package is ggplot2-native; the
@@ -160,6 +214,38 @@ which is honest but can be mistaken for ocean. Whichever you pick,
 
 [`coverage_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/coverage_map.md)
 goes further and maps availability itself.
+
+## Projections on the polygon backend
+
+The polygon backend (the default of
+[`attach_geometry()`](https://pursuitofdatascience.github.io/countryatlas/reference/attach_geometry.md),
+[`world_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_data.md)
+and
+[`join_world()`](https://pursuitofdatascience.github.io/countryatlas/reference/join_world.md))
+keeps its frame in longitude and latitude and is projected when it is
+drawn. Where `sf` can be loaded that is
+[`ggplot2::coord_sf()`](https://ggplot2.tidyverse.org/reference/ggsf.html)
+with `default_crs = sf::st_crs(4326)`, so any layer you add in longitude
+and latitude is projected with the map, point by point: the map's own
+outlines are dense, so a segment is drawn straight between its two
+projected ends rather than re-interpolated, and a long line of your own
+needs points along it to follow the projection. Where it cannot, Equal
+Earth is computed by the package itself, on the sphere, and the vertices
+are drawn in metres under
+[`ggplot2::coord_fixed()`](https://ggplot2.tidyverse.org/reference/coord_fixed.html);
+place your own layers on that map with
+[`project_lonlat()`](https://pursuitofdatascience.github.io/countryatlas/reference/project_lonlat.md),
+and zoom with
+[`zoom_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/zoom_map.md),
+which keeps the projection where `coord_quickmap(xlim, ylim)` would
+replace it. Another projection without `sf` falls back to that Equal
+Earth with a warning (class `countryatlas_projection_fallback`).
+`"orthographic"` draws through
+[`ggplot2::coord_map()`](https://ggplot2.tidyverse.org/reference/coord_map.html)
+and needs `mapproj`.
+[`map_provenance()`](https://pursuitofdatascience.github.io/countryatlas/reference/map_provenance.md)
+records which of these drew the map: `"equal_earth"`,
+`"equal_earth (spherical, built-in)"` or `"none"`.
 
 ## Choosing a classification
 
@@ -199,10 +285,8 @@ Computing Systems*, 1-11.
 ``` r
 # \donttest{
 snap <- countryatlas::world_snapshot$countries
-if (requireNamespace("maps", quietly = TRUE)) {
-  mapdf <- attach_geometry(snap, geometry = "polygon")
-  world_map(mapdf, gdp_per_capita, style = "quantile")
-}
+mapdf <- attach_geometry(snap, geometry = "polygon")
+world_map(mapdf, gdp_per_capita, style = "quantile")
 
 # }
 ```

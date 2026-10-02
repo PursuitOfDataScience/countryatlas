@@ -16,7 +16,8 @@ world_geometry(
   region = NULL,
   projection = "equal_earth",
   recenter = NULL,
-  year = NULL
+  year = NULL,
+  worldview = NULL
 )
 ```
 
@@ -29,13 +30,16 @@ world_geometry(
 
 - geometry:
 
-  `"polygon"` (a tibble of `long`/`lat`/`group`) or `"sf"`.
+  `"polygon"` (a tibble of `long`/`lat`/`group`: the bundled Natural
+  Earth 1:50m countries, which need no extra package) or `"sf"`.
+  `"maps"` draws the polygon backend from the `maps` package as releases
+  before 4.0.0 did; it is deprecated.
 
 - scale:
 
-  Natural Earth resolution for the `sf` backend. The polygon backend
-  serves one bundled resolution and warns if asked for another:
-  `"small"` (110m), `"medium"` (50m) or `"large"` (10m). `"large"`
+  Natural Earth resolution for the `sf` backend: `"small"` (110m),
+  `"medium"` (50m) or `"large"` (10m). The polygon backend draws its one
+  bundled resolution, 1:50m, and warns if asked for `"large"`. `"large"`
   additionally needs the `rnaturalearthhires` package, which is not on
   CRAN (`install.packages("rnaturalearthhires", repos =`
   `"https://ropensci.r-universe.dev")`); `"small"` and `"medium"` need
@@ -58,13 +62,14 @@ world_geometry(
 
   Projection for the `sf` backend (see
   [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)).
-  The polygon backend returns unprojected longitude/latitude and warns
-  if asked to project.
+  The polygon backend returns longitude/latitude, which the map verbs
+  project when they draw, and warns if asked to project here.
 
 - recenter:
 
-  Optional central meridian (e.g. `150`) for the `sf` backend. The
-  polygon backend cannot recentre and warns if asked to.
+  Optional central meridian (e.g. `150`). On the polygon backend every
+  ring is cut at the new antimeridian and shifted, so the longitudes run
+  from `recenter - 180` to `recenter + 180`.
 
 - year:
 
@@ -73,6 +78,20 @@ world_geometry(
   and CShapes (1886-2019). Returns `sf` keyed on `gwcode`; only
   `what = "countries"` is available, and `region` cannot be combined
   with it.
+
+- worldview:
+
+  Draw the boundaries as one country's government draws them: the
+  viewing country's ISO alpha-3 code (`"IND"`, `"CHN"`, ...) or `"ISO"`,
+  for one of the 31 points of view Natural Earth publishes. Needs
+  `geometry = "sf"`; the file is Natural Earth's 1:10m, downloaded once
+  (about 5 MB) into the package's cache. `NULL` (default) is the
+  worldview set with
+  [`dispute_policy()`](https://pursuitofdatascience.github.io/countryatlas/reference/dispute_policy.md),
+  if any, and otherwise Natural Earth's own de facto boundaries. The
+  package takes no position: you choose, and
+  [`map_provenance()`](https://pursuitofdatascience.github.io/countryatlas/reference/map_provenance.md)
+  records the choice.
 
 ## Value
 
@@ -103,7 +122,7 @@ A few Natural Earth features have no ISO code and so come back with
 `iso3c` `NA` – Somaliland at every scale, plus the Indian Ocean
 Territories and Ashmore and Cartier Islands from `"medium"` on. They are
 kept so the land is still drawn; drop or
-[`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)
+[`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_overrides.md)
 them if you group by `iso3c`.
 
 `"orthographic"` is the one genuinely hemispheric projection: the
@@ -115,7 +134,9 @@ The other three azimuthal projections (`"azimuthal_equal_area"`,
 `"north_polar"`, `"south_polar"`) are Lambert equal-area and draw the
 *whole* globe, the far side stretched around the rim rather than
 dropped, so pass `region` if you want a polar view of the northern
-countries alone.
+countries alone. `"north_polar"` leaves out what lies wholly south of 60
+degrees S (Antarctica), whose pole is its antipode: an empty geometry on
+the sf backend, no rows on the polygon backend.
 
 `"ocean"` is a whole-globe background rectangle. It is unavailable in
 all four azimuthal projections – `"orthographic"` has no image for it,
@@ -127,17 +148,15 @@ rather than returning an invisible layer.
 
 ``` r
 # \donttest{
-if (requireNamespace("maps", quietly = TRUE)) {
-  head(world_geometry("countries", geometry = "polygon"))
-}
+head(world_geometry("countries", geometry = "polygon"))
 #> # A tibble: 6 × 8
 #>    long   lat group order region subregion iso3c iso2c
-#>   <dbl> <dbl> <dbl> <int> <chr>  <chr>     <chr> <chr>
-#> 1 -69.9  12.5     1     1 Aruba  NA        ABW   AW   
-#> 2 -69.9  12.4     1     2 Aruba  NA        ABW   AW   
-#> 3 -69.9  12.4     1     3 Aruba  NA        ABW   AW   
-#> 4 -70.0  12.5     1     4 Aruba  NA        ABW   AW   
-#> 5 -70.1  12.5     1     5 Aruba  NA        ABW   AW   
-#> 6 -70.1  12.6     1     6 Aruba  NA        ABW   AW   
+#>   <dbl> <dbl> <int> <int> <chr>  <chr>     <chr> <chr>
+#> 1  131.  42.3     1     1 Russia NA        RUS   RU   
+#> 2  131.  42.3     1     2 Russia NA        RUS   RU   
+#> 3  131.  42.4     1     3 Russia NA        RUS   RU   
+#> 4  131.  42.4     1     4 Russia NA        RUS   RU   
+#> 5  131.  42.5     1     5 Russia NA        RUS   RU   
+#> 6  131.  42.5     1     6 Russia NA        RUS   RU   
 # }
 ```

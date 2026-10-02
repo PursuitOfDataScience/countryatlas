@@ -31,7 +31,18 @@ had, because the country resolves and the year is a number."><meta property="og:
     <li><a class="dropdown-item" href="../articles/beyond-the-choropleth.html">Beyond the choropleth</a></li>
     <li><a class="dropdown-item" href="../articles/honest-maps.html">Honest maps: classification, missingness and distortion</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas-and-ggsql.html">countryatlas and ggsql</a></li>
+    <li><a class="dropdown-item" href="../articles/panels.html">Panels done right</a></li>
+    <li><a class="dropdown-item" href="../articles/data-you-can-trace.html">Data you can trace: sources, vintages and provenance</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas.html">Full introduction (formal)</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>More, on the website</h6></li>
+    <li><a class="dropdown-item" href="../articles/gallery.html">Gallery</a></li>
+    <li><a class="dropdown-item" href="../articles/spatial-statistics.html">Spatial statistics on a world of islands</a></li>
+    <li><a class="dropdown-item" href="../articles/rates-and-small-numbers.html">Rates and small numbers</a></li>
+    <li><a class="dropdown-item" href="../articles/comparative-development.html">The comparative-development toolkit</a></li>
+    <li><a class="dropdown-item" href="../articles/disputed-territories.html">Disputed territories and worldviews</a></li>
+    <li><a class="dropdown-item" href="../articles/flows-networks-subnational.html">Flows, networks and subnational data</a></li>
+    <li><a class="dropdown-item" href="../articles/accessible-maps.html">Accessible and citable maps</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -78,21 +89,40 @@ the common case and worth confirming out loud.)</p></dd>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A tibble of the offending rows: <code>iso3c</code>, <code>country</code>, <code>year</code>, <code>issue</code>
-(<code>"before_existence"</code> or <code>"after_dissolution"</code>) and <code>existed</code> (a
-human-readable span). Zero rows means the panel is clean.</p>
+    <p>A tibble of the offending rows: <code>iso3c</code>, <code>country</code>, <code>year</code>, <code>issue</code>,
+<code>existed</code> (a human-readable span) and <code>basis</code> (where the dates come
+from). <code>issue</code> is <code>"before_existence"</code> or <code>"after_dissolution"</code> – the
+country did not exist – or the milder <code>"before_independence"</code>: it
+existed, but was not yet (or not then) an independent state. Zero rows
+means the panel is clean.</p>
     </div>
     <div class="section level2">
     <h2 id="what-it-can-and-cannot-see">What it can and cannot see<a class="anchor" aria-label="anchor" href="#what-it-can-and-cannot-see"></a></h2>
 
 
 <p>Dissolution dates come from <a href="historical_codes.html">historical_codes</a>, which covers the entities the
-package curates (USSR, Yugoslavia, Czechoslovakia and the rest). Independence
-dates come from the same table read in reverse: a successor state is treated
-as not existing before its predecessor dissolved. Countries with no entry in
-the crosswalk – most of the world – are assumed to have existed throughout,
-so a clean result means "nothing the crosswalk knows about is wrong", not
-"every date is right".</p>
+package curates (USSR, Yugoslavia, Czechoslovakia and the rest), and a
+successor state is treated as not existing before its predecessor
+dissolved (<code>basis = "historical_codes"</code>).</p>
+<p>Independence comes from Gleditsch &amp; Ward's list of independent states since
+1816 (Gleditsch &amp; Ward 1999, through the <code>states</code> package), with every spell
+of independence: Namibia from 1990, Eritrea from 1993, Timor-Leste from
+2002, and Estonia from 1918 to 1940 and again from 1991. A year inside an
+earlier spell also corrects the crosswalk for a state it dates from a later
+succession (Estonia's interwar years). A year outside
+every spell is <code>"before_independence"</code> (<code>basis = "gleditsch_ward"</code>). That
+is statehood, not data availability – a colony often reports statistics
+before independence, and a World Bank series may legitimately start there –
+so it is a separate, lower-severity issue, for the caller to judge.
+Territories that are not on the list are assumed to have existed
+throughout, so a clean result still means "nothing these lists know about
+is wrong", not "every date is right".</p>
+    </div>
+    <div class="section level2">
+    <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
+    <p>Gleditsch, K. S. &amp; Ward, M. D. (1999). A revised list of independent states
+since the congress of Vienna. <em>International Interactions</em> 25(4), 393-413.
+<a href="https://doi.org/10.1080/03050629908434958" class="external-link">doi:10.1080/03050629908434958</a></p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
@@ -107,13 +137,13 @@ so a clean result means "nothing the crosswalk knows about is wrong", not
 <span class="r-in"><span>  gdp   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">3</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">audit_time_coverage</span><span class="op">(</span><span class="va">panel</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">!</span> 1 row falls outside the country's existence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">!</span> 1 row falls outside the country's existence or independence.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Inspect the returned table; `dissolve_country()` resolves historical entities</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   to successors.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 1 × 5</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   iso3c country      year issue            existed  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>       <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>            <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> SSD   South Sudan  <span style="text-decoration: underline;">1</span>995 before_existence from 2011</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 1 × 6</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   iso3c country      year issue            existed   basis           </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>       <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>            <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>           </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> SSD   South Sudan  <span style="text-decoration: underline;">1</span>995 before_existence from 2011 historical_codes</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

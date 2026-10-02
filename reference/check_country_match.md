@@ -30,7 +30,7 @@ check_country_match(
 - custom_match:
 
   Overrides applied before matching (default
-  [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)).
+  [`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_overrides.md)).
 
 - suggest:
 
@@ -40,7 +40,18 @@ check_country_match(
 ## Value
 
 A tibble with columns `input`, `iso3c`, `matched`, `historical`,
-`suggestion`.
+`method` and `suggestion`. `method` says how a name was matched, tier by
+tier, each tried only for what is still unmatched: `"override"` (the
+[`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_overrides.md)
+table), `"regex_en"` (countrycode's English patterns), `"name_de"`,
+`"name_es"`, `"name_fr"` and `"name_it"` (an exact match, ignoring case,
+accents and punctuation, against countrycode's German, Spanish, French
+and Italian names), `"cldr"` (the same against every name, short name
+and variant in the Unicode CLDR tables countrycode carries, in every
+language), `"ambiguous"` (a CLDR name for more than one country, which
+is left unmatched) or `"none"`. Exact rather than countrycode's language
+patterns, which are unanchored and matched Somaliland to Somalia. For an
+`origin` other than a name it is `"code"`.
 
 ## Details
 
@@ -63,17 +74,17 @@ for applying the `suggestion` column automatically.
 
 ``` r
 check_country_match(c("USA", "Cote d'Ivoire", "Yugoslavia", "Wakanda"))
-#> # A tibble: 4 × 5
-#>   input         iso3c matched historical suggestion
-#>   <chr>         <chr> <lgl>   <lgl>      <chr>     
-#> 1 USA           USA   TRUE    FALSE      NA        
-#> 2 Cote d'Ivoire CIV   TRUE    FALSE      NA        
-#> 3 Yugoslavia    NA    FALSE   TRUE       Yugoslavia
-#> 4 Wakanda       NA    FALSE   FALSE      Canada    
+#> # A tibble: 4 × 6
+#>   input         iso3c matched historical method   suggestion
+#>   <chr>         <chr> <lgl>   <lgl>      <chr>    <chr>     
+#> 1 USA           USA   TRUE    FALSE      regex_en NA        
+#> 2 Cote d'Ivoire CIV   TRUE    FALSE      regex_en NA        
+#> 3 Yugoslavia    NA    FALSE   TRUE       none     Yugoslavia
+#> 4 Wakanda       NA    FALSE   FALSE      none     Canada    
 # "USSR" matches (to RUS!) but is flagged historical:
 check_country_match("USSR")
-#> # A tibble: 1 × 5
-#>   input iso3c matched historical suggestion
-#>   <chr> <chr> <lgl>   <lgl>      <chr>     
-#> 1 USSR  RUS   TRUE    TRUE       NA        
+#> # A tibble: 1 × 6
+#>   input iso3c matched historical method   suggestion
+#>   <chr> <chr> <lgl>   <lgl>      <chr>    <chr>     
+#> 1 USSR  RUS   TRUE    TRUE       regex_en NA        
 ```

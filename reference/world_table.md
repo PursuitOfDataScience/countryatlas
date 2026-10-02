@@ -75,8 +75,8 @@ world_table(countryatlas::world_snapshot$countries, gdp_per_capita,
 #>    rank iso3c country     gdp_per_capita
 #>   <int> <chr> <chr>                <dbl>
 #> 1     1 MCO   Monaco             247170.
-#> 2     2 BMU   Bermuda            122118.
+#> 2     2 BMU   Bermuda            116514.
 #> 3     3 LUX   Luxembourg         104147.
 #> 4     4 IRL   Ireland             94475.
-#> 5     5 CHE   Switzerland         90067.
+#> 5     5 CHE   Switzerland         93018.
 ```

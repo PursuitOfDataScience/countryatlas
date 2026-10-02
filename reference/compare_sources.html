@@ -33,7 +33,18 @@ used OWID, and here is where it differs from the World Bank".'><meta property="o
     <li><a class="dropdown-item" href="../articles/beyond-the-choropleth.html">Beyond the choropleth</a></li>
     <li><a class="dropdown-item" href="../articles/honest-maps.html">Honest maps: classification, missingness and distortion</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas-and-ggsql.html">countryatlas and ggsql</a></li>
+    <li><a class="dropdown-item" href="../articles/panels.html">Panels done right</a></li>
+    <li><a class="dropdown-item" href="../articles/data-you-can-trace.html">Data you can trace: sources, vintages and provenance</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas.html">Full introduction (formal)</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>More, on the website</h6></li>
+    <li><a class="dropdown-item" href="../articles/gallery.html">Gallery</a></li>
+    <li><a class="dropdown-item" href="../articles/spatial-statistics.html">Spatial statistics on a world of islands</a></li>
+    <li><a class="dropdown-item" href="../articles/rates-and-small-numbers.html">Rates and small numbers</a></li>
+    <li><a class="dropdown-item" href="../articles/comparative-development.html">The comparative-development toolkit</a></li>
+    <li><a class="dropdown-item" href="../articles/disputed-territories.html">Disputed territories and worldviews</a></li>
+    <li><a class="dropdown-item" href="../articles/flows-networks-subnational.html">Flows, networks and subnational data</a></li>
+    <li><a class="dropdown-item" href="../articles/accessible-maps.html">Accessible and citable maps</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -66,7 +77,8 @@ used OWID, and here is where it differs from the World Bank".</p>
 <span>  sources <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"wdi"</span>, <span class="st">"owid"</span><span class="op">)</span>,</span>
 <span>  <span class="va">year</span>,</span>
 <span>  countries <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  tolerance <span class="op">=</span> <span class="fl">0.05</span></span>
+<span>  tolerance <span class="op">=</span> <span class="fl">0.05</span>,</span>
+<span>  allow_unit_mismatch <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -96,13 +108,32 @@ character vector giving each source its own code:
 <dd><p>Relative difference above which a country counts as a
 disagreement (default <code>0.05</code>, i.e. 5%).</p></dd>
 
+
+<dt id="arg-allow-unit-mismatch">allow_unit_mismatch<a class="anchor" aria-label="anchor" href="#arg-allow-unit-mismatch"></a></dt>
+<dd><p>Compare anyway when the sources state different
+units (default <code>FALSE</code>). See below.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A tibble with one row per country: the value from each source,
 <code>n_sources</code> (how many reported it), <code>rel_diff</code> (max relative spread) and
 <code>disagrees</code>. The correlation, coverage and disagreement summary is attached
-as the <code>"countryatlas_source_summary"</code> attribute.</p>
+as the <code>"countryatlas_source_summary"</code> attribute, with each source's
+stated unit.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="different-units-are-not-a-disagreement">Different units are not a disagreement<a class="anchor" aria-label="anchor" href="#different-units-are-not-a-disagreement"></a></h2>
+
+
+<p>GDP per capita in constant 2015 US dollars and in current international
+dollars differ for every country, and calling that a disagreement between
+the sources would be wrong. Each fetch records the unit its provider states
+(see <code><a href="source_info.html">source_info()</a></code>); when two of them state different units the
+comparison is refused with class <code>countryatlas_unit_mismatch</code>, naming them.
+Pass <code>allow_unit_mismatch = TRUE</code> to compare anyway – a ratio that is
+constant across countries can still be worth seeing – and read
+<code>rel_diff</code> accordingly. A source that states no unit is not checked.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

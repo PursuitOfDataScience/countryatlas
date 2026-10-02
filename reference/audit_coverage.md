@@ -58,10 +58,10 @@ orientation from
 [`map_provenance()`](https://pursuitofdatascience.github.io/countryatlas/reference/map_provenance.md),
 whose `n_countries` is the numerator (countries drawn *with* a value)
 and whose `n_total` is the denominator. The two verbs report the same
-coverage from opposite ends, so on 215 countries with 24 missing this
-gives `n = 215` where
+coverage from opposite ends, so on 216 countries with 17 missing this
+gives `n = 216` where
 [`map_provenance()`](https://pursuitofdatascience.github.io/countryatlas/reference/map_provenance.md)
-gives `n_countries = 191`.
+gives `n_countries = 199`.
 
 ## Examples
 
@@ -76,21 +76,20 @@ audit_coverage(countryatlas::world_snapshot$countries)
 #> # A tibble: 4 × 4
 #>   indicator           n n_missing na_rate
 #>   <chr>           <int>     <int>   <dbl>
-#> 1 gdp_per_capita    215        24  0.112 
-#> 2 population        215         0  0     
-#> 3 life_expectancy   215         0  0     
-#> 4 co2_per_capita    215        12  0.0558
+#> 1 gdp_per_capita    216        17  0.0787
+#> 2 population        216         0  0     
+#> 3 life_expectancy   216         0  0     
+#> 4 co2_per_capita    216        13  0.0602
 #> ── Coverage by group ──
 #> 
-#> # A tibble: 8 × 4
+#> # A tibble: 7 × 4
 #>   region                     n_countries indicator      na_rate
 #>   <chr>                            <int> <chr>            <dbl>
-#> 1 South Asia                           8 gdp_per_capita  0.25  
-#> 2 East Asia & Pacific                 37 gdp_per_capita  0.216 
-#> 3 Middle East & North Africa          21 gdp_per_capita  0.143 
-#> 4 Latin America & Caribbean           41 gdp_per_capita  0.0976
-#> 5 Europe & Central Asia               56 gdp_per_capita  0.0893
-#> 6 Sub-Saharan Africa                  48 gdp_per_capita  0.0417
-#> 7 North America                        3 gdp_per_capita  0     
-#> 8 NA                                   1 gdp_per_capita  0     
+#> 1 East Asia & Pacific                 37 gdp_per_capita  0.135 
+#> 2 Middle East & North Africa          21 gdp_per_capita  0.0952
+#> 3 Europe & Central Asia               57 gdp_per_capita  0.0877
+#> 4 Latin America & Caribbean           42 gdp_per_capita  0.0714
+#> 5 Sub-Saharan Africa                  48 gdp_per_capita  0.0417
+#> 6 North America                        3 gdp_per_capita  0     
+#> 7 South Asia                           8 gdp_per_capita  0     
 ```

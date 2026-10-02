@@ -9,7 +9,15 @@ immediately; the off-diagonal categories are the spatial outliers.
 ## Usage
 
 ``` r
-lisa_map(data, value, weights = NULL, n_perm = 999, alpha = 0.05, ...)
+lisa_map(
+  data,
+  value,
+  weights = NULL,
+  n_perm = 9999,
+  alpha = 0.05,
+  p_adjust = c("fdr", "bonferroni", "holm", "none"),
+  ...
+)
 ```
 
 ## Arguments
@@ -26,12 +34,15 @@ lisa_map(data, value, weights = NULL, n_perm = 999, alpha = 0.05, ...)
 
   A
   [`country_weights()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_weights.md)
-  object.
+  object; `NULL` (default) is `country_weights("knn", k = 5)`, as in
+  [`local_morans()`](https://pursuitofdatascience.github.io/countryatlas/reference/local_morans.md).
 
-- n_perm, alpha:
+- n_perm, alpha, p_adjust:
 
   Passed to
   [`local_morans()`](https://pursuitofdatascience.github.io/countryatlas/reference/local_morans.md).
+  The significance mask uses the adjusted p-values, and the caption
+  names the method.
 
 - ...:
 
@@ -44,6 +55,13 @@ A `ggplot` object, with the
 [`local_morans()`](https://pursuitofdatascience.github.io/countryatlas/reference/local_morans.md)
 table attached as the `"countryatlas_lisa"` attribute.
 
+## Backend
+
+Either backend, as
+[`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md):
+the frame decides, and both draw in Equal Earth unless `projection` is
+passed on through `...`.
+
 ## See also
 
 [`local_morans()`](https://pursuitofdatascience.github.io/countryatlas/reference/local_morans.md),
@@ -54,12 +72,10 @@ table attached as the `"countryatlas_lisa"` attribute.
 ``` r
 # \donttest{
 snap <- countryatlas::world_snapshot$countries
-if (requireNamespace("maps", quietly = TRUE)) {
-  set.seed(1)
-  attach_geometry(snap, geometry = "polygon") |>
-    lisa_map(gdp_per_capita, weights = country_weights("knn", k = 5),
-             n_perm = 99)
-}
+set.seed(1)
+attach_geometry(snap, geometry = "polygon") |>
+  lisa_map(gdp_per_capita, weights = country_weights("knn", k = 5),
+           n_perm = 99)
 
 # }
 ```

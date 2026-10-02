@@ -67,23 +67,22 @@ A `ggplot2` layer.
 # \donttest{
 library(ggplot2)
 snap <- countryatlas::world_snapshot$countries
-if (requireNamespace("maps", quietly = TRUE)) {
-  mapdf <- attach_geometry(snap, geometry = "polygon")
+mapdf <- attach_geometry(snap, geometry = "polygon")
 
-  # Labelling all 188 countries at once is unreadable, and ggrepel responds
-  # by dropping nearly every label. Pass `data` to choose a subset ...
-  world_map(mapdf, gdp_per_capita) +
-    geom_country_labels(
-      data = ~ dplyr::filter(.x, iso3c %in% c("USA", "BRA", "CHN", "IND", "ZAF"))
-    )
+# Labelling all 188 countries at once is unreadable, and ggrepel responds
+# by dropping nearly every label. Pass `data` to choose a subset ...
+world_map(mapdf, gdp_per_capita) +
+  geom_country_labels(
+    data = ~ dplyr::filter(.x, iso3c %in% c("USA", "BRA", "CHN", "IND", "ZAF"))
+  )
 
-  # ... or zoom in, where there is room for every label.
-  europe <- attach_geometry(
-    dplyr::filter(snap, continent == "Europe"), geometry = "polygon")
-  world_map(europe, gdp_per_capita) +
-    geom_country_labels(size = 2.5) +
-    coord_quickmap(xlim = c(-25, 45), ylim = c(34, 72))
-}
+
+# ... or zoom in, where there is room for every label.
+europe <- attach_geometry(
+  dplyr::filter(snap, continent == "Europe"), geometry = "polygon")
+world_map(europe, gdp_per_capita) +
+  geom_country_labels(size = 2.5) +
+  coord_quickmap(xlim = c(-25, 45), ylim = c(34, 72))
 #> Coordinate system already present.
 #> ℹ Adding new coordinate system, which will replace the existing one.
 

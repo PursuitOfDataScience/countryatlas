@@ -51,7 +51,7 @@ spin_globe(
 
 - backend:
 
-  `"polygon"` (default; needs `maps` + `mapproj`, no `sf`) or `"sf"`.
+  `"polygon"` (default; needs `mapproj`, no `sf`) or `"sf"`.
 
 - width, height:
 
@@ -78,8 +78,7 @@ The path to the written GIF, invisibly.
 # checked: \dontrun{} meant the example was never executed by anything, and
 # an example nothing runs is an example free to rot.
 # \donttest{
-if (requireNamespace("maps", quietly = TRUE) &&
-    requireNamespace("mapproj", quietly = TRUE) &&
+if (requireNamespace("mapproj", quietly = TRUE) &&
     (requireNamespace("gifski", quietly = TRUE) ||
      requireNamespace("magick", quietly = TRUE))) {
   # No sf required on the polygon backend.

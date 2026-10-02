@@ -45,7 +45,18 @@
     <li><a class="dropdown-item" href="../articles/beyond-the-choropleth.html">Beyond the choropleth</a></li>
     <li><a class="dropdown-item" href="../articles/honest-maps.html">Honest maps: classification, missingness and distortion</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas-and-ggsql.html">countryatlas and ggsql</a></li>
+    <li><a class="dropdown-item" href="../articles/panels.html">Panels done right</a></li>
+    <li><a class="dropdown-item" href="../articles/data-you-can-trace.html">Data you can trace: sources, vintages and provenance</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas.html">Full introduction (formal)</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>More, on the website</h6></li>
+    <li><a class="dropdown-item" href="../articles/gallery.html">Gallery</a></li>
+    <li><a class="dropdown-item" href="../articles/spatial-statistics.html">Spatial statistics on a world of islands</a></li>
+    <li><a class="dropdown-item" href="../articles/rates-and-small-numbers.html">Rates and small numbers</a></li>
+    <li><a class="dropdown-item" href="../articles/comparative-development.html">The comparative-development toolkit</a></li>
+    <li><a class="dropdown-item" href="../articles/disputed-territories.html">Disputed territories and worldviews</a></li>
+    <li><a class="dropdown-item" href="../articles/flows-networks-subnational.html">Flows, networks and subnational data</a></li>
+    <li><a class="dropdown-item" href="../articles/accessible-maps.html">Accessible and citable maps</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -78,16 +89,17 @@
     
 <p>“World data on a map” has many honest forms. A choropleth is only the
 first. The package offers a full vocabulary; this vignette tours the
-ones that need only <code>maps</code> – itself a suggested package, so
-the map chunks are skipped when it is absent – and points to the rest,
-which need <code>sf</code> or <code>biscale</code> as well.</p>
+ones that draw on the bundled polygons, which need nothing installed,
+and points to the rest, which need <code>sf</code> or
+<code>biscale</code> as well.</p>
 <div class="section level2">
 <h2 id="proportional-symbol-bubble-maps">Proportional-symbol (bubble) maps<a class="anchor" aria-label="anchor" href="#proportional-symbol-bubble-maps"></a>
 </h2>
 <p>For <em>totals</em>, a choropleth misleads: large values hide in
 small countries. Sized circles at centroids are the right idiom.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/bubble_map.html">bubble_map</a></span><span class="op">(</span><span class="va">snap</span>, <span class="va">population</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">bubbles</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/warning.html" class="external-link">suppressWarnings</a></span><span class="op">(</span><span class="fu"><a href="../reference/bubble_map.html">bubble_map</a></span><span class="op">(</span><span class="va">snap</span>, <span class="va">population</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">bubbles</span></span></code></pre></div>
 <p><img src="beyond-the-choropleth_files/figure-html/unnamed-chunk-2-1.png" class="r-plt" alt="Bubble map: population drawn as proportional circles at country centroids." width="672" style="display: block; margin: auto;"></p>
 </div>
 <div class="section level2">
@@ -99,27 +111,25 @@ Caribbean) stay legible.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/spike_map.html">spike_map</a></span><span class="op">(</span><span class="va">snap</span>, <span class="va">population</span><span class="op">)</span></span></code></pre></div>
 <p><img src="beyond-the-choropleth_files/figure-html/unnamed-chunk-3-1.png" class="r-plt" alt="Spike map: population drawn as vertical spikes rising from country centroids." width="672" style="display: block; margin: auto;"></p>
-<p>Both verbs place one symbol per country centroid, and the bundled
-centroid table does not cover every code in the codelist. On this
-snapshot five countries with population – Hong Kong, Macao, Gibraltar,
-the British Virgin Islands and Tuvalu – have no centroid and so no
-symbol. Each verb warns and names them, and counts them as missing
-rather than shown:</p>
+<p>Both verbs place one symbol per country centroid, and the basemap
+does not draw every code in the codelist. On this snapshot one country
+with population, Gibraltar, has no polygon at 1:50m and so no symbol.
+Each verb warns and names it, and counts it as missing rather than
+shown:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">cov</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/warning.html" class="external-link">suppressWarnings</a></span><span class="op">(</span><span class="fu"><a href="../reference/bubble_map.html">bubble_map</a></span><span class="op">(</span><span class="va">snap</span>, <span class="va">population</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>            <span class="st">"countryatlas_provenance"</span><span class="op">)</span><span class="op">$</span><span class="va">coverage</span></span>
+<code class="sourceCode R"><span><span class="va">cov</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">bubbles</span>, <span class="st">"countryatlas_provenance"</span><span class="op">)</span><span class="op">$</span><span class="va">coverage</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unlist.html" class="external-link">unlist</a></span><span class="op">(</span><span class="va">cov</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"n_total"</span>, <span class="st">"n_shown"</span>, <span class="st">"n_missing"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   n_total   n_shown n_missing </span></span>
-<span><span class="co">#&gt;       215       210         5</span></span>
+<span><span class="co">#&gt;       216       215         1</span></span>
 <span><span class="va">cov</span><span class="op">$</span><span class="va">missing_iso3c</span></span>
-<span><span class="co">#&gt; [1] "GIB" "HKG" "MAC" "TUV" "VGB"</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] "GIB"</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="equal-area-tile-grids">Equal-area tile grids<a class="anchor" aria-label="anchor" href="#equal-area-tile-grids"></a>
 </h2>
 <p>Give every country the same visual weight so micro-states are
-visible. The bundled grid covers 239 countries – see
-<code><a href="../reference/world_tiles.html">?world_tiles</a></code> for the ten it omits.</p>
+visible. The bundled grid covers 247 countries – see
+<code><a href="../reference/world_tiles.html">?world_tiles</a></code> for the three it omits.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/tile_map.html">tile_map</a></span><span class="op">(</span><span class="va">snap</span>, <span class="va">gdp_per_capita</span><span class="op">)</span></span></code></pre></div>
 <p><img src="beyond-the-choropleth_files/figure-html/unnamed-chunk-5-1.png" class="r-plt" alt="Equal-area tile grid: one identically sized tile per country, shaded by GDP per capita." width="672" style="display: block; margin: auto;"></p>
@@ -155,17 +165,17 @@ side-by-side comparison:</p>
 </h2>
 <p>Centroid-anchored labels (names, ISO codes or flag emoji), with
 <code>ggrepel</code> collision avoidance when available. Zoom with
-<code><a href="https://ggplot2.tidyverse.org/reference/coord_map.html" class="external-link">coord_quickmap()</a></code> rather than <code><a href="https://ggplot2.tidyverse.org/reference/coord_cartesian.html" class="external-link">coord_cartesian()</a></code>
-– both replace the map’s coordinate system, but only the former keeps
-the latitude-dependent aspect ratio that stops Europe coming out
-stretched sideways.</p>
+<code><a href="../reference/zoom_map.html">zoom_map()</a></code>, which takes longitude and latitude limits and
+keeps the map’s projection: adding
+<code>coord_quickmap(xlim, ylim)</code> would replace the projection
+with an unprojected one.</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">mapdf</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/attach_geometry.html">attach_geometry</a></span><span class="op">(</span></span>
 <span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">snap</span>, <span class="va">continent</span> <span class="op">==</span> <span class="st">"Europe"</span><span class="op">)</span>, geometry <span class="op">=</span> <span class="st">"polygon"</span></span>
 <span><span class="op">)</span></span>
-<span><span class="fu"><a href="../reference/world_map.html">world_map</a></span><span class="op">(</span><span class="va">mapdf</span>, <span class="va">gdp_per_capita</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="../reference/geom_country_labels.html">geom_country_labels</a></span><span class="op">(</span>repel <span class="op">=</span> <span class="cn">FALSE</span>, size <span class="op">=</span> <span class="fl">2.5</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">ggplot2</span><span class="fu">::</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/coord_map.html" class="external-link">coord_quickmap</a></span><span class="op">(</span>xlim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">25</span>, <span class="fl">45</span><span class="op">)</span>, ylim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">34</span>, <span class="fl">72</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<span><span class="op">(</span><span class="fu"><a href="../reference/world_map.html">world_map</a></span><span class="op">(</span><span class="va">mapdf</span>, <span class="va">gdp_per_capita</span><span class="op">)</span> <span class="op">+</span></span>
+<span>   <span class="fu"><a href="../reference/geom_country_labels.html">geom_country_labels</a></span><span class="op">(</span>repel <span class="op">=</span> <span class="cn">FALSE</span>, size <span class="op">=</span> <span class="fl">2.5</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="../reference/zoom_map.html">zoom_map</a></span><span class="op">(</span>xlim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">25</span>, <span class="fl">45</span><span class="op">)</span>, ylim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">34</span>, <span class="fl">72</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p><img src="beyond-the-choropleth_files/figure-html/unnamed-chunk-8-1.png" class="r-plt" alt="Choropleth of Europe with ISO codes labelled at country centroids." width="672" style="display: block; margin: auto;"></p>
 </div>
 <div class="section level2">
@@ -206,14 +216,13 @@ optional packages, so they are shown here as code:</p>
 <code><a href="../reference/value_by_alpha_map.html">value_by_alpha_map()</a></code> does it by spending opacity instead,
 so the world stays recognisable: colour carries the value, opacity
 carries population, and a rate computed over a handful of people fades
-toward the background rather than shouting.</p>
+toward the background rather than shouting:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">mapdf</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/attach_geometry.html">attach_geometry</a></span><span class="op">(</span><span class="va">snap</span>, geometry <span class="op">=</span> <span class="st">"polygon"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="../reference/value_by_alpha_map.html">value_by_alpha_map</a></span><span class="op">(</span><span class="va">mapdf</span>, <span class="va">gdp_per_capita</span>, <span class="va">population</span><span class="op">)</span></span></code></pre></div>
-<p><img src="beyond-the-choropleth_files/figure-html/unnamed-chunk-10-1.png" class="r-plt" alt="Value-by-alpha map of GDP per capita weighted by population." width="672" style="display: block; margin: auto;"></p>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/value_by_alpha_map.html">value_by_alpha_map</a></span><span class="op">(</span><span class="fu"><a href="../reference/attach_geometry.html">attach_geometry</a></span><span class="op">(</span><span class="va">snap</span><span class="op">)</span>, <span class="va">gdp_per_capita</span>, <span class="va">population</span><span class="op">)</span></span></code></pre></div>
 <p>It needs no optional packages. The <em>Honest maps</em> vignette
-covers when to reach for it rather than for
-<code><a href="../reference/cartogram_map.html">cartogram_map()</a></code>.</p>
+draws it and covers when to reach for it rather than for
+<code><a href="../reference/cartogram_map.html">cartogram_map()</a></code>; the website’s Gallery shows every map type
+on the same data.</p>
 </div>
 <div class="section level2">
 <h2 id="country-adjacency-and-distance">Country adjacency and distance<a class="anchor" aria-label="anchor" href="#country-adjacency-and-distance"></a>
@@ -224,7 +233,7 @@ covers when to reach for it rather than for
 required:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/distance_between.html">distance_between</a></span><span class="op">(</span><span class="st">"France"</span>, <span class="st">"Germany"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 802.3524</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 802.3525</span></span></code></pre></div>
 <p><code><a href="../reference/country_borders.html">country_borders()</a></code> / <code><a href="../reference/neighbors.html">neighbors()</a></code> answer “who
 borders whom”, built from polygon topology, so they need
 <code>sf</code>:</p>

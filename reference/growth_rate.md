@@ -7,7 +7,13 @@ observed year (`"cagr"`), computed per country.
 ## Usage
 
 ``` r
-growth_rate(data, value, type = c("yoy", "cagr"), suffix = "_growth")
+growth_rate(
+  data,
+  value,
+  type = c("yoy", "cagr"),
+  suffix = "_growth",
+  by = c("year", "row")
+)
 ```
 
 ## Arguments
@@ -34,6 +40,17 @@ growth_rate(data, value, type = c("yoy", "cagr"), suffix = "_growth")
 - suffix:
 
   Suffix for the new column (default `"_growth"`).
+
+- by:
+
+  How the previous value is found for `"yoy"`. `"year"` (default) takes
+  the same country's value one year earlier, and `NA` where that year is
+  absent, so a gap in the panel can never pass for a one-year change.
+  `"row"` takes the previous observation, whatever its year – the 3.0.0
+  behaviour, for a panel that is irregular by design – and warns when
+  the years are not consecutive. A period column whose labels are not
+  years (`"pre-war"`) needs `"row"`. `"cagr"` always divides by the
+  actual span of years.
 
 ## Value
 

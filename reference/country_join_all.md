@@ -14,7 +14,8 @@ country_join_all(
   origin = "country.name",
   type = c("full", "left", "inner"),
   key = c("iso3c", "cowc", "cown", "gwn"),
-  warn = TRUE
+  warn = TRUE,
+  also_by = NULL
 )
 ```
 
@@ -52,6 +53,16 @@ country_join_all(
   per table, as
   [`country_join()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_join.md)
   does per side.
+
+- also_by:
+
+  Key columns to join on besides the country, present in every table.
+  `NULL` (default) joins on `year` as well wherever both sides of a step
+  have one, as
+  [`country_join()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_join.md)
+  does; [`character()`](https://rdrr.io/r/base/character.html) joins on
+  the country alone. See *Panels* in
+  [`country_join()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_join.md).
 
 ## Value
 

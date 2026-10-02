@@ -33,7 +33,18 @@ the answers are already known at plot time – this just makes them readable."><
     <li><a class="dropdown-item" href="../articles/beyond-the-choropleth.html">Beyond the choropleth</a></li>
     <li><a class="dropdown-item" href="../articles/honest-maps.html">Honest maps: classification, missingness and distortion</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas-and-ggsql.html">countryatlas and ggsql</a></li>
+    <li><a class="dropdown-item" href="../articles/panels.html">Panels done right</a></li>
+    <li><a class="dropdown-item" href="../articles/data-you-can-trace.html">Data you can trace: sources, vintages and provenance</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas.html">Full introduction (formal)</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>More, on the website</h6></li>
+    <li><a class="dropdown-item" href="../articles/gallery.html">Gallery</a></li>
+    <li><a class="dropdown-item" href="../articles/spatial-statistics.html">Spatial statistics on a world of islands</a></li>
+    <li><a class="dropdown-item" href="../articles/rates-and-small-numbers.html">Rates and small numbers</a></li>
+    <li><a class="dropdown-item" href="../articles/comparative-development.html">The comparative-development toolkit</a></li>
+    <li><a class="dropdown-item" href="../articles/disputed-territories.html">Disputed territories and worldviews</a></li>
+    <li><a class="dropdown-item" href="../articles/flows-networks-subnational.html">Flows, networks and subnational data</a></li>
+    <li><a class="dropdown-item" href="../articles/accessible-maps.html">Accessible and citable maps</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -90,9 +101,17 @@ distortion ellipses for a projection and takes no data of yours.</p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A one-row tibble of provenance fields, invisibly printed in a
 human-readable block. Fields: <code>countryatlas</code>, <code>fill</code>, <code>backend</code>,
-<code>projection</code>, <code>style</code>, <code>n_bins</code>, <code>na_style</code>, <code>n_countries</code>, <code>n_missing</code>,
-<code>n_total</code>, <code>uncertainty</code>, <code>disputes</code>, <code>dispute_policy</code>, <code>n_imputed</code>,
-<code>breaks</code>, <code>missing_iso3c</code> and <code>snapshot_year</code>.</p>
+<code>projection</code>, <code>style</code>, <code>modified</code>, <code>n_bins</code>, <code>na_style</code>, <code>n_countries</code>,
+<code>n_missing</code>, <code>n_total</code>, <code>uncertainty</code>, <code>disputes</code>, <code>dispute_policy</code>,
+<code>worldview</code>, <code>n_imputed</code>, <code>breaks</code>, <code>missing_iso3c</code>, <code>snapshot_year</code>, and
+<code>sources</code>, the
+<code><a href="source_info.html">source_info()</a></code> record of the fill column when the data carried one –
+which the print names: "World Bank WDI NY.GDP.PCAP.KD (constant 2015
+US$), release 2026-07, fetched 2026-10-01".</p>
+<p><code>projection</code> and <code>style</code> describe the plot as it is now, read from its
+coordinate system and fill scale: a map given <code>+ coord_sf(crs = 3035)</code>
+after the verb drew it reports <code>"custom"</code>, and <code>modified = TRUE</code> says the
+plot no longer matches what the verb recorded.</p>
 <p>The three counts are: <code>n_countries</code>, the countries actually drawn with a
 value; <code>n_missing</code>, those drawn without one; and <code>n_total</code>, the two added
 together – every country the map covers. <code>n_countries</code> is the numerator,
@@ -119,20 +138,20 @@ cover what a methods note needs:</p>
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="va">snap</span> <span class="op">&lt;-</span> <span class="fu">countryatlas</span><span class="fu">::</span><span class="va"><a href="world_snapshot.html">world_snapshot</a></span><span class="op">$</span><span class="va">countries</span></span></span>
-<span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"maps"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
-<span class="r-in"><span>  <span class="va">p</span> <span class="op">&lt;-</span> <span class="fu"><a href="attach_geometry.html">attach_geometry</a></span><span class="op">(</span><span class="va">snap</span>, geometry <span class="op">=</span> <span class="st">"polygon"</span><span class="op">)</span> <span class="op">|&gt;</span></span></span>
-<span class="r-in"><span>    <span class="fu"><a href="world_map.html">world_map</a></span><span class="op">(</span><span class="va">gdp_per_capita</span>, style <span class="op">=</span> <span class="st">"quantile"</span><span class="op">)</span></span></span>
-<span class="r-in"><span>  <span class="fu">map_provenance</span><span class="op">(</span><span class="va">p</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">}</span></span></span>
+<span class="r-in"><span><span class="va">p</span> <span class="op">&lt;-</span> <span class="fu"><a href="attach_geometry.html">attach_geometry</a></span><span class="op">(</span><span class="va">snap</span>, geometry <span class="op">=</span> <span class="st">"polygon"</span><span class="op">)</span> <span class="op">|&gt;</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="world_map.html">world_map</a></span><span class="op">(</span><span class="va">gdp_per_capita</span>, style <span class="op">=</span> <span class="st">"quantile"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">map_provenance</span><span class="op">(</span><span class="va">p</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> ── countryatlas map provenance </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> package: countryatlas 3.0.0 (snapshot 2024)</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> fill: gdp_per_capita</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> geometry: polygon backend, coord_quickmap</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> geometry: polygon backend, equal_earth</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> classification: quantile, 5 bins</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> missing data: grey</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> coverage: 189 countries shown, 51 missing</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">breaks</span>: 268.7 | 1662 | 4594 | 10290 | 29370 | 247200</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> coverage: 199 countries shown, 39 missing</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">breaks</span>: 268.7 | 1684 | 4655 | 10250 | 30130 | 247200</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">data</span>: World Bank WDI NY.GDP.PCAP.KD (constant 2015 US$), release 2026-07,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> fetched 2026-10-02</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

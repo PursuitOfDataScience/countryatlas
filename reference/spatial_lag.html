@@ -31,7 +31,18 @@ a scatter-plot axis against the country's own value (the Moran scatterplot)."><m
     <li><a class="dropdown-item" href="../articles/beyond-the-choropleth.html">Beyond the choropleth</a></li>
     <li><a class="dropdown-item" href="../articles/honest-maps.html">Honest maps: classification, missingness and distortion</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas-and-ggsql.html">countryatlas and ggsql</a></li>
+    <li><a class="dropdown-item" href="../articles/panels.html">Panels done right</a></li>
+    <li><a class="dropdown-item" href="../articles/data-you-can-trace.html">Data you can trace: sources, vintages and provenance</a></li>
     <li><a class="dropdown-item" href="../articles/countryatlas.html">Full introduction (formal)</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>More, on the website</h6></li>
+    <li><a class="dropdown-item" href="../articles/gallery.html">Gallery</a></li>
+    <li><a class="dropdown-item" href="../articles/spatial-statistics.html">Spatial statistics on a world of islands</a></li>
+    <li><a class="dropdown-item" href="../articles/rates-and-small-numbers.html">Rates and small numbers</a></li>
+    <li><a class="dropdown-item" href="../articles/comparative-development.html">The comparative-development toolkit</a></li>
+    <li><a class="dropdown-item" href="../articles/disputed-territories.html">Disputed territories and worldviews</a></li>
+    <li><a class="dropdown-item" href="../articles/flows-networks-subnational.html">Flows, networks and subnational data</a></li>
+    <li><a class="dropdown-item" href="../articles/accessible-maps.html">Accessible and citable maps</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -74,9 +85,10 @@ a scatter-plot axis against the country's own value (the Moran scatterplot).</p>
 
 
 <dt id="arg-weights">weights<a class="anchor" aria-label="anchor" href="#arg-weights"></a></dt>
-<dd><p>A <code><a href="country_weights.html">country_weights()</a></code> object. Defaults to land-border
-contiguity, which excludes islands – prefer <code>country_weights("knn")</code> for
-global work.</p></dd>
+<dd><p>A <code><a href="country_weights.html">country_weights()</a></code> object. <code>NULL</code> (default) uses
+<code>country_weights("knn", k = 5)</code>: every country's five nearest neighbours,
+islands included. <code>country_weights("contiguity")</code> gives the land-border
+default of earlier versions, which leaves every island out.</p></dd>
 
 
 <dt id="arg-suffix">suffix<a class="anchor" aria-label="anchor" href="#arg-suffix"></a></dt>
@@ -101,20 +113,20 @@ by a missing input value, the codes themselves are attached as the
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="va">snap</span> <span class="op">&lt;-</span> <span class="fu">countryatlas</span><span class="fu">::</span><span class="va"><a href="world_snapshot.html">world_snapshot</a></span><span class="op">$</span><span class="va">countries</span></span></span>
 <span class="r-in"><span><span class="fu">spatial_lag</span><span class="op">(</span><span class="va">snap</span>, <span class="va">gdp_per_capita</span>, weights <span class="op">=</span> <span class="fu"><a href="country_weights.html">country_weights</a></span><span class="op">(</span><span class="st">"knn"</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 215 × 11</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 216 × 11</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    iso3c iso2c country         continent region income gdp_per_capita population</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>           <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span>           <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span> AFG   AF    Afghanistan     Asia      South… Low i…            <span style="color: #BB0000;">NA</span>    42<span style="text-decoration: underline;">647</span>492</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span> AFG   AF    Afghanistan     Asia      South… Low i…           374.   42<span style="text-decoration: underline;">647</span>492</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span> ALB   AL    Albania         Europe    Europ… Upper…          <span style="text-decoration: underline;">6</span>549.    2<span style="text-decoration: underline;">377</span>128</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span> DZA   DZ    Algeria         Africa    Middl… Upper…          <span style="text-decoration: underline;">4</span>766.   46<span style="text-decoration: underline;">814</span>308</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span> DZA   DZ    Algeria         Africa    Middl… Lower…          <span style="text-decoration: underline;">4</span>766.   46<span style="text-decoration: underline;">814</span>308</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span> ASM   AS    American Samoa  Oceania   East … High …            <span style="color: #BB0000;">NA</span>       <span style="text-decoration: underline;">46</span>765</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span> AND   AD    Andorra         Europe    Europ… High …         <span style="text-decoration: underline;">41</span>035.      <span style="text-decoration: underline;">81</span>938</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span> AGO   AO    Angola          Africa    Sub-S… Lower…          <span style="text-decoration: underline;">2</span>845.   37<span style="text-decoration: underline;">885</span>849</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span> ATG   AG    Antigua and Ba… Americas  Latin… High …         <span style="text-decoration: underline;">18</span>350.      <span style="text-decoration: underline;">93</span>772</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span> AND   AD    Andorra         Europe    Europ… High …         <span style="text-decoration: underline;">41</span>224.      <span style="text-decoration: underline;">81</span>938</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span> AGO   AO    Angola          Africa    Sub-S… Lower…          <span style="text-decoration: underline;">2</span>799.   37<span style="text-decoration: underline;">885</span>849</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span> ATG   AG    Antigua and Ba… Americas  Latin… High …         <span style="text-decoration: underline;">18</span>305.      <span style="text-decoration: underline;">93</span>772</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span> ARG   AR    Argentina       Americas  Latin… Upper…         <span style="text-decoration: underline;">12</span>774.   45<span style="text-decoration: underline;">696</span>159</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span> ARM   AM    Armenia         Asia      Europ… Upper…          <span style="text-decoration: underline;">5</span>378.    3<span style="text-decoration: underline;">033</span>500</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span> ABW   AW    Aruba           Americas  Latin… High …         <span style="text-decoration: underline;">33</span>374.     <span style="text-decoration: underline;">107</span>995</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 205 more rows</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span> ABW   AW    Aruba           Americas  Latin… High …         <span style="text-decoration: underline;">33</span>939.     <span style="text-decoration: underline;">107</span>995</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 206 more rows</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 3 more variables: life_expectancy &lt;dbl&gt;, co2_per_capita &lt;dbl&gt;,</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;">#   gdp_per_capita_lag &lt;dbl&gt;</span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>

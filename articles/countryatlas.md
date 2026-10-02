@@ -22,8 +22,8 @@ The package rests on a single conviction: *if a task does not make it
 easier to get country data onto a map, or to make that map honest, it
 does not belong here*. Concretely, three packages are combined:
 
-- **`ggplot2::map_data("world")`** (or Natural Earth via `sf`) supplies
-  polygon geometry, i.e. *where* countries are;
+- **Natural Earth**, bundled at 1:50m (or through `sf` at three scales),
+  supplies polygon geometry, i.e. *where* countries are;
 - **`WDI`** supplies World Bank indicators, i.e. *what is true* about
   them;
 - **`countrycode`** supplies the crosswalk of ISO codes, continents and
@@ -46,15 +46,15 @@ indicators for one recent year.
 
 snapshot <- world_snapshot$countries
 dplyr::glimpse(snapshot)
-#> Rows: 215
+#> Rows: 216
 #> Columns: 10
 #> $ iso3c           <chr> "AFG", "ALB", "DZA", "ASM", "AND", "AGO", "ATG", "ARG"…
 #> $ iso2c           <chr> "AF", "AL", "DZ", "AS", "AD", "AO", "AG", "AR", "AM", …
 #> $ country         <chr> "Afghanistan", "Albania", "Algeria", "American Samoa",…
 #> $ continent       <chr> "Asia", "Europe", "Africa", "Oceania", "Europe", "Afri…
 #> $ region          <chr> "South Asia", "Europe & Central Asia", "Middle East & …
-#> $ income          <fct> Low income, Upper middle income, Upper middle income, …
-#> $ gdp_per_capita  <dbl> NA, 6549.234, 4765.729, NA, 41034.527, 2845.478, 18350…
+#> $ income          <fct> Low income, Upper middle income, Lower middle income, …
+#> $ gdp_per_capita  <dbl> 374.3767, 6549.2339, 4765.7290, NA, 41223.9925, 2798.5…
 #> $ population      <dbl> 42647492, 2377128, 46814308, 46765, 81938, 37885849, 9…
 #> $ life_expectancy <dbl> 66.28900, 79.77600, 76.47500, 72.99200, 84.18800, 64.8…
 #> $ co2_per_capita  <dbl> 0.282980298, 1.785221494, 3.980800058, 0.002138351, NA…
@@ -88,7 +88,7 @@ real projections, and `"none"` for pure analysis.
 
 ### `country_data()` and `attach_geometry()`
 
-For analysis you usually want one tidy row per country, not ~99,000
+For analysis you usually want one tidy row per country, not ~98,000
 polygon vertices.
 [`country_data()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_data.md)
 provides exactly that, and geometry is attached only at draw time:
@@ -97,7 +97,7 @@ provides exactly that, and geometry is attached only at draw time:
 
 mapdf <- attach_geometry(snapshot, geometry = "polygon")
 dim(mapdf)
-#> [1] 99338    15
+#> [1] 97812    15
 ```
 
 ## Visualising: the choropleth and beyond
@@ -220,7 +220,7 @@ country_join(left, right, country, nation)
 
 [`check_country_match()`](https://pursuitofdatascience.github.io/countryatlas/reference/check_country_match.md)
 is a pre-flight report;
-[`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/wdj_overrides.md)
+[`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_overrides.md)
 is the curated match table that replaces the old drop-list; and
 [`audit_coverage()`](https://pursuitofdatascience.github.io/countryatlas/reference/audit_coverage.md)
 reports missingness before a half-empty map is published.
@@ -228,13 +228,13 @@ reports missingness before a half-empty map is published.
 ``` r
 
 check_country_match(c("USA", "Cote d'Ivoire", "Yugoslavia", "Wakanda"))
-#> # A tibble: 4 × 5
-#>   input         iso3c matched historical suggestion
-#>   <chr>         <chr> <lgl>   <lgl>      <chr>     
-#> 1 USA           USA   TRUE    FALSE      NA        
-#> 2 Cote d'Ivoire CIV   TRUE    FALSE      NA        
-#> 3 Yugoslavia    NA    FALSE   TRUE       Yugoslavia
-#> 4 Wakanda       NA    FALSE   FALSE      Canada
+#> # A tibble: 4 × 6
+#>   input         iso3c matched historical method   suggestion
+#>   <chr>         <chr> <lgl>   <lgl>      <chr>    <chr>     
+#> 1 USA           USA   TRUE    FALSE      regex_en NA        
+#> 2 Cote d'Ivoire CIV   TRUE    FALSE      regex_en NA        
+#> 3 Yugoslavia    NA    FALSE   TRUE       none     Yugoslavia
+#> 4 Wakanda       NA    FALSE   FALSE      none     Canada
 ```
 
 [`repair_country_names()`](https://pursuitofdatascience.github.io/countryatlas/reference/repair_country_names.md)
@@ -243,7 +243,7 @@ confident misses only, and attaches a record of every change:
 
 ``` r
 
-repair_country_names(c("Brzil", "Germny", "United States"), verbose = FALSE)
+repair_country_names(c("Brzil", "Germny", "United States"), quiet = TRUE)
 #> [1] "Brazil"        "Germany"       "United States"
 #> attr(,"repairs")
 #> # A tibble: 2 × 2
@@ -259,10 +259,10 @@ audit_coverage(snapshot)$na_rates
 #> # A tibble: 4 × 4
 #>   indicator           n n_missing na_rate
 #>   <chr>           <int>     <int>   <dbl>
-#> 1 gdp_per_capita    215        24  0.112 
-#> 2 population        215         0  0     
-#> 3 life_expectancy   215         0  0     
-#> 4 co2_per_capita    215        12  0.0558
+#> 1 gdp_per_capita    216        17  0.0787
+#> 2 population        216         0  0     
+#> 3 life_expectancy   216         0  0     
+#> 4 co2_per_capita    216        13  0.0602
 ```
 
 The entities the previous version dropped (Kosovo, Micronesia, the
@@ -296,11 +296,11 @@ expands them to their successor states via the curated
 ``` r
 
 check_country_match(c("USSR", "Czechoslovakia"))
-#> # A tibble: 2 × 5
-#>   input          iso3c matched historical suggestion    
-#>   <chr>          <chr> <lgl>   <lgl>      <chr>         
-#> 1 USSR           RUS   TRUE    TRUE       NA            
-#> 2 Czechoslovakia NA    FALSE   TRUE       Czechoslovakia
+#> # A tibble: 2 × 6
+#>   input          iso3c matched historical method   suggestion    
+#>   <chr>          <chr> <lgl>   <lgl>      <chr>    <chr>         
+#> 1 USSR           RUS   TRUE    TRUE       regex_en NA            
+#> 2 Czechoslovakia NA    FALSE   TRUE       none     Czechoslovakia
 dissolve_country("Yugoslavia")
 #> # A tibble: 7 × 5
 #>   input      historical dissolved iso3c country             
@@ -414,28 +414,27 @@ snapshot |>
 #> # A tibble: 5 × 4
 #>   country     gdp_per_capita  rank percentile
 #>   <chr>                <dbl> <int>      <dbl>
-#> 1 Bermuda            122118.     2      0.995
-#> 2 Ireland             94475.     4      0.984
-#> 3 Luxembourg         104147.     3      0.989
+#> 1 Bermuda            116514.     2      0.995
+#> 2 Ireland             94475.     4      0.985
+#> 3 Luxembourg         104147.     3      0.990
 #> 4 Monaco             247170.     1      1    
-#> 5 Switzerland         90067.     5      0.979
+#> 5 Switzerland         93018.     5      0.980
 ```
 
 ``` r
 
 snapshot |>
   aggregate_regions(population, by = "region", fun = "sum")
-#> # A tibble: 8 × 2
-#>   region                     population
-#>   <chr>                           <dbl>
-#> 1 East Asia & Pacific        2364906595
-#> 2 Europe & Central Asia       926500729
-#> 3 Latin America & Caribbean   658983093
-#> 4 Middle East & North Africa  519229480
-#> 5 North America               381464223
-#> 6 South Asia                 1971301188
-#> 7 Sub-Saharan Africa         1291044964
-#> 8 NA                            3203295
+#> # A tibble: 7 × 5
+#>   region                     population n_countries n_reporting coverage
+#>   <chr>                           <dbl>       <int>       <int>    <dbl>
+#> 1 East Asia & Pacific        2364906569          37          37        1
+#> 2 Europe & Central Asia       928398799          57          57        1
+#> 3 Latin America & Caribbean   662185614          42          42        1
+#> 4 Middle East & North Africa  519257280          21          21        1
+#> 5 North America               381330762           3           3        1
+#> 6 South Asia                 1971301188           8           8        1
+#> 7 Sub-Saharan Africa         1289936286          48          48        1
 ```
 
 For panel data,
@@ -505,15 +504,15 @@ decomposes exactly into between/within components:
 ``` r
 
 gini(snapshot$gdp_per_capita, weights = snapshot$population)
-#> [1] 0.6094909
+#> [1] 0.6124852
 theil(snapshot$gdp_per_capita, weights = snapshot$population,
       groups = snapshot$continent)
 #> # A tibble: 3 × 3
 #>   component value share
 #>   <chr>     <dbl> <dbl>
-#> 1 total     0.678 1    
-#> 2 between   0.310 0.458
-#> 3 within    0.368 0.542
+#> 1 total     0.686 1    
+#> 2 between   0.312 0.455
+#> 3 within    0.374 0.545
 ```
 
 [`correlate_indicators()`](https://pursuitofdatascience.github.io/countryatlas/reference/correlate_indicators.md)
@@ -527,12 +526,12 @@ correlate_indicators(snapshot)
 #> # A tibble: 6 × 4
 #>   var_x           var_y                  r     n
 #>   <chr>           <chr>              <dbl> <int>
-#> 1 gdp_per_capita  life_expectancy  0.607     191
-#> 2 gdp_per_capita  co2_per_capita   0.435     184
-#> 3 life_expectancy co2_per_capita   0.307     203
-#> 4 gdp_per_capita  population      -0.0579    191
-#> 5 population      life_expectancy -0.0188    215
-#> 6 population      co2_per_capita   0.00660   203
+#> 1 gdp_per_capita  life_expectancy  0.607     199
+#> 2 life_expectancy co2_per_capita   0.307     203
+#> 3 gdp_per_capita  co2_per_capita   0.295     191
+#> 4 gdp_per_capita  population      -0.0567    199
+#> 5 population      life_expectancy -0.0194    216
+#> 6 population      co2_per_capita   0.00663   203
 ```
 
 For panels,
@@ -594,19 +593,20 @@ sessionInfo()
 #> [1] dplyr_1.2.1        ggplot2_4.0.3      countryatlas_3.0.0
 #> 
 #> loaded via a namespace (and not attached):
-#>  [1] tidyr_1.3.2        sass_0.4.10        utf8_1.2.6         generics_0.1.4    
+#>  [1] tidyr_1.3.2        utf8_1.2.6         sass_0.4.10        generics_0.1.4    
 #>  [5] class_7.3-23       KernSmooth_2.23-26 digest_0.6.39      magrittr_2.0.5    
 #>  [9] countrycode_1.9.0  evaluate_1.0.5     grid_4.6.1         RColorBrewer_1.1-3
-#> [13] fastmap_1.2.0      maps_3.4.3         jsonlite_2.0.0     e1071_1.7-17      
+#> [13] fastmap_1.2.0      jsonlite_2.0.0     e1071_1.7-17       DBI_1.3.0         
 #> [17] purrr_1.2.2        viridisLite_0.4.3  scales_1.4.0       stringdist_0.9.17 
 #> [21] textshaping_1.0.5  jquerylib_0.1.4    cli_3.6.6          rlang_1.3.0       
-#> [25] withr_3.0.3        cachem_1.1.0       yaml_2.3.12        otel_0.2.0        
-#> [29] parallel_4.6.1     tools_4.6.1        memoise_2.0.1      vctrs_0.7.3       
-#> [33] R6_2.6.1           proxy_0.4-29       lifecycle_1.0.5    classInt_0.4-11   
-#> [37] fs_2.1.0           htmlwidgets_1.6.4  ragg_1.5.2         pkgconfig_2.0.3   
-#> [41] desc_1.4.3         pkgdown_2.2.1      pillar_1.11.1      bslib_0.12.0      
-#> [45] gtable_0.3.6       glue_1.8.1         systemfonts_1.3.2  xfun_0.61         
-#> [49] tibble_3.3.1       tidyselect_1.2.1   knitr_1.52         farver_2.1.2      
-#> [53] htmltools_0.5.9    rmarkdown_2.32     labeling_0.4.3     compiler_4.6.1    
-#> [57] WDI_2.8.0          S7_0.2.2
+#> [25] units_1.0-1        withr_3.0.3        cachem_1.1.0       yaml_2.3.12       
+#> [29] otel_0.2.0         parallel_4.6.1     tools_4.6.1        memoise_2.0.1     
+#> [33] vctrs_0.7.3        R6_2.6.1           proxy_0.4-29       lifecycle_1.0.5   
+#> [37] classInt_0.4-11    fs_2.1.0           htmlwidgets_1.6.4  ragg_1.5.2        
+#> [41] pkgconfig_2.0.3    desc_1.4.3         pkgdown_2.2.1      pillar_1.11.1     
+#> [45] bslib_0.12.0       gtable_0.3.6       glue_1.8.1         Rcpp_1.1.2        
+#> [49] sf_1.1-3           systemfonts_1.3.2  xfun_0.61          tibble_3.3.1      
+#> [53] tidyselect_1.2.1   knitr_1.52         farver_2.1.2       htmltools_0.5.9   
+#> [57] labeling_0.4.3     rmarkdown_2.32     compiler_4.6.1     WDI_2.8.0         
+#> [61] S7_0.2.2
 ```
