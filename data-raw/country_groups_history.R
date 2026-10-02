@@ -1,32 +1,40 @@
 # Build country_groups_history --------------------------------------------------
 #
-# country_groups_tbl is a single 2024-01-01 snapshot, which makes any panel join
-# on group membership wrong: an EU panel spanning 2015-2020 either includes the
-# UK throughout or excludes it throughout, and neither is true. This table adds
+# country_groups_tbl is a single snapshot, which makes any panel join on group
+# membership wrong: an EU panel spanning 2015-2020 either includes the UK
+# throughout or excludes it throughout, and neither is true. This table adds
 # the dates.
 #
 # SCOPE, stated plainly because it matters more than the row count: this covers
-# the twelve groups whose accession and departure dates are documented,
-# unambiguous and stable. Commonwealth, G20 and OPEC are deliberately absent --
-# their membership histories involve suspensions, readmissions and contested
-# dates that would need sourcing case by case, and inventing a date is worse
-# than admitting there isn't one. country_groups(as_of =) falls back to the
-# snapshot for those, with a warning, rather than pretending.
+# the groups whose accession, departure and suspension dates are documented,
+# unambiguous and stable, and every date below carries its source. The rule
+# stands: a fabricated date is worse than an absent one, so a group is dated
+# only where every date is sourced. Not dated, and why:
+#   * Commonwealth, OPEC, the African Union, ECOWAS, CARICOM and the Pacific
+#     Islands Forum: long histories of suspensions, lapses and readmissions
+#     whose dates the sources give unevenly (often to the year, or not at all
+#     for the end of a suspension). country_groups(as_of =) falls back to the
+#     snapshot for those, with a warning, rather than pretending.
+#   * G20: its members are countries plus the EU and the AU, which are not; the
+#     table holds countries only, and the 1999 founding has no single
+#     accession date.
 #
-# `from` is the date membership took effect; `to` is the first date on which
-# the country was no longer a member (membership runs up to the day before),
-# or NA for a current member. country_groups() reads it that way (a member
-# on `when` if from <= when < to), which is also how every departure below is
-# dated: Austria left EFTA and joined the EU on the same 1995-01-01. Dates are
-# the treaty/accession date where one exists, otherwise 1 January of the
-# accession year.
+# A row is a spell: `from` is the date it took effect; `to` is the first date
+# on which it no longer held (it runs up to the day before), or NA for one
+# still in force. `status` is "member" or "suspended"; a country can have
+# several spells in a group (Seychelles left SADC in 2004 and rejoined in
+# 2008; Syria was suspended from the Arab League from 2011 to 2023).
+# country_groups() and in_group() count the "member" spells. Dates are the
+# treaty, accession or decision date where one exists; where a source gives
+# only the month, the 1st of that month (APEC's accessions, at the November
+# ministerial meeting of each year).
 
 library(tibble)
 library(dplyr)
 
-m <- function(group, iso3c, from, to = NA_character_) {
+m <- function(group, iso3c, from, to = NA_character_, status = "member") {
   tibble(group = group, iso3c = iso3c,
-         from = as.Date(from), to = as.Date(to))
+         from = as.Date(from), to = as.Date(to), status = status)
 }
 
 eu <- bind_rows(
@@ -148,20 +156,150 @@ g7 <- bind_rows(
   m("G7", "CAN", "1976-06-27")
 )
 
+# Shanghai Cooperation Organisation.
+# Source: https://en.wikipedia.org/wiki/Shanghai_Cooperation_Organisation
+# (membership table: founding 15 June 2001; India and Pakistan 9 June 2017;
+# Iran 4 July 2023; Belarus 4 July 2024).
+sco <- bind_rows(
+  m("SCO", c("CHN", "KAZ", "KGZ", "RUS", "TJK", "UZB"), "2001-06-15"),
+  m("SCO", c("IND", "PAK"), "2017-06-09"),
+  m("SCO", "IRN", "2023-07-04"),
+  m("SCO", "BLR", "2024-07-04")
+)
+
+# CPTPP: the date the agreement entered into force for each party.
+# Source: https://en.wikipedia.org/wiki/Comprehensive_and_Progressive_Agreement_for_Trans-Pacific_Partnership
+# (entry into force table; the United Kingdom 15 December 2024).
+cptpp <- bind_rows(
+  m("CPTPP", c("AUS", "CAN", "JPN", "MEX", "NZL", "SGP"), "2018-12-30"),
+  m("CPTPP", "VNM", "2019-01-14"),
+  m("CPTPP", "PER", "2021-09-19"),
+  m("CPTPP", "MYS", "2022-11-29"),
+  m("CPTPP", "CHL", "2023-02-21"),
+  m("CPTPP", "BRN", "2023-07-12"),
+  m("CPTPP", "GBR", "2024-12-15")
+)
+
+# RCEP: entry into force for each party. Myanmar ratified in 2021, but the
+# ASEAN Secretariat questioned the ratification's legitimacy and the date it
+# took effect is disputed, so it is not listed.
+# Source: https://en.wikipedia.org/wiki/Regional_Comprehensive_Economic_Partnership
+rcep <- bind_rows(
+  m("RCEP", c("AUS", "BRN", "KHM", "CHN", "JPN", "LAO", "NZL", "SGP", "THA",
+              "VNM"), "2022-01-01"),
+  m("RCEP", "KOR", "2022-02-01"),
+  m("RCEP", "MYS", "2022-03-18"),
+  m("RCEP", "IDN", "2023-01-02"),
+  m("RCEP", "PHL", "2023-06-02")
+)
+
+# East African Community, re-established by the treaty in force 7 July 2000.
+# Sources: https://www.eac.int/eac-history (Rwanda and Burundi full members
+# 1 July 2007; South Sudan 5 September 2016; DR Congo 11 July 2022);
+# https://www.eac.int/press-releases/3049-somalia-finally-joins-eac-as-the-bloc-s-8th-partner-state
+# (Somalia deposited its instrument of ratification on 4 March 2024).
+eac <- bind_rows(
+  m("EAC", c("KEN", "TZA", "UGA"), "2000-07-07"),
+  m("EAC", c("RWA", "BDI"), "2007-07-01"),
+  m("EAC", "SSD", "2016-09-05"),
+  m("EAC", "COD", "2022-07-11"),
+  m("EAC", "SOM", "2024-03-04")
+)
+
+# Southern African Development Community, established 17 August 1992 by the
+# nine SADCC members and Namibia.
+# Sources: https://en.wikipedia.org/wiki/Southern_African_Development_Community
+# (member table: South Africa 30 August 1994, Mauritius 28 August 1995, DR
+# Congo and Seychelles 8 September 1997, Seychelles until 1 July 2004,
+# Madagascar 18 August 2005 and reinstated 30 January 2014);
+# https://www.sadc.int/latest-news/union-comoros-becomes-16th-sadc-member-state
+# (Comoros admitted at the summit of 20 August 2017);
+# https://www.sadc.int/member-states/seychelles (rejoined 17 August 2008);
+# https://www.sanews.gov.za/south-africa/sadc-leaders-suspend-madagascar
+# (Madagascar suspended at the summit of 30 March 2009).
+sadc <- bind_rows(
+  m("SADC", c("AGO", "BWA", "LSO", "MWI", "MOZ", "NAM", "SWZ", "TZA", "ZMB",
+              "ZWE"), "1992-08-17"),
+  m("SADC", "ZAF", "1994-08-30"),
+  m("SADC", "MUS", "1995-08-28"),
+  m("SADC", "COD", "1997-09-08"),
+  m("SADC", "SYC", "1997-09-08", "2004-07-01"),
+  m("SADC", "SYC", "2008-08-17"),
+  m("SADC", "MDG", "2005-08-18", "2009-03-30"),
+  m("SADC", "MDG", "2009-03-30", "2014-01-30", status = "suspended"),
+  m("SADC", "MDG", "2014-01-30"),
+  m("SADC", "COM", "2017-08-20")
+)
+
+# Asia-Pacific Economic Cooperation: member *economies*, including Hong Kong
+# and Taiwan (Chinese Taipei). Each joined at the November ministerial meeting
+# of its year, and the sources give the month only, so the 1st of November.
+# Source: https://en.wikipedia.org/wiki/Asia-Pacific_Economic_Cooperation
+# (member economies table).
+apec <- bind_rows(
+  m("APEC", c("AUS", "BRN", "CAN", "IDN", "JPN", "KOR", "MYS", "NZL", "PHL",
+              "SGP", "THA", "USA"), "1989-11-01"),
+  m("APEC", c("CHN", "HKG", "TWN"), "1991-11-01"),
+  m("APEC", c("MEX", "PNG"), "1993-11-01"),
+  m("APEC", "CHL", "1994-11-01"),
+  m("APEC", c("PER", "RUS", "VNM"), "1998-11-01")
+)
+
+# League of Arab States. Yemen is dated from North Yemen's founding membership,
+# which the unified republic continued in 1990.
+# Sources: https://en.wikipedia.org/wiki/Member_states_of_the_Arab_League
+# (admission dates; Libya suspended 22 February to 27 August 2011; Syria
+# suspended 16 November 2011, readmitted 7 May 2023);
+# https://unispal.un.org/pdfs/a34160s13243.pdf (the Baghdad resolutions of
+# 31 March 1979 suspending Egypt's membership);
+# https://www.washingtonpost.com/archive/politics/1989/05/23/egypt-returns-to-fold-as-arabs-open-summit/ad5d0a7c-2c93-49d7-be06-c05db82f6a22/
+# (Egypt readmitted at the Casablanca summit, 23 May 1989).
+arab <- bind_rows(
+  m("ArabLeague", c("IRQ", "JOR", "LBN", "SAU", "YEM"), "1945-03-22"),
+  m("ArabLeague", "EGY", "1945-03-22", "1979-03-31"),
+  m("ArabLeague", "EGY", "1979-03-31", "1989-05-23", status = "suspended"),
+  m("ArabLeague", "EGY", "1989-05-23"),
+  m("ArabLeague", "SYR", "1945-03-22", "2011-11-16"),
+  m("ArabLeague", "SYR", "2011-11-16", "2023-05-07", status = "suspended"),
+  m("ArabLeague", "SYR", "2023-05-07"),
+  m("ArabLeague", "LBY", "1953-03-28", "2011-02-22"),
+  m("ArabLeague", "LBY", "2011-02-22", "2011-08-27", status = "suspended"),
+  m("ArabLeague", "LBY", "2011-08-27"),
+  m("ArabLeague", "SDN", "1956-01-19"),
+  m("ArabLeague", c("MAR", "TUN"), "1958-10-01"),
+  m("ArabLeague", "KWT", "1961-07-20"),
+  m("ArabLeague", "DZA", "1962-08-16"),
+  m("ArabLeague", c("BHR", "QAT"), "1971-09-11"),
+  m("ArabLeague", "OMN", "1971-09-29"),
+  m("ArabLeague", "ARE", "1971-12-06"),
+  m("ArabLeague", "MRT", "1973-11-26"),
+  m("ArabLeague", "SOM", "1974-02-14"),
+  m("ArabLeague", "PSE", "1976-09-09"),
+  m("ArabLeague", "DJI", "1977-09-04"),
+  m("ArabLeague", "COM", "1993-11-20")
+)
+
 country_groups_history <- bind_rows(
   eu, eurozone, nato, oecd, asean, efta, gcc, mercosur, nordic, visegrad,
-  brics, g7
+  brics, g7, sco, cptpp, rcep, eac, sadc, apec, arab
 ) |>
   arrange(group, from, iso3c) |>
   mutate(country = countrycode::countrycode(iso3c, "iso3c", "country.name",
                                             warn = FALSE),
          .after = iso3c)
 
+# No country may have overlapping spells in a group: each spell ends on or
+# before the next one begins.
+overlaps <- country_groups_history |>
+  arrange(group, iso3c, from) |>
+  group_by(group, iso3c) |>
+  filter(!is.na(lag(to)) & from < lag(to) | is.na(lag(to)) & row_number() > 1) |>
+  ungroup()
 stopifnot(
   !anyNA(country_groups_history$iso3c),
   !anyNA(country_groups_history$from),
-  # No country may appear twice in a group with overlapping spans.
-  !any(duplicated(country_groups_history[, c("group", "iso3c")])),
+  country_groups_history$status %in% c("member", "suspended"),
+  nrow(overlaps) == 0L,
   all(is.na(country_groups_history$to) |
         country_groups_history$to > country_groups_history$from)
 )
@@ -181,7 +319,7 @@ stopifnot(
 # rather than stopping at the alphabetically first group.
 today <- Sys.Date()
 current <- country_groups_history |>
-  filter(from <= today, is.na(to) | to > today)
+  filter(from <= today, is.na(to) | to > today, status == "member")
 # Read the snapshot from the WORKING TREE, not from the installed package.
 # This is a validation, and validating against `countryatlas::` compares the
 # new history table to whatever snapshot happens to be installed -- which is

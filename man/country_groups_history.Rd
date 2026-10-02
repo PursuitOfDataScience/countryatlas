@@ -5,25 +5,28 @@
 \alias{country_groups_history}
 \title{Dated country-group membership}
 \format{
-A tibble with 176 rows:
+A tibble with 288 rows:
 \describe{
 \item{group}{Group name.}
 \item{iso3c}{ISO 3166-1 alpha-3 code.}
 \item{country}{Country name.}
-\item{from}{Date membership took effect.}
-\item{to}{The first date on which the country was no longer a member
-(membership runs up to the day before), or \code{NA} for a current member.
-The United Kingdom's EU \code{to} is therefore 2020-02-01: it left at the
-end of 31 January 2020.}
+\item{from}{Date the spell took effect.}
+\item{to}{The first date on which it no longer held (it runs up to the
+day before), or \code{NA} for one still in force. The United Kingdom's EU
+\code{to} is therefore 2020-02-01: it left at the end of 31 January 2020.}
+\item{status}{\code{"member"} or \code{"suspended"}. A country can have several
+spells in a group: Seychelles left SADC in 2004 and rejoined in 2008,
+and Syria was suspended from the Arab League from 2011 to 2023.
+\code{\link[=country_groups]{country_groups()}} and \code{\link[=in_group]{in_group()}} count the member spells only.}
 }
 }
 \usage{
 country_groups_history
 }
 \description{
-When each country joined -- and where applicable left -- each of twelve
-international groups. The dated counterpart to \link{country_groups_tbl}, which is
-a single current snapshot.
+When each country joined -- and where applicable left, or was suspended
+from -- each of nineteen international groups. The dated counterpart to
+\link{country_groups_tbl}, which is a single current snapshot.
 }
 \details{
 A snapshot silently misstates any panel that spans an accession: an EU panel
@@ -33,15 +36,22 @@ table when given \code{as_of}.
 }
 \section{Scope, and what is deliberately absent}{
 
-Twelve groups are dated: EU, EuroZone, NATO, OECD, ASEAN, EFTA, GCC,
-Mercosur, Nordic, Visegrad, BRICS and G7. \strong{Commonwealth, G20 and OPEC are
-not}, and that is a decision rather than an omission -- their histories
-involve suspensions, readmissions and contested dates that would have to be
-sourced case by case, and a fabricated date is worse than an absent one.
+Nineteen groups are dated: EU, EuroZone, NATO, OECD, ASEAN, EFTA, GCC,
+Mercosur, Nordic, Visegrad, BRICS, G7, and since 4.0.0 SCO, CPTPP, RCEP,
+EAC, SADC, APEC (member economies, so Hong Kong and Taiwan too) and the
+Arab League (\code{"ArabLeague"}). Every date carries its source in
+\code{data-raw/country_groups_history.R}. \strong{Commonwealth, G20 and OPEC are
+not}, and that is a decision rather than an omission: the Commonwealth's
+and OPEC's suspensions, lapses and readmissions are dated unevenly by the
+sources, and G20's members include the EU and the African Union, which are
+not countries. A fabricated date is worse than an absent one, so
 \code{country_groups(as_of =)} warns and falls back to the snapshot for those.
+RCEP leaves out Myanmar, whose ratification the ASEAN Secretariat
+questioned and whose date of entry into force is disputed.
 
-Dates are the treaty or accession date where one exists, otherwise 1 January
-of the accession year. The table is validated at build time against
+Dates are the treaty, accession or decision date where one exists; where
+the sources give only the month, the 1st of that month (APEC's
+accessions). The table is validated at build time against
 \link{country_groups_tbl}: the members current today must reproduce the snapshot
 exactly, for every group covered.
 }

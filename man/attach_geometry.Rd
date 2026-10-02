@@ -13,7 +13,8 @@ attach_geometry(
   projection = "equal_earth",
   recenter = NULL,
   overrides = country_overrides(),
-  year = NULL
+  year = NULL,
+  worldview = NULL
 )
 }
 \arguments{
@@ -21,18 +22,23 @@ attach_geometry(
 
 \item{by}{The join key (default \code{"iso3c"}).}
 
-\item{geometry}{\code{"polygon"} (default) or \code{"sf"}.}
+\item{geometry}{\code{"polygon"} (default: the bundled Natural Earth 1:50m
+countries) or \code{"sf"}. \code{"maps"}, the \code{maps} package's polygons as drawn
+before 4.0.0, is deprecated.}
 
 \item{scale}{Natural Earth resolution for the \code{sf} backend. The polygon
-backend serves one bundled resolution and warns if asked for another. \code{"large"} needs the
-non-CRAN \code{rnaturalearthhires} package; see \code{\link[=world_geometry]{world_geometry()}}. It also
-affects which countries are covered at all -- see below.}
+backend draws its one bundled resolution, 1:50m, and warns if asked for
+\code{"large"}, which needs the non-CRAN \code{rnaturalearthhires} package; see
+\code{\link[=world_geometry]{world_geometry()}}. It also affects which countries are covered at all --
+see below.}
 
 \item{region}{Optional region subset (see \code{\link[=world_geometry]{world_geometry()}}).}
 
-\item{projection, recenter}{Projection, and optional central meridian, for
-the \code{sf} backend (see \code{\link[=world_map]{world_map()}} for the projections available). The
-polygon backend can do neither and warns if asked.}
+\item{projection, recenter}{Projection, and optional central meridian. The
+\code{sf} backend projects the geometry here (see \code{\link[=world_map]{world_map()}} for the
+projections available). The polygon backend returns longitude/latitude,
+which the map verbs project when they draw, so it warns about
+\code{projection}; \code{recenter} cuts its rings at the new antimeridian.}
 
 \item{overrides}{Name -> iso3c overrides applied when matching the geometry
 backend's country names (default \code{\link[=country_overrides]{country_overrides()}}). Pass a custom set
@@ -41,6 +47,9 @@ built with \code{\link[=country_overrides]{country_overrides()}} to add your own
 \item{year}{Attach historical geometry for this year instead of present-day
 borders, via \code{\link[=historical_geometry]{historical_geometry()}}. Entities that never had an ISO code
 cannot match on \code{iso3c}, so a low match rate warns.}
+
+\item{worldview}{A Natural Earth point of view, as in \code{\link[=world_geometry]{world_geometry()}}:
+the viewing country's ISO code or \code{"ISO"}. Needs \code{geometry = "sf"}.}
 }
 \value{
 For \code{"polygon"}, a tibble with \code{long}/\code{lat}/\code{group} plus your
@@ -69,12 +78,12 @@ The join keeps only countries the chosen backend actually carries, so rows of
 \code{data} with no matching geometry are dropped silently -- worth checking first
 when a country you expected is missing from the map. Coverage differs by
 backend and, for \code{"sf"}, by \code{scale}, which changes \emph{which} countries are
-present and not merely how detailed they look. Of the 215 countries in
-\link{world_snapshot}, \code{"polygon"} carries 210, \code{"sf"} with \code{scale = "small"} (the
-default, 110m) carries 169, and \code{"sf"} with \code{scale = "medium"} carries 214:
-the 110m coastlines omit most small states, so \code{scale = "medium"} is the fix
-when microstates matter -- Hong Kong, Macao, Tuvalu and the British Virgin
-Islands are each in no other backend. Gibraltar alone is in none of them.
+present and not merely how detailed they look. Of the 216 countries in
+\link{world_snapshot}, \code{"polygon"} and \code{"sf"} with \code{scale = "medium"} carry the
+same 215, because both are Natural Earth 1:50m, while \code{"sf"} with
+\code{scale = "small"} (the default, 110m) carries 170: the 110m coastlines omit
+most small states, so use the polygon backend or \code{scale = "medium"} when
+microstates matter. Gibraltar alone is in none of them.
 }
 
 \section{How many rows come back}{
@@ -85,9 +94,9 @@ your columns. That is what makes them draw in \code{na.value} rather than vanish
 which is the point -- a choropleth that quietly omits the countries you have
 no data for reads as though they did not exist. It does mean the result is
 much larger than \code{data} and is not something to summarise directly:
-\code{attach_geometry()} on three countries returns 240 of them on the polygon
-backend and 176 on \code{"sf"}, whatever \code{data} held. The row count is larger
-still: \code{"polygon"} gives one row per polygon \emph{vertex} (about 99,000), and
+\code{attach_geometry()} on three countries returns 237 of them on the polygon
+backend and 175 on \code{"sf"}, whatever \code{data} held. The row count is larger
+still: \code{"polygon"} gives one row per polygon \emph{vertex} (about 98,000), and
 \code{"sf"} one row per \emph{feature} -- usually one per country, but a divided
 country appears more than once (Cyprus at \code{scale = "small"}; Cyprus and
 India at \code{"medium"}), so an \code{iso3c} join against it can fan out. Summarise
@@ -98,8 +107,6 @@ de-duplicate to one row per country first.
 \examples{
 \donttest{
 df <- data.frame(iso3c = c("USA", "CAN"), value = c(1, 2))
-if (requireNamespace("maps", quietly = TRUE)) {
-  attach_geometry(df, geometry = "polygon")
-}
+attach_geometry(df, geometry = "polygon")
 }
 }

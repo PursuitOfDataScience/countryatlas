@@ -2,7 +2,7 @@
 % Please edit documentation in R/cache.R
 \name{clear_wdi_cache}
 \alias{clear_wdi_cache}
-\title{Clear the on-disk / in-memory WDI cache}
+\title{Clear the World Bank cache (deprecated)}
 \usage{
 clear_wdi_cache(disk = FALSE)
 }
@@ -13,44 +13,13 @@ clear_wdi_cache(disk = FALSE)
 Invisibly \code{TRUE}.
 }
 \description{
-Forget memoised World Bank fetches, both in-session and (optionally) on disk.
+\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}}
+
+\code{clear_wdi_cache()} was generalised into \code{\link[=clear_country_cache]{clear_country_cache()}} in 3.0.0,
+which clears any source's cache; \code{clear_wdi_cache(disk)} is
+\code{clear_country_cache("wdi", disk)}. It now says so, and goes in 5.0.0.
 }
-\section{Where the cache lives}{
-
-The persistent cache goes in the standard per-user cache location,
-\code{tools::R_user_dir("countryatlas", "cache")}. Point it elsewhere with
-\code{options(countryatlas.cache_dir = )}, or skip the disk entirely by passing
-\code{cache = FALSE} to \code{\link[=world_data]{world_data()}} / \code{\link[=country_data]{country_data()}}. The directory itself is
-created the first time a cached fetch is attempted, whether or not the World
-Bank answers; only a successful fetch leaves a response in it, and reading the
-bundled \link{world_snapshot} never goes near it. Under \verb{R CMD check} the whole
-cache moves to the session temp directory, so a check never writes to the
-user's file space.
-
-The directory may hold other files too. The cache only ever writes, expires
-and deletes its own entries (named by a hash, with the extension
-\code{.countryatlas}), and \code{disk = TRUE} removes the directory itself only when
-that leaves it empty.
-}
-
-\section{How the cache is managed}{
-
-The persistent cache expires its own contents, so it does not grow without
-bound and does not serve stale figures indefinitely: an entry is dropped
-once it is 30 days old, and if the directory exceeds 50 MB the
-least-recently-used entries go first. Both limits are adjustable with
-\code{options(countryatlas.cache_max_age = )} (seconds) and
-\code{options(countryatlas.cache_max_size = )} (bytes). A dropped entry costs a
-re-fetch, nothing more.
-
-Expiry matters beyond disk space: World Bank observations are revised, so a
-figure cached long ago is not necessarily the figure the API would return
-today.
-}
-
 \examples{
-clear_wdi_cache()              # forget the in-session memo
-\dontrun{
-clear_wdi_cache(disk = TRUE)   # also delete the persistent cache
+clear_country_cache("wdi")   # instead of clear_wdi_cache()
 }
-}
+\keyword{internal}

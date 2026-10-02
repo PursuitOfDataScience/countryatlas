@@ -24,13 +24,10 @@ the spatial toolkit it needs neither \code{sf} nor the network.
 }
 \section{Countries without a bundled centroid}{
 
-\link{country_meta} carries no centroid for a handful of small or dependent
-territories (Bouvet Island, the British Virgin Islands, Gibraltar, Hong Kong,
-Macao, Svalbard and Jan Mayen, Tokelau, Tuvalu, the U.S. Minor Outlying
-Islands and the Aland Islands), and no row at all for Kosovo, because
-\link[countrycode:codelist]{countrycode::codelist} has none. Those inputs return \code{NA} here even though
-the geometry backends do map them -- so \code{\link[=neighbors]{neighbors()}} and \code{\link[=country_borders]{country_borders()}}
-know about Kosovo while this function does not.
+\link{country_meta} carries no centroid for three territories Natural Earth does
+not draw at 1:50m (Bouvet Island, Gibraltar and the U.S. Minor Outlying
+Islands); those inputs return \code{NA} here. Kosovo, which
+\link[countrycode:codelist]{countrycode::codelist} does not carry, has a curated row with a centroid.
 }
 
 \examples{

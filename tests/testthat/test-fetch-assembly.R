@@ -4,8 +4,9 @@
 # case where two iso2c codes map to one iso3c.
 #
 # Two things matter for mocking it:
-#   * mock WDI::WDI, not fetch_one_indicator() -- the latter is what derives
-#     iso3c from iso2c, so replacing it would skip the code under test;
+#   * mock wb_request(), the World Bank client, not fetch_one_indicator() --
+#     the latter is what derives iso3c from iso2c, so replacing it would skip
+#     the code under test;
 #   * pass cache = FALSE, or the on-disk memoise cache serves a previous real
 #     fetch and the mock is never consulted.
 
@@ -27,7 +28,7 @@ fake_wdi <- function(indicator, start, end, extra = FALSE, language = "en", ...)
 
 test_that("fetch_wdi derives iso3c and merges several indicators", {
   wdi_calls <<- NULL
-  testthat::local_mocked_bindings(WDI = fake_wdi, .package = "WDI")
+  testthat::local_mocked_bindings(wb_request = fake_wdi, .package = "countryatlas")
   one <- countryatlas:::fetch_wdi(c(gdp = "A"), start = 2018, end = 2020,
                                   cache = FALSE)
   expect_true(all(c("iso3c", "gdp") %in% names(one)))
@@ -51,10 +52,10 @@ test_that("fetch_wdi derives iso3c and merges several indicators", {
 
 test_that("one failing indicator does not take the others down", {
   testthat::local_mocked_bindings(
-    WDI = function(indicator, ...) {
+    wb_request = function(indicator, ...) {
       if (names(indicator)[1] == "pop") stop("boom") else fake_wdi(indicator, ...)
     },
-    .package = "WDI"
+    .package = "countryatlas"
   )
   out <- suppressWarnings(
     countryatlas:::fetch_wdi(c(gdp = "A", pop = "B", co2 = "C"),
@@ -72,7 +73,7 @@ test_that("one failing indicator does not take the others down", {
 
 test_that("country_data(latest = TRUE) takes the most recent non-NA value", {
   wdi_calls <<- NULL
-  testthat::local_mocked_bindings(WDI = fake_wdi, .package = "WDI")
+  testthat::local_mocked_bindings(wb_request = fake_wdi, .package = "countryatlas")
   lat <- country_data(2020, c(gdp = "A"), latest = TRUE, cache = FALSE)
   # Documented as "the most recent non-NA value", so the window opens at 1960
   # rather than at the requested year.
@@ -89,7 +90,7 @@ test_that("country_data(latest = TRUE) takes the most recent non-NA value", {
 
 test_that("country_data returns a keyed panel for a year range", {
   wdi_calls <<- NULL
-  testthat::local_mocked_bindings(WDI = fake_wdi, .package = "WDI")
+  testthat::local_mocked_bindings(wb_request = fake_wdi, .package = "countryatlas")
   pan <- country_data(2018:2020, c(gdp = "A"), cache = FALSE)
   expect_equal(nrow(pan), 9L)
   expect_equal(anyDuplicated(pan[, c("iso3c", "year")]), 0L)
@@ -101,7 +102,7 @@ test_that("two iso2c codes mapping to one iso3c collapse to a single row", {
   # France has both FR and the retired FX; the merge declares a many-to-many
   # relationship and country_data() is what de-duplicates.
   testthat::local_mocked_bindings(
-    WDI = function(indicator, ...) {
+    wb_request = function(indicator, ...) {
       nm <- names(indicator)[1]
       d <- data.frame(iso2c = c("FR", "FX"),
                       country = c("France", "France (metropolitan)"),
@@ -109,7 +110,7 @@ test_that("two iso2c codes mapping to one iso3c collapse to a single row", {
       d[[nm]] <- c(1, 2)
       d
     },
-    .package = "WDI"
+    .package = "countryatlas"
   )
   out <- country_data(2020, c(v = "X"), cache = FALSE)
   expect_lte(sum(out$iso3c == "FRA", na.rm = TRUE), 1L)
@@ -117,10 +118,10 @@ test_that("two iso2c codes mapping to one iso3c collapse to a single row", {
 
 test_that("cache = TRUE short-circuits a repeated fetch", {
   wdi_calls <<- NULL
-  testthat::local_mocked_bindings(WDI = fake_wdi, .package = "WDI")
+  testthat::local_mocked_bindings(wb_request = fake_wdi, .package = "countryatlas")
   old <- options(countryatlas.cache_dir = file.path(tempdir(), "ca-cache-test"))
-  on.exit({ clear_wdi_cache(disk = TRUE); options(old) }, add = TRUE)
-  clear_wdi_cache()
+  on.exit({ clear_country_cache("wdi", disk = TRUE); options(old) }, add = TRUE)
+  clear_country_cache("wdi")
   a <- country_data(2019:2020, c(g = "X"), cache = TRUE)
   n_after_first <- length(wdi_calls)
   b <- country_data(2019:2020, c(g = "X"), cache = TRUE)
@@ -146,7 +147,7 @@ test_that("country_data with no indicator returns the full country spine", {
 
 test_that("the fetching examples degrade instead of failing offline", {
   boom <- function(...) stop("Could not resolve host: api.worldbank.org")
-  local_mocked_bindings(WDI = boom, .package = "WDI")
+  local_mocked_bindings(wb_request = boom, .package = "countryatlas")
 
   expect_warning(wd <- world_data(2020, geometry = "none", cache = FALSE),
                  "Could not fetch")
@@ -233,11 +234,11 @@ test_that("an unusable cache does not turn a good fetch into NAs", {
   on.exit({ st$fetch_memo <- old_memo; options(old); unlink(f) }, add = TRUE)
 
   local_mocked_bindings(
-    WDI = function(indicator, ...) {
+    wb_request = function(indicator, ...) {
       data.frame(iso2c = c("US", "FR"), country = c("United States", "France"),
                  year = 2020L, pop = c(331e6, 67e6))
     },
-    .package = "WDI")
+    .package = "countryatlas")
 
   st$fetch_memo <- NULL
   out <- suppressMessages(country_data(2020, c(pop = "SP.POP.TOTL"),
@@ -298,14 +299,14 @@ test_that("the country label's provenance is what ?world_data says", {
     out[[if (is.null(nm) || !nzchar(nm)) indicator[[1]] else nm]] <- c(1, 2)
     out
   }
-  testthat::with_mocked_bindings(.package = "WDI", WDI = fake, {
+  testthat::with_mocked_bindings(.package = "countryatlas", wb_request = fake, {
     got <- country_data(2020, "NY.GDP.PCAP.CD", cache = FALSE, parallel = FALSE)
     expect_identical(got$country[got$iso3c == "KOR"], "Korea, Rep.")
     expect_identical(got$country[got$iso3c == "COD"], "Congo, Dem. Rep.")
   })
   # With nothing fetched, the spine supplies the label -- countrycode's.
-  testthat::with_mocked_bindings(.package = "WDI",
-                                 WDI = function(...) stop("offline"), {
+  testthat::with_mocked_bindings(.package = "countryatlas",
+                                 wb_request = function(...) stop("offline"), {
     spine <- suppressWarnings(
       world_data(2020, "NY.GDP.PCAP.CD", geometry = "none", cache = FALSE,
                  parallel = FALSE))
@@ -314,7 +315,7 @@ test_that("the country label's provenance is what ?world_data says", {
   })
   # And the rest of the API agrees with the spine, not the fetch.
   expect_identical(convert_country(c("KOR", "COD"), to = "country",
-                                   from = "iso3c"),
+                                   origin = "iso3c"),
                    c("South Korea", "Congo - Kinshasa"))
   sc <- standardize_country(tibble::tibble(x = c("KOR", "COD")), "x",
                             origin = "iso3c", add = c("iso3c", "country"))
@@ -327,19 +328,19 @@ test_that("the cache directory is honoured when it changes mid-session", {
   # ignored: writes kept landing in the original directory. ?clear_wdi_cache
   # offers that option as the way to relocate the cache and says nothing about
   # having to set it before the first fetch. It only ever took effect because
-  # clear_wdi_cache() happened to reset the state.
+  # clear_country_cache("wdi") happened to reset the state.
   a <- file.path(tempfile("cache_a"), "c")
   b <- file.path(tempfile("cache_b"), "c")
   dir.create(a, recursive = TRUE)
   dir.create(b, recursive = TRUE)
   old <- options(countryatlas.cache_dir = a)
   on.exit({
-    clear_wdi_cache(disk = TRUE)
+    clear_country_cache("wdi", disk = TRUE)
     options(old)
   }, add = TRUE)
   n <- function(d) length(list.files(d, recursive = TRUE))
 
-  testthat::with_mocked_bindings(.package = "WDI", WDI = fake_wdi, {
+  testthat::with_mocked_bindings(.package = "countryatlas", wb_request = fake_wdi, {
     invisible(country_data(2020, "SP.POP.TOTL", parallel = FALSE))
     expect_gt(n(a), 0L)
     expect_identical(n(b), 0L)
@@ -362,7 +363,7 @@ test_that("a corrupt cache entry is recovered from, not blamed on the API", {
   # memoise::cache_filesystem() that surfaced readRDS()'s own "unknown input
   # format" from inside the fetch, which the package had to catch and explain
   # -- and the bad entry stayed put, so every later call degraded identically
-  # until someone ran clear_wdi_cache(disk = TRUE) by hand.
+  # until someone ran clear_country_cache("wdi", disk = TRUE) by hand.
   #
   # cachem::cache_disk() (adopted for the expiry and size cap CRAN policy
   # wants) treats an unreadable entry as a miss instead, so the right contract
@@ -378,7 +379,7 @@ test_that("a corrupt cache entry is recovered from, not blamed on the API", {
     on.exit(options(old), add = TRUE)
     msgs <- character(0)
     out <- NULL
-    testthat::with_mocked_bindings(.package = "WDI", WDI = fake_wdi, {
+    testthat::with_mocked_bindings(.package = "countryatlas", wb_request = fake_wdi, {
       invisible(country_data(2020, "SP.POP.TOTL", parallel = FALSE))
       corrupt(list.files(d, recursive = TRUE, full.names = TRUE))
       out <- withCallingHandlers(
@@ -410,8 +411,8 @@ test_that("a corrupt cache entry is recovered from, not blamed on the API", {
   dir.create(d, recursive = TRUE)
   old <- options(countryatlas.cache_dir = d)
   on.exit(options(old), add = TRUE)
-  testthat::with_mocked_bindings(.package = "WDI",
-                                 WDI = function(...) stop("Could not resolve host"), {
+  testthat::with_mocked_bindings(.package = "countryatlas",
+                                 wb_request = function(...) stop("Could not resolve host"), {
     expect_warning(country_data(2020, "SP.POP.TOTL", parallel = FALSE),
                    "World Bank API")
   })
@@ -433,7 +434,7 @@ test_that("an unwritable cache is reported once per directory, not per session",
   on.exit(options(old), add = TRUE)
 
   seen <- 0L
-  testthat::with_mocked_bindings(.package = "WDI", WDI = fake_wdi, {
+  testthat::with_mocked_bindings(.package = "countryatlas", wb_request = fake_wdi, {
     withCallingHandlers({
       invisible(country_data(2020, "SP.POP.TOTL", parallel = FALSE))
       options(countryatlas.cache_dir = b)
@@ -484,7 +485,7 @@ test_that("a memory-only memo is not thrown away by forking", {
   ind <- c(pop = "SP.POP.TOTL", gdp = "NY.GDP.MKTP.CD")
 
   suppressMessages(testthat::with_mocked_bindings(
-    .package = "WDI", WDI = counting_wdi, {
+    .package = "countryatlas", wb_request = counting_wdi, {
       invisible(country_data(2020, ind, parallel = TRUE))
       first <- n_fetches()
       invisible(country_data(2020, ind, parallel = TRUE))
@@ -519,7 +520,7 @@ test_that("a writable cache still fetches indicators in parallel", {
     fake_wdi(indicator, start, end, extra = extra, language = language, ...)
   }
   suppressMessages(testthat::with_mocked_bindings(
-    .package = "WDI", WDI = pid_wdi, {
+    .package = "countryatlas", wb_request = pid_wdi, {
       invisible(country_data(
         2020, c(pop = "SP.POP.TOTL", gdp = "NY.GDP.MKTP.CD"), parallel = TRUE
       ))
@@ -556,7 +557,7 @@ test_that("a failed indicator still warns when indicators are fetched in paralle
   }, add = TRUE)
   .wdj_state$fetch_memo <- NULL
 
-  suppressMessages(testthat::with_mocked_bindings(.package = "WDI", WDI = flaky, {
+  suppressMessages(testthat::with_mocked_bindings(.package = "countryatlas", wb_request = flaky, {
     expect_warning(
       out <- country_data(2020, c(bad = "BAD.CODE", gdp = "NY.GDP.MKTP.CD"),
                           parallel = TRUE),
@@ -578,7 +579,7 @@ test_that("one problem is reported once even when two entries share a code", {
   on.exit(.wdj_state$fetch_memo <- NULL, add = TRUE)
 
   seen <- character()
-  suppressMessages(testthat::with_mocked_bindings(.package = "WDI", WDI = flaky, {
+  suppressMessages(testthat::with_mocked_bindings(.package = "countryatlas", wb_request = flaky, {
     withCallingHandlers(
       invisible(country_data(2020, c(a = "SP.POP.TOTL", b = "SP.POP.TOTL"),
                              cache = FALSE, parallel = FALSE)),

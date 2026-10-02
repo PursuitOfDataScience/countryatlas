@@ -25,6 +25,15 @@ lowest value), so under \code{desc = FALSE} rank 1 has percentile 0.}
 Adds \code{rank}, \code{percentile} and \code{z_score} for a value column, optionally within
 a group (region, year, ...), for "top 10" tables and labelling.
 }
+\section{Panels}{
+
+With no \code{within}, every row is ranked against every other. On a panel that
+pools the years: a country's 2020 and its 2000 compete for the same ranks,
+and \code{z_score} carries the time trend. So a frame whose \code{year} holds more
+than one value warns (class \code{countryatlas_panel}); \code{within = year} ranks
+countries within each year, which is nearly always what is meant.
+}
+
 \examples{
 df <- data.frame(iso3c = c("USA", "CHN", "IND"), gdp = c(21, 17, 3))
 rank_countries(df, gdp)

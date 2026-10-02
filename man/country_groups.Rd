@@ -9,8 +9,9 @@ country_groups(group = NULL, as_of = NULL)
 \arguments{
 \item{group}{One or more group names: any of \code{"EU"}, \code{"OECD"}, \code{"G7"},
 \code{"G20"}, \code{"BRICS"}, \code{"ASEAN"}, \code{"EFTA"}, \code{"Commonwealth"}, \code{"OPEC"},
-\code{"EuroZone"}, \code{"NATO"}, \code{"Mercosur"}, \code{"GCC"}, \code{"Nordic"}, \code{"Visegrad"}.
-If \code{NULL}, the whole table is returned.}
+\code{"EuroZone"}, \code{"NATO"}, \code{"Mercosur"}, \code{"GCC"}, \code{"Nordic"}, \code{"Visegrad"},
+\code{"SCO"}, \code{"CPTPP"}, \code{"RCEP"}, \code{"EAC"}, \code{"SADC"}, \code{"APEC"} and
+\code{"ArabLeague"}. If \code{NULL}, the whole table is returned.}
 
 \item{as_of}{A date (or a year) at which to evaluate membership. \code{NULL}
 (default) uses the current snapshot. \strong{A bare year means 1 January of that
@@ -39,11 +40,13 @@ throughout, and both are wrong:
 "GBR" \%in\% country_groups("EU", as_of = 2021)$iso3c   # FALSE
 }\if{html}{\out{</div>}}
 
-\link{country_groups_history} carries dated membership for twelve groups: EU,
-EuroZone, NATO, OECD, ASEAN, EFTA, GCC, Mercosur, Nordic, Visegrad, BRICS and
-G7. Commonwealth, G20 and OPEC are \strong{not} dated -- their histories involve
-suspensions, readmissions and contested dates that would have to be sourced
-case by case, and a fabricated date is worse than an absent one. Asking for
+\link{country_groups_history} carries dated membership for nineteen groups: EU,
+EuroZone, NATO, OECD, ASEAN, EFTA, GCC, Mercosur, Nordic, Visegrad, BRICS,
+G7, SCO, CPTPP, RCEP, EAC, SADC, APEC and the Arab League, with
+suspensions as spells of their own: Syria is not counted in the Arab League
+from 2011 to 2023. Commonwealth, G20 and OPEC are \strong{not} dated -- their
+histories involve suspensions, readmissions and contested dates the sources
+give unevenly, and a fabricated date is worse than an absent one. Asking for
 \code{as_of} on those warns and falls back to the snapshot.
 }
 

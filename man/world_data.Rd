@@ -17,7 +17,8 @@ world_data(
   cache = TRUE,
   language = "en",
   parallel = TRUE,
-  overrides = country_overrides()
+  overrides = country_overrides(),
+  vintage = NULL
 )
 }
 \arguments{
@@ -48,8 +49,12 @@ only the \code{sf} backend can do that properly -- see \code{\link[=world_geomet
 the \code{sf} backend (see \code{\link[=world_map]{world_map()}} for the projections available). The
 other backends warn if asked, rather than ignoring the request.}
 
-\item{latest}{If \code{TRUE}, use the most recent non-\code{NA} value per country for a
-single-year request.}
+\item{latest}{For a single-year request: \code{TRUE} takes each indicator's most
+recent non-\code{NA} value per country, and \code{"common"} the most recent year in
+which \emph{every} requested indicator is present, so arithmetic across them is
+consistent. Either way each indicator gains an \verb{<indicator>_year} column
+saying which year its value comes from. \code{FALSE} (default) pins the
+requested year.}
 
 \item{cache}{Whether to use the memoised / on-disk WDI cache.}
 
@@ -61,6 +66,13 @@ because a forked worker's memo dies with it and nothing would be cached.}
 
 \item{overrides}{Name -> iso3c overrides for geometry matching (default
 \code{\link[=country_overrides]{country_overrides()}}).}
+
+\item{vintage}{Which release of the World Development Indicators to read:
+\code{NULL} (default) for the current one, or an archived release such as
+\code{"2024-07"} from the World Bank's WDI Database Archives (see
+\code{\link[=wdi_vintages]{wdi_vintages()}}). An archived release never changes, so its cache
+entries never expire. A series the release does not hold warns and names
+the nearest releases that do.}
 }
 \value{
 A tibble (polygon backend), \code{sf} object (sf backend) or country-level
@@ -87,15 +99,10 @@ panel), an \code{sf} backend with real projections, and region subsetting.
 }
 \examples{
 \donttest{
-# geometry = "polygon", the default, comes from the suggested `maps`
-# package, so guard the call: an example may not assume a Suggests is
-# installed (R CMD check runs \donttest{} blocks, and CRAN has a
-# check flavour with no suggested packages at all).
-if (requireNamespace("maps", quietly = TRUE)) {
-  world_data(2020)
-}
+# geometry = "polygon", the default, is bundled: nothing to install.
+world_data(2020)
 
-# geometry = "none" needs nothing beyond the hard dependencies.
+# geometry = "none" returns the country table alone.
 world_data(2020, indicator = c(life_exp = "SP.DYN.LE00.IN"),
            geometry = "none")
 }

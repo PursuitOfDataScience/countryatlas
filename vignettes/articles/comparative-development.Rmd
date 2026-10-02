@@ -1,0 +1,56 @@
+---
+title: "The comparative-development toolkit"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", message = FALSE,
+                      warning = FALSE, dpi = 96)
+library(countryatlas)
+snap <- world_snapshot$countries
+```
+
+## Inequality, concept by concept
+
+Milanovic separates inequality between countries as units (concept 1) from
+inequality between countries weighted by their populations (concept 2).
+`inequality()` gives every standard measure under either:
+
+```{r}
+inequality(snap$gdp_per_capita)
+inequality(snap$gdp_per_capita, weights = snap$population)
+```
+
+How much of it lies between continents? Theil's L decomposes without depending
+on the order:
+
+```{r}
+theil(snap$gdp_per_capita, snap$population, groups = snap$continent, type = "L")
+```
+
+## Convergence and mobility
+
+`beta_convergence()` and `sigma_convergence()` summarise a distribution in one
+number each. `transition_matrix()` shows how countries move within it (Quah):
+
+```{r}
+set.seed(4)
+pan <- expand.grid(iso3c = snap$iso3c[1:60], year = 2000:2010,
+                   stringsAsFactors = FALSE)
+pan$gdp <- exp(9 + stats::ave(stats::rnorm(nrow(pan), 0, 0.05), pan$iso3c,
+                              FUN = cumsum) + rep(stats::rnorm(60), 11))
+tm <- transition_matrix(pan, gdp, n_classes = 3, classes = "relative")
+tm
+attr(tm, "ergodic")
+rank_mobility(pan, gdp, from = 2000, to = 2010)
+```
+
+## Money across countries and years
+
+`deflate()` turns current prices into constant ones, and `to_ppp()` converts
+exchange-rate dollars to purchasing-power parity; a cross-country panel over
+time usually needs both. Both fetch their price series from the World Bank:
+
+```{r, eval = FALSE}
+d <- country_data(2010:2020, c(gdp = "NY.GDP.MKTP.CN"), panel = TRUE)
+d |> deflate(gdp, base_year = 2015) |> to_ppp(gdp_real)
+```

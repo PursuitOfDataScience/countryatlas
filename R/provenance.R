@@ -29,9 +29,18 @@
 #'
 #' @return A one-row tibble of provenance fields, invisibly printed in a
 #'   human-readable block. Fields: `countryatlas`, `fill`, `backend`,
-#'   `projection`, `style`, `n_bins`, `na_style`, `n_countries`, `n_missing`,
-#'   `n_total`, `uncertainty`, `disputes`, `dispute_policy`, `n_imputed`,
-#'   `breaks`, `missing_iso3c` and `snapshot_year`.
+#'   `projection`, `style`, `modified`, `n_bins`, `na_style`, `n_countries`,
+#'   `n_missing`, `n_total`, `uncertainty`, `disputes`, `dispute_policy`,
+#'   `worldview`, `n_imputed`, `breaks`, `missing_iso3c`, `snapshot_year`, and
+#'   `sources`, the
+#'   [source_info()] record of the fill column when the data carried one --
+#'   which the print names: "World Bank WDI NY.GDP.PCAP.KD (constant 2015
+#'   US$), release 2026-07, fetched 2026-10-01".
+#'
+#'   `projection` and `style` describe the plot as it is now, read from its
+#'   coordinate system and fill scale: a map given `+ coord_sf(crs = 3035)`
+#'   after the verb drew it reports `"custom"`, and `modified = TRUE` says the
+#'   plot no longer matches what the verb recorded.
 #'
 #'   The three counts are: `n_countries`, the countries actually drawn with a
 #'   value; `n_missing`, those drawn without one; and `n_total`, the two added
@@ -54,11 +63,9 @@
 #' @examples
 #' \donttest{
 #' snap <- countryatlas::world_snapshot$countries
-#' if (requireNamespace("maps", quietly = TRUE)) {
-#'   p <- attach_geometry(snap, geometry = "polygon") |>
-#'     world_map(gdp_per_capita, style = "quantile")
-#'   map_provenance(p)
-#' }
+#' p <- attach_geometry(snap, geometry = "polygon") |>
+#'   world_map(gdp_per_capita, style = "quantile")
+#' map_provenance(p)
 #' }
 map_provenance <- function(x, value = NULL) {
   prov <- attr(x, "countryatlas_provenance")
@@ -90,15 +97,37 @@ map_provenance <- function(x, value = NULL) {
                  backend = if (is_sf(x)) "sf" else if (has_map_geometry(x)) "polygon" else NA_character_,
                  n_bins = NA_integer_, na_style = NA_character_,
                  coverage = na_coverage(x, value_name), breaks = NULL,
-                 n_imputed = imputed_count(x))
+                 n_imputed = imputed_count(x),
+                 sources = fill_source_info(x, value_name))
   }
 
+  # What the plot shows now, not only what the verb recorded: a coord or a
+  # fill scale added afterwards changes the map, and the record used to say
+  # otherwise (`+ coord_sf(crs = 3035)` still reported Equal Earth).
+  modified <- FALSE
+  if (inherits(x, "ggplot")) {
+    now <- current_projection(x, prov$projection %||% NA_character_)
+    if (!identical(now, prov$projection %||% NA_character_) &&
+        !is.na(prov$projection %||% NA_character_)) {
+      prov$projection <- now
+      modified <- TRUE
+    }
+    kind_now <- current_scale_kind(x)
+    kind_then <- style_scale_kind(prov$style %||% NA_character_)
+    if (!is.na(kind_now) && !is.na(kind_then) && kind_now != kind_then) {
+      prov$style <- paste0("modified (", kind_now, " scale)")
+      prov$breaks <- NULL
+      prov$n_bins <- NA_integer_
+      modified <- TRUE
+    }
+  }
   out <- tibble::tibble(
     countryatlas = as.character(utils::packageVersion("countryatlas")),
     fill         = prov$fill %||% NA_character_,
     backend      = prov$backend %||% NA_character_,
     projection   = prov$projection %||% NA_character_,
     style        = prov$style %||% NA_character_,
+    modified     = modified,
     n_bins       = if (is.null(prov$n_bins)) NA_integer_ else as.integer(prov$n_bins),
     na_style     = prov$na_style %||% NA_character_,
     # `n_countries` is the *numerator* -- countries drawn with a value -- which
@@ -112,11 +141,13 @@ map_provenance <- function(x, value = NULL) {
     uncertainty  = prov$uncertainty %||% NA_character_,
     disputes     = prov$disputes %||% NA_character_,
     dispute_policy = prov$dispute_policy %||% NA_character_,
+    worldview    = prov$worldview %||% NA_character_,
     n_imputed    = prov$n_imputed %||% 0L,
     snapshot_year = countryatlas::world_snapshot$year
   )
   out$breaks <- list(prov$breaks)
   out$missing_iso3c <- list(prov$coverage$missing_iso3c %||% character(0))
+  out$sources <- list(prov$sources %||% empty_source_info())
   structure(out, class = c("countryatlas_provenance", class(out)))
 }
 
@@ -176,8 +207,23 @@ print.countryatlas_provenance <- function(x, ...) {
     if (!is.null(nimp) && isTRUE(as.numeric(nimp) > 0))
       sprintf("%s interpolated value(s)", nimp)
   )
+  src <- get1("sources")
+  if (is.data.frame(src) && nrow(src)) {
+    for (i in seq_len(nrow(src))) {
+      line <- source_line(src[i, ])
+      cli::cli_text("{.strong data}: {line}")
+    }
+  }
   for (e in notes) cli::cli_text("{.strong note}: {e}")
   invisible(x)
+}
+
+# The source_info() rows that describe the fill column, or NULL.
+fill_source_info <- function(data, fill) {
+  info <- attr(data, "countryatlas_sources")
+  if (is.null(info) || is.null(fill)) return(NULL)
+  info <- info[info$column %in% fill, , drop = FALSE]
+  if (nrow(info)) info else NULL
 }
 
 
@@ -207,8 +253,42 @@ restate_provenance <- function(p, data, value_name, shown = NULL) {
   if (!is.null(value_name) && value_name %in% names(data)) {
     prov$coverage <- na_coverage(data, value_name, shown = shown)
   }
+  prov$sources <- fill_source_info(data, value_name)
+  prov$values <- alt_values(data, value_name)
+  # An automatic caption was written from the internal column the verb drew;
+  # rewrite it from the recount, or the caption and the provenance disagree.
+  # Only the part the verb wrote: a caller-facing verb may have added its own
+  # sentence (lisa_map() names its multiple-testing method), or replaced the
+  # caption outright (coverage_map()).
+  if (identical(prov$footnote, "auto") && !is.null(prov$caption)) {
+    cap <- map_caption("auto", prov$coverage, prov$caption_notes, prov$sources,
+                       lead = prov$caption_lead)
+    cur <- gg_caption(p)
+    if (!is.null(cap) && !is.null(cur) && grepl(prov$caption, cur, fixed = TRUE)) {
+      p <- p + ggplot2::labs(caption = sub(prov$caption, cap, cur, fixed = TRUE))
+      prov$caption <- cap
+    }
+  }
   attr(p, "countryatlas_provenance") <- prov
   p
+}
+
+# The caption a map verb adds. `footnote = "auto"` states the coverage, then
+# the verb's own notes (small states drawn as points, a dispute convention,
+# imputed values), then the source; a string is used as given, followed by
+# the notes; `FALSE` or `NULL` adds nothing.
+map_caption <- function(footnote, coverage, notes = NULL, sources = NULL,
+                        lead = NULL, call = rlang::caller_env()) {
+  if (is.null(footnote) || isFALSE(footnote)) return(NULL)
+  auto <- identical(footnote, "auto") || isTRUE(footnote)
+  line <- if (is.null(coverage) || is.na(coverage$n_total %||% NA)) {
+    if (auto) NULL else resolve_footnote(footnote, coverage, call)
+  } else {
+    resolve_footnote(footnote, coverage, call)
+  }
+  src <- if (auto) source_caption(sources)
+  out <- paste(stats::na.omit(c(lead, line, notes, src)), collapse = " ")
+  if (nzchar(out)) out
 }
 
 # Attach provenance to a plot built outside world_map().
@@ -218,20 +298,39 @@ restate_provenance <- function(p, data, value_name, shown = NULL) {
 # reading "any plot the package's map verbs produced". A partial implementation
 # of a provenance feature is worse than none, because the gap is invisible until
 # someone relies on it.
+#
+# `footnote` is the verb's own argument (see map_caption()); a caption the
+# verb already set, such as gridded_cartogram()'s "1 cell = ...", leads it.
 wdj_provenance <- function(p, data, fill, backend, projection = NA_character_,
-                           style = NA_character_, extra = list()) {
+                           style = NA_character_, extra = list(),
+                           footnote = NULL, notes = NULL) {
   cov <- if (!is.null(fill) && fill %in% names(data)) {
     na_coverage(data, fill)
   } else {
     list(n_total = NA_integer_, n_shown = NA_integer_, n_missing = NA_integer_,
          missing_iso3c = character(0))
   }
-  attr(p, "countryatlas_provenance") <- utils::modifyList(list(
+  prov <- utils::modifyList(list(
     fill = fill %||% NA_character_, style = style, projection = projection,
     backend = backend, n_bins = NA_integer_, na_style = NA_character_,
     coverage = cov, breaks = NULL,
     disputes = "ignore", dispute_policy = dispute_policy(),
-    uncertainty = NA_character_, n_imputed = imputed_count(data)
+    uncertainty = NA_character_, n_imputed = imputed_count(data),
+    sources = fill_source_info(data, fill), values = alt_values(data, fill)
   ), extra)
+  p <- with_alt_text(p)
+  if (!is.null(footnote) && !isFALSE(footnote)) {
+    own <- gg_caption(p)
+    lead <- if (length(own) && !is.na(own[1]) && nzchar(own[1])) own[1]
+    cap <- map_caption(footnote, prov$coverage, notes, prov$sources, lead = lead)
+    if (!is.null(cap)) p <- p + ggplot2::labs(caption = cap)
+    prov$footnote <- if (identical(footnote, "auto") || isTRUE(footnote)) "auto" else "custom"
+    prov$caption_notes <- notes
+    prov$caption_lead <- lead
+    prov$caption <- cap
+  } else {
+    prov$footnote <- "none"
+  }
+  attr(p, "countryatlas_provenance") <- prov
   p
 }

@@ -1,13 +1,14 @@
 # Spatial weights and the statistics built on them --------------------------------
 #
 # morans_i() shipped in 2.0.0 with one hard-wired weight scheme: land-border
-# contiguity, row-standardised. That is a defensible default and a consequential
-# one -- an island has no land border, so Japan, the UK, Australia, Indonesia,
-# Madagascar, New Zealand, the Philippines, Iceland and every small island state
-# carried no weight and left the analysis. 2.1.0 made that visible (n_excluded);
-# this makes it fixable. country_weights("knn") gives every country neighbours,
-# and the same object drives local statistics, Geary's C, Getis-Ord and the
-# spatial lag.
+# contiguity, row-standardised. That is a defensible scheme and a consequential
+# default -- an island has no land border, so Japan, the UK, Australia,
+# Indonesia, Madagascar, New Zealand, the Philippines, Iceland and every small
+# island state carried no weight and left the analysis. 2.1.0 made that visible
+# (n_excluded), 3.0.0 made it fixable with country_weights("knn"), and 4.0.0
+# makes knn (k = 5) the default, so a "global" statistic covers the globe. The
+# same object drives local statistics, Geary's C, Getis-Ord and the spatial
+# lag.
 #
 # The distinctive one is type = "custom": adjacency does not have to be
 # geographic. "Countries near each other in *trade* space" is often the relevant
@@ -44,15 +45,16 @@ warn_weights_args_ignored <- function(type, k, cutoff_km, w, scale) {
 #'
 #' Build a reusable neighbour-weights object for [morans_i()], [local_morans()],
 #' [gearys_c()], [getis_ord()] and [spatial_lag()]. Four schemes, three of which
-#' give every country at least one neighbour -- which land-border contiguity, the
-#' historical default, cannot do for an island.
+#' give every country at least one neighbour -- which land-border contiguity,
+#' the default before 4.0.0, cannot do for an island.
 #'
 #' @param type
+#'   * `"knn"` (default) -- the `k` nearest countries by great-circle centroid
+#'     distance. Every country gets exactly `k` neighbours, islands included.
+#'     Needs nothing but the bundled [country_meta]. It is also what every
+#'     statistic here uses when `weights` is `NULL`.
 #'   * `"contiguity"` -- shared land border, from [country_borders()]. Needs
 #'     `sf`. Islands get no neighbours; see [morans_i()]'s note.
-#'   * `"knn"` -- the `k` nearest countries by great-circle centroid distance.
-#'     Every country gets exactly `k` neighbours, islands included. Needs
-#'     nothing but the bundled [country_meta].
 #'   * `"distance"` -- every country within `cutoff_km`. Needs nothing.
 #'   * `"custom"` -- your own adjacency (see `w`), which is how non-geographic
 #'     neighbourhoods -- trade volume, migration flows, colonial or language
@@ -91,7 +93,7 @@ warn_weights_args_ignored <- function(type, k, cutoff_km, w, scale) {
 #' morans_i(snap, gdp_per_capita, weights = country_weights("knn", k = 5),
 #'          n_perm = 99)
 #' }
-country_weights <- function(type = c("contiguity", "knn", "distance", "custom"),
+country_weights <- function(type = c("knn", "contiguity", "distance", "custom"),
                             countries = NULL, k = 5, cutoff_km = NULL,
                             w = NULL, style = c("W", "B"), scale = "small") {
   type <- rlang::arg_match(type)
@@ -199,9 +201,8 @@ weights_contiguity <- function(countries, scale) {
 }
 
 # Centroid table for the distance-based schemes. country_meta carries no
-# centroid for a handful of small territories and no row at all for Kosovo (see
-# ?distance_between), so say which countries dropped out rather than returning a
-# quietly smaller matrix.
+# centroid for a handful of small territories (see ?distance_between), so say
+# which countries dropped out rather than returning a quietly smaller matrix.
 weights_centroids <- function(countries, call = rlang::caller_env()) {
   meta <- countryatlas::country_meta[, c("iso3c", "centroid_lon", "centroid_lat")]
   meta <- meta[!is.na(meta$centroid_lon) & !is.na(meta$centroid_lat), ]
@@ -455,7 +456,7 @@ zero_variance <- function(x, val_name, call = rlang::caller_env()) {
 # subset to the countries that have both a value and a row in the matrix, and a
 # report of who fell out. Doing it once keeps morans_i()'s exclusion accounting
 # consistent across all of them.
-align_weights <- function(data, val_name, weights, scale = "small",
+align_weights <- function(data, val_name, weights, scale = NULL,
                           call = rlang::caller_env()) {
   if (!"iso3c" %in% names(data)) {
     wdj_abort("{.arg data} must contain an {.field iso3c} column.", call = call)
@@ -474,7 +475,13 @@ align_weights <- function(data, val_name, weights, scale = "small",
   # `n_excluded` as though an island had been dropped.
   df <- df[!blank_key(df$iso3c) & is.finite(df[[val_name]]), ]
 
-  if (is.null(weights)) weights <- country_weights("contiguity", scale = scale)
+  # knn (k = 5) by default: contiguity silently deletes every island from a
+  # "global" statistic. `scale` survives only for morans_i()'s deprecated
+  # argument, which asked for the old contiguity default at a resolution.
+  if (is.null(weights)) {
+    weights <- if (is.null(scale)) country_weights("knn", k = 5) else
+      country_weights("contiguity", scale = scale)
+  }
   if (!inherits(weights, "countryatlas_weights")) {
     wdj_abort(c(
       "{.arg weights} must come from {.fn country_weights}.",
@@ -557,17 +564,45 @@ align_weights <- function(data, val_name, weights, scale = "small",
 #'
 #' @param data A country-level frame with `iso3c` and the value column.
 #' @param value The value column (unquoted).
-#' @param weights A [country_weights()] object. Defaults to land-border
-#'   contiguity, which excludes islands -- prefer `country_weights("knn")` for
-#'   global work.
-#' @param n_perm Permutations for the pseudo-p-value (default `999`; use `0` to
-#'   skip the test, which leaves `p_value` as `NA`).
+#' @param weights A [country_weights()] object. `NULL` (default) uses
+#'   `country_weights("knn", k = 5)`: every country's five nearest neighbours,
+#'   islands included. `country_weights("contiguity")` gives the land-border
+#'   default of earlier versions, which leaves every island out.
+#' @param n_perm Permutations for the pseudo-p-value (default `9999`; use `0`
+#'   to skip the test, which leaves `p_value` as `NA`). The smallest p-value a
+#'   permutation test can give is \eqn{1/(n_{perm}+1)}, and false-discovery
+#'   control across about 190 countries needs a finer floor than 999
+#'   permutations give; see the section below.
 #' @param alpha Significance threshold for the `cluster` label (default `0.05`).
+#' @param p_adjust How to adjust the per-country p-values for testing about
+#'   190 countries at once: `"fdr"` (default; Benjamini-Hochberg false
+#'   discovery rate), `"bonferroni"`, `"holm"` or `"none"`. See the section
+#'   below.
 #'
 #' @return A tibble, one row per country: `iso3c`, `value`, `lag` (the
-#'   neighbour average), `ii` (the local statistic), `p_value` and `cluster`
-#'   (`"High-High"`, `"Low-Low"`, `"High-Low"`, `"Low-High"` or `"Not
-#'   significant"`).
+#'   neighbour average), `ii` (the local statistic), `p_value`, `p_adjusted`
+#'   and `cluster` (`"High-High"`, `"Low-Low"`, `"High-Low"`, `"Low-High"` or
+#'   `"Not significant"`, judged on `p_adjusted`). The method is recorded as
+#'   the `"countryatlas_p_adjust"` attribute.
+#'
+#' @section One test per country:
+#' A local statistic runs one test per country, about 190 of them, so at
+#' `alpha = 0.05` roughly ten countries are expected to look significant when
+#' nothing is going on at all. `p_adjust = "fdr"` controls the false discovery
+#' rate instead -- the share of flagged countries that are false alarms --
+#' which is the standard remedy for exactly this setting (Caldas de Castro &
+#' Singer 2006) and what GeoDa offers. `"bonferroni"` and `"holm"` control the
+#' chance of any false alarm, which is stricter; `"none"` reproduces the
+#' unadjusted labels of earlier versions. `p_value` itself is never adjusted,
+#' so it still matches `spdep`.
+#'
+#' Adjustment needs resolution. A permutation p-value cannot go below
+#' \eqn{1/(n_{perm}+1)}, and Benjamini-Hochberg flags the most significant of
+#' 190 tests only when its p-value is below \eqn{0.05/190 \approx 0.00026}.
+#' With 999 permutations the floor, 0.001, is above that, so nothing short of
+#' several countries all reaching the floor can be flagged, and an empty map
+#' would say "no clusters" when it means "not enough permutations". Hence the
+#' default of 9,999, which takes about a second for the whole world.
 #'
 #'   `p_value` is a **two-sided** pseudo-p from conditional permutation:
 #'   \eqn{(1 + \#\{|I_i^{*}| \ge |I_i|\}) / (n_{perm} + 1)}, so it is never
@@ -583,6 +618,11 @@ align_weights <- function(data, val_name, weights, scale = "small",
 #' *Geographical Analysis* 27(2), 93-115.
 #' \doi{10.1111/j.1538-4632.1995.tb00338.x}
 #'
+#' Caldas de Castro, M. & Singer, B. H. (2006). Controlling the false discovery
+#' rate: a new application to account for multiple and dependent tests in local
+#' statistics of spatial association. *Geographical Analysis* 38(2), 180-208.
+#' \doi{10.1111/j.0016-7363.2006.00682.x}
+#'
 #' @seealso [lisa_map()], [morans_i()], [country_weights()]
 #' @export
 #' @examples
@@ -592,11 +632,13 @@ align_weights <- function(data, val_name, weights, scale = "small",
 #' local_morans(snap, gdp_per_capita, weights = country_weights("knn", k = 5),
 #'              n_perm = 99)
 #' }
-local_morans <- function(data, value, weights = NULL, n_perm = 999,
-                         alpha = 0.05) {
+local_morans <- function(data, value, weights = NULL, n_perm = 9999,
+                         alpha = 0.05,
+                         p_adjust = c("fdr", "bonferroni", "holm", "none")) {
   val_name <- quo_arg_name(rlang::enquo(value), "value")
   check_number(n_perm, "n_perm", lo = 0, hi = .Machine$integer.max)
   check_number(alpha, "alpha", lo = 0, hi = 1)
+  p_adjust <- rlang::arg_match(p_adjust)
   al <- align_weights(data, val_name, weights)
   m <- al$m; x <- al$x; n <- length(x)
 
@@ -634,11 +676,8 @@ local_morans <- function(data, value, weights = NULL, n_perm = 999,
       # One draw of length(nb) values, without replacement, per permutation;
       # vapply() keeps a single neighbour as a row vector, which matrix()
       # shapes into the same k-by-n_perm layout as several.
-      draws <- matrix(
-        others[vapply(seq_len(n_perm),
-                      function(b) sample.int(n - 1L, length(nb)),
-                      integer(length(nb)))],
-        nrow = length(nb))
+      draws <- matrix(others[perm_draws(n - 1L, length(nb), n_perm)],
+                      nrow = length(nb))
       iip <- (z[i] / m2) * colSums(draws * m[i, nb])
       ge[i] <- sum(abs(iip) >= abs(ii[i]))
     }
@@ -650,13 +689,70 @@ local_morans <- function(data, value, weights = NULL, n_perm = 999,
   cluster <- ifelse(hi & hi_lag, "High-High",
              ifelse(!hi & !hi_lag, "Low-Low",
              ifelse(hi & !hi_lag, "High-Low", "Low-High")))
-  cluster[is.na(p) | p > alpha] <- "Not significant"
-  tibble::tibble(
+  # About 190 tests at once: unadjusted, roughly ten countries are expected to
+  # come out "significant" under the null, and the map gave no hint which.
+  p_adj <- adjust_p(p, p_adjust)
+  cluster[is.na(p_adj) | p_adj > alpha] <- "Not significant"
+  out <- tibble::tibble(
     iso3c = al$iso3c, value = x, lag = lag_raw, ii = as.numeric(ii),
-    p_value = p,
+    p_value = p, p_adjusted = p_adj,
     cluster = factor(cluster, levels = c("High-High", "Low-Low", "High-Low",
                                          "Low-High", "Not significant"))
   )
+  attr(out, "countryatlas_p_adjust") <- p_adjust
+  out
+}
+
+# `B` draws of `k` distinct indices from 1..N, as a k-by-B matrix: the
+# conditional permutation's neighbour sets. One sample.int() call per draw cost
+# 1.2 s for 999 permutations over 189 countries and 12 s for 9,999, which is
+# the resolution false-discovery control needs (with 999 the smallest p-value,
+# 0.001, is above the first Benjamini-Hochberg cutoff for 190 tests). When a
+# draw with replacement is likely to come out distinct anyway -- k small
+# against N, as for knn -- draw every tuple at once and redraw only the ones
+# with a repeat: rejection sampling, so each surviving tuple is uniform over
+# ordered sets of k distinct indices, exactly what sample.int() gives. A large
+# neighbourhood, where repeats are the rule, keeps the one-call-per-draw form.
+perm_draws <- function(N, k, B) {
+  if (k == 0L || B == 0L) return(matrix(integer(), k, B))
+  accept <- prod(1 - (seq_len(k) - 1L) / N)
+  if (accept < 0.5) {
+    return(matrix(vapply(seq_len(B), function(b) sample.int(N, k), integer(k)),
+                  nrow = k))
+  }
+  M <- matrix(sample.int(N, k * B, replace = TRUE), nrow = k)
+  if (k == 1L) return(M)
+  pairs <- utils::combn(k, 2L)
+  todo <- seq_len(B)
+  repeat {
+    sub <- M[, todo, drop = FALSE]
+    dup <- logical(length(todo))
+    for (j in seq_len(ncol(pairs))) {
+      dup <- dup | sub[pairs[1L, j], ] == sub[pairs[2L, j], ]
+    }
+    todo <- todo[dup]
+    if (!length(todo)) break
+    M[, todo] <- sample.int(N, k * length(todo), replace = TRUE)
+  }
+  M
+}
+
+# p.adjust() over the non-missing p-values: "fdr" is Benjamini-Hochberg. NA
+# stays NA and does not count towards the number of tests, which is what
+# p.adjust() itself does with n = length(p) on the finite ones.
+adjust_p <- function(p, method) {
+  if (identical(method, "none")) return(p)
+  out <- p
+  ok <- !is.na(p)
+  out[ok] <- stats::p.adjust(p[ok], method = switch(method, fdr = "BH", method))
+  out
+}
+
+# The words a caption uses for a p_adjust method.
+p_adjust_label <- function(method) {
+  switch(method,
+         fdr = "false discovery rate (Benjamini-Hochberg)",
+         bonferroni = "Bonferroni", holm = "Holm", none = "no adjustment")
 }
 
 #' Map LISA clusters
@@ -668,9 +764,15 @@ local_morans <- function(data, value, weights = NULL, n_perm = 999,
 #'
 #' @param data A map-ready frame (polygon or `sf`) with `iso3c`.
 #' @param value The value column (unquoted).
-#' @param weights A [country_weights()] object.
-#' @param n_perm,alpha Passed to [local_morans()].
+#' @param weights A [country_weights()] object; `NULL` (default) is
+#'   `country_weights("knn", k = 5)`, as in [local_morans()].
+#' @param n_perm,alpha,p_adjust Passed to [local_morans()]. The significance
+#'   mask uses the adjusted p-values, and the caption names the method.
 #' @param ... Passed to [world_map()].
+#'
+#' @section Backend:
+#' Either backend, as [world_map()]: the frame decides, and both draw in Equal
+#' Earth unless `projection` is passed on through `...`.
 #'
 #' @return A `ggplot` object, with the [local_morans()] table attached as the
 #'   `"countryatlas_lisa"` attribute.
@@ -679,21 +781,20 @@ local_morans <- function(data, value, weights = NULL, n_perm = 999,
 #' @examples
 #' \donttest{
 #' snap <- countryatlas::world_snapshot$countries
-#' if (requireNamespace("maps", quietly = TRUE)) {
-#'   set.seed(1)
-#'   attach_geometry(snap, geometry = "polygon") |>
-#'     lisa_map(gdp_per_capita, weights = country_weights("knn", k = 5),
-#'              n_perm = 99)
+#' set.seed(1)
+#' attach_geometry(snap, geometry = "polygon") |>
+#'   lisa_map(gdp_per_capita, weights = country_weights("knn", k = 5),
+#'            n_perm = 99)
 #' }
-#' }
-lisa_map <- function(data, value, weights = NULL, n_perm = 999, alpha = 0.05,
-                     ...) {
+lisa_map <- function(data, value, weights = NULL, n_perm = 9999, alpha = 0.05,
+                     p_adjust = c("fdr", "bonferroni", "holm", "none"), ...) {
   refuse_reserved_dots(rlang::list2(...), c("style", "legend"), "lisa_map")
+  p_adjust <- rlang::arg_match(p_adjust)
   value_q <- rlang::enquo(value)
   val_name <- quo_arg_name(value_q, "value")
   check_map_geometry(data)
   lisa <- local_morans(data, !!value_q, weights = weights, n_perm = n_perm,
-                       alpha = alpha)
+                       alpha = alpha, p_adjust = p_adjust)
   data[[".wdj_cluster"]] <- lisa$cluster[match(data$iso3c, lisa$iso3c)]
   cl_sym <- rlang::sym(".wdj_cluster")
   p <- suppressMessages(
@@ -708,10 +809,27 @@ lisa_map <- function(data, value, weights = NULL, n_perm = 999, alpha = 0.05,
       )
   )
   attr(p, "countryatlas_lisa") <- lisa
+  # The mask is a multiple-testing decision, so the map says which one.
+  sig <- sprintf("Clusters significant at %s after %s.", fmt_num(alpha),
+                 p_adjust_label(p_adjust))
+  if (identical(p_adjust, "none")) {
+    sig <- sprintf("Clusters significant at %s, unadjusted for %d tests.",
+                   fmt_num(alpha), sum(!is.na(lisa$p_value)))
+  }
+  cap <- gg_caption(p)
+  p <- p + ggplot2::labs(caption = paste(stats::na.omit(c(cap, sig)),
+                                         collapse = " "))
   # Shown means "has a cluster", not "has a value": a country the weights
   # cannot connect keeps its value and is drawn as no-data.
-  restate_provenance(p, data, val_name,
-                     shown = !is.na(data[[".wdj_cluster"]]))
+  p <- restate_provenance(p, data, val_name,
+                          shown = !is.na(data[[".wdj_cluster"]]))
+  prov <- attr(p, "countryatlas_provenance")
+  if (!is.null(prov)) {
+    prov$p_adjust <- p_adjust
+    prov$alpha <- alpha
+    attr(p, "countryatlas_provenance") <- prov
+  }
+  p
 }
 
 #' Geary's C (spatial autocorrelation)
@@ -793,9 +911,14 @@ gearys_c <- function(data, value, weights = NULL, n_perm = 999) {
 #'   number computed outside its domain. \eqn{G_i^*} standardises and is
 #'   defined for signed data.
 #'
-#' @return With `local = TRUE`, a tibble of `iso3c`, `gi_star`, `z_score` and
-#'   `p_value` (two-sided, from the normal approximation), one row per country
-#'   used. With `local = FALSE`, a one-row tibble of `g`, `expected`, `n`
+#' @param p_adjust For `local = TRUE`, how to adjust the per-country p-values
+#'   for multiple testing: `"fdr"` (default), `"bonferroni"`, `"holm"` or
+#'   `"none"`, as in [local_morans()]. The global form makes one test and
+#'   takes no adjustment.
+#'
+#' @return With `local = TRUE`, a tibble of `iso3c`, `gi_star`, `z_score`,
+#'   `p_value` (two-sided, from the normal approximation) and `p_adjusted`,
+#'   one row per country used. With `local = FALSE`, a one-row tibble of `g`, `expected`, `n`
 #'   (countries used -- the same count, so the local form returns `n` rows) and
 #'   `n_links` (non-zero weights).
 #' @references
@@ -809,8 +932,17 @@ gearys_c <- function(data, value, weights = NULL, n_perm = 999) {
 #' snap <- countryatlas::world_snapshot$countries
 #' getis_ord(snap, gdp_per_capita, weights = country_weights("knn", k = 5))
 #' }
-getis_ord <- function(data, value, weights = NULL, local = TRUE) {
+getis_ord <- function(data, value, weights = NULL, local = TRUE,
+                      p_adjust = c("fdr", "bonferroni", "holm", "none")) {
   check_bool(local, "local")
+  p_given <- !missing(p_adjust)
+  p_adjust <- rlang::arg_match(p_adjust)
+  if (!local && p_given) {
+    wdj_warn(c(
+      "{.arg p_adjust} applies only to the local statistics and is ignored.",
+      "i" = "The global G is a single test."
+    ), class = "countryatlas_p_adjust_ignored")
+  }
   val_name <- quo_arg_name(rlang::enquo(value), "value")
   al <- align_weights(data, val_name, weights)
   m <- al$m; x <- al$x; n <- length(x)
@@ -890,9 +1022,13 @@ getis_ord <- function(data, value, weights = NULL, local = TRUE) {
   flat <- zero_variance(x, val_name)
   z <- if (flat) rep(NA_real_, n) else num / den
   gi <- as.numeric(ms %*% x)
-  tibble::tibble(iso3c = al$iso3c,
-                 gi_star = if (sum(x) == 0) rep(NA_real_, n) else gi / sum(x),
-                 z_score = z, p_value = 2 * stats::pnorm(-abs(z)))
+  p <- 2 * stats::pnorm(-abs(z))
+  out <- tibble::tibble(iso3c = al$iso3c,
+                        gi_star = if (sum(x) == 0) rep(NA_real_, n) else gi / sum(x),
+                        z_score = z, p_value = p,
+                        p_adjusted = adjust_p(p, p_adjust))
+  attr(out, "countryatlas_p_adjust") <- p_adjust
+  out
 }
 
 #' The neighbour average, as a column
@@ -947,8 +1083,8 @@ spatial_lag <- function(data, value, weights = NULL, suffix = "_lag") {
   yrs <- if ("year" %in% names(data)) unique(stats::na.omit(data$year)) else NULL
   if (length(yrs) > 1L) {
     # Resolve the weights once: they describe geography, not time, and
-    # rebuilding contiguity per year would re-read the basemap each pass.
-    if (is.null(weights)) weights <- country_weights("contiguity")
+    # rebuilding them per year would redo the same work each pass.
+    if (is.null(weights)) weights <- country_weights("knn", k = 5)
     out <- rep(NA_real_, nrow(data))
     exc <- character(0)
     # One sparse year is that year's problem. A year with too few connected
@@ -1007,12 +1143,15 @@ spatial_lag <- function(data, value, weights = NULL, suffix = "_lag") {
 #' @param data A country-level data frame with `iso3c` (map-ready frames are
 #'   reduced to one row per country first).
 #' @param value The value column (unquoted).
-#' @param scale Natural Earth resolution for the default contiguity adjacency
-#'   (see [country_borders()]). Ignored when `weights` is supplied.
+#' @param scale `r lifecycle::badge("deprecated")` The Natural Earth resolution
+#'   of the contiguity weights that were the default before 4.0.0. Supplying it
+#'   still builds them, with a warning; write
+#'   `weights = country_weights("contiguity", scale = )` instead.
 #' @param n_perm Number of permutations for the pseudo-p-value (default `999`;
 #'   use `0` to skip the test, which leaves `p_value` as `NA`).
-#' @param weights A [country_weights()] object. Defaults to land-border
-#'   contiguity, row-standardised -- which excludes every island. See below.
+#' @param weights A [country_weights()] object. `NULL` (default) uses
+#'   `country_weights("knn", k = 5)`, row-standardised, so every country with
+#'   data and a centroid takes part. See below.
 #'
 #' @return A one-row tibble: `i` (observed Moran's I), `expected`
 #'   (\eqn{-1/(n-1)} under no autocorrelation), `n` (countries used),
@@ -1024,17 +1163,18 @@ spatial_lag <- function(data, value, weights = NULL, suffix = "_lag") {
 #'   `p_value`.
 #'
 #' @section Which countries are left out:
-#' The default weights are land-border contiguity, and an island has no land
-#' border -- so any country with no land neighbour *present in `data`* drops out
-#' entirely. On the bundled [world_snapshot] that is around a quarter of the
-#' countries with data: Japan, the United Kingdom, Australia, Indonesia,
-#' Madagascar, New Zealand, the Philippines, Iceland, Cuba, Sri Lanka and every
-#' small island state. The omission is systematic rather than random.
-#'
-#' `n_excluded` and `excluded` report it, and [country_weights()] fixes it --
-#' `"knn"` and `"distance"` give every country neighbours:
+#' The default weights are the five nearest neighbours, so every country with
+#' data and a bundled centroid takes part. Land-border contiguity, the default
+#' before 4.0.0, is still available and still systematic in what it drops: an
+#' island has no land border, so any country with no land neighbour *present
+#' in `data`* leaves the statistic -- Japan, the United Kingdom, Australia,
+#' Indonesia, Madagascar, New Zealand, the Philippines, Iceland, Cuba, Sri Lanka
+#' and every small island state. On the bundled [world_snapshot]'s GDP per
+#' capita that changes the answer, not only the sample: see the numbers in the
+#' example below. `n_excluded` and `excluded` report who is left out under
+#' either scheme:
 #' ```r
-#' morans_i(snap, gdp_per_capita, weights = country_weights("knn", k = 5))
+#' morans_i(snap, gdp_per_capita, weights = country_weights("contiguity"))
 #' ```
 #'
 #' @references
@@ -1051,10 +1191,24 @@ spatial_lag <- function(data, value, weights = NULL, suffix = "_lag") {
 #' morans_i(snap, gdp_per_capita, n_perm = 99,
 #'          weights = country_weights("knn", k = 5))
 #' }
-morans_i <- function(data, value, scale = "small", n_perm = 999,
+morans_i <- function(data, value, scale = deprecated(), n_perm = 999,
                      weights = NULL) {
   val_name <- quo_arg_name(rlang::enquo(value), "value")
   check_number(n_perm, "n_perm", lo = 0, hi = .Machine$integer.max)
+  # `scale` set the resolution of the old contiguity default. Honour it the
+  # old way, so a 3.0.0 call keeps its meaning, and say how to write it now.
+  if (lifecycle::is_present(scale)) {
+    lifecycle::deprecate_warn(
+      "4.0.0", "morans_i(scale)",
+      details = c(
+        "i" = "The default weights are now k-nearest neighbours (k = 5).",
+        "i" = paste0("Write `weights = country_weights(\"contiguity\", ",
+                     "scale = \"", scale, "\")` for the land-border weights ",
+                     "it used to build.")))
+    if (!is.null(weights)) scale <- NULL
+  } else {
+    scale <- NULL
+  }
   al <- align_weights(data, val_name, weights, scale = scale)
   m <- al$m; x <- al$x; n <- length(x)
 
@@ -1077,5 +1231,246 @@ morans_i <- function(data, value, scale = "small", n_perm = 999,
     n_excluded = length(al$excluded), n_links = al$n_links, p_value = p_value
   )
   out$excluded <- list(al$excluded)
+  out
+}
+
+# --- Rates, two variables, and categories -----------------------------------------
+
+#' Moran's I for rates, not fooled by small denominators
+#'
+#' Moran's I on raw rates mistakes the noise of small denominators for
+#' clustering: a few small states with extreme rates beside one another look
+#' like a hot spot. The empirical-Bayes index (Assuncao & Reis 1999)
+#' standardises each rate by how much variation its denominator alone would
+#' produce before testing for autocorrelation.
+#'
+#' @param data A country-level frame with `iso3c`.
+#' @param numerator,denominator The counts and their population at risk
+#'   (unquoted).
+#' @param weights A [country_weights()] object; `NULL` (default) is k-nearest
+#'   neighbours (k = 5), as for [morans_i()].
+#' @param n_perm Permutations for the pseudo p-value (default `999`; `0` skips
+#'   it).
+#'
+#' @return A one-row tibble like [morans_i()]'s: `i`, `expected`, `n`,
+#'   `n_excluded`, `n_links`, `p_value` (one-sided, for positive
+#'   autocorrelation) and the list-column `excluded`.
+#'
+#' @section The statistic:
+#' With rates \eqn{p_i = y_i / x_i}, the global rate \eqn{b = \sum y / \sum x}
+#' and the method-of-moments between-country variance \eqn{a} (as in
+#' [smooth_rates()]), each rate is standardised as
+#' \eqn{z_i = (p_i - b) / \sqrt{a + b / x_i}} and Moran's I is computed on
+#' \eqn{z}. It agrees with `spdep::EBImoran.mc()` on the same weights.
+#'
+#' @references
+#' Assuncao, R. M. & Reis, E. A. (1999). A new proposal to adjust Moran's I
+#' for population density. *Statistics in Medicine* 18(16), 2147-2162.
+#' \doi{10.1002/(SICI)1097-0258(19990830)18:16<2147::AID-SIM179>3.0.CO;2-I}
+#' @seealso [morans_i()], [smooth_rates()], [rate_funnel()]
+#' @export
+#' @examples
+#' snap <- countryatlas::world_snapshot$countries
+#' snap$births <- snap$population * 0.02
+#' eb_morans_i(snap, births, population, n_perm = 0)
+eb_morans_i <- function(data, numerator, denominator, weights = NULL,
+                        n_perm = 999) {
+  num_name <- quo_arg_name(rlang::enquo(numerator), "numerator")
+  den_name <- quo_arg_name(rlang::enquo(denominator), "denominator")
+  check_number(n_perm, "n_perm", lo = 0, hi = .Machine$integer.max)
+  check_cols(data, c("iso3c", num_name, den_name))
+  check_numeric_col(data, num_name)
+  check_numeric_col(data, den_name)
+  df <- distinct_countries(tibble::as_tibble(sf_drop(data)))
+  y <- df[[num_name]]
+  x <- df[[den_name]]
+  # Built typed rather than with ifelse(), which returns logical(0) on an
+  # empty frame and so failed a numeric check on a column the caller never
+  # named.
+  ok <- is.finite(y) & y >= 0 & is.finite(x) & x > 0
+  df$.wdj_rate <- rep(NA_real_, nrow(df))
+  df$.wdj_rate[ok] <- y[ok] / x[ok]
+  al <- align_weights(df, ".wdj_rate", weights)
+  m <- al$m
+  at <- match(al$iso3c, df$iso3c)
+  y <- y[at]
+  x <- x[at]
+  n <- length(y)
+  b <- sum(y) / sum(x)
+  p <- y / x
+  s2 <- sum(x * (p - b)^2) / sum(x)
+  a <- max(s2 - b / (sum(x) / n), 0)
+  z <- (p - b) / sqrt(a + b / x)
+  stat <- function(v) {
+    vc <- v - mean(v)
+    (n / sum(m)) * sum(vc * as.numeric(m %*% vc)) / sum(vc^2)
+  }
+  flat <- zero_variance(z, "the standardised rate")
+  i_obs <- if (flat) NA_real_ else stat(z)
+  p_value <- NA_real_
+  n_perm <- as.integer(n_perm)
+  if (n_perm > 0L && !flat) {
+    perm <- vapply(seq_len(n_perm), function(k) stat(sample(z)), numeric(1))
+    p_value <- (1 + sum(perm >= i_obs)) / (n_perm + 1)
+  }
+  out <- tibble::tibble(i = i_obs, expected = -1 / (n - 1), n = n,
+                        n_excluded = length(al$excluded),
+                        n_links = al$n_links, p_value = p_value)
+  out$excluded <- list(al$excluded)
+  out
+}
+
+#' Bivariate local Moran: high X among high Y
+#'
+#' The local Moran statistic for two variables (Anselin, Syabri & Smirnov
+#' 2002): each country's standardised `x` against the average standardised
+#' `y` of its neighbours, so "rich countries surrounded by long-lived
+#' neighbours" is a cluster, and a rich country among short-lived neighbours
+#' an outlier.
+#'
+#' @param data A country-level frame with `iso3c`.
+#' @param x,y The two value columns (unquoted).
+#' @param weights,n_perm,alpha,p_adjust As in [local_morans()].
+#'
+#' @return A tibble with one row per country used: `iso3c`, `x`, `lag_y` (the
+#'   neighbours' average `y`), `ii`, `p_value`, `p_adjusted` and `cluster`
+#'   (`"High-High"`, `"Low-Low"`, `"High-Low"`, `"Low-High"` or
+#'   `"Not significant"`), where the first word is the country's `x` and the
+#'   second its neighbours' `y`. A country needs both values to take part.
+#'
+#' @references
+#' Anselin, L., Syabri, I. & Smirnov, O. (2002). Visualizing multivariate
+#' spatial correlation with dynamically linked windows. *Proceedings, CSISS
+#' Workshop on New Tools for Spatial Data Analysis*.
+#' @seealso [local_morans()], [lisa_map()]
+#' @export
+#' @examples
+#' \donttest{
+#' snap <- countryatlas::world_snapshot$countries
+#' bivariate_lisa(snap, gdp_per_capita, life_expectancy, n_perm = 499)
+#' }
+bivariate_lisa <- function(data, x, y, weights = NULL, n_perm = 9999,
+                           alpha = 0.05,
+                           p_adjust = c("fdr", "bonferroni", "holm", "none")) {
+  x_name <- quo_arg_name(rlang::enquo(x), "x")
+  y_name <- quo_arg_name(rlang::enquo(y), "y")
+  check_number(n_perm, "n_perm", lo = 0, hi = .Machine$integer.max)
+  check_number(alpha, "alpha", lo = 0, hi = 1)
+  p_adjust <- rlang::arg_match(p_adjust)
+  check_cols(data, c("iso3c", x_name, y_name))
+  check_numeric_col(data, x_name)
+  check_numeric_col(data, y_name)
+  df <- distinct_countries(tibble::as_tibble(sf_drop(data)))
+  # Typed, not ifelse(): see eb_morans_i().
+  ok <- is.finite(df[[x_name]]) & is.finite(df[[y_name]])
+  df$.wdj_both <- rep(NA_real_, nrow(df))
+  df$.wdj_both[ok] <- df[[x_name]][ok]
+  al <- align_weights(df, ".wdj_both", weights)
+  m <- al$m
+  at <- match(al$iso3c, df$iso3c)
+  xv <- df[[x_name]][at]
+  yv <- df[[y_name]][at]
+  n <- length(xv)
+  flat <- zero_variance(xv, x_name) || zero_variance(yv, y_name)
+  sdp <- function(v) sqrt(sum((v - mean(v))^2) / length(v))
+  zx <- (xv - mean(xv)) / sdp(xv)
+  zy <- (yv - mean(yv)) / sdp(yv)
+  lag_zy <- as.numeric(m %*% zy)
+  ii <- if (flat) rep(NA_real_, n) else zx * lag_zy
+  p <- rep(NA_real_, n)
+  n_perm <- as.integer(n_perm)
+  if (n_perm > 0L && !flat) {
+    ge <- integer(n)
+    for (i in seq_len(n)) {
+      nb <- which(m[i, ] != 0)
+      others <- zy[-i]
+      draws <- matrix(others[perm_draws(n - 1L, length(nb), n_perm)],
+                      nrow = length(nb))
+      iip <- zx[i] * colSums(draws * m[i, nb])
+      ge[i] <- sum(abs(iip) >= abs(ii[i]))
+    }
+    p <- (1 + ge) / (n_perm + 1)
+  }
+  cluster <- ifelse(zx > 0 & lag_zy > 0, "High-High",
+             ifelse(zx <= 0 & lag_zy <= 0, "Low-Low",
+             ifelse(zx > 0, "High-Low", "Low-High")))
+  p_adj <- adjust_p(p, p_adjust)
+  cluster[is.na(p_adj) | p_adj > alpha] <- "Not significant"
+  out <- tibble::tibble(
+    iso3c = al$iso3c, x = xv, lag_y = as.numeric(m %*% yv), ii = ii,
+    p_value = p, p_adjusted = p_adj,
+    cluster = factor(cluster, levels = c("High-High", "Low-Low", "High-Low",
+                                         "Low-High", "Not significant")))
+  attr(out, "countryatlas_p_adjust") <- p_adjust
+  out
+}
+
+#' Join counts: do neighbours share a category?
+#'
+#' For a categorical variable -- income group, region, a yes/no -- count the
+#' neighbouring pairs whose two countries fall in the same category, and
+#' compare each count with what random labelling would give. Many more
+#' same-category joins than chance is clustering; fewer is a checkerboard.
+#'
+#' @param data A country-level frame with `iso3c`.
+#' @param value The categorical column (unquoted): a factor, character or
+#'   logical.
+#' @param weights A [country_weights()] object; `NULL` (default) is k-nearest
+#'   neighbours (k = 5). A pair is joined when either country lists the other
+#'   as a neighbour.
+#' @param n_perm Permutations of the labels for the p-values (default `999`).
+#'
+#' @return A tibble with one row per category: `category`, `n` (countries in
+#'   it), `joins` (pairs within it), `expected` and `sd` (under permutation),
+#'   `z`, and `p_value` (two-sided). Its `"n_joins"` attribute is the number
+#'   of joined pairs.
+#' @references
+#' Cliff, A. D. & Ord, J. K. (1981). *Spatial Processes: Models and
+#' Applications*. Pion.
+#' @seealso [morans_i()] for a numeric variable
+#' @export
+#' @examples
+#' snap <- countryatlas::world_snapshot$countries
+#' join_counts(snap, income, n_perm = 199)
+join_counts <- function(data, value, weights = NULL, n_perm = 999) {
+  val_name <- quo_arg_name(rlang::enquo(value), "value")
+  check_number(n_perm, "n_perm", lo = 1, hi = .Machine$integer.max)
+  check_cols(data, c("iso3c", val_name))
+  v <- data[[val_name]]
+  if (is.numeric(v)) {
+    wdj_abort(c(
+      "{.arg value} must be categorical: a factor, character or logical.",
+      "i" = "For a numeric column, use {.fn morans_i}."
+    ))
+  }
+  df <- distinct_countries(tibble::as_tibble(sf_drop(data)))
+  lab <- as.character(df[[val_name]])
+  # Typed, not ifelse(): see eb_morans_i().
+  df$.wdj_code <- rep(NA_real_, nrow(df))
+  df$.wdj_code[!is.na(lab)] <- 1
+  al <- align_weights(df, ".wdj_code", weights)
+  lab <- lab[match(al$iso3c, df$iso3c)]
+  adj <- (al$m > 0) | t(al$m > 0)
+  pairs <- which(upper.tri(adj) & adj, arr.ind = TRUE)
+  cats <- sort(unique(lab), method = "radix")
+  count <- function(l) {
+    same <- l[pairs[, 1]] == l[pairs[, 2]]
+    vapply(cats, function(cc) sum(same & l[pairs[, 1]] == cc), numeric(1))
+  }
+  obs <- count(lab)
+  sims <- vapply(seq_len(as.integer(n_perm)), function(k) count(sample(lab)),
+                 numeric(length(cats)))
+  sims <- matrix(sims, nrow = length(cats))
+  expd <- rowMeans(sims)
+  sdv <- apply(sims, 1, stats::sd)
+  p <- vapply(seq_along(cats), function(k) {
+    dev <- abs(sims[k, ] - expd[k])
+    (1 + sum(dev >= abs(obs[k] - expd[k]))) / (n_perm + 1)
+  }, numeric(1))
+  out <- tibble::tibble(
+    category = cats, n = as.integer(table(factor(lab, levels = cats))),
+    joins = as.integer(obs), expected = expd, sd = sdv,
+    z = ifelse(sdv > 0, (obs - expd) / sdv, NA_real_), p_value = p)
+  attr(out, "n_joins") <- nrow(pairs)
   out
 }

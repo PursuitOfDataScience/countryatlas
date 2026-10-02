@@ -38,6 +38,7 @@ per_capita <- function(data, value, pop = NULL, suffix = "_per_capita",
     pop_name <- quo_arg_name(pop_q, "pop")
     check_cols(data, pop_name)
     check_numeric_col(data, pop_name)
+    warn_mixed_years(data, val_name, pop_name, what = "divide")
     pop_vec <- data[[pop_name]]
   } else {
     if (!"iso3c" %in% names(data)) {
@@ -47,8 +48,15 @@ per_capita <- function(data, value, pop = NULL, suffix = "_per_capita",
     # read.csv() gives for "2020") made dplyr refuse with "Can't join
     # `x$year` with `y$year` due to incompatible types", after the download.
     # deflate() carries this guard for the same join; checked before fetching.
-    if ("year" %in% names(data)) check_numeric_col(data, "year")
-    years <- if ("year" %in% names(data)) unique(stats::na.omit(data$year)) else NULL
+    # The population is fetched for the year the value comes from: the
+    # value's own `<value>_year` when country_data(latest = TRUE) recorded
+    # one, otherwise the frame's `year`. Joining a latest-value frame on
+    # `year` alone was impossible (it has none), so it fell back to last
+    # year's population whatever year the value was from.
+    yr_col <- c(paste0(val_name, "_year"), "year")
+    yr_col <- yr_col[yr_col %in% names(data)][1]
+    if (!is.na(yr_col)) check_numeric_col(data, yr_col)
+    years <- if (!is.na(yr_col)) unique(stats::na.omit(data[[yr_col]])) else NULL
     # An all-NA (or absent) year column leaves nothing to bound the fetch with;
     # min()/max() would return Inf/-Inf and the World Bank request would be
     # nonsense. Fall back to last year, as for a frame with no year at all.
@@ -60,7 +68,7 @@ per_capita <- function(data, value, pop = NULL, suffix = "_per_capita",
     # dying on a "column `.wdj_pop` doesn't exist" subscript error. Check every
     # column the join below needs, `year` included, so a partial result can't
     # crash with a raw vctrs subscript error either.
-    need <- c("iso3c", if ("year" %in% names(data)) "year", ".wdj_pop")
+    need <- c("iso3c", if (!is.na(yr_col)) "year", ".wdj_pop")
     if (!all(need %in% names(popdf)) || !nrow(popdf)) {
       wdj_abort(c(
         "Could not fetch population ({.val SP.POP.TOTL}) from the World Bank.",
@@ -73,13 +81,15 @@ per_capita <- function(data, value, pop = NULL, suffix = "_per_capita",
     # "replacement has 0 rows, data has 2". Drop it -- the fetched population is
     # what this branch is for, and the column is removed again below either way.
     data[[".wdj_pop"]] <- NULL
-    if ("year" %in% names(data)) {
-      data <- dplyr::left_join(data, popdf[, c("iso3c", "year", ".wdj_pop")],
-                               by = c("iso3c", "year"), na_matches = "never")
+    if (!is.na(yr_col)) {
+      data <- dplyr::left_join(data, one_per_key(popdf[, c("iso3c", "year", ".wdj_pop")]),
+                               by = c("iso3c", stats::setNames("year", yr_col)),
+                               na_matches = "never",
+                               relationship = "many-to-one")
     } else {
       popdf <- dplyr::distinct(popdf, .data$iso3c, .keep_all = TRUE)
       data <- dplyr::left_join(data, popdf[, c("iso3c", ".wdj_pop")], by = "iso3c",
-                               na_matches = "never")
+                               na_matches = "never", relationship = "many-to-one")
     }
     pop_vec <- data[[".wdj_pop"]]
     data[[".wdj_pop"]] <- NULL
@@ -135,6 +145,34 @@ per_capita <- function(data, value, pop = NULL, suffix = "_per_capita",
 #' @param fun Aggregation: `"sum"` (default), `"mean"`, `"median"`, `"min"`,
 #'   `"max"` or `"weighted_mean"`.
 #' @param weight Optional weight column (unquoted) for `"weighted_mean"`.
+#' @param min_coverage The smallest share of a group that has to report before
+#'   an aggregate is computed, between 0 and 1. Default `2/3`, the World Bank's
+#'   rule for its own regional aggregates. Below it the group's value is `NA`,
+#'   with a warning naming the group. `0` computes every group from whatever it
+#'   has, as 3.0.0 did.
+#' @param coverage_weight Optional column (unquoted), typically population,
+#'   whose share among the reporting members measures coverage instead of the
+#'   count of countries. For `fun = "weighted_mean"` it defaults to `weight`.
+#'
+#' @section Coverage:
+#' A sum over a region that is missing its largest member is not that region's
+#' total, and nothing about the number says so. So every row reports how much
+#' of the group stands behind it: `n_countries` (members present in `data`),
+#' `n_reporting` (members with a value), `coverage` (their share) and, with a
+#' coverage weight, `coverage_weighted` (the share of that weight the reporting
+#' members hold). A group whose coverage is below `min_coverage` is `NA`.
+#'
+#' The default threshold is the World Bank's rule for the aggregates in the
+#' World Development Indicators: a sum is not computed when more than a third
+#' of the observations are missing, and a weighted mean is not computed when
+#' missing data account for more than a third of the weights. Coverage is
+#' tested on `coverage_weighted` when there is one, so `fun = "weighted_mean"`
+#' follows the second rule by default. Note that only members present in `data`
+#' are counted: a country with no row at all is invisible to this check, so
+#' complete the frame against the full membership first (for example with
+#' [country_codes()] or [country_groups()]) when that matters. Rows whose
+#' grouping value is missing are reported but never withheld: they are not a
+#' group with a membership to fall short of.
 #'
 #' @section Groups with no data:
 #' Missing values are dropped before aggregating, so a group is summarised from
@@ -144,17 +182,27 @@ per_capita <- function(data, value, pop = NULL, suffix = "_per_capita",
 #' region we simply have no data for. Use [audit_coverage()] to see where those
 #' gaps are.
 #'
-#' @return A tibble of `by` plus the aggregated value.
+#' @return A tibble of `by`, the aggregated value, `n_countries`,
+#'   `n_reporting` and `coverage`, plus `coverage_weighted` when a coverage
+#'   weight applies.
+#' @seealso [aggregate_groups()] to aggregate by dated group membership.
 #' @export
 #' @examples
 #' df <- data.frame(iso3c = c("USA", "CAN", "BRA"),
 #'                  region = c("North America", "North America", "Latin America"),
 #'                  gdp = c(21, 1.7, 1.4))
 #' aggregate_regions(df, gdp, fun = "sum")
+#'
+#' # A region missing a third of its members is not aggregated by default.
+#' ssa <- data.frame(iso3c = c("NGA", "ZAF", "KEN"), region = "Sub-Saharan Africa",
+#'                   gdp = c(NA, 400, 100), pop = c(223, 60, 55))
+#' aggregate_regions(ssa, gdp, coverage_weight = pop, min_coverage = 0)
 aggregate_regions <- function(data, value, by = "region", fun = "sum",
-                              weight = NULL) {
+                              weight = NULL, min_coverage = 2/3,
+                              coverage_weight = NULL) {
   val_name <- quo_arg_name(rlang::enquo(value), "value")
   fun <- rlang::arg_match(fun, c("sum", "mean", "median", "min", "max", "weighted_mean"))
+  check_number(min_coverage, "min_coverage", lo = 0, hi = 1)
   # `by` takes strings, and `value` right above it takes a bare column, so
   # writing `by = region` is the natural slip. It failed while `by` was being
   # evaluated -- base R's "object 'region' not found", which names neither the
@@ -218,11 +266,55 @@ aggregate_regions <- function(data, value, by = "region", fun = "sum",
     ))
   }
 
-  grouped <- dplyr::group_by(data, dplyr::across(dplyr::all_of(by)))
-  out <- if (fun == "weighted_mean") {
+  if (fun == "weighted_mean") {
     w_name <- quo_arg_name(w_q, "weight")
     check_cols(data, w_name)
     check_numeric_col(data, w_name)
+  }
+  cw_q <- rlang::enquo(coverage_weight)
+  cw_name <- if (!rlang::quo_is_null(cw_q)) {
+    quo_arg_name(cw_q, "coverage_weight")
+  } else if (fun == "weighted_mean") w_name
+  if (!is.null(cw_name)) {
+    check_cols(data, cw_name)
+    check_numeric_col(data, cw_name)
+  }
+  aggregate_core(data, val_name, by, fun,
+                 w_name = if (fun == "weighted_mean") w_name, cw_name = cw_name,
+                 min_coverage = min_coverage)
+}
+
+# The arithmetic behind aggregate_regions() and aggregate_groups(): the value
+# per group plus how much of the group stands behind it. Arguments arrive
+# validated; `call` is the verb a coverage warning should name.
+aggregate_core <- function(data, val_name, by, fun, w_name = NULL,
+                           cw_name = NULL, min_coverage = 2/3,
+                           call = rlang::caller_env()) {
+  # Whether a member reports: it has a value, and for a weighted mean a
+  # weight too, since without one it contributes nothing to the mean.
+  reports <- !is.na(data[[val_name]])
+  if (fun == "weighted_mean") reports <- reports & !is.na(data[[w_name]])
+  data[[".wdj_reports"]] <- reports
+  # Members are countries where there is a code, so a country listed twice in
+  # a group counts once; an uncoded row stands for itself.
+  data[[".wdj_unit"]] <- if ("iso3c" %in% names(data)) {
+    ifelse(blank_key(data$iso3c), paste0(".row", seq_len(nrow(data))),
+           as.character(data$iso3c))
+  } else as.character(seq_len(nrow(data)))
+  grouped <- dplyr::group_by(data, dplyr::across(dplyr::all_of(by)))
+  cov <- dplyr::summarise(
+    grouped,
+    n_countries = dplyr::n_distinct(.data$.wdj_unit),
+    n_reporting = dplyr::n_distinct(.data$.wdj_unit[.data$.wdj_reports]),
+    coverage_weighted = if (is.null(cw_name)) NA_real_ else {
+      w <- .data[[cw_name]]
+      tot <- sum(w[is.finite(w)])
+      if (!is.finite(tot) || tot <= 0) NA_real_ else
+        sum(w[is.finite(w) & .data$.wdj_reports]) / tot
+    },
+    .groups = "drop"
+  )
+  out <- if (fun == "weighted_mean") {
     dplyr::summarise(
       grouped,
       "{val_name}" := {
@@ -259,7 +351,189 @@ aggregate_regions <- function(data, value, by = "region", fun = "sum",
       .groups = "drop"
     )
   }
+  # A Sub-Saharan Africa sum without Nigeria came back as a regional total,
+  # with nothing to say a quarter of the region was missing. Report how much
+  # stands behind every row, and withhold the rows that fall below the rule.
+  out$n_countries <- cov$n_countries
+  out$n_reporting <- cov$n_reporting
+  out$coverage <- num_ifelse(cov$n_countries > 0,
+                             cov$n_reporting / cov$n_countries)
+  if (!is.null(cw_name)) out$coverage_weighted <- cov$coverage_weighted
+  apply_min_coverage(out, val_name, by, min_coverage,
+                     test = if (is.null(cw_name)) out$coverage else
+                       dplyr::coalesce(cov$coverage_weighted, out$coverage),
+                     call = call)
+}
+
+# Withhold the aggregates whose coverage falls below the threshold, and name
+# the groups. A group with nothing reporting is NA whatever the rule, and is
+# named too when the rule is in force, since it is below any positive one.
+#
+# The rows whose grouping value is missing are not a group with a membership
+# to fall short of: on a map-ready frame they are the basemap countries the
+# data never covered. The rule leaves them as they are.
+apply_min_coverage <- function(out, val_name, by, min_coverage, test,
+                               call = rlang::caller_env()) {
+  unkeyed <- Reduce(`|`, lapply(out[by], is.na), logical(nrow(out)))
+  low <- !is.na(test) & test < min_coverage & !unkeyed
+  if (!any(low)) return(out)
+  out[[val_name]][low] <- NA
+  lab <- do.call(paste, c(unname(lapply(out[low, by, drop = FALSE], as.character)),
+                          sep = " / "))
+  pct <- sprintf("%s (%s%%)", lab, fmt_num(round(100 * test[low])))
+  wdj_warn(c(
+    "{sum(low)} group{?s} {?falls/fall} below the {fmt_num(round(100 * min_coverage))}%
+     coverage rule, so {cli::qty(sum(low))}{?its/their} {.field {val_name}}
+     {?is/are} {.val {NA}}:",
+    "*" = "{.val {utils::head(pct, 8)}}",
+    "i" = "An aggregate over part of a group is not the group's figure. Pass
+           {.code min_coverage = 0} to compute it anyway; the coverage columns
+           say how much stands behind each row."
+  ), class = "countryatlas_low_coverage", call = call)
   out
+}
+
+#' Aggregate by dated group membership
+#'
+#' Roll countries up to a group such as the EU or the OECD using the members of
+#' each row's own year, not today's list. An "EU" series built from the current
+#' 27 members misstates every year before 2020 and every year before an
+#' accession; this builds it from whoever was a member at the time, under the
+#' same coverage rule as [aggregate_regions()].
+#'
+#' @param data A country-level frame with an `iso3c` column, and a `year`
+#'   column for a panel.
+#' @param value The value column to aggregate (unquoted).
+#' @param groups One or more group names (see [country_groups()]).
+#' @param as_of `NULL` (default) uses each row's `year` when `data` has one
+#'   (a bare year is 1 January of that year, as in [in_group()]), and the
+#'   current membership otherwise. A single date or year applies one
+#'   membership to every row.
+#' @param fun,weight As in [aggregate_regions()].
+#' @param min_coverage The smallest share of the group's members that has to
+#'   report before an aggregate is computed. Default `2/3`, the World Bank's
+#'   rule. `0` computes every group-year from whatever it has.
+#'
+#' @section Who counts as a member:
+#' Coverage is measured against the group's full membership on that date,
+#' taken from [country_groups_history], not against the members that happen to
+#' be in `data`: a member with no row is counted as missing. That is the
+#' difference from [aggregate_regions()], which can only count what it is
+#' given. For `fun = "weighted_mean"` the weighted share is computed over the
+#' members present, since an absent member's weight is unknown. A group with no
+#' dated history (Commonwealth, G20, OPEC) warns and uses the current
+#' membership for every year.
+#'
+#' @return A tibble of `group` (and `year` for a panel), the aggregated value,
+#'   `n_countries` (members on that date), `n_reporting`, `coverage`, and for a
+#'   weighted mean `coverage_weighted`.
+#' @seealso [aggregate_regions()], [in_group()], [country_groups_history]
+#' @export
+#' @examples
+#' pan <- data.frame(iso3c = rep(c("GBR", "FRA", "DEU", "HRV"), each = 2),
+#'                   year = rep(c(2012, 2021), 4), gdp = 1:8)
+#' # The United Kingdom counts in 2012 and not in 2021; Croatia the reverse.
+#' aggregate_groups(pan, gdp, "EU", min_coverage = 0)
+aggregate_groups <- function(data, value, groups, as_of = NULL, fun = "sum",
+                             weight = NULL, min_coverage = 2/3) {
+  val_name <- quo_arg_name(rlang::enquo(value), "value")
+  fun <- rlang::arg_match(fun, c("sum", "mean", "median", "min", "max",
+                                 "weighted_mean"))
+  check_number(min_coverage, "min_coverage", lo = 0, hi = 1)
+  if (!is.character(groups) || !length(groups) || anyNA(groups)) {
+    wdj_abort(c(
+      "{.arg groups} must name at least one group.",
+      "i" = "See {.fn country_groups} for the groups available."
+    ))
+  }
+  groups <- unique(groups)
+  # Validated by country_groups(), which names the groups that do exist.
+  country_groups(groups)
+  check_cols(data, c("iso3c", val_name))
+  check_numeric_col(data, val_name)
+  w_q <- rlang::enquo(weight)
+  has_w <- !rlang::quo_is_null(w_q)
+  if (fun == "weighted_mean" && !has_w) {
+    wdj_abort('{.arg weight} is required when {.code fun = "weighted_mean"}.')
+  }
+  if (has_w && fun != "weighted_mean") {
+    wdj_abort(c(
+      '{.arg weight} is only used when {.code fun = "weighted_mean"}.',
+      "x" = 'Got {.code fun = "{fun}"}, which ignores it.',
+      "i" = 'Pass {.code fun = "weighted_mean"} to weight, or drop {.arg weight}.'
+    ))
+  }
+  w_name <- if (has_w) quo_arg_name(w_q, "weight")
+  if (has_w) {
+    check_cols(data, w_name)
+    check_numeric_col(data, w_name)
+  }
+  data <- tibble::as_tibble(dplyr::ungroup(sf_drop(data)))
+  if (has_map_geometry(data)) {
+    wdj_warn(c(
+      "{.arg data} looks like it has map geometry attached.",
+      "!" = "Aggregating it counts each country once per geometry row.",
+      "i" = "Aggregate the country-level table first, then attach geometry."
+    ))
+  }
+  panel <- is.null(as_of) && "year" %in% names(data)
+  if (panel) check_numeric_col(data, "year")
+  check_panel_unique(data,
+    why = "A repeated country-year would count the same member twice.")
+  # One date per row, or one for the whole frame, or none (today's members).
+  when <- if (panel) {
+    as_of_dates(data$year, nrow(data), call = environment())
+  } else if (!is.null(as_of)) {
+    rep(as_of_date(as_of, call = environment()), nrow(data))
+  }
+  keep <- c("iso3c", if (panel) "year", val_name, w_name)
+  # Nothing in, nothing out: a frame with no rows reports on no group-year,
+  # rather than on every group's whole membership as missing.
+  if (!nrow(data)) {
+    long <- data[0L, keep, drop = FALSE]
+    long$group <- character()
+    return(aggregate_core(long, val_name, by = c("group", if (panel) "year"),
+                          fun, w_name = w_name, cw_name = w_name,
+                          min_coverage = min_coverage))
+  }
+  hist <- countryatlas::country_groups_history
+  parts <- lapply(groups, function(g) {
+    member <- if (is.null(when)) {
+      in_group(data$iso3c, g, "iso3c")
+    } else in_group(data$iso3c, g, "iso3c", as_of = when)
+    rows <- data[member %in% TRUE, keep, drop = FALSE]
+    # The members the frame has no row for, date by date, so that a missing
+    # member counts against coverage rather than out of it.
+    dates <- if (is.null(when)) list(NULL) else as.list(unique(when[!is.na(when)]))
+    absent <- lapply(dates, function(d) {
+      m <- if (is.null(d) || !g %in% hist$group) {
+        # An undated group has already been warned about by in_group().
+        country_groups(g)$iso3c
+      } else {
+        sp <- hist[hist$group == g & hist$from <= d &
+                     (is.na(hist$to) | hist$to > d), , drop = FALSE]
+        if ("status" %in% names(sp)) sp <- sp[sp$status == "member", , drop = FALSE]
+        unique(sp$iso3c)
+      }
+      have <- if (is.null(d)) data$iso3c else data$iso3c[when %in% d]
+      miss <- setdiff(m, have)
+      if (!length(miss)) return(NULL)
+      a <- tibble::tibble(iso3c = miss)
+      if (panel) a$year <- as.numeric(format(d, "%Y"))
+      a
+    })
+    rows <- dplyr::bind_rows(c(list(rows), absent))
+    rows$group <- rep(g, nrow(rows))
+    rows
+  })
+  long <- dplyr::bind_rows(parts)
+  long <- long[, c("group", setdiff(names(long), "group")), drop = FALSE]
+  # Absent members carry no value and no weight, so they count as members
+  # that did not report.
+  if (!val_name %in% names(long)) long[[val_name]] <- numeric(nrow(long))
+  aggregate_core(long, val_name, by = c("group", if (panel) "year"), fun,
+                 w_name = w_name, cw_name = w_name,
+                 min_coverage = min_coverage)
 }
 
 #' Add rank, percentile and z-score
@@ -274,6 +548,13 @@ aggregate_regions <- function(data, value, by = "region", fun = "sum",
 #' @param desc Rank descending (largest = rank 1); default `TRUE`. This affects
 #'   `rank` only: `percentile` is always the percentile of the *value* (0 is the
 #'   lowest value), so under `desc = FALSE` rank 1 has percentile 0.
+#'
+#' @section Panels:
+#' With no `within`, every row is ranked against every other. On a panel that
+#' pools the years: a country's 2020 and its 2000 compete for the same ranks,
+#' and `z_score` carries the time trend. So a frame whose `year` holds more
+#' than one value warns (class `countryatlas_panel`); `within = year` ranks
+#' countries within each year, which is nearly always what is meant.
 #'
 #' @return `data` with `rank`, `percentile` and `z_score` columns added.
 #' @export
@@ -314,6 +595,23 @@ rank_countries <- function(data, value, within = NULL, desc = TRUE) {
     # within-group one. Every other function here likewise imposes its own
     # grouping rather than inheriting the caller's.
     data <- dplyr::ungroup(data)
+    # A panel ranked with no `within` pools every country-year: France 2020
+    # ranked 1 and France 2000 ranked 6, and z_score was computed across all
+    # six rows, so a time trend leaked into a cross-country score. The sibling
+    # verbs that need one row per country already say so with this class.
+    if ("year" %in% names(data)) {
+      yrs <- unique(stats::na.omit(data$year))
+      if (length(yrs) > 1L) {
+        wdj_warn(c(
+          "{.arg data} spans {length(yrs)} years, and the ranks pool all of
+           them.",
+          "x" = "Each country-year is ranked against every other, so
+                 {.field z_score} mixes the time trend into a cross-country
+                 score.",
+          "i" = "Use {.code within = year} to rank countries within each year."
+        ), class = "countryatlas_panel")
+      }
+    }
   }
   ord <- if (isTRUE(desc)) function(x) dplyr::desc(x) else function(x) x
   # A repeated country-year is ranked twice: on a frame with USA-2020 duplicated
@@ -555,6 +853,14 @@ wdj_interp_linear <- function(x, y) {
 #'   negative values, but not after a zero or an infinity: neither has a
 #'   ratio, so that row is `NA` (with a warning) rather than `Inf` or -100%.
 #' @param suffix Suffix for the new column (default `"_growth"`).
+#' @param by How the previous value is found for `"yoy"`. `"year"` (default)
+#'   takes the same country's value one year earlier, and `NA` where that year
+#'   is absent, so a gap in the panel can never pass for a one-year change.
+#'   `"row"` takes the previous observation, whatever its year -- the 3.0.0
+#'   behaviour, for a panel that is irregular by design -- and warns when the
+#'   years are not consecutive. A period column whose labels are not years
+#'   (`"pre-war"`) needs `"row"`. `"cagr"` always divides by the actual span
+#'   of years.
 #'
 #' @return `data` with a growth-rate column added (a proportion, so 0.03 = 3%).
 #'   Rows come back sorted by `iso3c` then `year`: the calculation reads each
@@ -565,16 +871,20 @@ wdj_interp_linear <- function(x, y) {
 #' df <- data.frame(iso3c = "USA", year = 2000:2002, gdp = c(100, 110, 121))
 #' growth_rate(df, gdp)
 growth_rate <- function(data, value, type = c("yoy", "cagr"),
-                        suffix = "_growth") {
+                        suffix = "_growth", by = c("year", "row")) {
   type <- rlang::arg_match(type)
+  by <- rlang::arg_match(by)
   val_name <- quo_arg_name(rlang::enquo(value), "value")
   check_panel_cols(data, val_name)
   check_numeric_col(data, val_name)
   check_string(suffix, "suffix")
   new_col <- paste0(val_name, suffix)
-  # Only "yoy" needs this: "cagr" divides by the actual year span, so a gap
-  # is already handled there.
-  if (identical(type, "yoy")) warn_irregular_years(data, "the growth rate")
+  # Only a row-keyed "yoy" needs this: "cagr" divides by the actual year span,
+  # and a year-keyed "yoy" gives NA across a gap, so a gap is handled there.
+  if (identical(type, "yoy") && identical(by, "row")) {
+    warn_irregular_years(data, "the growth rate")
+  }
+  if (identical(type, "yoy") && identical(by, "year")) year_number(data$year)
   # ... and only "cagr" needs a numeric year, because only it does arithmetic
   # on one. A character year reached `.data$year - y0` and surfaced as a dplyr
   # mutate error quoting an internal expression rather than naming the column.
@@ -599,9 +909,13 @@ growth_rate <- function(data, value, type = c("yoy", "cagr"),
     # is 0, so the row after an Inf came back as -1 -- a confident -100% for a
     # series that simply went on -- while the Inf row itself reads Inf, which
     # is honest. Same NA as after a zero, reported alongside it.
+    if (identical(by, "year")) {
+      out$.wdj_prev <- lag_by_year(out, val_name, 1L)
+    } else {
+      out <- dplyr::mutate(out, .wdj_prev = dplyr::lag(.data[[val_name]]))
+    }
     out <- dplyr::mutate(
       out,
-      .wdj_prev = dplyr::lag(.data[[val_name]]),
       "{new_col}" := num_ifelse(is.finite(.data$.wdj_prev) & .data$.wdj_prev != 0,
                                 .data[[val_name]] / .data$.wdj_prev - 1)
     )
@@ -858,18 +1172,61 @@ index_to <- function(data, value, base_year, to = 100, suffix = "_index") {
 #' @param method `"pearson"` (default) or `"spearman"`.
 #' @param min_n Minimum number of complete pairs for a correlation to be
 #'   reported (default `3`).
+#' @param by_year If `TRUE`, correlate within each year of a panel and return
+#'   one table per year, stacked with a leading `year` column. `FALSE`
+#'   (default) wants one row per country and, handed a panel, keeps each
+#'   country's earliest year with a warning.
+#' @param weight Optional column (unquoted), typically population, to weight
+#'   each country by. Unweighted, every country counts once (Milanovic's
+#'   "concept 1"); weighted by population, a correlation describes the average
+#'   person rather than the average country ("concept 2"). A Spearman
+#'   correlation is weighted on the ranks.
 #'
 #' @return A tibble with one row per indicator pair: `var_x`, `var_y`, `r`,
-#'   `n` (complete pairs), sorted by `|r|` descending.
+#'   `n` (complete pairs), sorted by `|r|` descending; with `by_year = TRUE`,
+#'   the same per year, led by `year`.
 #' @export
 #' @examples
 #' correlate_indicators(countryatlas::world_snapshot$countries)
+#' # weighted by population: the correlation for the average person
+#' correlate_indicators(countryatlas::world_snapshot$countries,
+#'                      gdp_per_capita, life_expectancy, weight = population)
 correlate_indicators <- function(data, ..., method = c("pearson", "spearman"),
-                                 min_n = 3) {
+                                 min_n = 3, by_year = FALSE, weight = NULL) {
   # An NA gave "missing value where TRUE/FALSE needed" and a length-2 value "the
   # condition has length > 1" -- the tell-tale unchecked-scalar messages.
   check_number(min_n, "min_n", lo = 1, hi = .Machine$integer.max)
   method <- rlang::arg_match(method)
+  check_bool(by_year, "by_year")
+  w_q <- rlang::enquo(weight)
+  w_name <- if (!rlang::quo_is_null(w_q)) quo_arg_name(w_q, "weight")
+  if (!is.null(w_name)) {
+    check_cols(data, w_name)
+    check_numeric_col(data, w_name)
+  }
+  if (isTRUE(by_year)) {
+    if (!"year" %in% names(data)) {
+      wdj_abort(c(
+        "{.code by_year = TRUE} needs a {.field year} column.",
+        "i" = "A cross-section has one table to give; drop {.arg by_year}."
+      ))
+    }
+    data <- tibble::as_tibble(sf_drop(data))
+    yrs <- sort(unique(stats::na.omit(data$year)))
+    out <- lapply(yrs, function(y) {
+      one <- data[!is.na(data$year) & data$year == y, , drop = FALSE]
+      one$year <- NULL
+      r <- correlate_indicators(one, ..., method = method, min_n = min_n,
+                                weight = !!w_q)
+      tibble::add_column(r, year = rep(y, nrow(r)), .before = 1L)
+    })
+    if (!length(out)) {
+      return(tibble::tibble(year = data$year[0], var_x = character(),
+                            var_y = character(), r = numeric(),
+                            n = integer()))
+    }
+    return(dplyr::bind_rows(out))
+  }
   data <- tibble::as_tibble(data)
   # One row per country. Gating on `group` only caught polygon frames; an sf
   # frame has no `group` column yet still repeats divided countries (Cyprus at
@@ -902,7 +1259,8 @@ correlate_indicators <- function(data, ..., method = c("pearson", "spearman"),
   } else {
     num <- names(data)[vapply(data, is.numeric, logical(1))]
     keep <- setdiff(num, c("year", "long", "lat", "group", "order",
-                           "centroid_lon", "centroid_lat", "row", "col"))
+                           "centroid_lon", "centroid_lat", "row", "col",
+                           w_name, grep("_year$", num, value = TRUE)))
     vals <- data[, keep, drop = FALSE]
   }
   bad <- names(vals)[!vapply(vals, is.numeric, logical(1))]
@@ -914,12 +1272,18 @@ correlate_indicators <- function(data, ..., method = c("pearson", "spearman"),
   }
   nms <- names(vals)
   pairs <- utils::combn(nms, 2, simplify = FALSE)
+  w <- if (!is.null(w_name)) data[[w_name]]
   out <- lapply(pairs, function(p) {
     x <- vals[[p[1]]]; y <- vals[[p[2]]]
     ok <- is.finite(x) & is.finite(y)
+    if (!is.null(w)) ok <- ok & is.finite(w) & w > 0
     n <- sum(ok)
     r <- if (n >= min_n) {
-      suppressWarnings(stats::cor(x[ok], y[ok], method = method))
+      if (is.null(w)) {
+        suppressWarnings(stats::cor(x[ok], y[ok], method = method))
+      } else {
+        weighted_cor(x[ok], y[ok], w[ok], method)
+      }
     } else {
       NA_real_
     }
@@ -927,6 +1291,23 @@ correlate_indicators <- function(data, ..., method = c("pearson", "spearman"),
   })
   out <- dplyr::bind_rows(out)
   out[order(-abs(out$r), na.last = TRUE), ]
+}
+
+# Weighted Pearson correlation, or Spearman as the weighted Pearson of the
+# ranks. A constant variable has no correlation to give, as with cor(), which
+# returns NA there too.
+weighted_cor <- function(x, y, w, method = "pearson") {
+  if (identical(method, "spearman")) {
+    x <- rank(x)
+    y <- rank(y)
+  }
+  w <- w / sum(w)
+  dx <- x - sum(w * x)
+  dy <- y - sum(w * y)
+  vx <- sum(w * dx^2)
+  vy <- sum(w * dy^2)
+  if (!(vx > 0) || !(vy > 0)) return(NA_real_)
+  sum(w * dx * dy) / sqrt(vx * vy)
 }
 
 #' Panel lag / difference by country
@@ -938,9 +1319,17 @@ correlate_indicators <- function(data, ..., method = c("pearson", "spearman"),
 #'
 #' @param data A panel with `iso3c` and `year`.
 #' @param value The value column (unquoted).
-#' @param n Number of periods to lag / difference over (default `1`).
+#' @param n Number of years (or, with `by = "row"`, observations) to lag /
+#'   difference over (default `1`).
 #' @param suffix Suffix for the new column. Defaults to `"_lag"` / `"_diff"`
 #'   (with `n` appended when `n > 1`, e.g. `"_lag5"`).
+#' @param by How "earlier" is found. `"year"` (default) takes the value `n`
+#'   years earlier for the same country, and `NA` where that year is absent,
+#'   so a gap in the panel can never pass for a one-year change. `"row"` takes
+#'   the previous observation, whatever its year -- the 3.0.0 behaviour, for a
+#'   panel that is irregular by design -- and warns when the years are not
+#'   consecutive. A period column whose labels are not years (`"pre-war"`)
+#'   needs `"row"`.
 #'
 #' @return `data` with the lagged / differenced column added. Rows come back
 #'   sorted by `iso3c` then `year`: the calculation reads each country's series
@@ -951,19 +1340,27 @@ correlate_indicators <- function(data, ..., method = c("pearson", "spearman"),
 #' df <- data.frame(iso3c = "USA", year = 2000:2003, gdp = c(100, 110, 121, 133))
 #' lag_by_country(df, gdp)
 #' diff_by_country(df, gdp)
-lag_by_country <- function(data, value, n = 1, suffix = NULL) {
+lag_by_country <- function(data, value, n = 1, suffix = NULL,
+                           by = c("year", "row")) {
+  by <- rlang::arg_match(by)
   val_name <- quo_arg_name(rlang::enquo(value), "value")
   check_panel_cols(data, val_name)
   check_number(n, "n", lo = 1, hi = .Machine$integer.max)
   n <- as.integer(n)
   if (!is.null(suffix)) check_string(suffix, "suffix")
   new_col <- paste0(val_name, suffix %||% paste0("_lag", if (n > 1L) n else ""))
-  warn_irregular_years(data, "the lag")
+  if (identical(by, "row")) warn_irregular_years(data, "the lag") else
+    year_number(data$year)
   warn_overwrite(data, new_col)
   out <- data %>%
     group_by_unit() %>%
-    dplyr::arrange(year_sort_key(.data$year), .by_group = TRUE) %>%
-    dplyr::mutate("{new_col}" := dplyr::lag(.data[[val_name]], n = n))
+    dplyr::arrange(year_sort_key(.data$year), .by_group = TRUE)
+  out <- if (identical(by, "year")) {
+    out[[new_col]] <- lag_by_year(out, val_name, n)
+    out
+  } else {
+    dplyr::mutate(out, "{new_col}" := dplyr::lag(.data[[val_name]], n = n))
+  }
   out <- wdj_return_frame(na_where_no_year(out, new_col))
   warn_all_na_result(out, val_name, new_col,
                      "A lag of {n} needs {n + 1} years for the same country.")
@@ -972,7 +1369,9 @@ lag_by_country <- function(data, value, n = 1, suffix = NULL) {
 
 #' @rdname lag_by_country
 #' @export
-diff_by_country <- function(data, value, n = 1, suffix = NULL) {
+diff_by_country <- function(data, value, n = 1, suffix = NULL,
+                            by = c("year", "row")) {
+  by <- rlang::arg_match(by)
   val_name <- quo_arg_name(rlang::enquo(value), "value")
   check_panel_cols(data, val_name)
   check_numeric_col(data, val_name)
@@ -980,18 +1379,59 @@ diff_by_country <- function(data, value, n = 1, suffix = NULL) {
   n <- as.integer(n)
   if (!is.null(suffix)) check_string(suffix, "suffix")
   new_col <- paste0(val_name, suffix %||% paste0("_diff", if (n > 1L) n else ""))
-  warn_irregular_years(data, "the difference")
+  if (identical(by, "row")) warn_irregular_years(data, "the difference") else
+    year_number(data$year)
   warn_overwrite(data, new_col)
   out <- data %>%
     group_by_unit() %>%
-    dplyr::arrange(year_sort_key(.data$year), .by_group = TRUE) %>%
+    dplyr::arrange(year_sort_key(.data$year), .by_group = TRUE)
+  out <- if (identical(by, "year")) {
+    out[[new_col]] <- out[[val_name]] - lag_by_year(out, val_name, n)
+    out
+  } else {
     dplyr::mutate(
+      out,
       "{new_col}" := .data[[val_name]] - dplyr::lag(.data[[val_name]], n = n)
     )
+  }
   out <- wdj_return_frame(na_where_no_year(out, new_col))
   warn_all_na_result(out, val_name, new_col,
                      "A difference over {n} year{?s} needs {n + 1} years for
                       the same country.")
+  out
+}
+
+# The value `n` years earlier for the same unit, matched on the year itself,
+# so a missing year gives NA rather than the row before it. 3.0.0 lagged by
+# row and warned when the years were not consecutive, because switching would
+# have changed results for everyone relying on it; a major version is the
+# place to make that switch.
+lag_by_year <- function(data, val_name, n) {
+  yr <- year_number(data$year)
+  uk <- unit_key(data)
+  key <- paste(uk, yr)
+  hit <- match(paste(uk, yr - n), key)
+  hit[is.na(yr)] <- NA_integer_
+  data[[val_name]][hit]
+}
+
+# Years as numbers, for arithmetic on them: a Date's calendar year, a factor's
+# or a string's labels. A label that is not a year ("pre-war") cannot be
+# counted back from, so that is refused, pointing at the row-keyed lag.
+year_number <- function(x, call = rlang::caller_env()) {
+  if (inherits(x, "Date")) return(as.integer(format(x, "%Y")))
+  if (is.numeric(x)) return(as.numeric(x))
+  lab <- as.character(x)
+  out <- suppressWarnings(as.numeric(lab))
+  bad <- unique(lab[!is.na(lab) & is.na(out)])
+  if (length(bad)) {
+    wdj_abort(c(
+      "{.field year} has labels that are not years, so there is no year
+       {.code n} earlier to look up:",
+      "*" = "{.val {utils::head(bad, 6)}}",
+      "i" = 'Use {.code by = "row"} to compare each row with the previous one.'
+    ), class = "countryatlas_year_not_numeric", call = call)
+  }
   out
 }
 
@@ -1462,13 +1902,169 @@ gini <- function(x, weights = NULL, na.rm = TRUE) {
   num / (2 * sw^2 * mu)
 }
 
+#' Inequality, every standard measure at once
+#'
+#' The usual inequality measures for one variable, in one tibble, so a report
+#' does not rest on whichever index came to hand. Weight by population for
+#' inequality between people rather than between countries.
+#'
+#' @param x A numeric vector, such as GDP per capita.
+#' @param weights Optional non-negative weights (population), the same length
+#'   as `x` or length 1.
+#' @param measures Any of `"gini"`, `"theil_t"`, `"theil_l"` (the mean log
+#'   deviation), `"atkinson"`, `"cv"` (the coefficient of variation),
+#'   `"palma"` (the top 10%'s share over the bottom 40%'s) and `"p90_p10"`
+#'   (the 90th percentile over the 10th). All by default.
+#' @param epsilon The Atkinson index's inequality aversion (default `1`):
+#'   larger values weigh the bottom of the distribution more.
+#'
+#' @return A tibble of `measure` and `value`, one row per measure, every one
+#'   computed on the same values: the finite, positive values of `x` with a
+#'   non-missing weight. The Theil and Atkinson indices need positive values,
+#'   so a zero or negative value is dropped from all of them, with a warning
+#'   (class `countryatlas_nonpositive_dropped`). A measure that is undefined
+#'   on the data (too few values) is `NA`.
+#'
+#' @section Which inequality:
+#' Milanovic (2005) separates three concepts. *Concept 1* is inequality between
+#' countries as units, each counting once: `weights = NULL`. *Concept 2* weights
+#' each country by its population but still gives everyone their country's
+#' mean: `weights = population`. *Concept 3*, inequality between all the
+#' world's people, needs each country's internal distribution, which a
+#' country-level table does not have, so it is out of scope here; concept 2
+#' understates it by exactly the within-country inequality it cannot see.
+#'
+#' @references
+#' Atkinson, A. B. (1970). On the measurement of inequality. *Journal of
+#' Economic Theory* 2(3), 244-263. \doi{10.1016/0022-0531(70)90039-6}
+#'
+#' Milanovic, B. (2005). *Worlds Apart: Measuring International and Global
+#' Inequality*. Princeton University Press.
+#'
+#' Palma, J. G. (2011). Homogeneous middles vs. heterogeneous tails, and the
+#' end of the "inverted-U". *Development and Change* 42(1), 87-153.
+#' \doi{10.1111/j.1467-7660.2011.01694.x}
+#' @seealso [gini()], [theil()], [sigma_convergence()]
+#' @export
+#' @examples
+#' snap <- countryatlas::world_snapshot$countries
+#' inequality(snap$gdp_per_capita)                            # concept 1
+#' inequality(snap$gdp_per_capita, weights = snap$population) # concept 2
+inequality <- function(x, weights = NULL,
+                       measures = c("gini", "theil_t", "theil_l", "atkinson",
+                                    "cv", "palma", "p90_p10"),
+                       epsilon = 1) {
+  if (!is.numeric(x)) {
+    wdj_abort("{.arg x} must be numeric, not {.obj_type_friendly {x}}.")
+  }
+  measures <- rlang::arg_match(measures, multiple = TRUE)
+  check_number(epsilon, "epsilon", lo = 0)
+  if (!is.null(weights)) {
+    if (!is.numeric(weights)) {
+      wdj_abort("{.arg weights} must be numeric, not {.obj_type_friendly {weights}}.")
+    }
+    check_along(weights, length(x), "weights")
+  }
+  w <- if (is.null(weights)) rep(1, length(x)) else rep_len(as.numeric(weights), length(x))
+  ok <- is.finite(x) & is.finite(w)
+  x <- x[ok]
+  w <- w[ok]
+  if (any(w < 0)) wdj_abort("{.arg weights} must be non-negative.")
+  # One sample for every measure. Each helper dropped what it could not use
+  # on its own terms, under suppressWarnings(), so c(-1, 2, 3) gave Gini NA,
+  # Theil and Atkinson on two values and the CV on all three, in one table
+  # and without a word.
+  pos <- x > 0
+  if (!all(pos)) {
+    wdj_warn(c(
+      "Dropping {sum(!pos)} non-positive value{?s} of {.arg x}.",
+      "i" = "The Theil and Atkinson indices need positive values, so every
+             measure is computed on the same positive ones."
+    ), class = "countryatlas_nonpositive_dropped")
+    x <- x[pos]
+    w <- w[pos]
+  }
+  value <- vapply(measures, function(m) {
+    suppressWarnings(switch(m,
+      gini = gini(x, w),
+      theil_t = theil(x, w, type = "T"),
+      theil_l = theil(x, w, type = "L"),
+      atkinson = atkinson_index(x, w, epsilon),
+      cv = {
+        sw <- sum(w)
+        mu <- if (sw > 0) sum(w * x) / sw else NA_real_
+        if (!is.finite(mu) || mu == 0 || length(x) < 2L) NA_real_ else
+          sqrt(sum(w * (x - mu)^2) / sw) / mu
+      },
+      palma = share_ratio(x, w, top = 0.1, bottom = 0.4),
+      p90_p10 = {
+        q <- weighted_quantile(x, w, c(0.1, 0.9))
+        if (is.finite(q[1]) && q[1] > 0) q[2] / q[1] else NA_real_
+      }))
+  }, numeric(1))
+  tibble::tibble(measure = measures, value = unname(value))
+}
+
+# Atkinson (1970): 1 minus the equally distributed equivalent income over the
+# mean. Needs positive values.
+atkinson_index <- function(x, w, epsilon) {
+  keep <- x > 0 & w > 0
+  x <- x[keep]
+  w <- w[keep] / sum(w[keep])
+  if (length(x) < 2L) return(NA_real_)
+  mu <- sum(w * x)
+  ede <- if (isTRUE(all.equal(epsilon, 1))) {
+    exp(sum(w * log(x)))
+  } else {
+    sum(w * x^(1 - epsilon))^(1 / (1 - epsilon))
+  }
+  1 - ede / mu
+}
+
+# The weighted quantiles of `x`: the value below which a share `p` of the
+# total weight lies, interpolated between neighbouring observations.
+weighted_quantile <- function(x, w, p) {
+  keep <- w > 0
+  x <- x[keep]
+  w <- w[keep]
+  if (!length(x)) return(rep(NA_real_, length(p)))
+  o <- order(x)
+  x <- x[o]
+  w <- w[o]
+  cw <- (cumsum(w) - w / 2) / sum(w)
+  stats::approx(cw, x, xout = p, rule = 2, ties = "ordered")$y
+}
+
+# The share of the total held by the top `top` of the weight, over the share
+# held by the bottom `bottom`: the Palma ratio for 0.1 and 0.4. Shares are
+# read off the Lorenz curve, interpolated, so a country can be split between
+# the groups.
+share_ratio <- function(x, w, top, bottom) {
+  keep <- w > 0 & x >= 0
+  x <- x[keep]
+  w <- w[keep]
+  if (length(x) < 2L || sum(w * x) <= 0) return(NA_real_)
+  o <- order(x)
+  x <- x[o]
+  w <- w[o]
+  pw <- c(0, cumsum(w) / sum(w))
+  px <- c(0, cumsum(w * x) / sum(w * x))
+  lorenz <- function(q) stats::approx(pw, px, xout = q, ties = "ordered")$y
+  low <- lorenz(bottom)
+  high <- 1 - lorenz(1 - top)
+  if (!is.finite(low) || low <= 0) return(NA_real_)
+  high / low
+}
+
 #' Theil index, with between/within decomposition
 #'
-#' The Theil T inequality index -- less famous than Gini, but it decomposes
+#' The Theil inequality indices -- less famous than Gini, but they decompose
 #' *exactly* into a between-group and a within-group component, answering "how
 #' much of world inequality is between continents vs within them?" in one
 #' call. Weight by population to describe inequality between people rather
-#' than between country units.
+#' than between country units. `type = "T"` (default) is Theil's T, weighted
+#' by income shares; `type = "L"` is Theil's L, the mean log deviation,
+#' weighted by population shares, whose decomposition is path-independent.
 #'
 #' @param x A positive numeric vector (log scale; zero/negative values are
 #'   dropped with a warning).
@@ -1478,10 +2074,14 @@ gini <- function(x, weights = NULL, na.rm = TRUE) {
 #'   `x` (or length 1). When supplied, the decomposition is returned instead of
 #'   the scalar. A row whose group is missing is dropped along with the rows
 #'   whose value is missing, so the decomposition's `total` is computed over the
-#'   grouped subset and can differ from the ungrouped `theil(x)`. For
-#'   `world_snapshot`, Puerto Rico has no `region`, which is the whole of the
-#'   difference there.
+#'   grouped subset and can differ from the ungrouped `theil(x)`.
 #' @param na.rm Whether to drop `NA` values (default `TRUE`).
+#' @param type `"T"` (default) or `"L"`. T is \eqn{\sum_i s_i (x_i/\mu)
+#'   \log(x_i/\mu)} with population shares \eqn{s_i}; L is \eqn{\sum_i s_i
+#'   \log(\mu/x_i)}. Their decompositions differ: T's within-group term
+#'   weights each group by its share of income, L's by its share of
+#'   population, which is why L's between and within parts do not depend on
+#'   the order in which they are taken out.
 #'
 #' @return Without `groups`: a single non-negative number (`0` = perfect
 #'   equality). With `groups`: a tibble with components `"total"`,
@@ -1500,7 +2100,9 @@ gini <- function(x, weights = NULL, na.rm = TRUE) {
 #' snap <- countryatlas::world_snapshot$countries
 #' theil(snap$gdp_per_capita, weights = snap$population)
 #' theil(snap$gdp_per_capita, weights = snap$population, groups = snap$continent)
-theil <- function(x, weights = NULL, groups = NULL, na.rm = TRUE) {
+theil <- function(x, weights = NULL, groups = NULL, na.rm = TRUE,
+                  type = c("T", "L")) {
+  type <- rlang::arg_match(type)
   check_bool(na.rm, "na.rm")
   if (!is.numeric(x)) {
     wdj_abort("{.arg x} must be numeric, not {.obj_type_friendly {x}}.")
@@ -1567,7 +2169,11 @@ theil <- function(x, weights = NULL, groups = NULL, na.rm = TRUE) {
     return(NA_real_)
   }
   mu <- sum(w * x) / sw
-  theil_t <- function(x, w, sw, mu) sum((w / sw) * (x / mu) * log(x / mu))
+  theil_t <- if (identical(type, "T")) {
+    function(x, w, sw, mu) sum((w / sw) * (x / mu) * log(x / mu))
+  } else {
+    function(x, w, sw, mu) sum((w / sw) * log(mu / x))
+  }
   total <- theil_t(x, w, sw, mu)
   if (is.null(g)) return(total)
 
@@ -1583,6 +2189,11 @@ theil <- function(x, weights = NULL, groups = NULL, na.rm = TRUE) {
     # warning to say which group did it.
     if (swg == 0) return(tibble::tibble(between = 0, within = 0))
     mug <- sum(w[i] * x[i]) / swg
+    if (identical(type, "L")) {
+      return(tibble::tibble(
+        between = (swg / sw) * log(mu / mug),
+        within = (swg / sw) * theil_t(x[i], w[i], swg, mug)))
+    }
     tibble::tibble(
       between = (swg / sw) * (mug / mu) * log(mug / mu),
       within = (swg / sw) * (mug / mu) * theil_t(x[i], w[i], swg, mug)

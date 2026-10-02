@@ -151,3 +151,113 @@ test_that("a parquet export defaults into the session temp dir, not getwd()", {
   expect_true(grepl("tempfile", body_txt, fixed = TRUE))
   expect_false(grepl("getwd", body_txt, fixed = TRUE))
 })
+
+test_that("world_query gained layers, faceting and binning", {
+  q <- world_query(gdp, layer = "binned", n_bins = 4, facet = "year")
+  expect_match(q, "BIN fill INTO 4")
+  expect_match(q, "FACET BY year")
+  b <- world_query(gdp, layer = "bubble", size = "population")
+  expect_match(b, "population AS size")
+  expect_match(b, "DRAW spatial_point")
+  expect_error(world_query(gdp, layer = "bubble"), "needs a .*size. column")
+  # The default is unchanged.
+  expect_match(world_query(gdp), "DRAW spatial")
+})
+
+test_that("counts coerced with as.integer() carry an upper bound", {
+  # check_number() with only `lo` lets a value past 2^31-1 through, and the
+  # as.integer() below each of these turns it into NA with R's bare "NAs
+  # introduced by coercion to integer range": world_query() then emitted
+  # "BIN fill INTO NA", od_map()'s min(NA, nrow) reached seq_len(NA), and
+  # convergence_club()'s size comparisons all became NA. compute_breaks() has
+  # carried this bound since 2.0.0; these three had not.
+  od <- data.frame(from = c("France", "Germany"),
+                   to = c("Germany", "Italy"), w = c(1, 2))
+  panel <- tibble::tibble(iso3c = rep(c("A", "B", "C"), each = 6),
+                          year = rep(2000:2005, 3), v = as.numeric(1:18))
+  expect_error(world_query(gdp, layer = "binned", n_bins = 3e9), "n_bins")
+  expect_error(od_map(od, from, to, w, origins = 3e9), "origins")
+  expect_error(convergence_club(panel, v, min_size = 3e9), "min_size")
+  # Ordinary values are unaffected.
+  expect_match(world_query(gdp, layer = "binned", n_bins = 5), "BIN fill INTO 5")
+})
+
+test_that("as_ggsql_source is explicit about who owns the connection", {
+  skip_slow_on_cran()
+  # format = "duckdb" hands back a live connection and duckdb keeps its
+  # in-memory database alive until the handle is released, but neither @return
+  # nor @param said the caller owns it -- while the parquet branch quietly
+  # closed its own. Pin all three lifecycles so they cannot drift apart.
+  skip_if_not_installed("DBI")
+  skip_if_not_installed("duckdb")
+  d <- data.frame(iso3c = c("USA", "FRA"), v = 1:2)
+
+  # Ours to close, and usable when we get it.
+  con <- as_ggsql_source(d, format = "duckdb")
+  expect_true(DBI::dbIsValid(con))
+  expect_equal(nrow(DBI::dbReadTable(con, "countryatlas_world")), 2L)
+  DBI::dbDisconnect(con, shutdown = TRUE)
+
+  # Parquet closes the connection it opened and returns only the path.
+  path <- as_ggsql_source(d, format = "parquet")
+  expect_true(file.exists(path))
+  expect_type(path, "character")
+
+  # A connection we were handed is never ours to close, in either format.
+  own <- DBI::dbConnect(duckdb::duckdb())
+  on.exit(try(DBI::dbDisconnect(own, shutdown = TRUE), silent = TRUE), add = TRUE)
+  back <- as_ggsql_source(d, con = own)
+  expect_identical(back, own)
+  expect_true(DBI::dbIsValid(own))
+  invisible(as_ggsql_source(d, format = "parquet", con = own))
+  expect_true(DBI::dbIsValid(own))
+
+  # The instruction must be in the help, not only in a code comment. Read the
+  # source .Rd: an installed package has no man/ directory (the help is
+  # compiled), so system.file() returns "" there and readLines("") errors --
+  # the same source-tree assumption the helper below exists to avoid.
+  skip_if_no_source_tree()
+  rd <- "../../man/as_ggsql_source.Rd"
+  skip_if_not(file.exists(rd), "Rd source not present")
+  expect_match(paste(readLines(rd, warn = FALSE), collapse = " "),
+               "dbDisconnect", fixed = TRUE)
+})
+
+test_that("world_query stays a dependency-free string builder", {
+  # It must not gate on ggsql at all -- only executing the query does.
+  q <- world_query(gdp_per_capita, projection = "equal_earth",
+                   palette = "magma", transform = "log10", title = "It's a test")
+  expect_s3_class(q, "ggsql_query")
+  expect_match(as.character(q), "DRAW spatial", fixed = TRUE)
+  expect_match(as.character(q), "PROJECT TO equal_earth", fixed = TRUE)
+  expect_match(as.character(q), "SCALE fill TO magma VIA log10", fixed = TRUE)
+  # A quote in the title is SQL-escaped, not injected.
+  expect_match(as.character(q), "'It''s a test'", fixed = TRUE)
+  # Omitting the optional clauses omits the lines.
+  bare <- world_query(x, projection = NULL, palette = NULL)
+  expect_false(grepl("PROJECT TO", bare, fixed = TRUE))
+  expect_false(grepl("SCALE", bare, fixed = TRUE))
+})
+
+test_that("world_query() records the ggsql engine version its projection needs", {
+  # PROJECT TO equal_earth was emitted by default and execution was gated on
+  # 0.4.1, the DRAW spatial version -- but the engine added Equal Earth in
+  # 0.5.0, so the gate would have let an unknown projection through.
+  ver <- function(...) attr(world_query(gdp, ...), "countryatlas_ggsql_version")
+  expect_identical(ver(), "0.5.0")
+  expect_identical(ver(projection = "mercator"), "0.4.1")
+  expect_identical(ver(projection = NULL), "0.4.1")
+  # The package's names are translated where ggsql spells them differently.
+  q <- function(p) unclass(world_query(gdp, projection = p))
+  expect_match(q("plate_carree"), "PROJECT TO equirectangular", fixed = TRUE)
+  expect_match(q("natural_earth"), "PROJECT TO natural", fixed = TRUE)
+  expect_match(q("azimuthal_equal_area"), "PROJECT TO lambert", fixed = TRUE)
+  # ggsql's own names pass through, and a name neither side lists makes no
+  # version claim beyond DRAW spatial's.
+  expect_match(q("sinusoidal"), "PROJECT TO sinusoidal", fixed = TRUE)
+  expect_identical(ver(projection = "equirectangular"), "0.4.1")
+  expect_identical(ver(projection = "sinusoidal"), "0.4.1")
+  # Every name the table translates is one the package itself knows.
+  tab <- countryatlas:::ggsql_projection_table()
+  expect_true(all(tab$projection %in% projection_info()$projection))
+})

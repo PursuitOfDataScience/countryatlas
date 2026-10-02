@@ -8,8 +8,9 @@ smooth_rates(
   data,
   numerator,
   denominator,
-  method = c("eb", "none"),
-  suffix = "_smoothed"
+  method = c("eb", "local_eb", "none"),
+  suffix = "_smoothed",
+  weights = NULL
 )
 }
 \arguments{
@@ -17,10 +18,18 @@ smooth_rates(
 
 \item{numerator, denominator}{The count and its denominator (unquoted).}
 
-\item{method}{\code{"eb"} (default) for empirical-Bayes shrinkage, or \code{"none"} to
-compute the raw rate only.}
+\item{method}{\code{"eb"} (default) shrinks each rate toward the global rate;
+\code{"local_eb"} toward its neighbourhood's -- its own and its neighbours'
+pooled rate -- so a rate is compared with the places around it rather
+than the whole world (Marshall 1991; Anselin, Lozano & Koschinsky 2006);
+\code{"none"} computes the raw rate only.}
 
 \item{suffix}{Suffix for the new columns (default \code{"_smoothed"}).}
+
+\item{weights}{For \code{"local_eb"}: who a country's neighbours are, as a
+\code{\link[=country_weights]{country_weights()}} object; \code{NULL} (default) is k-nearest neighbours
+(k = 5). A country with no usable neighbour has no neighbourhood rate,
+so it is \code{NA}, with a warning.}
 }
 \value{
 \code{data} with \verb{<numerator>_rate} and \verb{<numerator>_smoothed} columns
@@ -50,6 +59,12 @@ the data contain no evidence of real between-country variation.
 
 On a panel the prior is estimated separately for each \code{year}, so every
 rate is shrunk toward its own year's global rate and every row is kept.
+
+\code{"local_eb"} estimates the same two moments in each country's neighbourhood
+(itself and its neighbours): the local rate \eqn{m_i} and the local
+between-country variance \eqn{a_i}, computed from the deviations of the
+neighbourhood's rates from \eqn{m_i}. It agrees with
+\code{spdep::EBlocal(geoda = TRUE)} on the same neighbours.
 }
 
 \examples{
@@ -59,6 +74,14 @@ d <- data.frame(
   pop   = c(1.41e9, 1.39e9, 11000, 12000)
 )
 smooth_rates(d, cases, pop)
+}
+\references{
+Marshall, R. J. (1991). Mapping disease and mortality rates using empirical
+Bayes estimators. \emph{Journal of the Royal Statistical Society, Series C}
+40(2), 283-294. \doi{10.2307/2347593}
+
+Anselin, L., Lozano, N. & Koschinsky, J. (2006). Rate transformations and
+smoothing. Spatial Analysis Laboratory, University of Illinois.
 }
 \seealso{
 \code{\link[=rate_check]{rate_check()}}, \code{\link[=per_capita]{per_capita()}}, \code{\link[=value_by_alpha_map]{value_by_alpha_map()}}

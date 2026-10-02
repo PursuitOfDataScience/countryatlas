@@ -91,7 +91,7 @@ test_that("a parallel multi-indicator fetch matches the serial one", {
     d[[nm]] <- c(US = 100, CN = 50, FR = 70)[d$iso2c] * (d$year - min(yrs) + 1)
     d
   }
-  testthat::local_mocked_bindings(WDI = fake_wdi, .package = "WDI")
+  testthat::local_mocked_bindings(wb_request = fake_wdi, .package = "countryatlas")
   args <- list(c(gdp = "A", pop = "B", co2 = "C"), start = 2018, end = 2020,
                cache = FALSE)
   par <- do.call(countryatlas:::fetch_wdi, c(args, list(parallel = TRUE)))
@@ -101,6 +101,7 @@ test_that("a parallel multi-indicator fetch matches the serial one", {
 })
 
 test_that("a failing indicator inside a fork loses only that indicator", {
+  skip_slow_on_cran()
   fake_wdi <- function(indicator, start, end, ...) {
     nm <- names(indicator)[1]
     if (nm == "pop") stop("fork-boom")
@@ -109,7 +110,7 @@ test_that("a failing indicator inside a fork loses only that indicator", {
     d[[nm]] <- c(1, 2)
     d
   }
-  testthat::local_mocked_bindings(WDI = fake_wdi, .package = "WDI")
+  testthat::local_mocked_bindings(wb_request = fake_wdi, .package = "countryatlas")
   out <- suppressWarnings(
     countryatlas:::fetch_wdi(c(gdp = "A", pop = "B", co2 = "C"),
                              start = 2020, end = 2020, cache = FALSE,

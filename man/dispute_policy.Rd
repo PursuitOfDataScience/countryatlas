@@ -4,7 +4,7 @@
 \alias{dispute_policy}
 \title{State which map convention you are using}
 \usage{
-dispute_policy(policy = NULL)
+dispute_policy(policy = NULL, worldview = NULL)
 }
 \arguments{
 \item{policy}{One of:
@@ -20,6 +20,12 @@ shapes drawn are still de facto.
 }
 
 Called with no argument, returns the current policy.}
+
+\item{worldview}{Optional point of view to draw: the viewing country's ISO
+alpha-3 code (\code{"IND"}) or \code{"ISO"}, one of Natural Earth's 31 published
+worldviews (see \code{\link[=world_geometry]{world_geometry()}}). Once set, geometry attached on the
+\code{sf} backend draws that country's boundaries, and the provenance records
+it. \code{NA} clears it.}
 }
 \value{
 When called with no argument, the policy currently in effect. When
@@ -35,12 +41,13 @@ sets the session's convention so \code{\link[=world_map]{world_map()}} can recor
 }
 \section{What this does and does not do}{
 
-It records a choice and makes it visible. It does not redraw any boundary,
-and selecting \code{"de_jure"} will not give you claimed-boundary geometry,
-because the package does not have any -- Natural Earth's auxiliary claim
-lines are not bundled. Anyone publishing under an institutional convention
-should verify the shapes against that institution's own basemap rather than
-trusting a setting.
+On its own it records a choice and makes it visible. It does not redraw any
+boundary, and selecting \code{"de_jure"} gives no claimed-boundary geometry, so
+it warns. With a \code{worldview} it does change the shapes: the \code{sf} backend
+draws that country's published view. The package ships no worldview of its
+own beyond Natural Earth's default, and anyone publishing under an
+institutional convention should still verify the shapes against that
+institution's own basemap rather than trusting a setting.
 }
 
 \examples{

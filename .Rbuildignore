@@ -17,3 +17,5 @@
 ^\.git$
 ^\.claude$
 Rplots\.pdf$
+^vignettes/articles$
+^tests/testthat/_snaps/visual-regression$

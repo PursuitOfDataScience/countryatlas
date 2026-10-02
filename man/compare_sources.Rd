@@ -9,7 +9,8 @@ compare_sources(
   sources = c("wdi", "owid"),
   year,
   countries = NULL,
-  tolerance = 0.05
+  tolerance = 0.05,
+  allow_unit_mismatch = FALSE
 )
 }
 \arguments{
@@ -25,12 +26,16 @@ character vector giving each source its own code:
 
 \item{tolerance}{Relative difference above which a country counts as a
 disagreement (default \code{0.05}, i.e. 5\%).}
+
+\item{allow_unit_mismatch}{Compare anyway when the sources state different
+units (default \code{FALSE}). See below.}
 }
 \value{
 A tibble with one row per country: the value from each source,
 \code{n_sources} (how many reported it), \code{rel_diff} (max relative spread) and
 \code{disagrees}. The correlation, coverage and disagreement summary is attached
-as the \code{"countryatlas_source_summary"} attribute.
+as the \code{"countryatlas_source_summary"} attribute, with each source's
+stated unit.
 }
 \description{
 Fetch the same indicator from several providers and put the answers side by
@@ -39,6 +44,18 @@ PPP bases, territorial definitions, revision schedules -- and on the ISO spine
 the comparison is one join. This is the verb that turns "I used OWID" into "I
 used OWID, and here is where it differs from the World Bank".
 }
+\section{Different units are not a disagreement}{
+
+GDP per capita in constant 2015 US dollars and in current international
+dollars differ for every country, and calling that a disagreement between
+the sources would be wrong. Each fetch records the unit its provider states
+(see \code{\link[=source_info]{source_info()}}); when two of them state different units the
+comparison is refused with class \code{countryatlas_unit_mismatch}, naming them.
+Pass \code{allow_unit_mismatch = TRUE} to compare anyway -- a ratio that is
+constant across countries can still be worth seeing -- and read
+\code{rel_diff} accordingly. A source that states no unit is not checked.
+}
+
 \examples{
 \dontrun{
 cmp <- compare_sources(c(wdi = "NY.GDP.PCAP.KD", owid = "gdp_per_capita"),

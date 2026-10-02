@@ -1,4 +1,4 @@
-# Disputed territories, uncertainty and imputation --------------------------------
+# Disputed territories ---------------------------------------------------------
 #
 # Every world map takes a political position, including the ones that think they
 # do not. Natural Earth documents an explicit de facto policy; the EU's
@@ -29,6 +29,11 @@
 #'   * `"neutral"` -- disputed areas marked as disputed rather than assigned.
 #'
 #'   Called with no argument, returns the current policy.
+#' @param worldview Optional point of view to draw: the viewing country's ISO
+#'   alpha-3 code (`"IND"`) or `"ISO"`, one of Natural Earth's 31 published
+#'   worldviews (see [world_geometry()]). Once set, geometry attached on the
+#'   `sf` backend draws that country's boundaries, and the provenance records
+#'   it. `NA` clears it.
 #'
 #' @return When called with no argument, the policy currently in effect. When
 #'   setting, the policy that was in effect *before* the call, invisibly -- R's
@@ -36,12 +41,13 @@
 #'   `on.exit(dispute_policy(dispute_policy("neutral")))` restores it.
 #'
 #' @section What this does and does not do:
-#' It records a choice and makes it visible. It does not redraw any boundary,
-#' and selecting `"de_jure"` will not give you claimed-boundary geometry,
-#' because the package does not have any -- Natural Earth's auxiliary claim
-#' lines are not bundled. Anyone publishing under an institutional convention
-#' should verify the shapes against that institution's own basemap rather than
-#' trusting a setting.
+#' On its own it records a choice and makes it visible. It does not redraw any
+#' boundary, and selecting `"de_jure"` gives no claimed-boundary geometry, so
+#' it warns. With a `worldview` it does change the shapes: the `sf` backend
+#' draws that country's published view. The package ships no worldview of its
+#' own beyond Natural Earth's default, and anyone publishing under an
+#' institutional convention should still verify the shapes against that
+#' institution's own basemap rather than trusting a setting.
 #'
 #' @seealso [disputed_territories], [check_dispute_coverage()], [world_map()]
 #' @export
@@ -49,9 +55,17 @@
 #' old <- dispute_policy("neutral")   # sets, and returns what it replaced
 #' dispute_policy()                   # "neutral"
 #' dispute_policy(old)                # put it back
-dispute_policy <- function(policy = NULL) {
+dispute_policy <- function(policy = NULL, worldview = NULL) {
   valid <- c("none", "de_facto", "de_jure", "neutral")
+  if (!is.null(worldview)) {
+    if (length(worldview) == 1L && is.na(worldview)) {
+      options(countryatlas.worldview = NULL)
+    } else {
+      options(countryatlas.worldview = check_worldview(worldview))
+    }
+  }
   if (is.null(policy)) {
+    if (!is.null(worldview)) return(invisible(getOption("countryatlas.dispute_policy", "none")))
     # Validate on *read*, not only on write. Setting the option directly is
     # documented as discouraged but perfectly possible, and every other option
     # the package reads is checked when it is read. It matters more here than
@@ -71,13 +85,15 @@ dispute_policy <- function(policy = NULL) {
     return(got)
   }
   policy <- rlang::arg_match(policy, valid)
-  if (identical(policy, "de_jure")) {
+  if (identical(policy, "de_jure") && is.null(getOption("countryatlas.worldview"))) {
     wdj_warn(c(
       "The geometry is still de facto.",
       "!" = "{.pkg countryatlas} ships Natural Earth's administered boundaries
              and no claimed-boundary layer, so this records your intent but does
              not change a single shape.",
-      "i" = "Verify against your institution's own basemap before publishing."
+      "i" = "Pass {.arg worldview} to draw a country's published boundaries,
+             and verify against your institution's own basemap before
+             publishing."
     ))
   }
   # The PREVIOUS policy, not the new one. R's convention for a setter is to
@@ -202,369 +218,5 @@ dispute_note <- function(disputes, data) {
   paste0(
     "Disputed territories: ", n_marked, " marked, ",
     sum(is.na(dt$iso3c)), " untracked (no ISO code). Convention: ", pol, "."
-  )
-}
-
-#' Fill missing values, and say that you did
-#'
-#' Interpolate or carry forward missing observations in a panel. Every value this
-#' invents is flagged in a companion column, and that flag is **not optional** --
-#' an imputed value that travels through a pipeline looking like data is exactly
-#' the failure this package exists to prevent.
-#'
-#' @param data A panel with `iso3c` and `year`.
-#' @param value Column(s) to fill (character). `NULL` fills every numeric column
-#'   except `year`.
-#' @param method `"linear"` (default, interior gaps only), `"locf"` (carry the
-#'   last observation forward) or `"none"`.
-#' @param max_gap Longest run of consecutive missing years to fill. Gaps longer
-#'   than this are left alone, because interpolating across a decade is not
-#'   interpolation. Default `3`.
-#'
-#' @return `data` with the gaps filled and, for each filled column, a logical
-#'   `<column>_imputed` companion. The map verbs count those *columns* when they
-#'   write provenance, so they keep working through any verb that preserves
-#'   columns. An `"countryatlas_imputed"` attribute lists the flag columns for
-#'   convenience, but nothing in the package reads it, and `dplyr` drops it as
-#'   it drops most attributes -- rely on the columns, not the attribute. Rows
-#'   come back sorted by `iso3c` then `year`.
-#'
-#' @section The hard rule:
-#' The flag cannot be turned off. [world_map()] reads it and refuses to draw
-#' imputed values as though they were observed without at least noting it in the
-#' caption. If you need values with no flag, compute them yourself -- the
-#' package will not hand you a frame where invented numbers are indistinguishable
-#' from measured ones.
-#'
-#' @seealso [complete_years()], [rate_check()], [coverage_map()]
-#' @export
-#' @examples
-#' p <- data.frame(iso3c = "USA", year = 2000:2005,
-#'                 gdp = c(1, NA, NA, 4, NA, 6))
-#' interpolate_missing(p, "gdp")
-interpolate_missing <- function(data, value = NULL,
-                                method = c("linear", "locf", "none"),
-                                max_gap = 3) {
-  method <- rlang::arg_match(method)
-  check_number(max_gap, "max_gap", lo = 1, hi = .Machine$integer.max)
-  max_gap <- as.integer(max_gap)
-  if (!all(c("iso3c", "year") %in% names(data))) {
-    wdj_abort("{.arg data} must have {.field iso3c} and {.field year} columns.")
-  }
-  # A repeated country-year is not just a wrong lag here: stats::approx()
-  # collapses tied x-values to their mean, so the two rows for that year are
-  # *overwritten* with the average -- 20 and 999 both became 509.5 -- and the
-  # `_imputed` flag says FALSE for them, because it compares "was NA" against
-  # "is not NA" and neither was ever NA. The comparison below is documented as
-  # catching a filler that changes an observed value; it cannot catch this one,
-  # so the malformed input has to be reported instead.
-  # This function used to carry its own duplicate-column-name guard as well,
-  # which became unreachable once check_panel_unique() grew one; coverage
-  # showed the block never running, so it is gone. Note the name check is
-  # belt-and-braces -- a validator further down rejects duplicate names too,
-  # so removing this call still errors on them. What only this call catches is
-  # the duplicate *row* case above, which is why it stays.
-  check_panel_unique(data)
-  measures <- setdiff(names(data)[vapply(data, is.numeric, logical(1))], "year")
-  value_expr <- substitute(value)
-  value <- tryCatch(value %||% measures, error = function(e) {
-    abort_bare_column(value_expr, "value", e)
-  })
-  check_cols(data, value)
-  # "Do not interpolate" still has to return the same shape as the other two
-  # methods: a bare `data` here leaked an incoming grouping and gave back a
-  # data.frame where `method = "linear"` gives a tibble.
-  if (identical(method, "none")) return(wdj_return_frame(data))
-  # Only "linear" cares about the year's type: it interpolates *on* the year
-  # via approx(), so a labelled year column reached approx() as NA and surfaced
-  # its "need at least two non-NA values to interpolate" wrapped in a dplyr
-  # across() error, naming neither the column nor its type. "locf" carries the
-  # last value forward in row order and needs no arithmetic, so guarding it
-  # would reject input it handles correctly.
-  #
-  # Coercibility, not check_numeric_col(): approx() reads "2000" happily, so a
-  # character year works here and demanding is.numeric() would refuse input
-  # this verb has always handled. That is the difference from deflate() and
-  # beta_convergence(), which do the arithmetic themselves.
-  if (identical(method, "linear")) {
-    yr <- suppressWarnings(as.numeric(as.character(data$year)))
-    unreadable <- unique(as.character(data$year)[!is.na(data$year) & is.na(yr)])
-    if (length(unreadable)) {
-      wdj_abort(c(
-        "{.field year} must be readable as a number for
-         {.code method = \"linear\"}.",
-        "x" = "{length(unreadable)} value{?s} {?is/are} not:
-               {.val {utils::head(unreadable, 5)}}.",
-        "i" = "Linear interpolation places the filled value *along* the year
-               axis. {.code method = \"locf\"} carries the last value forward
-               and needs no arithmetic."
-      ))
-    }
-  }
-
-  flags <- paste0(value, "_imputed")
-  # Warn only about a flag column we cannot carry forward. A logical one is
-  # this function's own provenance record and is preserved below, so
-  # warn_overwrite()'s "rename them first to keep the original values" would be
-  # false advice; anything else really is being clobbered.
-  warn_overwrite(data, flags[vapply(flags, function(f)
-    f %in% names(data) && !is.logical(data[[f]]), logical(1))])
-  # "This value was imputed" is a property of the data, not of the call that
-  # produced it. Running interpolate_missing() twice on the same column
-  # recomputed the flag from scratch, and the cells the first call filled are
-  # no longer NA -- so every TRUE became FALSE and the flag was, in effect,
-  # turned off. The documented hard rule is that it cannot be, and world_map()
-  # relies on that to avoid drawing imputed values as observed with no caption.
-  # Carried as a column for the same reason the "was missing" flags below are:
-  # the pipeline arranges by (iso3c, year), so a vector held aside would land
-  # the old flags on the wrong rows.
-  prior <- paste0(".countryatlas_prior_", flags)
-  for (i in seq_along(flags)) {
-    p <- if (flags[i] %in% names(data)) data[[flags[i]]] else NULL
-    data[[prior[i]]] <- if (is.logical(p)) !is.na(p) & p else FALSE
-  }
-  # Record "was missing" as columns, so it travels with the rows. It used to be
-  # captured as plain vectors off `data` and compared against `out` further
-  # down -- but the pipeline below arranges by (iso3c, year), so the two lined
-  # up only when the caller happened to hand over an already-sorted frame. On
-  # anything else the flags landed on the wrong rows: observed values came back
-  # marked imputed and imputed ones came back marked observed, and world_map()
-  # believes this column when it writes its caption.
-  for (i in seq_along(value)) data[[flags[i]]] <- is.na(data[[value[i]]])
-
-  out <- data %>%
-    group_by_unit() %>%
-    dplyr::arrange(year_sort_key(.data$year), .by_group = TRUE) %>%
-    dplyr::mutate(dplyr::across(
-      dplyr::all_of(value),
-      ~ fill_capped(.data$year, .x, method, max_gap)
-    )) %>%
-    dplyr::ungroup()
-
-  # Flag exactly the cells that were NA before and are not now. Computed by
-  # comparison rather than tracked inside the filler, so a filler that ever
-  # changes an observed value would show up here as a flagged cell.
-  for (i in seq_along(value)) {
-    out[[flags[i]]] <- (out[[flags[i]]] & !is.na(out[[value[i]]])) | out[[prior[i]]]
-  }
-  # ".wdj_unit" alongside the prior-flag columns: this verb returns the result
-  # of its own column surgery rather than wdj_return_frame(), which is where
-  # the key is normally dropped.
-  out <- out[, setdiff(names(out), c(prior, ".wdj_unit")), drop = FALSE]
-  attr(out, "countryatlas_imputed") <- flags
-  out
-}
-
-# Fill a single country's series, refusing runs longer than max_gap.
-fill_capped <- function(x, y, method, max_gap) {
-  na <- is.na(y)
-  if (!any(na) || sum(!na) < 1L) return(y)
-  # Identify runs of NA, so an over-long gap stays empty. Measured in *years*,
-  # not in rows: max_gap is documented as "the longest run of consecutive
-  # missing years ... because interpolating across a decade is not
-  # interpolation", and counting rows defeats that on any panel that is not
-  # annual. A decadal panel of 2000, 2010, 2020 with 2010 missing is one
-  # missing row, so the default max_gap = 3 filled it -- inventing a value 10
-  # years from either anchor, which is the exact thing the parameter exists to
-  # refuse. Five-yearly data spanned 15 years the same way.
-  #
-  # The span is the distance between the observations that bracket the run,
-  # which on an annual panel equals the number of missing rows exactly, so
-  # annual behaviour is unchanged. A run with an observation on only one side
-  # is measured from that side, which is what LOCF carrying forward cares
-  # about. A non-numeric year (read.csv gives "2000", and this verb otherwise
-  # tolerates it) falls back to the row count rather than erroring.
-  r <- rle(na)
-  # A row with no year has no place in the series, so nothing is carried or
-  # interpolated into it: sorted last, "locf" filled it from the latest real
-  # year and flagged the result as imputed.
-  keep <- !is.na(x)
-  xn <- suppressWarnings(as.numeric(as.character(x)))
-  # Only a year that is present and unreadable disables the span check. A
-  # missing one used to as well, silently switching the whole series from
-  # "years between observations" back to a row count.
-  if (anyNA(xn[!is.na(x)])) xn <- NULL
-  pos <- 1L
-  for (i in seq_along(r$lengths)) {
-    if (r$values[i]) {
-      lo <- pos
-      hi <- pos + r$lengths[i] - 1L
-      # Two conditions, because one alone gets a case wrong.
-      #
-      # The run length in rows is what an annual panel means by "consecutive
-      # missing years", and keeping it preserves annual behaviour exactly.
-      #
-      # The years condition is how far the invented value actually sits from
-      # real data: the distance from each filled year to its *nearest*
-      # observation. Measuring the bracketing span instead punishes a point
-      # that is close to one anchor merely because the other is distant --
-      # 2000, 2001, 2005 with 2001 missing spans five years, but the filled
-      # point is one year from 2000 and interpolating it is perfectly sound.
-      # The nearest-anchor distance catches what matters: 2000, 2010, 2020
-      # with 2010 missing puts the invented value ten years from anything
-      # observed, which is the "interpolating across a decade" the parameter
-      # exists to refuse.
-      too_long <- r$lengths[i] > max_gap
-      if (!too_long && !is.null(xn)) {
-        prev_obs <- if (lo > 1L) xn[lo - 1L] else NA_real_
-        next_obs <- if (hi < length(xn)) xn[hi + 1L] else NA_real_
-        gap_yrs <- vapply(lo:hi, function(j) {
-          min(c(if (!is.na(prev_obs)) xn[j] - prev_obs,
-                if (!is.na(next_obs)) next_obs - xn[j]), Inf)
-        }, numeric(1))
-        too_long <- anyNA(gap_yrs) || max(gap_yrs) > max_gap
-      }
-      if (too_long) keep[lo:hi] <- FALSE
-    }
-    pos <- pos + r$lengths[i]
-  }
-  filled <- if (identical(method, "linear")) {
-    wdj_interp_linear(x, y)
-  } else {
-    # LOCF, without pulling in another dependency. Assignment rather than
-    # ifelse() so the fill keeps whatever type arrived; positions before the
-    # first observation are left holding y's own typed NA.
-    idx <- cumsum(!is.na(y))
-    seen <- idx > 0L
-    out <- y
-    out[seen] <- y[!is.na(y)][idx[seen]]
-    out
-  }
-  # ifelse() drops attributes, so a classed column came back stripped: a Date
-  # of 2020-01-01 returned as the bare number 18262. Worse, it only happened
-  # when the series actually had a gap, because the no-NA path above returns
-  # `y` untouched -- so the same column changed type depending on its data.
-  # Assigning into a copy of `y` preserves the class through `[<-`.
-  #
-  # Only the cells that were missing. `filled` is the whole series recomputed,
-  # and for an observed row that is the observed value, except where the
-  # filler cannot place the row at all, as approx() cannot for a row with no
-  # year, which came back NA and was written over a value that had been there.
-  fill <- keep & na
-  out <- y
-  out[fill] <- filled[fill]
-  out
-}
-
-# --- Value-Suppressing Uncertainty Palettes -------------------------------------
-#
-# Correll, Moritz & Heer (CHI 2018): a 2-D palette where the *value* range
-# contracts as uncertainty rises, so an uncertain estimate cannot claim an
-# extreme colour. Their crowdsourced study found readers weighted uncertainty
-# more heavily with a VSUP than with an ordinary bivariate map. The construction
-# here is the continuous form: a country's position along the value ramp is
-# pulled toward the middle in proportion to its uncertainty, and the legend is
-# laid out as the value x uncertainty grid the palette actually is.
-
-# Build the per-row fill colour and the matching legend levels.
-# One resolution of the value-suppressing ramp, for the map and its legend both.
-#
-# vsup_fill() resolved it with a tryCatch fallback to viridis while vsup_scale()
-# hard-coded viridis, so the two could disagree about what the swatches mean.
-# hcl.colors() also takes a *different* set of names from
-# scale_fill_viridis_c(): it accepts "plasma", "inferno", "cividis", "mako" and
-# "rocket" but rejects "magma" and "turbo", which the rest of world_map()
-# honours. Falling back in silence would reproduce the bug this replaced --
-# `palette` accepted and quietly ignored -- so say so once.
-vsup_cols <- function(option = "viridis") {
-  base <- grDevices::hcl.colors(256, palette = "viridis")
-  if (identical(option, "viridis") || is.null(option)) return(base)
-  cols <- tryCatch(grDevices::hcl.colors(256, palette = option),
-                   error = function(e) NULL)
-  if (is.null(cols)) {
-    wdj_warn(c(
-      "{.arg palette} {.val {option}} is not available for a value-suppressing
-       palette; viridis is used.",
-      "i" = 'The uncertainty ramp is built with {.fn grDevices::hcl.colors},
-             which takes {.val plasma}, {.val inferno}, {.val cividis},
-             {.val mako} or {.val rocket} -- not {.val magma} or {.val turbo}.'
-    ), class = "countryatlas_vsup_palette_ignored", .frequency = "once",
-       .frequency_id = paste0("vsup-palette-", option))
-    return(base)
-  }
-  cols
-}
-
-vsup_fill <- function(value, uncertainty, n_bins = 4, n_uncertainty = 3,
-                      option = "viridis", suppress = 0.85, unit = NULL) {
-  ok <- is.finite(value) & is.finite(uncertainty)
-  v_rank <- rep(NA_real_, length(value))
-  u_rank <- rep(NA_real_, length(value))
-  if (any(ok)) {
-    # Rank, not linear rescaling. Both axes here are typically skewed -- on
-    # `world_snapshot`'s GDP per capita a linear stretch put 174 of 191
-    # countries in the bottom bin and left most of the palette unused, which
-    # defeats the entire point of a 2-D palette. Ranking also matches the
-    # quantile default the rest of the package uses for choropleths, and like
-    # those breaks it is taken once per country (`unit`), not once per
-    # polygon vertex: see unit_percent_rank().
-    v_rank[ok] <- unit_percent_rank(value[ok], unit[ok])
-    u_rank[ok] <- unit_percent_rank(uncertainty[ok], unit[ok])
-    # percent_rank() is (rank - 1)/(n - 1), so it is NaN when exactly one row
-    # is usable -- and cut() then gave NA, the row got no colour, and the map
-    # drew a country whose value and uncertainty were both present as though
-    # neither were. That is not a one-row-input curiosity: a mostly-missing
-    # uncertainty column with a single usable country blanked the whole VSUP
-    # layer. A lone observation has no rank position relative to others, so
-    # the honest place for it is the middle of each ramp, claiming neither
-    # extreme -- which is also where a maximally uncertain value lands.
-    v_rank[ok & !is.finite(v_rank)] <- 0.5
-    u_rank[ok & !is.finite(u_rank)] <- 0.5
-  }
-  v_bin <- cut(v_rank, breaks = seq(0, 1, length.out = n_bins + 1L),
-               include.lowest = TRUE, labels = FALSE)
-  u_bin <- cut(u_rank, breaks = seq(0, 1, length.out = n_uncertainty + 1L),
-               include.lowest = TRUE, labels = FALSE)
-
-  # Value position at the centre of its bin, then suppressed toward 0.5 by the
-  # uncertainty level. At the top uncertainty bin the whole value range
-  # collapses to a narrow band around the middle of the ramp -- which is the
-  # point: an uncertain estimate should not be allowed to look extreme.
-  centre <- (v_bin - 0.5) / n_bins
-  shrink <- 1 - suppress * ((u_bin - 1) / max(1L, n_uncertainty - 1L))
-  pos <- 0.5 + (centre - 0.5) * shrink
-  cols <- vsup_cols(option)
-  fill <- rep(NA_character_, length(value))
-  idx <- pmax(1L, pmin(256L, round(pos * 255) + 1L))
-  fill[!is.na(idx)] <- cols[idx[!is.na(idx)]]
-  # `fill` looks unused -- world_map() maps `label` through vsup_scale() and
-  # never reads it -- but it is the only handle on the *colours* this function
-  # produces, and two tests use it to assert the defining VSUP property (each
-  # uncertainty band spans a narrower slice of the value ramp than the one
-  # below). Checking `label` cannot show that: the labels are the same
-  # whatever palette the ramp is. Keep it; the cost is one hcl.colors(256) per
-  # map.
-  list(fill = fill, v_bin = v_bin, u_bin = u_bin,
-       label = ifelse(is.na(v_bin) | is.na(u_bin), NA_character_,
-                      sprintf("v%d / u%d", v_bin, u_bin)))
-}
-
-# The legend: one swatch per (value, uncertainty) cell, laid out as a grid so
-# the 2-D structure is visible rather than asserted.
-# `option` and `suppress` are taken rather than assumed: both were hard-coded
-# here while vsup_fill() took them as arguments, so the legend could not follow
-# the map -- world_map(palette = ) reached neither, and any future change to
-# either default would have had to be made twice. Defaults match vsup_fill()'s.
-vsup_scale <- function(vs, n_bins, n_uncertainty, value_name, uncertainty_name,
-                       option = "viridis", suppress = 0.85) {
-  grid <- expand.grid(v = seq_len(n_bins), u = seq_len(n_uncertainty))
-  # Compute the swatch colour from the *bin indices* directly, so the legend
-  # cannot drift from the map when the data's range changes.
-  centre <- (grid$v - 0.5) / n_bins
-  shrink <- 1 - suppress * ((grid$u - 1) / max(1L, n_uncertainty - 1L))
-  pos <- 0.5 + (centre - 0.5) * shrink
-  cols <- vsup_cols(option)
-  swatch <- cols[pmax(1L, pmin(256L, round(pos * 255) + 1L))]
-  labels <- sprintf("v%d / u%d", grid$v, grid$u)
-  values <- stats::setNames(swatch, labels)
-  ggplot2::scale_fill_manual(
-    name = paste0(value_name, "\nby ", uncertainty_name),
-    # breaks as well as limits: with limits alone ggplot2 still omitted a key
-    # for a value x uncertainty cell no country happened to fall in, and an
-    # incomplete grid defeats a legend whose entire job is to show the grid.
-    values = values, na.value = "grey85", drop = FALSE,
-    limits = labels, breaks = labels,
-    guide = ggplot2::guide_legend(ncol = n_uncertainty, byrow = FALSE,
-                                  reverse = FALSE)
   )
 }

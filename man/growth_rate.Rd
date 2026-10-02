@@ -4,7 +4,13 @@
 \alias{growth_rate}
 \title{Year-on-year (or compound) growth rate}
 \usage{
-growth_rate(data, value, type = c("yoy", "cagr"), suffix = "_growth")
+growth_rate(
+  data,
+  value,
+  type = c("yoy", "cagr"),
+  suffix = "_growth",
+  by = c("year", "row")
+)
 }
 \arguments{
 \item{data}{A panel with \code{iso3c} and \code{year}.}
@@ -21,6 +27,15 @@ negative values, but not after a zero or an infinity: neither has a
 ratio, so that row is \code{NA} (with a warning) rather than \code{Inf} or -100\%.}
 
 \item{suffix}{Suffix for the new column (default \code{"_growth"}).}
+
+\item{by}{How the previous value is found for \code{"yoy"}. \code{"year"} (default)
+takes the same country's value one year earlier, and \code{NA} where that year
+is absent, so a gap in the panel can never pass for a one-year change.
+\code{"row"} takes the previous observation, whatever its year -- the 3.0.0
+behaviour, for a panel that is irregular by design -- and warns when the
+years are not consecutive. A period column whose labels are not years
+(\code{"pre-war"}) needs \code{"row"}. \code{"cagr"} always divides by the actual span
+of years.}
 }
 \value{
 \code{data} with a growth-rate column added (a proportion, so 0.03 = 3\%).

@@ -15,9 +15,9 @@ projection_compare(
 )
 }
 \arguments{
-\item{data}{An \code{sf} map-ready frame (projections are an \code{sf}-backend
-feature; the polygon backend draws in \code{coord_quickmap()} and cannot
-reproject).}
+\item{data}{An \code{sf} map-ready frame: the comparison reprojects the
+geometry itself. To draw one polygon-backend map in another projection,
+pass \code{projection} to \code{\link[=world_map]{world_map()}}.}
 
 \item{fill}{The fill column (unquoted).}
 

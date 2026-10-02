@@ -4,16 +4,26 @@
 \alias{lisa_map}
 \title{Map LISA clusters}
 \usage{
-lisa_map(data, value, weights = NULL, n_perm = 999, alpha = 0.05, ...)
+lisa_map(
+  data,
+  value,
+  weights = NULL,
+  n_perm = 9999,
+  alpha = 0.05,
+  p_adjust = c("fdr", "bonferroni", "holm", "none"),
+  ...
+)
 }
 \arguments{
 \item{data}{A map-ready frame (polygon or \code{sf}) with \code{iso3c}.}
 
 \item{value}{The value column (unquoted).}
 
-\item{weights}{A \code{\link[=country_weights]{country_weights()}} object.}
+\item{weights}{A \code{\link[=country_weights]{country_weights()}} object; \code{NULL} (default) is
+\code{country_weights("knn", k = 5)}, as in \code{\link[=local_morans]{local_morans()}}.}
 
-\item{n_perm, alpha}{Passed to \code{\link[=local_morans]{local_morans()}}.}
+\item{n_perm, alpha, p_adjust}{Passed to \code{\link[=local_morans]{local_morans()}}. The significance
+mask uses the adjusted p-values, and the caption names the method.}
 
 \item{...}{Passed to \code{\link[=world_map]{world_map()}}.}
 }
@@ -27,15 +37,19 @@ non-significant ones left neutral. Hot spots (High-High) and cold spots
 (Low-Low) read immediately; the off-diagonal categories are the spatial
 outliers.
 }
+\section{Backend}{
+
+Either backend, as \code{\link[=world_map]{world_map()}}: the frame decides, and both draw in Equal
+Earth unless \code{projection} is passed on through \code{...}.
+}
+
 \examples{
 \donttest{
 snap <- countryatlas::world_snapshot$countries
-if (requireNamespace("maps", quietly = TRUE)) {
-  set.seed(1)
-  attach_geometry(snap, geometry = "polygon") |>
-    lisa_map(gdp_per_capita, weights = country_weights("knn", k = 5),
-             n_perm = 99)
-}
+set.seed(1)
+attach_geometry(snap, geometry = "polygon") |>
+  lisa_map(gdp_per_capita, weights = country_weights("knn", k = 5),
+           n_perm = 99)
 }
 }
 \seealso{

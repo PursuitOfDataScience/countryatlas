@@ -14,7 +14,8 @@ country_join(
   type = c("left", "inner", "full"),
   suffix = c(".x", ".y"),
   key = c("iso3c", "cowc", "cown", "gwn"),
-  warn = TRUE
+  warn = TRUE,
+  also_by = NULL
 )
 }
 \arguments{
@@ -37,6 +38,12 @@ alternate spines historical work needs -- see the section below.}
 \item{warn}{Whether to report values that resolve to no country (default
 \code{TRUE}). They join to nothing, so a silent reconciliation failure is the
 one thing this verb exists to prevent. Each side is reported separately.}
+
+\item{also_by}{Key columns to join on besides the country: a character
+vector of columns present in both tables, or a named one when the names
+differ (\code{c(year = "yr")} joins \code{x$year} to \code{y$yr}). \code{NULL} (default) joins
+on \code{year} as well whenever both tables have one, and says so;
+\code{character()} joins on the country alone.}
 }
 \value{
 A tibble joined on a reconciled \code{iso3c} key.
@@ -47,6 +54,23 @@ The generic two-table version of the package's whole reason for being: join
 both sides to \code{iso3c} first. Tables keyed on \code{"Czech Republic"} vs
 \code{"Czechia"}, or \code{"South Korea"} vs \code{"Korea, Rep."}, just work.
 }
+\section{Panels}{
+ one row per country-year:
+Two country-year panels are joined country-year to country-year: when both
+tables have a \code{year} column it becomes part of the key, with a message, so
+France 2019 meets France 2019 rather than every year of France meeting every
+other. A panel joined to a cross-section (one side has no \code{year}) repeats the
+cross-section's values across the panel's years, and says that too. Pass
+\code{also_by} to key on other columns, or \code{also_by = character()} to join on the
+country alone.
+
+Whatever the keys, a key that appears more than once on \emph{both} sides pairs
+every copy with every copy. dplyr warns about that many-to-many join only
+when it is called from the console, never from inside a package, so this
+verb checks for itself and warns with class \code{countryatlas_many_to_many},
+naming the keys.
+}
+
 \section{Joining historical data}{
  the second spine:
 ISO 3166 was first published in 1974 and never covered colonies, so \code{iso3c}

@@ -79,9 +79,7 @@ detect_country_col <- function(data, call = rlang::caller_env()) {
 #' rates <- data.frame(country = c("United States", "Brazil", "Kenya"),
 #'                     vaccination_pct = c(0.7, 0.8, 0.6))
 #' \donttest{
-#' if (requireNamespace("maps", quietly = TRUE)) {
-#'   joined <- join_world(rates, country)
-#' }
+#' joined <- join_world(rates, country)
 #' }
 join_world <- function(data,
                        country_col = NULL,
@@ -93,7 +91,14 @@ join_world <- function(data,
                        recenter = NULL,
                        warn = TRUE) {
   check_bool(warn, "warn")
-  geometry <- rlang::arg_match(geometry)
+  # "maps" passes through to attach_geometry(), deprecated on the caller's
+  # behalf here.
+  if (identical(geometry, "maps")) {
+    user_env <- rlang::caller_env()
+    deprecate_maps_geometry(user_env)
+  } else {
+    geometry <- rlang::arg_match(geometry)
+  }
   col_q <- rlang::enquo(country_col)
   if (rlang::quo_is_null(col_q) || rlang::quo_is_missing(col_q)) {
     col_name <- detect_country_col(data)
@@ -170,8 +175,9 @@ join_world <- function(data,
     warn_recenter_ignored(recenter, 'geometry = "none"')
     return(std)
   }
-  attach_geometry(std, by = "iso3c", geometry = geometry, scale = scale,
-                  region = region, projection = projection, recenter = recenter)
+  quiet_maps_deprecation(
+    attach_geometry(std, by = "iso3c", geometry = geometry, scale = scale,
+                    region = region, projection = projection, recenter = recenter))
 }
 
 #' Reconcile and join two messy country tables
@@ -195,6 +201,26 @@ join_world <- function(data,
 #' @param warn Whether to report values that resolve to no country (default
 #'   `TRUE`). They join to nothing, so a silent reconciliation failure is the
 #'   one thing this verb exists to prevent. Each side is reported separately.
+#' @param also_by Key columns to join on besides the country: a character
+#'   vector of columns present in both tables, or a named one when the names
+#'   differ (`c(year = "yr")` joins `x$year` to `y$yr`). `NULL` (default) joins
+#'   on `year` as well whenever both tables have one, and says so;
+#'   `character()` joins on the country alone.
+#' @section Panels: one row per country-year:
+#' Two country-year panels are joined country-year to country-year: when both
+#' tables have a `year` column it becomes part of the key, with a message, so
+#' France 2019 meets France 2019 rather than every year of France meeting every
+#' other. A panel joined to a cross-section (one side has no `year`) repeats the
+#' cross-section's values across the panel's years, and says that too. Pass
+#' `also_by` to key on other columns, or `also_by = character()` to join on the
+#' country alone.
+#'
+#' Whatever the keys, a key that appears more than once on *both* sides pairs
+#' every copy with every copy. dplyr warns about that many-to-many join only
+#' when it is called from the console, never from inside a package, so this
+#' verb checks for itself and warns with class `countryatlas_many_to_many`,
+#' naming the keys.
+#'
 #' @section Joining historical data: the second spine:
 #' ISO 3166 was first published in 1974 and never covered colonies, so `iso3c`
 #' cannot key anything before about 1970. Correlates of War and Gleditsch-Ward
@@ -222,7 +248,7 @@ country_join <- function(x, y, by_x, by_y,
                          type = c("left", "inner", "full"),
                          suffix = c(".x", ".y"),
                          key = c("iso3c", "cowc", "cown", "gwn"),
-                         warn = TRUE) {
+                         warn = TRUE, also_by = NULL) {
   type <- rlang::arg_match(type)
   key <- rlang::arg_match(key)
   check_bool(warn, "warn")
@@ -265,11 +291,116 @@ country_join <- function(x, y, by_x, by_y,
     warn_key_collapse(x[[bx]], x[[key]], "`x`", bx, key)
     warn_key_collapse(y[[by_]], y[[key]], "`y`", by_, key)
   }
+  extra <- join_also_by(also_by, x, y, key, c(bx, by_), c("`x`", "`y`"))
+  warn_many_to_many(x, y, c(key, names(extra)), c(key, unname(extra)),
+                    "`x`", "`y`")
   join_fun <- switch(type,
                      left = dplyr::left_join,
                      inner = dplyr::inner_join,
                      full = dplyr::full_join)
-  join_fun(x, y, by = key, suffix = suffix, na_matches = "never")
+  # many-to-many is declared, not assumed: warn_many_to_many() has just said
+  # whether it happened, which is the warning dplyr withholds from packages.
+  join_fun(x, y, by = c(key, extra), suffix = suffix, na_matches = "never",
+           relationship = "many-to-many")
+}
+
+# The key columns a country join uses besides the country code itself, as a
+# dplyr `by` vector named by the x-side column.
+#
+# A country join used to key on the country alone, so two country-year panels
+# met every year against every year: two countries by two years came back as
+# 8 rows, with `year.x` and `year.y`, and no warning -- dplyr shows its
+# many-to-many warning only for joins it treats as user-facing, which a join
+# inside a package is not. add_indicator() already joined panels on `year`;
+# the flagship join now does too, and says so, as dplyr's natural join does.
+join_also_by <- function(also_by, x, y, key, by_cols, sides,
+                         call = rlang::caller_env()) {
+  if (is.null(also_by)) {
+    in_x <- "year" %in% names(x)
+    in_y <- "year" %in% names(y)
+    if (in_x && in_y) {
+      wdj_inform(c(
+        "Joining on {.field year} as well as {.field {key}}.",
+        "i" = "Pass {.code also_by = character()} to join on the country alone."
+      ), class = "countryatlas_join_year")
+      return(c(year = "year"))
+    }
+    if (in_x != in_y) {
+      panel <- if (in_x) x else y
+      yrs <- unique(stats::na.omit(panel$year))
+      if (length(yrs) > 1L) {
+        flat <- sides[if (in_x) 2L else 1L]
+        long <- sides[if (in_x) 1L else 2L]
+        wdj_inform(c(
+          "{flat} has no {.field year} column, so each of its rows meets all
+           {length(yrs)} years of {long}.",
+          "i" = "Pass {.arg also_by} to join on another column as well."
+        ), class = "countryatlas_join_broadcast")
+      }
+    }
+    return(character())
+  }
+  if (!is.character(also_by) || anyNA(also_by) || !all(nzchar(also_by))) {
+    wdj_abort(c(
+      "{.arg also_by} must be a character vector of column names.",
+      "x" = if (is.character(also_by)) "It contains a missing or empty name."
+            else "Got {.obj_type_friendly {also_by}}.",
+      "i" = 'Write {.code also_by = "year"}, or {.code also_by = c(year = "yr")}
+             when the two tables name it differently.'
+    ), call = call)
+  }
+  x_cols <- names(also_by) %||% also_by
+  x_cols[!nzchar(x_cols)] <- also_by[!nzchar(x_cols)]
+  y_cols <- unname(also_by)
+  bad <- intersect(c(x_cols, y_cols), c(key, by_cols))
+  if (length(bad)) {
+    wdj_abort(c(
+      "{.arg also_by} cannot include the country column or the derived key.",
+      "x" = "Got {.field {bad}}.",
+      "i" = "The country is always part of the key; {.arg also_by} adds to it."
+    ), call = call)
+  }
+  for (i in 1:2) {
+    have <- names(if (i == 1L) x else y)
+    want <- if (i == 1L) x_cols else y_cols
+    miss <- setdiff(want, have)
+    if (length(miss)) {
+      wdj_abort(c(
+        "{.arg also_by} names {cli::qty(length(miss))}{?a column/columns}
+         {sides[i]} does not have: {.field {miss}}.",
+        "i" = "Name the {.code x} column and the {.code y} column, as in
+               {.code also_by = c(year = \"yr\")}, when they differ."
+      ), call = call)
+    }
+  }
+  stats::setNames(y_cols, x_cols)
+}
+
+# Warn when a join key appears more than once on both sides, which pairs every
+# copy with every copy. dplyr has this warning but suppresses it for joins made
+# from package code, so the verbs that join for the caller have to say it
+# themselves. Keys with a missing part never match (na_matches = "never"), so
+# they are not counted.
+warn_many_to_many <- function(x, y, x_cols, y_cols, x_side, y_side,
+                              call = rlang::caller_env()) {
+  keys_of <- function(d, cols) {
+    k <- d[, cols, drop = FALSE]
+    ok <- stats::complete.cases(k)
+    out <- do.call(paste, c(unname(lapply(k, as.character)), sep = " "))
+    out[ok]
+  }
+  kx <- keys_of(x, x_cols)
+  ky <- keys_of(y, y_cols)
+  both <- intersect(unique(kx[duplicated(kx)]), unique(ky[duplicated(ky)]))
+  if (!length(both)) return(invisible(character(0)))
+  wdj_warn(c(
+    "{length(both)} key{?s} appear{?s/} more than once in both {x_side} and
+     {y_side}, so the join pairs every copy with every copy.",
+    "*" = "{.val {utils::head(both, 5)}}",
+    "i" = "Add the column that tells the rows apart with {.arg also_by}, or
+           de-duplicate one side first."
+  ), class = "countryatlas_many_to_many", call = call)
+  invisible(both)
 }
 
 # Standardisation can map two distinct inputs onto one code -- "France" and
@@ -330,6 +461,10 @@ warn_key_collapse <- function(orig, key, side, by_name, key_name,
 #'   cannot carry.
 #' @param warn Whether to report values that resolve to no country (default
 #'   `TRUE`), per table, as [country_join()] does per side.
+#' @param also_by Key columns to join on besides the country, present in every
+#'   table. `NULL` (default) joins on `year` as well wherever both sides of a
+#'   step have one, as [country_join()] does; `character()` joins on the
+#'   country alone. See *Panels* in [country_join()].
 #'
 #' @return A single tibble joined on `key` (clashing non-key columns get
 #'   dplyr's default `.x`/`.y` suffixes).
@@ -342,7 +477,7 @@ warn_key_collapse <- function(orig, key, side, by_name, key_name,
 country_join_all <- function(tables, by, origin = "country.name",
                              type = c("full", "left", "inner"),
                              key = c("iso3c", "cowc", "cown", "gwn"),
-                             warn = TRUE) {
+                             warn = TRUE, also_by = NULL) {
   type <- rlang::arg_match(type)
   key <- rlang::arg_match(key)
   check_bool(warn, "warn")
@@ -400,7 +535,46 @@ country_join_all <- function(tables, by, origin = "country.name",
     }
     tb
   })
+  if (!is.null(also_by)) {
+    if (!is.null(names(also_by))) {
+      wdj_abort(c(
+        "{.arg also_by} must name columns present in every table, unnamed.",
+        "i" = "A named {.arg also_by} pairs two tables' column names, which
+               only {.fn country_join} has; rename the columns to match first."
+      ))
+    }
+    # Validated against every table up front, so a column missing from the
+    # fourth table is reported before three joins have run.
+    for (i in seq_len(n)) {
+      join_also_by(also_by, prepped[[i]], prepped[[i]], key, by[i],
+                   rep(sprintf("table %d", i), 2L))
+    }
+  }
   join_fun <- switch(type, left = dplyr::left_join,
                      inner = dplyr::inner_join, full = dplyr::full_join)
-  Reduce(function(x, y) join_fun(x, y, by = key, na_matches = "never"), prepped)
+  out <- prepped[[1L]]
+  said_year <- FALSE
+  for (i in seq_len(n)[-1L]) {
+    nxt <- prepped[[i]]
+    extra <- if (is.null(also_by)) {
+      # The same rule as country_join(), applied at each step, but said once
+      # per call rather than once per table.
+      yr <- intersect("year", intersect(names(out), names(nxt)))
+      if (length(yr) && !said_year) {
+        wdj_inform(c(
+          "Joining on {.field year} as well as {.field {key}}.",
+          "i" = "Pass {.code also_by = character()} to join on the country
+                 alone."
+        ), class = "countryatlas_join_year")
+        said_year <- TRUE
+      }
+      stats::setNames(yr, yr)
+    } else stats::setNames(also_by, also_by)
+    warn_many_to_many(out, nxt, c(key, names(extra)), c(key, unname(extra)),
+                      if (i == 2L) "table 1" else sprintf("tables 1-%d", i - 1L),
+                      sprintf("table %d", i))
+    out <- join_fun(out, nxt, by = c(key, extra), na_matches = "never",
+                    relationship = "many-to-many")
+  }
+  out
 }

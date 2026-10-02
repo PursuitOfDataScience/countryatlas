@@ -1,0 +1,111 @@
+---
+title: "Gallery"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", message = FALSE,
+                      warning = FALSE, fig.width = 8, fig.height = 3.6, dpi = 96)
+library(countryatlas)
+snap <- world_snapshot$countries
+poly <- attach_geometry(snap)
+has_sf <- requireNamespace("sf", quietly = TRUE) &&
+  requireNamespace("rnaturalearth", quietly = TRUE)
+if (has_sf) sfd <- attach_geometry(snap, geometry = "sf")
+```
+
+Every map here is one call on the bundled snapshot, offline. Each carries its
+coverage and source in the caption, alt text from `map_alt_text()`, and a
+provenance record from `map_provenance()`.
+
+## Choropleths
+
+```{r, fig.alt = "Quantile choropleth of GDP per capita."}
+world_map(poly, gdp_per_capita)
+```
+
+```{r, fig.alt = "Choropleth with the World Bank income thresholds as fixed classes."}
+world_map(poly, gdp_per_capita, breaks = c(-Inf, 1136, 4466, 13846, Inf))
+```
+
+```{r, fig.alt = "Categorical map of World Bank income groups."}
+world_map(poly, income)
+```
+
+```{r, fig.alt = "World map of GDP per capita centred on the Pacific."}
+world_map(poly, gdp_per_capita, recenter = 150)
+```
+
+```{r, fig.alt = "Ternary map of a made-up three-part composition, centred on the average country."}
+set.seed(1)
+mix <- transform(snap, farm = runif(nrow(snap), 1, 4),
+                 industry = runif(nrow(snap), 2, 6),
+                 services = runif(nrow(snap), 4, 9))
+ternary_map(attach_geometry(mix), farm, industry, services)
+```
+
+## Symbols, flows and grids
+
+```{r, fig.alt = "Proportional-symbol map of population."}
+bubble_map(snap, population)
+```
+
+```{r, fig.alt = "Spike map of population."}
+spike_map(snap, population)
+```
+
+```{r, fig.alt = "Great-circle arcs between six pairs of countries."}
+corridors <- data.frame(
+  from = c("Brazil", "Nigeria", "South Africa", "Kenya", "Indonesia", "Peru"),
+  to = c("Portugal", "United Kingdom", "United Kingdom", "United Kingdom",
+         "Saudi Arabia", "Spain"),
+  people = c(1.4, 2.1, 2.6, 1.7, 1.8, 1.2))
+flow_map(corridors, from, to, people)
+```
+
+```{r, fig.height = 4.6, fig.alt = "Equal-area tile grid, one square per country."}
+tile_map(snap, gdp_per_capita)
+```
+
+```{r, fig.alt = "Gridded cartogram: one square per fixed number of people."}
+gridded_cartogram(snap, population, cells = 600)
+```
+
+## Honest maps
+
+```{r, fig.alt = "Value-by-alpha map: GDP per capita in colour, population as opacity."}
+value_by_alpha_map(poly, gdp_per_capita, population)
+```
+
+```{r, fig.alt = "Map of which countries report CO2 per capita."}
+coverage_map(poly, co2_per_capita)
+```
+
+```{r, fig.height = 2.6, fig.alt = "GDP per capita under six classification methods."}
+classify_compare(poly, gdp_per_capita, ncol = 3)
+```
+
+## Globes and cartograms
+
+```{r, fig.width = 4.5, fig.height = 4.5, eval = has_sf, fig.alt = "Orthographic globe shaded by income group."}
+globe_map(sfd, income, lon = 20, lat = 10)
+```
+
+```{r, eval = has_sf, fig.alt = "Dorling cartogram of population."}
+dorling_map(sfd, population)
+```
+
+```{r, eval = has_sf, fig.alt = "Bivariate choropleth of GDP per capita against life expectancy."}
+if (requireNamespace("biscale", quietly = TRUE)) {
+  bivariate_map(sfd, gdp_per_capita, life_expectancy)
+}
+```
+
+## Over time
+
+```{r, fig.height = 4, fig.alt = "A sparkline of a made-up series for every country on the tile grid."}
+set.seed(1)
+pan <- expand.grid(iso3c = world_tiles$iso3c, year = 2000:2020,
+                   stringsAsFactors = FALSE)
+pan$v <- stats::ave(stats::rnorm(nrow(pan)), pan$iso3c, FUN = cumsum)
+tile_trend_map(pan, v, label = FALSE)
+```

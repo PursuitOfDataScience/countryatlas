@@ -1,0 +1,40 @@
+# The time budgets that got 3.0.0 through CRAN (T6). CRAN's incoming check
+# rejected two uploads for "Overall checktime > 10 min", on a Windows machine
+# that ran the tests 2.5 times slower than a workstation. So the suite has to
+# stay small where CRAN runs it: the CRAN-mode tests, the vignette rebuild and
+# the whole --as-cran check each have a ceiling, and this fails the build when
+# one is crossed. The ceilings are the reference machine's budgets (40 s, 50 s,
+# 4.5 min) scaled by COUNTRYATLAS_BUDGET_SCALE for this runner.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+name: budgets
+
+permissions: read-all
+
+jobs:
+  budgets:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      COUNTRYATLAS_BUDGET_SCALE: "1.5"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::rcmdcheck, any::pkgbuild, any::testthat
+          needs: check
+
+      - name: Check the budgets
+        run: Rscript .github/scripts/check-budgets.R

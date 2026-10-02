@@ -28,13 +28,17 @@ world map with a large well-covered region and a systematically empty one is
 telling you something about the indicator that the headline map hides behind
 a uniform grey.
 }
+\section{Backend}{
+
+Either backend, as \code{\link[=world_map]{world_map()}}: the frame decides, and both draw in Equal
+Earth unless \code{projection} is passed on through \code{...}.
+}
+
 \examples{
 \donttest{
 snap <- countryatlas::world_snapshot$countries
-if (requireNamespace("maps", quietly = TRUE)) {
-  attach_geometry(snap, geometry = "polygon") |>
-    coverage_map(gdp_per_capita)
-}
+attach_geometry(snap, geometry = "polygon") |>
+  coverage_map(gdp_per_capita)
 }
 }
 \seealso{

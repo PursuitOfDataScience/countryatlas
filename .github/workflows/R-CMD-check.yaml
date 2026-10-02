@@ -42,6 +42,9 @@ jobs:
       # defaults on the other legs, so those legs are unaffected.
       _R_CHECK_DEPENDS_ONLY_: ${{ matrix.config.depends-only && 'true' || 'false' }}
       _R_CHECK_FORCE_SUGGESTS_: ${{ matrix.config.depends-only && 'false' || 'true' }}
+      # Draw every polygon-backend verb in every projection
+      # (test-map-projection.R), about 90 seconds a leg.
+      COUNTRYATLAS_RENDER_ALL: true
 
     steps:
       - uses: actions/checkout@v7

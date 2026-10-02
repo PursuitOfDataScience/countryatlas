@@ -115,7 +115,7 @@ dissolve_country <- function(x, warn = TRUE) {
       historical = NA_character_,
       dissolved = NA_integer_,
       iso3c = iso,
-      country = convert_country(iso, to = "country", from = "iso3c", warn = FALSE)
+      country = convert_country(iso, to = "country", origin = "iso3c", warn = FALSE)
     )
   })
   out <- dplyr::bind_rows(out)

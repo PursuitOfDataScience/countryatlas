@@ -52,3 +52,59 @@ test_that("identifier matching does not depend on LC_CTYPE", {
   expect_identical(as.character(picked), "ISO3C")
   expect_identical(attr(picked, "origin"), "iso3c")
 })
+
+test_that("the sf paths survive hostile formatting options", {
+  skip_slow_on_cran()
+  skip_if_no_sf_geometry()
+  snap <- countryatlas::world_snapshot$countries
+  for (opt in list(list(OutDec = ","), list(scipen = -9),
+                   list(OutDec = ",", scipen = -9))) {
+    old <- options(opt)
+    expect_gt(nrow(suppressWarnings(attach_geometry(snap, geometry = "sf"))), 0L)
+    expect_gt(nrow(suppressWarnings(
+      world_geometry("countries", geometry = "sf",
+                     projection = "orthographic", recenter = 48.9))), 0L)
+    expect_gt(nrow(suppressWarnings(world_geometry("graticule",
+                                                   geometry = "sf"))), 0L)
+    expect_equal(nrow(suppressWarnings(locate_country(2.3, 48.9))), 1L)
+    options(old)
+  }
+})
+
+test_that("the verbs survive hostile number-formatting options", {
+  skip_slow_on_cran()
+  # A comma decimal mark is ordinary in much of the world, and fmt_num() exists
+  # so a PROJ string never depends on it. (A *negative* scipen is not covered:
+  # it breaks sf and ggplot2 on their own -- st_crs(paste0("EPSG:", 4326))
+  # becomes "EPSG:4.326e+03" -- with this package not even loaded.)
+  skip_if_no_sf_geometry()
+  snap <- countryatlas::world_snapshot$countries
+  sfd <- attach_geometry(snap, geometry = "sf")
+  with_opts <- function(o, code) {
+    old <- options(o)
+    on.exit(options(old), add = TRUE)
+    force(code)
+  }
+  # expect_no_error() takes no `info`, so report the option and the message.
+  survives <- function(o, code) {
+    tryCatch({
+      with_opts(o, force(code))
+      TRUE
+    }, error = function(e) conditionMessage(e))
+  }
+  # stringsAsFactors is deliberately absent: R deprecated it, so merely setting
+  # it warns, and it no longer affects data.frame() on the versions we support.
+  for (o in list(list(OutDec = ","), list(scipen = 0L), list(digits = 3L),
+                 list(warn = 2L), list(useFancyQuotes = FALSE))) {
+    lbl <- paste(names(o), unlist(o), sep = "=")
+    expect_true(isTRUE(survives(o, ggplot2::ggplot_build(
+      world_map(sfd, gdp_per_capita)))), info = lbl)
+    expect_true(isTRUE(survives(o, world_geometry("countries",
+                                                 geometry = "sf"))), info = lbl)
+    expect_true(isTRUE(survives(o, locate_country(lon = 2.3, lat = 48.8))),
+                info = lbl)
+    expect_true(isTRUE(survives(o, convert_country("France", to = "iso3c"))),
+                info = lbl)
+    expect_true(isTRUE(survives(o, world_query(gdp_per_capita))), info = lbl)
+  }
+})

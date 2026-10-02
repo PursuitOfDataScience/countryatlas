@@ -9,7 +9,7 @@
 \code{countryatlas} exists to kill one recurring source of pain: country names
 never line up across data sources. The package makes ISO codes the universal
 join key and hands you a ready-to-map tibble that stitches together map
-geometry (\code{\link[ggplot2:map_data]{ggplot2::map_data()}} or Natural Earth \code{sf}), World Bank indicators
+geometry (bundled Natural Earth polygons, or Natural Earth \code{sf}), World Bank indicators
 (\code{\link[WDI:WDI]{WDI::WDI()}}) and the \code{\link[countrycode:countrycode]{countrycode::countrycode()}} crosswalk.
 }
 \details{
@@ -105,16 +105,16 @@ The happy path stays one call: \code{\link[=world_data]{world_data()}}. Everythi
 
 \section{Performance & caching}{
 
-\code{\link[=clear_wdi_cache]{clear_wdi_cache()}}, \code{\link[=clear_country_cache]{clear_country_cache()}}.
+\code{\link[=clear_country_cache]{clear_country_cache()}}.
 }
 
 \section{Options}{
 
-Six options change the package's behaviour. All are unset by default.
+Eight options change the package's behaviour. All are unset by default.
 \describe{
-\item{\code{countryatlas.cache_dir}}{Where the persistent World Bank cache
-lives. Defaults to \code{tools::R_user_dir("countryatlas", "cache")}; set it to
-\code{""} for session-only caching. See \code{\link[=clear_wdi_cache]{clear_wdi_cache()}}.}
+\item{\code{countryatlas.cache_dir}}{Where the persistent cache lives, one
+directory per source. Defaults to \code{tools::R_user_dir("countryatlas", "cache")}; set it to \code{""} for session-only caching. See
+\code{\link[=clear_country_cache]{clear_country_cache()}}.}
 \item{\code{countryatlas.cache_max_age}}{How long a persistent cache entry
 stays usable, in seconds. Defaults to 30 days. World Bank figures are
 revised, so an old entry is not merely stale on disk -- it is a
@@ -130,13 +130,29 @@ parallel (only when the cache is on disk -- a memory-only memo cannot
 survive a fork). Defaults to one fewer than the available cores, and
 to 2 under \verb{R CMD check}, per CRAN policy. Must be a single finite
 number; values below one are clamped to one.}
-\item{\code{countryatlas.gdp_compat}}{Set to \code{TRUE} to restore the
-\code{gdp_per_capita_2015} column that \code{\link[=world_data]{world_data()}} emitted in 1.0.0. A
-deprecation shim, off by default, and now warning when used.}
+\item{\code{countryatlas.timeout}}{How long one request to a provider may
+take, in seconds. Defaults to 60. Every built-in source goes through the
+same client, so a failing fetch is bounded: at most
+\code{countryatlas.retries + 1} requests of this length each, plus the waits
+between them.}
+\item{\code{countryatlas.retries}}{How many times a request is retried after a
+failure worth retrying (HTTP 429, a 5xx, a dropped connection), with
+exponential backoff and jitter, honouring \code{Retry-After}. Defaults to 3;
+a whole number from 0 to 10.}
+\item{\code{countryatlas.strict}}{Set to \code{TRUE} to make a failed download an
+error (class \code{countryatlas_fetch_failed}) instead of a warning and an
+empty result, for a pipeline that must not continue with data missing.
+The default, \code{FALSE}, is what CRAN asks of a package that uses the
+network: fail gracefully.}
 \item{\code{countryatlas.dispute_policy}}{Which map convention disputed
 territories are drawn under: \code{"none"} (default), \code{"de_facto"},
 \code{"de_jure"} or \code{"neutral"}. Set it with \code{\link[=dispute_policy]{dispute_policy()}} rather than
 directly, which also reports what the setting does and does not change.}
+\item{\code{countryatlas.worldview}}{A Natural Earth point of view the \code{sf}
+backend draws, as the viewing country's ISO code (\code{"IND"}) or
+\code{"ISO"}; unset by default. Set it with
+\code{dispute_policy(worldview = )}, which validates it; see
+\code{\link[=world_geometry]{world_geometry()}}.}
 }
 }
 

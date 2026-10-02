@@ -8,15 +8,21 @@ value_by_alpha_map(
   data,
   value,
   equalize,
-  style = c("quantile", "continuous", "binned", "jenks"),
+  style = c("quantile", "continuous", "binned", "equal", "jenks", "fisher", "headtails",
+    "sd", "fixed"),
   palette = NULL,
   n_bins = 5,
+  breaks = NULL,
+  midpoint = NULL,
   alpha_range = c(0.15, 1),
   transform = c("rank", "log10", "identity"),
   background = "grey20",
   title = NULL,
   legend = NULL,
-  projection = "equal_earth"
+  projection = "equal_earth",
+  footnote = "auto",
+  small_states = c("auto", "none", "dots"),
+  small_area_km2 = 1000
 )
 }
 \arguments{
@@ -27,9 +33,10 @@ value_by_alpha_map(
 \item{equalize}{The equalising column, carried by opacity (unquoted) --
 population, total counts, or whatever denominator the rate was built on.}
 
-\item{style}{Classification for the colour channel (as \code{\link[=world_map]{world_map()}}).}
+\item{style}{Classification for the colour channel, as in \code{\link[=world_map]{world_map()}}
+(any of its styles but \code{"categorical"}).}
 
-\item{palette}{Optional viridis palette name.}
+\item{palette, breaks, midpoint}{As in \code{\link[=world_map]{world_map()}}.}
 
 \item{n_bins}{Number of colour bins for the binned styles.}
 
@@ -44,7 +51,10 @@ opacity is low (default a dark neutral).}
 
 \item{title, legend}{Optional plot title and legend title.}
 
-\item{projection}{Projection for the \code{sf} backend.}
+\item{projection}{Projection, as in \code{\link[=world_map]{world_map()}}.}
+
+\item{footnote, small_states, small_area_km2}{As in \code{\link[=world_map]{world_map()}}. A small
+state drawn as a point takes its opacity from \code{equalize} too.}
 }
 \value{
 A \code{ggplot} object.
@@ -58,13 +68,18 @@ a cartogram it solves it \strong{without distorting geometry}, which is the main
 objection to cartograms. Roth, Woodruff & Johnson (2010) introduced it for
 exactly this purpose.
 }
+\section{Backend}{
+
+Either backend, from the frame: an \code{sf} frame draws through \code{coord_sf()}, a
+polygon frame on the polygon backend, both in \code{projection} (Equal Earth by
+default).
+}
+
 \examples{
 \donttest{
 snap <- countryatlas::world_snapshot$countries
-if (requireNamespace("maps", quietly = TRUE)) {
-  attach_geometry(snap, geometry = "polygon") |>
-    value_by_alpha_map(gdp_per_capita, population)
-}
+attach_geometry(snap, geometry = "polygon") |>
+  value_by_alpha_map(gdp_per_capita, population)
 }
 }
 \references{

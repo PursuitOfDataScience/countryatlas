@@ -4,7 +4,8 @@
 # warning about misses. `origin` is any countrycode origin scheme
 # ("country.name", "iso2c", "iso3c", "wb", ...).
 wdj_to_iso3c <- function(x, origin = "country.name", custom_match = country_overrides(),
-                         call = rlang::caller_env(), arg = "origin") {
+                         call = rlang::caller_env(), arg = "origin",
+                         with_method = FALSE) {
   check_string(origin, arg, call = call)
   # `origin` was checked and the override table was not, though every value in
   # it lands in the iso3c column -- and the iso3c branch below whitelists those
@@ -72,6 +73,9 @@ wdj_to_iso3c <- function(x, origin = "country.name", custom_match = country_over
     }
     valid <- c(wdj_known_iso3c(), unname(custom_match))
     out[!is.na(out) & !(out %in% valid)] <- NA_character_
+    if (isTRUE(with_method)) {
+      return(list(iso3c = out, method = ifelse(is.na(out), "none", "code")))
+    }
     return(out)
   }
   cc <- function(vals) {
@@ -94,6 +98,15 @@ wdj_to_iso3c <- function(x, origin = "country.name", custom_match = country_over
     )
   }
   out <- cc(x)
+  # The curated codes have no codelist row, so countrycode cannot read them
+  # back: every iso2c column the package writes says "XK" for Kosovo, and
+  # convert_country("XK", origin = "iso2c") then resolved to NA.
+  if (identical(origin, "iso2c")) {
+    fb <- wdj_code_fallback()
+    up <- ascii_upper(trimws(x, whitespace = "[\\h\\v]"))
+    k <- is.na(out) & up %in% fb$iso2c
+    out[k] <- fb$iso3c[match(up[k], fb$iso2c)]
+  }
   # Second pass for the spellings that resolved to nothing, on the
   # combining-mark-stripped form. See strip_combining() for why.
   miss <- is.na(out) & !is.na(x)
@@ -105,6 +118,23 @@ wdj_to_iso3c <- function(x, origin = "country.name", custom_match = country_over
       patch[redo] <- cc(alt[redo])
       out[miss] <- patch
     }
+  }
+  method <- ifelse(is.na(out), NA_character_,
+                   ifelse(x %in% names(custom_match), "override", "regex_en"))
+  # Then the names in other languages: see match_name_tiers().
+  if (identical(origin, "country.name")) {
+    miss <- is.na(out) & !is.na(x) & nzchar(trimws(x))
+    if (any(miss)) {
+      ux <- unique(x[miss])
+      tiers <- match_name_tiers(ux)
+      at <- match(x[miss], ux)
+      out[miss] <- tiers$iso3c[at]
+      method[miss] <- tiers$method[at]
+    }
+  }
+  if (isTRUE(with_method)) {
+    method[is.na(method)] <- "none"
+    return(list(iso3c = out, method = method))
   }
   out
 }
@@ -389,7 +419,13 @@ standardize_country <- function(data,
   check_add(add)
   add <- unique(c("iso3c", add))
   raw <- data[[col_name]]
-  iso3c <- wdj_to_iso3c(raw, origin = origin, custom_match = custom_match)
+  # Matched and derived once per distinct value, then expanded: a million
+  # rows of two hundred names spent most of their time deriving iso2c,
+  # continent and region row by row.
+  check_country_vector(raw)
+  u <- unique(as.character(raw))
+  pos <- match(as.character(raw), u)
+  iso3c <- wdj_to_iso3c(u, origin = origin, custom_match = custom_match)[pos]
 
   if (isTRUE(warn) && anyNA(iso3c)) {
     miss <- unique(as.character(raw)[is.na(iso3c)])
@@ -403,7 +439,8 @@ standardize_country <- function(data,
     }
   }
 
-  derived <- wdj_derive_from_iso3c(iso3c, add)
+  ui <- unique(iso3c)
+  derived <- wdj_derive_from_iso3c(ui, add)[match(iso3c, ui), , drop = FALSE]
   # Drop any columns we are about to (re)create, then bind. When the caller
   # passed `add` themselves, replacing an existing `continent` is precisely what
   # they asked for and no warning is due. But `add` *defaults* to four columns,
@@ -433,4 +470,159 @@ standardize_country <- function(data,
   # normalises everything else to a tibble, as before.
   for (nm in names(derived)) data[[nm]] <- derived[[nm]]
   wdj_return_frame(data)
+}
+
+# --- Names in other languages (tiers 4 and 5) ---------------------------------------
+#
+# The English regex left Allemagne, Deutschland, Alemania and the Russian,
+# Chinese and Japanese names for Germany unmatched, and Elfenbeinkueste for
+# Cote d'Ivoire. Two more tiers, tried only for what is still unmatched: an
+# exact match against countrycode's German, Spanish, French and Italian names,
+# then against every CLDR name, short name and variant in
+# countrycode::codelist, both folded to a common form. Exact, not
+# countrycode's language regexes: those are unanchored, and matched
+# Somaliland to Somalia and "Indian Ocean Territories" to India, two names
+# the English patterns deliberately leave alone.
+
+# Latin letters with diacritics, to their base letters: the NFC half of
+# accent-folding (strip_combining() handles NFD). Written as escapes: the
+# package source is ASCII.
+LATIN_FOLD_FROM <- paste0(
+  "\u00c0\u00c1\u00c2\u00c3\u00c4\u00c5\u00c7\u00c8\u00c9\u00ca\u00cb\u00cc",
+  "\u00cd\u00ce\u00cf\u00d1\u00d2\u00d3\u00d4\u00d5\u00d6\u00d9\u00da\u00db",
+  "\u00dc\u00dd\u00e0\u00e1\u00e2\u00e3\u00e4\u00e5\u00e7\u00e8\u00e9\u00ea",
+  "\u00eb\u00ec\u00ed\u00ee\u00ef\u00f1\u00f2\u00f3\u00f4\u00f5\u00f6\u00f9",
+  "\u00fa\u00fb\u00fc\u00fd\u00ff\u0100\u0101\u0102\u0103\u0104\u0105\u0106",
+  "\u0107\u0108\u0109\u010a\u010b\u010c\u010d\u010e\u010f\u0112\u0113\u0114",
+  "\u0115\u0116\u0117\u0118\u0119\u011a\u011b\u011c\u011d\u011e\u011f\u0120",
+  "\u0121\u0122\u0123\u0124\u0125\u0128\u0129\u012a\u012b\u012c\u012d\u012e",
+  "\u012f\u0130\u0134\u0135\u0136\u0137\u0139\u013a\u013b\u013c\u013d\u013e",
+  "\u0143\u0144\u0145\u0146\u0147\u0148\u014c\u014d\u014e\u014f\u0150\u0151",
+  "\u0154\u0155\u0156\u0157\u0158\u0159\u015a\u015b\u015c\u015d\u015e\u015f",
+  "\u0160\u0161\u0162\u0163\u0164\u0165\u0168\u0169\u016a\u016b\u016c\u016d",
+  "\u016e\u016f\u0170\u0171\u0172\u0173\u0174\u0175\u0176\u0177\u0178\u0179",
+  "\u017a\u017b\u017c\u017d\u017e\u0110\u0111\u0126\u0127\u0131\u0141\u0142",
+  "\u00d8\u00f8\u0166\u0167\u013f\u0140\u00f0\u00d0")
+LATIN_FOLD_TO <- paste0(
+  "AAAAAACEEEEI",
+  "IIINOOOOOUUU",
+  "UYaaaaaaceee",
+  "eiiiinooooou",
+  "uuuyyAaAaAaC",
+  "cCcCcCcDdEeE",
+  "eEeEeEeGgGgG",
+  "gGgHhIiIiIiI",
+  "iIJjKkLlLlLl",
+  "NnNnNnOoOoOo",
+  "RrRrRrSsSsSs",
+  "SsTtTtUuUuUu",
+  "UuUuUuWwYyYZ",
+  "zZzZzDdHhiLl",
+  "OoTtLldD")
+LATIN_FOLD_MULTI <- c("\u00c6" = "AE", "\u00e6" = "ae", "\u00df" = "ss",
+                      "\u0152" = "OE", "\u0153" = "oe", "\u00de" = "TH",
+                      "\u00fe" = "th", "\u0132" = "IJ", "\u0133" = "ij")
+
+# The common form a name is compared in: no combining marks, Latin accents
+# folded, lower case, German umlaut digraphs collapsed (so "Elfenbeinkueste"
+# meets "Elfenbeinkuste"), no punctuation, single spaces. Lower-cased without
+# tolower(), which follows the locale: in Turkish, "I" lower-cases to a
+# dotless i and the same name stopped matching.
+fold_name <- function(x) {
+  x <- strip_combining(as.character(x))
+  hi <- !is.na(x) & grepl("[^[:ascii:]]", x, perl = TRUE)
+  if (any(hi)) {
+    y <- chartr(LATIN_FOLD_FROM, LATIN_FOLD_TO, enc2utf8(x[hi]))
+    lig <- grepl(paste0("[", paste(names(LATIN_FOLD_MULTI), collapse = ""), "]"),
+                 y, perl = TRUE)
+    for (k in names(LATIN_FOLD_MULTI)) {
+      y[lig] <- gsub(k, LATIN_FOLD_MULTI[[k]], y[lig], fixed = TRUE)
+    }
+    x[hi] <- chartr(CASE_FOLD_UPPER, CASE_FOLD_LOWER, y)
+  }
+  x <- ascii_lower(x)
+  x <- gsub("(?<=[aou])e", "", x, perl = TRUE)
+  x <- gsub("\\p{P}+", "", x, perl = TRUE)
+  gsub("\\s+", " ", trimws(x))
+}
+
+# Upper to lower case for the Greek and Cyrillic alphabets, by code point.
+CASE_FOLD_UPPER <- paste0(intToUtf8(c(0x0391:0x03A1, 0x03A3:0x03A9), multiple = FALSE),
+                          intToUtf8(c(0x0400:0x042F), multiple = FALSE))
+CASE_FOLD_LOWER <- paste0(intToUtf8(c(0x03B1:0x03C1, 0x03C3:0x03C9), multiple = FALSE),
+                          intToUtf8(c(0x0450:0x045F, 0x0430:0x044F), multiple = FALSE))
+
+.name_index <- new.env(parent = emptyenv())
+
+# Folded names from codelist columns, with the countries each names: one
+# index per tier. A key that names more than one country names none, and a
+# key of three letters or fewer is a code, not a name (the CLDR tables carry
+# "FR" and "DE"), so it is left out.
+name_index <- function(cols) {
+  cl <- countrycode::codelist
+  raw <- unlist(cl[cols], use.names = FALSE)
+  iso <- rep(cl$iso3c, length(cols))
+  keep <- !is.na(raw) & !is.na(iso)
+  raw <- raw[keep]
+  iso <- iso[keep]
+  # Folded once per distinct string: most names repeat across the columns.
+  u <- unique(raw)
+  folded <- fold_name(u)
+  uk <- unique(folded)
+  kid <- match(folded, uk)[match(raw, u)]
+  iid <- match(iso, cl$iso3c)
+  once <- !duplicated(kid * (nrow(cl) + 1) + iid) & nzchar(uk[kid]) &
+    !grepl("^[a-z]{1,3}$", uk[kid])
+  key <- uk[kid[once]]
+  iso <- iso[once]
+  ambiguous <- unique(key[duplicated(key)])
+  keep <- !key %in% ambiguous
+  list(key = key[keep], iso3c = iso[keep], ambiguous = ambiguous)
+}
+
+# Every CLDR name, short name and variant in countrycode::codelist. Built once
+# per session.
+cldr_index <- function() {
+  if (is.null(.name_index$cldr)) {
+    cl <- countrycode::codelist
+    .name_index$cldr <- name_index(
+      grep("^cldr\\.(name|short|variant)\\.", names(cl), value = TRUE))
+  }
+  .name_index$cldr
+}
+
+language_index <- function(lang) {
+  key <- paste0("lang_", lang)
+  if (is.null(.name_index[[key]])) {
+    .name_index[[key]] <- name_index(paste0("country.name.", lang))
+  }
+  .name_index[[key]]
+}
+
+# Tiers 4 and 5 for the names English matching left unresolved: the iso3c and
+# how it was found ("name_de" ... "cldr"), or "ambiguous" for a name the
+# index has for several countries.
+match_name_tiers <- function(x) {
+  out <- rep(NA_character_, length(x))
+  method <- rep(NA_character_, length(x))
+  key <- fold_name(x)
+  for (lang in c("de", "es", "fr", "it")) {
+    k <- is.na(out) & !is.na(x)
+    if (!any(k)) break
+    idx <- language_index(lang)
+    r <- idx$iso3c[match(key[k], idx$key)]
+    hit <- !is.na(r)
+    out[k][hit] <- r[hit]
+    method[k][hit] <- paste0("name_", lang)
+  }
+  k <- is.na(out) & !is.na(x)
+  if (any(k)) {
+    idx <- cldr_index()
+    r <- idx$iso3c[match(key[k], idx$key)]
+    hit <- !is.na(r)
+    out[k][hit] <- r[hit]
+    method[k][hit] <- "cldr"
+    method[k][!hit & key[k] %in% idx$ambiguous] <- "ambiguous"
+  }
+  list(iso3c = out, method = method)
 }

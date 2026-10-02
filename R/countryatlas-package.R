@@ -3,7 +3,7 @@
 #' `countryatlas` exists to kill one recurring source of pain: country names
 #' never line up across data sources. The package makes ISO codes the universal
 #' join key and hands you a ready-to-map tibble that stitches together map
-#' geometry ([ggplot2::map_data()] or Natural Earth `sf`), World Bank indicators
+#' geometry (bundled Natural Earth polygons, or Natural Earth `sf`), World Bank indicators
 #' ([WDI::WDI()]) and the [countrycode::countrycode()] crosswalk.
 #'
 #' The happy path stays one call: [world_data()]. Everything else is opt-in.
@@ -71,14 +71,15 @@
 #' [as_ggsql_source()], [world_query()].
 #'
 #' @section Performance & caching:
-#' [clear_wdi_cache()], [clear_country_cache()].
+#' [clear_country_cache()].
 #'
 #' @section Options:
-#' Six options change the package's behaviour. All are unset by default.
+#' Eight options change the package's behaviour. All are unset by default.
 #' \describe{
-#'   \item{`countryatlas.cache_dir`}{Where the persistent World Bank cache
-#'     lives. Defaults to `tools::R_user_dir("countryatlas", "cache")`; set it to
-#'     `""` for session-only caching. See [clear_wdi_cache()].}
+#'   \item{`countryatlas.cache_dir`}{Where the persistent cache lives, one
+#'     directory per source. Defaults to `tools::R_user_dir("countryatlas",
+#'     "cache")`; set it to `""` for session-only caching. See
+#'     [clear_country_cache()].}
 #'   \item{`countryatlas.cache_max_age`}{How long a persistent cache entry
 #'     stays usable, in seconds. Defaults to 30 days. World Bank figures are
 #'     revised, so an old entry is not merely stale on disk -- it is a
@@ -94,13 +95,29 @@
 #'     survive a fork). Defaults to one fewer than the available cores, and
 #'     to 2 under `R CMD check`, per CRAN policy. Must be a single finite
 #'     number; values below one are clamped to one.}
-#'   \item{`countryatlas.gdp_compat`}{Set to `TRUE` to restore the
-#'     `gdp_per_capita_2015` column that [world_data()] emitted in 1.0.0. A
-#'     deprecation shim, off by default, and now warning when used.}
+#'   \item{`countryatlas.timeout`}{How long one request to a provider may
+#'     take, in seconds. Defaults to 60. Every built-in source goes through the
+#'     same client, so a failing fetch is bounded: at most
+#'     `countryatlas.retries + 1` requests of this length each, plus the waits
+#'     between them.}
+#'   \item{`countryatlas.retries`}{How many times a request is retried after a
+#'     failure worth retrying (HTTP 429, a 5xx, a dropped connection), with
+#'     exponential backoff and jitter, honouring `Retry-After`. Defaults to 3;
+#'     a whole number from 0 to 10.}
+#'   \item{`countryatlas.strict`}{Set to `TRUE` to make a failed download an
+#'     error (class `countryatlas_fetch_failed`) instead of a warning and an
+#'     empty result, for a pipeline that must not continue with data missing.
+#'     The default, `FALSE`, is what CRAN asks of a package that uses the
+#'     network: fail gracefully.}
 #'   \item{`countryatlas.dispute_policy`}{Which map convention disputed
 #'     territories are drawn under: `"none"` (default), `"de_facto"`,
 #'     `"de_jure"` or `"neutral"`. Set it with [dispute_policy()] rather than
 #'     directly, which also reports what the setting does and does not change.}
+#'   \item{`countryatlas.worldview`}{A Natural Earth point of view the `sf`
+#'     backend draws, as the viewing country's ISO code (`"IND"`) or
+#'     `"ISO"`; unset by default. Set it with
+#'     `dispute_policy(worldview = )`, which validates it; see
+#'     [world_geometry()].}
 #' }
 #'
 #' @keywords internal
@@ -109,6 +126,7 @@
 ## usethis namespace: start
 #' @importFrom rlang .data %||% :=
 #' @importFrom dplyr %>%
+#' @importFrom lifecycle deprecated
 ## usethis namespace: end
 NULL
 

@@ -1,6 +1,6 @@
 # Standalone copy of the override mapping for the data-raw build, so the script
 # does not depend on the package being installed. Keep in sync with
-# R/overrides.R::wdj_overrides().
+# R/overrides.R::country_overrides().
 
 wdj_overrides_snapshot <- function() {
   c(
@@ -16,7 +16,8 @@ wdj_overrides_snapshot <- function() {
     "Virgin Islands, U.S." = "VIR",
     "British Virgin Islands" = "VGB",
     "Channel Islands" = "GBR",
-    "Kosovo, Republic of" = "XKX"
+    "Kosovo, Republic of" = "XKX",
+    "Naoero" = "NRU"
   )
 }
 

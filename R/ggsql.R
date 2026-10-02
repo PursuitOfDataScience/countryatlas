@@ -33,8 +33,12 @@ ggsql_wkb_frame <- function(data, geometry_col = "geometry") {
 #' @param fill The fill column (unquoted or a string).
 #' @param source The table/source name registered with ggsql (default
 #'   `"countryatlas_world"`).
-#' @param projection A projection ggsql's `PROJECT TO` understands (e.g.
-#'   `"equal_earth"`, `"orthographic"`), or `NULL` to omit the clause.
+#' @param projection A projection: one of the package's own names (see
+#'   [projection_info()]), translated to ggsql's where the two differ
+#'   (`"plate_carree"` becomes `equirectangular`, `"natural_earth"` becomes
+#'   `natural`, `"azimuthal_equal_area"` becomes `lambert`), or any other name
+#'   ggsql's `PROJECT TO` understands, passed through. `NULL` omits the
+#'   clause.
 #' @param palette A scale ggsql's `SCALE ... TO` understands (default
 #'   `"viridis"`), or `NULL` to omit.
 #' @param transform Optional scale transform for `SCALE ... VIA` (e.g.
@@ -51,12 +55,16 @@ ggsql_wkb_frame <- function(data, geometry_col = "geometry") {
 #' @return A `ggsql_query` string (prints as the formatted query).
 #' @section Executing the query:
 #' Building the string needs nothing installed. *Running* it needs
-#' `ggsql` >= 0.4.1, the version that added the `DRAW spatial` clause; older
-#' `ggsql` releases parse the query and reject that clause. As of August 2026
-#' that clause has shipped in the ggsql *engine* but not yet in the ggsql R
-#' package (still 0.3.3), so [interactive_map()]`(engine = "ggsql")` will refuse
-#' until the bindings catch up. `PROJECT TO` additionally needs a spatial
-#' backend -- for DuckDB, its `spatial` extension.
+#' `ggsql` >= 0.4.1, the version that added the `DRAW spatial` clause and map
+#' projections; older `ggsql` releases parse the query and reject that clause.
+#' Projections arrived in the engine at different versions -- `equal_earth`,
+#' the default here, only in 0.5.0 -- so the query records the version it
+#' needs as its `"countryatlas_ggsql_version"` attribute, and
+#' [interactive_map()]`(engine = "ggsql")` refuses an installed `ggsql` older
+#' than that, naming the projection. As of October 2026 the ggsql *engine* is
+#' at 0.5.2 while the ggsql R package on CRAN is still 0.3.3, so execution
+#' waits for the bindings to catch up. `PROJECT TO` additionally needs a
+#' spatial backend -- for DuckDB, its `spatial` extension.
 #' @export
 #' @examples
 #' world_query(gdp_per_capita, projection = "equal_earth",
@@ -149,8 +157,11 @@ world_query <- function(fill, source = "countryatlas_world",
     # is the one thing that changes, so the rest of the query is untouched.
     sprintf("DRAW %s", if (identical(layer, "bubble")) "spatial_point" else draw)
   )
+  needs <- "0.4.1"
   if (!is.null(projection)) {
-    lines <- c(lines, sprintf("PROJECT TO %s", projection))
+    gp <- ggsql_projection(projection)
+    lines <- c(lines, sprintf("PROJECT TO %s", gp$ggsql))
+    if (!is.na(gp$since)) needs <- gp$since
   }
   if (!is.null(palette) || !is.null(transform)) {
     scale_line <- if (!is.null(palette)) sprintf("SCALE fill TO %s", palette) else "SCALE fill"
@@ -166,7 +177,45 @@ world_query <- function(fill, source = "countryatlas_world",
   if (!is.null(title)) {
     lines <- c(lines, sprintf("LABEL title => '%s'", gsub("'", "''", title)))
   }
-  structure(paste(lines, collapse = "\n"), class = c("ggsql_query", "character"))
+  structure(paste(lines, collapse = "\n"), class = c("ggsql_query", "character"),
+            countryatlas_ggsql_version = needs)
+}
+
+# The projections the ggsql engine knows, by the engine version that added
+# them, read from posit-dev/ggsql's own source (map_projections.rs at v0.4.1
+# and v0.5.2). world_query() emitted `PROJECT TO equal_earth` by default and
+# gated execution on 0.4.1, the version that added DRAW spatial -- but Equal
+# Earth arrived only in 0.5.0, so the gate would have let an unknown
+# projection through the day a 0.4.x binding reached CRAN. Names on the left
+# are this package's; ggsql spells three of them differently. eckert4,
+# gall_peters and the two polar views have no named counterpart there.
+ggsql_projection_table <- function() {
+  tibble::tribble(
+    ~projection,             ~ggsql,            ~since,
+    "equal_earth",           "equal_earth",     "0.5.0",
+    "robinson",              "robinson",        "0.4.1",
+    "mollweide",             "mollweide",       "0.4.1",
+    "natural_earth",         "natural",         "0.4.1",
+    "plate_carree",          "equirectangular", "0.4.1",
+    "mercator",              "mercator",        "0.4.1",
+    "winkel_tripel",         "winkel_tripel",   "0.4.1",
+    "orthographic",          "orthographic",    "0.4.1",
+    "azimuthal_equal_area",  "lambert",         "0.4.1"
+  )
+}
+
+# One projection name, resolved: the package's name translated to ggsql's,
+# and the engine version it needs; a name the table does not know is passed
+# through unchanged with no version claim, since ggsql may know it.
+ggsql_projection <- function(projection) {
+  tab <- ggsql_projection_table()
+  i <- match(projection, tab$projection)
+  if (is.na(i)) {
+    j <- match(projection, tab$ggsql)
+    if (!is.na(j)) return(list(ggsql = projection, since = tab$since[j]))
+    return(list(ggsql = projection, since = NA_character_))
+  }
+  list(ggsql = tab$ggsql[i], since = tab$since[i])
 }
 
 # Refuse anything that is not a bare SQL identifier. This builder emits a

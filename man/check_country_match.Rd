@@ -24,7 +24,18 @@ check_country_match(
 }
 \value{
 A tibble with columns \code{input}, \code{iso3c}, \code{matched}, \code{historical},
-\code{suggestion}.
+\code{method} and \code{suggestion}. \code{method} says how a name was matched, tier by
+tier, each tried only for what is still unmatched: \code{"override"} (the
+\code{\link[=country_overrides]{country_overrides()}} table), \code{"regex_en"} (countrycode's English
+patterns), \code{"name_de"}, \code{"name_es"}, \code{"name_fr"} and \code{"name_it"} (an
+exact match, ignoring case, accents and punctuation, against
+countrycode's German, Spanish, French and Italian names), \code{"cldr"} (the
+same against every name, short name and variant in the Unicode CLDR
+tables countrycode carries, in every language), \code{"ambiguous"} (a CLDR
+name for more than one country, which is left unmatched) or \code{"none"}.
+Exact rather than countrycode's language patterns, which are unanchored
+and matched Somaliland to Somalia. For an \code{origin} other than a name it
+is \code{"code"}.
 }
 \description{
 A report on what will and will not match before you trust the map: the

@@ -7,10 +7,11 @@
 classify_compare(
   data,
   value,
-  methods = c("quantile", "jenks", "equal", "pretty"),
-  n = 5,
+  methods = c("quantile", "jenks", "fisher", "headtails", "equal", "pretty"),
+  n_bins = 5,
   ncol = NULL,
-  ...
+  ...,
+  n = deprecated()
 )
 }
 \arguments{
@@ -19,19 +20,27 @@ classify_compare(
 \item{value}{The value column (unquoted).}
 
 \item{methods}{Classification styles to compare. Any of \code{"quantile"},
-\code{"jenks"}, \code{"equal"}, \code{"pretty"} and \code{"sd"}. \code{"jenks"} needs the optional
-\code{classInt}; without it, it falls back to quantile breaks with a warning.}
+\code{"jenks"}, \code{"fisher"}, \code{"headtails"}, \code{"equal"}, \code{"pretty"} and \code{"sd"},
+with the breaks \code{\link[=world_map]{world_map()}} would draw for each. \code{"jenks"} and
+\code{"fisher"} need the optional \code{classInt}; without it they fall back to
+quantile breaks with a warning.}
 
-\item{n}{Number of classes (default \code{5}).}
+\item{n_bins}{Number of classes (default \code{5}), as the map verbs call it;
+\code{"headtails"} and \code{"pretty"} choose their own.}
 
 \item{ncol}{Number of facet columns.}
 
 \item{...}{Passed to \code{\link[=world_map]{world_map()}}.}
+
+\item{n}{\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}} Use \code{n_bins}.}
 }
 \value{
 A faceted \code{ggplot} object, with the per-method break and class-count
 table attached as the \code{"countryatlas_classification"} attribute (and
-readable with \code{\link[=map_provenance]{map_provenance()}}).
+readable with \code{\link[=map_provenance]{map_provenance()}}). Each method's rows also carry three
+measures of fit: \code{gvf}, the goodness of variance fit, and \code{tai}, the
+tabular accuracy index (both Jenks & Caspall 1971; 1 is a perfect fit),
+and \code{max_class_share}, the share of countries in the fullest class.
 }
 \description{
 Small multiples of one choropleth, drawn once per classification method, plus
@@ -41,14 +50,22 @@ found quantiles among the best methods for general choropleth reading and
 natural breaks (Jenks) below 70\% as accurate, which is the reverse of the
 common GIS default.
 }
+\section{No number picks a classification}{
+
+GVF and TAI measure how homogeneous the classes are, which is what natural
+breaks optimise; they rate a map that puts most countries in one class
+highly, and they say nothing about how well readers read the map. They are
+reported to inform the choice, never to rank the methods: Brewer & Pickle's
+finding that quantiles read best stands beside them, and
+\code{max_class_share} flags the map whose fullest class swallows the rest.
+}
+
 \examples{
 \donttest{
 snap <- countryatlas::world_snapshot$countries
-if (requireNamespace("maps", quietly = TRUE)) {
-  cmp <- attach_geometry(snap, geometry = "polygon") |>
-    classify_compare(gdp_per_capita)
-  attr(cmp, "countryatlas_classification")
-}
+cmp <- attach_geometry(snap, geometry = "polygon") |>
+  classify_compare(gdp_per_capita)
+attr(cmp, "countryatlas_classification")
 }
 }
 \references{
@@ -56,6 +73,14 @@ Brewer, C. A. & Pickle, L. (2002). Evaluation of methods for classifying
 epidemiological data on choropleth maps in series. \emph{Annals of the
 Association of American Geographers} 92(4), 662-681.
 \doi{10.1111/1467-8306.00310}
+
+Jenks, G. F. & Caspall, F. C. (1971). Error on choroplethic maps:
+definition, measurement, reduction. \emph{Annals of the Association of American
+Geographers} 61(2), 217-244. \doi{10.1111/j.1467-8306.1971.tb00779.x}
+
+Jiang, B. (2013). Head/tail breaks: a new classification scheme for data
+with a heavy-tailed distribution. \emph{The Professional Geographer} 65(3),
+482-494. \doi{10.1080/00330124.2012.700499}
 }
 \seealso{
 \code{\link[=world_map]{world_map()}}, \code{\link[=map_provenance]{map_provenance()}}

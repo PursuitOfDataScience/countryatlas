@@ -9,14 +9,15 @@ panel <- data.frame(iso3c = rep(c("USA", "CHN", "IND", "BRA"), each = 3),
 
 test_that("diagnostic verbs return their documented columns", {
   expect_named(check_country_match("USA"),
-               c("input", "iso3c", "matched", "historical", "suggestion"))
+               c("input", "iso3c", "matched", "historical", "method",
+                 "suggestion"))
   expect_named(dissolve_country("USSR"),
                c("input", "historical", "dissolved", "iso3c", "country"))
   expect_type(dissolve_country("France", warn = FALSE)$dissolved, "integer")
   a <- audit_coverage(snap)
   expect_named(a, c("unmatched", "na_rates", "by_group"))
   expect_s3_class(a, "countryatlas_coverage")
-  r <- repair_country_names(c("Brzil", "Germny"), verbose = FALSE)
+  r <- repair_country_names(c("Brzil", "Germny"), quiet = TRUE)
   expect_type(r, "character")
   expect_length(r, 2L)
   expect_s3_class(attr(r, "repairs"), "tbl_df")
@@ -62,7 +63,8 @@ test_that("panel helpers add the documented column", {
                  class = "countryatlas_all_na_result")
   expect_true("gdp_diff5" %in% names(d5))
   expect_named(aggregate_regions(snap, population, by = "region"),
-               c("region", "population"))
+               c("region", "population", "n_countries", "n_reporting",
+                 "coverage"))
   expect_true(all(c("rank", "percentile", "z_score") %in%
                     names(rank_countries(snap, gdp_per_capita))))
   cy <- complete_years(data.frame(iso3c = "A", year = c(2000L, 2002L), g = c(1, 3)))
@@ -101,14 +103,10 @@ test_that("plot and geometry verbs return their documented objects", {
   q <- world_query(x)
   expect_s3_class(q, "ggsql_query")
   expect_type(unclass(q), "character")
-  # suppressWarnings(): wdj_overrides() is deprecated and warns once per
-  # session (.frequency = "once"), so a bare call here made the result depend
-  # on file order -- whichever file ran first consumed the one-shot, and the
-  # other saw nothing. test-features-3.0.0.R wraps its call for this reason.
-  o <- suppressWarnings(wdj_overrides())
+  o <- country_overrides()
   expect_type(o, "character")
   expect_false(is.null(names(o)))
-  expect_true(isTRUE(clear_wdi_cache()))                     # invisibly TRUE
+  expect_true(isTRUE(clear_country_cache("wdi")))                     # invisibly TRUE
 })
 
 test_that("sf-backed verbs return their documented shape", {
@@ -116,7 +114,8 @@ test_that("sf-backed verbs return their documented shape", {
   skip_if_no_sf_geometry()
   expect_s3_class(world_geometry("countries", geometry = "sf"), "sf")
   expect_s3_class(attach_geometry(snap, geometry = "sf"), "sf")
-  m <- morans_i(snap, gdp_per_capita, n_perm = 0)
+  m <- morans_i(snap, gdp_per_capita, n_perm = 0,
+                weights = country_weights("contiguity"))
   expect_equal(nrow(m), 1L)
   expect_named(m, c("i", "expected", "n", "n_excluded", "n_links", "p_value",
                     "excluded"))
@@ -138,7 +137,6 @@ test_that("sf-backed verbs return their documented shape", {
 })
 
 test_that("polygon-backed verbs return their documented shape", {
-  skip_if_not_installed("maps")
   expect_s3_class(world_geometry("countries", geometry = "polygon"), "tbl_df")
   expect_s3_class(attach_geometry(snap, geometry = "polygon"), "tbl_df")
 })
@@ -151,7 +149,7 @@ test_that("every convert_country shortcut maps to the scheme its name promises",
   # pin a known value for each.
   expect_equal(as.numeric(convert_country("France", to = "calling_code")), 33)
   expect_equal(as.numeric(convert_country(c("USA", "JPN"), to = "calling_code",
-                                          from = "iso3c")), c(1, 81))
+                                          origin = "iso3c")), c(1, 81))
   expect_equal(convert_country("France", to = "iso3c"), "FRA")
   expect_equal(convert_country("France", to = "iso2c"), "FR")
   expect_equal(convert_country("France", to = "currency"), "EUR")
@@ -207,7 +205,9 @@ test_that("the 2.0.0 exports keep their leading argument order", {
     check_country_match = "x, origin, custom_match",
     clear_wdi_cache = "disk",
     complete_years = "data, years, value",
-    convert_country = "x, to, from",
+    # 4.0.0 renamed `from` to `origin` in the same position, so a positional
+    # call means what it did.
+    convert_country = "x, to, origin",
     correlate_indicators = "data, ..., method",
     country_borders = "scale, region",
     country_codes = "codes",
@@ -247,7 +247,6 @@ test_that("the 2.0.0 exports keep their leading argument order", {
     theme_world_map = "base_size, base_family",
     tile_map = "data, fill, label",
     wdi_search = "pattern, field, cache",
-    wdj_overrides = "extra",
     world_data = "year, indicator, geometry",
     world_geometry = "what, geometry, scale",
     world_map = "data, fill, style",
@@ -270,7 +269,6 @@ test_that("every map verb's provenance names the column the caller asked about",
   # `.wdj_class`, `.wdj_cluster` -- used to report *that* column, and
   # `.wdj_available` is never NA, so coverage_map()'s provenance said
   # `n_missing = 0` while its own caption said otherwise.
-  skip_if_not_installed("maps")
   skip_if_not_installed("ggplot2")
   d <- data.frame(iso3c = c("FRA","DEU","ITA","ESP","POL","NLD"),
                   value = c(10, 20, NA, 40, 15, 55), unc = c(1,2,3,4,5,6),
@@ -292,12 +290,10 @@ test_that("every map verb's provenance names the column the caller asked about",
     value_by_alpha_map = function() value_by_alpha_map(g, value, unc),
     gridded_cartogram  = function() gridded_cartogram(d, value)
   )
-  # lisa_map() defaults to contiguity weights, which need sf. The loop asserts
-  # a per-verb invariant, so drop just this verb rather than the whole test:
-  # the block is guarded for maps, so a machine with maps and no sf reached it.
-  if (requireNamespace("sf", quietly = TRUE)) {
-    cases$lisa_map <- function() lisa_map(g, value)
-  }
+  # lisa_map() on the six countries alone: the default k-nearest weights
+  # look for neighbours among all of them, most of which have no value here.
+  w6 <- country_weights("knn", countries = d$iso3c, k = 2)
+  cases$lisa_map <- function() lisa_map(g, value, weights = w6, n_perm = 0)
   for (nm in names(cases)) {
     p <- suppressWarnings(suppressMessages(cases[[nm]]()))
     prov <- attr(p, "countryatlas_provenance")
@@ -372,4 +368,132 @@ test_that("every world_geometry() what returns a column named `geometry`", {
                      label = paste("world_geometry", what, "geometry column"))
     expect_true("geometry" %in% names(g))
   }
+})
+
+test_that("no verb hands back a grouping the caller did not ask for", {
+  skip_slow_on_cran()
+  iso <- c("USA", "FRA", "DEU", "BRA")
+  d <- expand.grid(iso3c = iso, year = 2000:2002, stringsAsFactors = FALSE)
+  for (cc in c("gdp", "pop", "num", "den")) {
+    d[[cc]] <- as.numeric(seq_len(nrow(d))) + 10
+  }
+  d$region <- ifelse(d$iso3c %in% c("USA", "BRA"), "Americas", "Other")
+  gd <- dplyr::group_by(d, .data$region)
+  # to_ppp() and smooth_rates() ended in a bare `data`, so the grouping came
+  # straight back out and the caller's next mutate() computed per region.
+  verbs <- list(
+    share_of_world      = function(x) share_of_world(x, "gdp"),
+    per_capita          = function(x) per_capita(x, "gdp", "pop"),
+    index_to            = function(x) index_to(x, "gdp", 2000),
+    growth_rate         = function(x) growth_rate(x, "gdp"),
+    rank_countries      = function(x) rank_countries(x, "gdp"),
+    to_ppp              = function(x) to_ppp(x, "gdp", "pop"),
+    smooth_rates        = function(x) smooth_rates(x, "num", "den"),
+    lag_by_country      = function(x) lag_by_country(x, "gdp"),
+    diff_by_country     = function(x) diff_by_country(x, "gdp"),
+    interpolate_missing = function(x) interpolate_missing(x, "gdp"),
+    complete_years      = function(x) complete_years(x, 2000:2002, "gdp"),
+    aggregate_regions   = function(x) aggregate_regions(x, "gdp")
+  )
+  # Every *mode*, not just the default: the leak survived on early-return
+  # paths (`method = "none"`) of verbs whose main path had been fixed.
+  verbs <- c(verbs, list(
+    `smooth_rates(none)` = function(x) {
+      smooth_rates(x, "num", "den", method = "none")
+    },
+    `interpolate_missing(none)` = function(x) {
+      interpolate_missing(x, "gdp", method = "none")
+    },
+    `interpolate_missing(locf)` = function(x) {
+      interpolate_missing(x, "gdp", method = "locf")
+    },
+    `complete_years(locf)` = function(x) {
+      complete_years(x, 2000:2002, "gdp", method = "locf")
+    },
+    `growth_rate(cagr)` = function(x) growth_rate(x, "gdp", type = "cagr"),
+    `smooth_rates(1 row)` = function(x) {
+      smooth_rates(x[1, , drop = FALSE], "num", "den")
+    }
+  ))
+  for (nm in names(verbs)) {
+    out <- suppressWarnings(suppressMessages(verbs[[nm]](gd)))
+    expect_false(dplyr::is_grouped_df(out), label = paste(nm, "returns grouped"))
+    # A plain data.frame comes back as a tibble whichever mode ran.
+    plain <- suppressWarnings(suppressMessages(verbs[[nm]](d)))
+    expect_s3_class(plain, "tbl_df")
+    # ...and the values do not depend on the grouping either.
+    expect_equal(as.data.frame(dplyr::ungroup(out)), as.data.frame(plain),
+                 ignore_attr = TRUE, label = paste(nm, "differs when grouped"))
+  }
+})
+
+test_that("a verb hands back the class it was given", {
+  skip_slow_on_cran()
+  # per_capita(), share_of_world() and standardize_country() document their
+  # result as "`data` with the requested columns added", and rank_countries()
+  # honours that -- but these three ended with as_tibble(), which strips the sf
+  # class. The geometry column survived, so nothing looked wrong until the next
+  # verb reported "`data` has no map geometry".
+  skip_if_no_sf_geometry()
+  snap <- world_snapshot$countries
+  gsf <- suppressWarnings(join_world(snap, geometry = "sf"))
+  gsf$pop <- gsf$population
+
+  expect_s3_class(suppressWarnings(per_capita(gsf, population, pop = pop)), "sf")
+  expect_s3_class(suppressWarnings(share_of_world(gsf, population)), "sf")
+  expect_s3_class(suppressWarnings(standardize_country(gsf, iso3c,
+                                                       origin = "iso3c")), "sf")
+  expect_s3_class(suppressWarnings(rank_countries(gsf, population)), "sf")
+
+  # The pipelines that used to die.
+  expect_s3_class(suppressWarnings(
+    world_map(per_capita(gsf, population, pop = pop),
+              population_per_capita)), "ggplot")
+  expect_s3_class(suppressWarnings(
+    world_map(share_of_world(gsf, population), population_share)), "ggplot")
+
+  # sf is the only class carried through: everything else is still normalised
+  # to a tibble, and grouping is still dropped -- as_tibble() was doing both
+  # jobs at these return points and only the sf part was wrong.
+  d <- data.frame(iso3c = c("USA", "FRA"), v = c(1, 2), pop = c(10, 20))
+  expect_s3_class(per_capita(d, v, pop = pop), "tbl_df")
+  expect_s3_class(share_of_world(d, v), "tbl_df")
+  expect_s3_class(standardize_country(data.frame(nm = "France"), nm,
+                                      warn = FALSE), "tbl_df")
+  grp <- dplyr::group_by(data.frame(iso3c = c("USA", "FRA"), v = c(1, 2),
+                                    pop = c(10, 20)), iso3c)
+  expect_false(dplyr::is_grouped_df(per_capita(grp, v, pop = pop)))
+  # share_of_world() deliberately says it is ignoring the grouping, because the
+  # share is of the world total and not the group's -- so assert that rather
+  # than let it surface as an uncaught warning.
+  expect_warning(out <- share_of_world(grp, v), "grouping is ignored")
+  expect_false(dplyr::is_grouped_df(out))
+  expect_equal(share_of_world(d, v)$v_share, c(1 / 3, 2 / 3))
+  expect_equal(per_capita(d, v, pop = pop)$v_per_capita, c(0.1, 0.1))
+})
+
+test_that("the 4.0.0 renames warn, and the old name gives the new name's answer", {
+  skip_slow_on_cran()
+  withr::local_options(lifecycle_verbosity = "warning")
+  dep <- "lifecycle_warning_deprecated"
+  expect_warning(a <- convert_country("FR", from = "iso2c"), class = dep)
+  expect_identical(a, convert_country("FR", origin = "iso2c"))
+
+  od <- data.frame(from = "China", to = "United States", value = 1)
+  rows <- function(p) vapply(ggplot2::ggplot_build(p)$data, nrow, 1L)
+  expect_warning(f1 <- flow_map(od, from, to, value, n = 10), class = dep)
+  expect_identical(rows(f1), rows(flow_map(od, from, to, value, arc_points = 10)))
+
+  poly <- attach_geometry(snap)
+  fills <- function(p) ggplot2::ggplot_build(p)$data[[1]]$fill
+  expect_warning(c1 <- classify_compare(poly, gdp_per_capita, methods = "quantile",
+                                        n = 3), class = dep)
+  expect_identical(fills(c1), fills(classify_compare(poly, gdp_per_capita,
+                                                     methods = "quantile",
+                                                     n_bins = 3)))
+
+  x <- c("Frnace", "Germany")
+  skip_if_not_installed("stringdist")
+  expect_warning(r1 <- repair_country_names(x, verbose = FALSE), class = dep)
+  expect_identical(r1, repair_country_names(x, quiet = TRUE))
 })

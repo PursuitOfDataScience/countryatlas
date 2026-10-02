@@ -13,16 +13,18 @@ in_group(x, group, origin = "country.name", as_of = NULL)
 
 \item{origin}{How to read \code{x} (default \code{"country.name"}).}
 
-\item{as_of}{A date or year at which to evaluate membership; \code{NULL} (default)
-uses the current snapshot. A bare year means 1 January of that year, so use
-a \code{"YYYY-MM-DD"} string when an accession or exit falls mid-year. See
-\code{\link[=country_groups]{country_groups()}}.}
+\item{as_of}{A date or year at which to evaluate membership: one value for
+every element of \code{x}, or one per element, so a panel can ask about each
+row's own year (\code{mutate(eu = in_group(iso3c, "EU", "iso3c", as_of = year))}). \code{NULL} (default) uses the current snapshot. A bare year means 1
+January of that year, so use a \code{"YYYY-MM-DD"} string when an accession or
+exit falls mid-year. See \code{\link[=country_groups]{country_groups()}}.}
 }
 \value{
 A logical vector the same length as \code{x}. A value \code{origin} cannot
 resolve to an ISO code answers \code{FALSE} -- the same as a country that is
 genuinely outside the group -- so run \code{\link[=check_country_match]{check_country_match()}} first if you
-need to tell "not a member" from "not recognised".
+need to tell "not a member" from "not recognised". A missing \code{as_of}
+answers \code{NA}: membership at an unknown date is unknown.
 }
 \description{
 A vectorised membership predicate built on \code{\link[=country_groups]{country_groups()}}.
@@ -32,6 +34,8 @@ in_group(c("France", "United States", "Japan"), "EU")
 # membership is a function of time
 in_group("United Kingdom", "EU", as_of = 2016)
 in_group("United Kingdom", "EU", as_of = 2021)
+# one date per row, as a panel needs
+in_group(c("GBR", "GBR"), "EU", origin = "iso3c", as_of = c(2016, 2021))
 }
 \seealso{
 \code{\link[=country_groups]{country_groups()}}, \link{country_groups_history}

@@ -4,7 +4,14 @@
 \alias{correlate_indicators}
 \title{Pairwise correlation of indicators on the spine}
 \usage{
-correlate_indicators(data, ..., method = c("pearson", "spearman"), min_n = 3)
+correlate_indicators(
+  data,
+  ...,
+  method = c("pearson", "spearman"),
+  min_n = 3,
+  by_year = FALSE,
+  weight = NULL
+)
 }
 \arguments{
 \item{data}{A country-level (or map-ready) data frame; map-ready frames are
@@ -19,10 +26,22 @@ other structural columns are used.}
 
 \item{min_n}{Minimum number of complete pairs for a correlation to be
 reported (default \code{3}).}
+
+\item{by_year}{If \code{TRUE}, correlate within each year of a panel and return
+one table per year, stacked with a leading \code{year} column. \code{FALSE}
+(default) wants one row per country and, handed a panel, keeps each
+country's earliest year with a warning.}
+
+\item{weight}{Optional column (unquoted), typically population, to weight
+each country by. Unweighted, every country counts once (Milanovic's
+"concept 1"); weighted by population, a correlation describes the average
+person rather than the average country ("concept 2"). A Spearman
+correlation is weighted on the ranks.}
 }
 \value{
 A tibble with one row per indicator pair: \code{var_x}, \code{var_y}, \code{r},
-\code{n} (complete pairs), sorted by \verb{|r|} descending.
+\code{n} (complete pairs), sorted by \verb{|r|} descending; with \code{by_year = TRUE},
+the same per year, led by \code{year}.
 }
 \description{
 Which indicators move together across countries? Computes pairwise
@@ -33,4 +52,7 @@ a world fact.
 }
 \examples{
 correlate_indicators(countryatlas::world_snapshot$countries)
+# weighted by population: the correlation for the average person
+correlate_indicators(countryatlas::world_snapshot$countries,
+                     gdp_per_capita, life_expectancy, weight = population)
 }

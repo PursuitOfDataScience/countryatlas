@@ -5,7 +5,7 @@
 \title{Spatial weights on the country spine}
 \usage{
 country_weights(
-  type = c("contiguity", "knn", "distance", "custom"),
+  type = c("knn", "contiguity", "distance", "custom"),
   countries = NULL,
   k = 5,
   cutoff_km = NULL,
@@ -16,12 +16,13 @@ country_weights(
 }
 \arguments{
 \item{type}{\itemize{
+\item \code{"knn"} (default) -- the \code{k} nearest countries by great-circle centroid
+distance. Every country gets exactly \code{k} neighbours, islands included.
+Needs nothing but the bundled \link{country_meta}. It is also what every
+statistic here uses when \code{weights} is \code{NULL}.
+\itemize{
 \item \code{"contiguity"} -- shared land border, from \code{\link[=country_borders]{country_borders()}}. Needs
 \code{sf}. Islands get no neighbours; see \code{\link[=morans_i]{morans_i()}}'s note.
-\itemize{
-\item \code{"knn"} -- the \code{k} nearest countries by great-circle centroid distance.
-Every country gets exactly \code{k} neighbours, islands included. Needs
-nothing but the bundled \link{country_meta}.
 \item \code{"distance"} -- every country within \code{cutoff_km}. Needs nothing.
 \item \code{"custom"} -- your own adjacency (see \code{w}), which is how non-geographic
 neighbourhoods -- trade volume, migration flows, colonial or language
@@ -51,8 +52,8 @@ that built it. Inspect it by printing; \code{as.matrix()} gives the matrix.
 \description{
 Build a reusable neighbour-weights object for \code{\link[=morans_i]{morans_i()}}, \code{\link[=local_morans]{local_morans()}},
 \code{\link[=gearys_c]{gearys_c()}}, \code{\link[=getis_ord]{getis_ord()}} and \code{\link[=spatial_lag]{spatial_lag()}}. Four schemes, three of which
-give every country at least one neighbour -- which land-border contiguity, the
-historical default, cannot do for an island.
+give every country at least one neighbour -- which land-border contiguity,
+the default before 4.0.0, cannot do for an island.
 }
 \section{Choosing a scheme}{
 

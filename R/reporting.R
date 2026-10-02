@@ -116,8 +116,8 @@ country_factsheet <- function(x, indicators = NULL, origin = "country.name") {
   structure(
     # %||% only replaces NULL, and first_or_na() returns NA_character_ when the
     # code has no row in country_meta -- so this fallback was written and never
-    # fired. Kosovo (XKX, which countrycode has no metadata row for) printed a
-    # header of literally "NA (XKX)" while carrying real neighbours and history.
+    # fired. Kosovo, before country_meta had a row for it, printed a header of
+    # literally "NA (XKX)" while carrying real neighbours and history.
     list(iso3c = iso,
          name = na_fallback(first_or_na(row$country),
                             if (is.character(x)) x else iso),
@@ -170,7 +170,7 @@ print.countryatlas_factsheet <- function(x, ...) {
       "Not 0: the 110m basemap has no polygon for this microstate. ",
       "Use country_borders(scale = \"medium\")."))
   } else if (length(note)) {
-    miss <- suppressWarnings(convert_country(note, from = "iso3c",
+    miss <- suppressWarnings(convert_country(note, origin = "iso3c",
                                              to = "country", warn = FALSE))
     miss[is.na(miss)] <- note[is.na(miss)]
     cli::cli_text(cli::col_grey(

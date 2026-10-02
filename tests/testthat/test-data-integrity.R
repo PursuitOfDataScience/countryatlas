@@ -38,11 +38,12 @@ test_that("country_meta$area_km2 is anchored to real areas, not just positive", 
   # fix -- the two failure modes being a wrapped ring measuring 179x too large
   # and a polar cap cancelling to ~0. Either would sail through the old checks.
   #
-  # Tolerances are wide on purpose. These come from map_data("world") at its
-  # own coastline resolution and exclude or include disputed ground by its own
-  # conventions, so they are not expected to match a gazetteer exactly; 10% is
-  # far tighter than any plausible formula bug and far looser than the
-  # legitimate disagreement.
+  # Tolerances are wide on purpose. These come from Natural Earth's 1:50m
+  # coastlines and exclude or include disputed ground by its own conventions,
+  # so they are not expected to match a gazetteer exactly; 10% is far tighter
+  # than any plausible formula bug and far looser than the legitimate
+  # disagreement. France is metropolitan France, as in ISO 3166: its overseas
+  # departments have rows of their own.
   cm <- countryatlas::country_meta
   area <- stats::setNames(cm$area_km2, cm$iso3c)
   expected <- c(RUS = 17098246, CAN = 9984670, USA = 9833520, CHN = 9596960,
@@ -96,7 +97,6 @@ test_that("country_meta centroids still agree with polygon_centroids()", {
   # The bundled centroids were built with the same largest-piece rule the live
   # geometry uses; drift between the two would silently change
   # distance_between() / bubble_map() placement.
-  skip_if_not_installed("maps")
   live <- world_geometry("centroids", geometry = "polygon")
   cm <- countryatlas::country_meta[, c("iso3c", "centroid_lon", "centroid_lat")]
   both <- merge(as.data.frame(cm), as.data.frame(live), by = "iso3c",
@@ -119,7 +119,8 @@ test_that("country_groups_tbl memberships are well formed", {
   expect_setequal(
     unique(g$group),
     c("EU", "OECD", "G7", "G20", "BRICS", "ASEAN", "EFTA", "Commonwealth",
-      "OPEC", "EuroZone", "NATO", "Nordic", "Visegrad", "Mercosur", "GCC")
+      "OPEC", "EuroZone", "NATO", "Nordic", "Visegrad", "Mercosur", "GCC",
+      "SCO", "CPTPP", "RCEP", "EAC", "SADC", "APEC", "ArabLeague")
   )
   # Groups whose size is fixed by name or treaty.
   expect_equal(sum(g$group == "G7"), 7L)
@@ -209,7 +210,7 @@ test_that("historical_codes and historical_aliases() stay in step", {
   expect_true(all(unname(aliases) %in% hc$historical))
   # The stored successor name must match what convert_country() would give.
   expect_equal(hc$country,
-               convert_country(hc$iso3c, to = "country", from = "iso3c",
+               convert_country(hc$iso3c, to = "country", origin = "iso3c",
                                warn = FALSE))
 })
 
@@ -325,7 +326,7 @@ test_that("data-raw/ still rebuilds the hand-curated datasets byte for byte", {
   }
 })
 
-test_that("the data-raw override snapshot is still in sync with wdj_overrides()", {
+test_that("the data-raw override snapshot is still in sync with country_overrides()", {
   # data-raw/overrides_snapshot.R keeps a standalone copy so the dataset build
   # does not depend on the installed package. Its header says "keep in sync",
   # which a comment cannot enforce -- drift here would silently change
@@ -390,9 +391,9 @@ test_that("map-ready frames are reduced to one row per country everywhere", {
 
 test_that("distance_between returns NA exactly where a centroid is missing", {
   # Documented in ?distance_between: country_meta has no centroid for a handful
-  # of small territories, and no row at all for Kosovo (countrycode has none).
-  # Asserted as a property, so a future data rebuild that adds them makes this
-  # test fail and prompt a doc update rather than silently diverging.
+  # of small territories. Asserted as a property, so a future data rebuild that
+  # adds them makes this test fail and prompt a doc update rather than silently
+  # diverging.
   meta <- countryatlas::country_meta
   has_centroid <- meta$iso3c[!is.na(meta$centroid_lon) & !is.na(meta$centroid_lat)]
   no_centroid <- setdiff(meta$iso3c, has_centroid)
@@ -403,10 +404,13 @@ test_that("distance_between returns NA exactly where a centroid is missing", {
   if (length(no_centroid)) {
     expect_true(all(is.na(distance_between(no_centroid, "FRA", origin = "iso3c"))))
   }
-  # Kosovo resolves to XKX everywhere else, but has no row here.
+  # Kosovo, which countrycode does not carry, has a curated row and centroid:
+  # Pristina is about 240 km from Belgrade, and the centroids are closer.
   expect_equal(convert_country("Kosovo", to = "iso3c"), "XKX")
-  expect_false("XKX" %in% meta$iso3c)
-  expect_true(is.na(distance_between("Kosovo", "Serbia")))
+  expect_true("XKX" %in% meta$iso3c)
+  d_ks <- distance_between("Kosovo", "Serbia")
+  expect_gt(d_ks, 100)
+  expect_lt(d_ks, 300)
   # Every code that DOES have a centroid gives a finite distance.
   sample_codes <- utils::head(has_centroid, 40)
   expect_false(anyNA(distance_between(sample_codes, "FRA", origin = "iso3c")))
@@ -436,11 +440,19 @@ test_that("codes round-trip through every invertible scheme", {
   expect_gt(length(all3), 200L)
   for (sch in list(c("iso2c", "iso2c"), c("country", "country.name"),
                    c("iso3n", "iso3n"))) {
-    fwd <- suppressWarnings(convert_country(all3, to = sch[1], from = "iso3c"))
-    back <- suppressWarnings(convert_country(fwd, to = "iso3c", from = sch[2]))
+    # Kosovo has a user-assigned alpha-2 and alpha-3 code but no ISO 3166
+    # numeric one, so it has nothing to round-trip through iso3n.
+    codes <- if (identical(sch[1], "iso3n")) setdiff(all3, "XKX") else all3
+    fwd <- suppressWarnings(convert_country(codes, to = sch[1], origin = "iso3c"))
+    back <- suppressWarnings(convert_country(fwd, to = "iso3c", origin = sch[2]))
     expect_false(anyNA(fwd), info = sch[1])       # every code has a value
-    expect_equal(back, all3, info = sch[1])       # and it maps back
+    expect_equal(back, codes, info = sch[1])      # and it maps back
   }
+  # The iso2c the package writes for Kosovo reads back, through every verb
+  # that resolves codes.
+  expect_identical(convert_country("XK", origin = "iso2c"), "XKX")
+  expect_identical(standardize_country(data.frame(c = "xk "), c,
+                                       origin = "iso2c")$iso3c, "XKX")
 })
 
 test_that("the override table is internally consistent", {
@@ -463,7 +475,11 @@ test_that("every bundled table refers only to known codes", {
   # disputed_territories when 3.0.0 added them -- which is exactly how a new
   # table ends up with no referential check at all. Discovering the tables
   # means the next one is covered the day it lands.
-  known <- countryatlas:::wdj_known_iso3c()
+  # Former economies (YUG, CSK, SUN, SCG, ANT) are classified in
+  # country_classifications under codes ISO 3166-1 has retired; they are known
+  # to the package through historical_codes, and only there.
+  known <- c(countryatlas:::wdj_known_iso3c(),
+             stats::na.omit(countryatlas::historical_codes$iso3c_hist))
   items <- utils::data(package = "countryatlas")$results[, "Item"]
   # `world_snapshot` is a list of frames, so recurse one level.
   seen <- character(0)
@@ -490,75 +506,57 @@ test_that("every bundled table refers only to known codes", {
 # checks that the surrounding text is true, so these would drift silently and
 # the documentation would start lying to readers.
 
-test_that("README.Rmd's claims hold", {
-  skip_slow_on_cran()
-  # The README is the front page and makes two hard numeric claims, and unlike
-  # the vignettes nothing checked either. Its headline figure is computed from
-  # a live WDI fetch, so it cannot be pinned offline -- but the *argument* it
-  # rests on can be, against the bundled snapshot: joining by plain country
-  # name loses dozens of countries, and join_world() loses none.
-  skip_if_not_installed("maps")
-  snap <- countryatlas::world_snapshot$countries
-  regions <- unique(sub(":.*", "", maps::map("world", plot = FALSE,
-                                             fill = TRUE)$names))
-  lost_by_name <- sum(!snap$country %in% regions)
-  # "42 of 215 countries silently vanish" -- the live figure moves with WDI and
-  # with the maps package, so assert the shape of the claim, not the digit.
-  expect_gt(lost_by_name, 30)
-  expect_lt(lost_by_name, 60)
-  expect_equal(nrow(snap), 215)
-  # ... and that the package's own join is the fix: every snapshot country
-  # carries a code the ISO spine recognises.
-  expect_false(anyNA(snap$iso3c))
-  expect_length(setdiff(snap$iso3c, countryatlas:::wdj_known_iso3c()), 0L)
-
-  # "Equal-interval breaks put 92% of countries in one class here" -- this one
-  # is computed from bundled data, so it is exact.
-  mapdf <- suppressWarnings(attach_geometry(snap, geometry = "polygon"))
-  tb <- attr(suppressWarnings(classify_compare(mapdf, gdp_per_capita)),
-             "countryatlas_classification")
-  equal <- tb[tb$method == "equal", ]
-  expect_equal(round(100 * max(equal$share)), 92)
-  # ... and the contrast it draws with quantiles.
-  quant <- tb[tb$method == "quantile", ]
-  expect_lt(max(quant$share), 0.25)
-})
-
-test_that("the README lists every verb a reader could reach for", {
-  # A new export that never makes it into the front page's verb table is
-  # invisible to anyone who starts where readers start. Reads README.Rmd, so it
-  # needs the source tree.
+test_that("the README stays short, and runs what it shows", {
+  # The owner's standard: a hook, three real examples, setup in four steps, a
+  # gotchas table, under about 70 lines. The 3.0.0 README had grown to 470.
   skip_if_no_source_tree()
   skip_if_not(file.exists("../../README.Rmd"), "README.Rmd not present")
-  rd_txt <- paste(readLines("../../README.Rmd", warn = FALSE), collapse = "\n")
-  listed <- gsub("[`()]", "",
-                 regmatches(rd_txt,
-                            gregexpr("`[a-zA-Z_][a-zA-Z0-9_.]*\\(\\)`",
-                                     rd_txt))[[1]])
-  ns <- asNamespace("countryatlas")
-  fns <- Filter(function(n) is.function(get(n, envir = ns)),
-                getNamespaceExports("countryatlas"))
-  # The two omissions are deliberate: wdj_overrides() is deprecated, and
-  # clear_wdi_cache() is the retained old name for clear_country_cache().
-  expect_setequal(setdiff(fns, listed), c("wdj_overrides", "clear_wdi_cache"))
-  # And the README names nothing the package does not export.
-  expect_length(intersect(listed, fns), length(fns) - 2L)
+  rd <- readLines("../../README.Rmd", warn = FALSE)
+  expect_lt(length(rd), 75L)
+  txt <- paste(rd, collapse = "\n")
+  expect_match(txt, "## .*Setup")
+  expect_match(txt, "## .*Gotchas")
+  # Every function it names is exported, so nothing it shows is stale.
+  named <- unique(gsub("[`(]", "", regmatches(
+    txt, gregexpr("`?[a-z][a-z0-9_]*\\(", txt))[[1]]))
+  ours <- intersect(named, ls(asNamespace("countryatlas")))
+  expect_true(all(ours %in% getNamespaceExports("countryatlas")))
+  # And the examples it shows still say what it shows.
+  d <- data.frame(country = c("Cote d'Ivoire", "Korea, Rep.", "Deutschland", "U.K."))
+  expect_identical(standardize_country(d, country, add = "iso3c")$iso3c,
+                   c("CIV", "KOR", "DEU", "GBR"))
+  expect_identical(in_group(c("GBR", "GBR"), "EU", origin = "iso3c",
+                            as_of = c(2016, 2021)), c(TRUE, FALSE))
 })
 
-test_that("the README's bundled-data counts match the data", {
-  # A hand-maintained count in the front page drifts the moment the dataset
-  # grows: 3.0.0 added the two price-conversion series to common_indicators,
-  # taking it from 20 rows to 22, and the README still said 20. Assert it
-  # against the data so the next addition has to update the prose too.
+test_that("the reference index lists every exported function", {
+  # A new export that is in no section of the pkgdown reference is invisible
+  # to anyone who browses the site. 3.0.0 pinned this to the README's verb
+  # table; a 70-line README cannot list 120 exports, so it pins the index.
+  # What pkgdown::check_pkgdown() checks, in base R so the test needs no
+  # pkgdown: every page not marked internal has an alias in some section, and
+  # every entry names a page.
   skip_if_no_source_tree()
-  skip_if_not(file.exists("../../README.Rmd"), "README.Rmd not present")
-  rd_txt <- paste(readLines("../../README.Rmd", warn = FALSE), collapse = "\n")
-  claim <- regmatches(
-    rd_txt,
-    regexpr("`common_indicators` keeps the [0-9]+ you actually use", rd_txt))
-  expect_length(claim, 1L)
-  expect_equal(as.integer(gsub("[^0-9]", "", claim)),
-               nrow(common_indicators))
+  skip_if_not(file.exists("../../_pkgdown.yml"), "_pkgdown.yml not present")
+  yml <- readLines("../../_pkgdown.yml", warn = FALSE)
+  ref <- yml[seq(grep("^reference:", yml), length(yml))]
+  stop_at <- grep("^[a-z_]+:", ref)[-1]
+  if (length(stop_at)) ref <- ref[seq_len(stop_at[1] - 1L)]
+  listed <- sub("^\\s*- ", "", grep("^\\s*- [A-Za-z0-9_.]+\\s*$", ref, value = TRUE))
+  listed <- trimws(listed)
+  pages <- lapply(list.files("../../man", pattern = "[.]Rd$", full.names = TRUE),
+                  function(f) {
+                    rd <- readLines(f, warn = FALSE)
+                    list(file = basename(f),
+                         internal = any(grepl("^\\\\keyword[{]internal[}]", rd)),
+                         aliases = sub("^\\\\alias[{](.*)[}]$", "\\1",
+                                       grep("^\\\\alias[{]", rd, value = TRUE)))
+                  })
+  public <- Filter(function(pg) !pg$internal, pages)
+  unlisted <- vapply(public, function(pg) !any(pg$aliases %in% listed), logical(1))
+  expect_identical(vapply(public[unlisted], `[[`, "", "file"), character(0))
+  known <- unlist(lapply(pages, `[[`, "aliases"))
+  expect_identical(setdiff(listed, known), character(0))
 })
 
 test_that("the dataset help pages' cross-dataset counts match the data", {
@@ -598,19 +596,22 @@ test_that("the dataset help pages' cross-dataset counts match the data", {
   # help pages must agree with each other as well as with the data.
   expect_equal(rd_num(ws_rd, "for [0-9]+ countries"), n_diff)
 
-  # "Ten further territories have a row but no centroid or area."
-  no_centroid <- sum(is.na(country_meta$centroid_lon) |
-                       is.na(country_meta$centroid_lat))
-  expect_equal(no_centroid, 10L)
-  expect_true(grepl("Ten further territories",
+  # "Three territories have a row but no centroid or area ... Bouvet Island,
+  # Gibraltar and the U.S. Minor Outlying Islands."
+  no_centroid <- country_meta$iso3c[is.na(country_meta$centroid_lon) |
+                                      is.na(country_meta$centroid_lat)]
+  expect_setequal(no_centroid, c("BVT", "GIB", "UMI"))
+  expect_true(grepl("Three territories have a row",
                     paste(readLines(cm, warn = FALSE), collapse = " "),
                     fixed = TRUE))
 
-  # "Kosovo (XKX) has no row -- countrycode has none either."
-  expect_false("XKX" %in% country_meta$iso3c)
+  # "plus a curated row for Kosovo (XKX), which countrycode does not carry"
+  expect_true("XKX" %in% country_meta$iso3c)
   expect_false("XKX" %in% countrycode::codelist$iso3c)
-  # But the paths the page says do handle it, still do.
-  expect_equal(suppressWarnings(convert_country("XKX", from = "iso3c",
+  expect_true(grepl("curated row for Kosovo",
+                    paste(readLines(cm, warn = FALSE), collapse = " "),
+                    fixed = TRUE))
+  expect_equal(suppressWarnings(convert_country("XKX", origin = "iso3c",
                                                 to = "iso3c")), "XKX")
 })
 
@@ -620,26 +621,26 @@ test_that("honest-maps.Rmd's claims hold", {
   # island list named the United Kingdom and Indonesia as dropped by contiguity
   # weights when both keep land borders -- a vignette about maps quietly
   # misleading, quietly misleading.
-  skip_if_not_installed("maps")
   snap <- countryatlas::world_snapshot$countries
 
   # "projection_info() says what each of the thirteen preserves"
   expect_equal(nrow(projection_info()), 13L)
 
   # "Equal-interval and pretty breaks put over 90% of countries into a single
-  # class"; "Quantiles put roughly 38 countries in each class"
+  # class"; "Quantiles put roughly 40 countries in each class"
   mapdf <- suppressWarnings(attach_geometry(snap, geometry = "polygon"))
   tb <- attr(suppressWarnings(classify_compare(mapdf, gdp_per_capita)),
              "countryatlas_classification")
   for (m in c("equal", "pretty")) {
     expect_gt(max(tb$share[tb$method == m]), 0.9)
   }
-  expect_true(all(abs(tb$n[tb$method == "quantile"] - 38) <= 2))
+  expect_true(all(abs(tb$n[tb$method == "quantile"] - 40) <= 2))
 
   # "silently removes a quarter of the countries with data", and the specific
-  # countries named.
+  # countries named. Contiguity is no longer the default, so it is asked for.
   skip_if_no_sf_geometry()
-  r <- suppressWarnings(morans_i(snap, gdp_per_capita, n_perm = 0))
+  r <- suppressWarnings(morans_i(snap, gdp_per_capita, n_perm = 0,
+                                 weights = country_weights("contiguity")))
   share_lost <- r$n_excluded / (r$n + r$n_excluded)
   expect_gt(share_lost, 0.2)
   expect_lt(share_lost, 0.3)
@@ -648,6 +649,14 @@ test_that("honest-maps.Rmd's claims hold", {
                   %in% excluded))
   # ... and the two the vignette now explains are *not* dropped.
   expect_false(any(c("GBR", "IDN") %in% excluded))
+  # "The default is now the five nearest neighbours, so every country with
+  # data and a centroid takes part": exactly the ones with no centroid drop.
+  k <- morans_i(snap, gdp_per_capita, n_perm = 0)
+  expect_identical(k$n + k$n_excluded, r$n + r$n_excluded)
+  meta <- countryatlas::country_meta
+  no_centroid <- meta$iso3c[is.na(meta$centroid_lon) | is.na(meta$centroid_lat)]
+  expect_setequal(k$excluded[[1]],
+                  intersect(snap$iso3c[!is.na(snap$gdp_per_capita)], no_centroid))
 })
 
 test_that("the vignettes' version and projection lists match the code", {
@@ -659,7 +668,7 @@ test_that("the vignettes' version and projection lists match the code", {
   skip_if_no_source_tree()
   gg <- paste(readLines("../../vignettes/countryatlas-and-ggsql.Rmd",
                         warn = FALSE), collapse = " ")
-  src <- paste(readLines("../../R/visualization.R", warn = FALSE),
+  src <- paste(readLines("../../R/map-interactive.R", warn = FALSE),
                collapse = " ")
   # The version interactive_map() actually enforces, and the version the
   # vignette quotes, have to be the same string.
@@ -677,6 +686,7 @@ test_that("the vignettes' version and projection lists match the code", {
 })
 
 test_that("getting-started.Rmd's claims hold", {
+  skip_slow_on_cran()
   # It said "income is an ordered factor", which it is not -- a plain factor
   # whose levels happen to be in income order, built that way deliberately in
   # data-raw/. The visual claim held either way, so nothing caught it.
@@ -700,6 +710,7 @@ test_that("getting-started.Rmd's claims hold", {
 })
 
 test_that("joining-your-own-data.Rmd's claims hold", {
+  skip_slow_on_cran()
   # "snaps such points to the nearest country within tolerance_km (25 km by
   # default)"
   expect_equal(formals(locate_country)$tolerance_km, 25)
@@ -721,6 +732,7 @@ test_that("joining-your-own-data.Rmd's claims hold", {
 })
 
 test_that("the point-lookup example in the vignettes resolves as printed", {
+  skip_slow_on_cran()
   skip_if_no_sf_geometry()
   # locate_country(lon = c(2.35, -74.0, 139.7), lat = c(48.85, 40.7, 35.7))
   loc <- locate_country(lon = c(2.35, -74.0, 139.7),
@@ -730,26 +742,24 @@ test_that("the point-lookup example in the vignettes resolves as printed", {
 
 test_that("the row-count and grid-size claims hold", {
   skip_slow_on_cran()
-  skip_if_not_installed("maps")
-  # countryatlas.Rmd: "not ~99,000 polygon rows"
+  # countryatlas.Rmd: "not ~98,000 polygon rows"
   n <- nrow(attach_geometry(countryatlas::world_snapshot$countries,
                             geometry = "polygon"))
   expect_gt(n, 90000L)
   expect_lt(n, 110000L)
-  # beyond-the-choropleth.Rmd: "the bundled grid covers 239 countries -- see
-  # ?world_tiles for the ten it omits"
-  expect_equal(nrow(countryatlas::world_tiles), 239L)
+  # beyond-the-choropleth.Rmd: "the bundled grid covers 247 countries -- see
+  # ?world_tiles for the three it omits"
+  expect_equal(nrow(countryatlas::world_tiles), 247L)
   expect_equal(nrow(countryatlas::country_meta) -
-                 nrow(countryatlas::world_tiles), 10L)
-  # beyond-the-choropleth.Rmd names the five countries bubble_map()/spike_map()
-  # cannot place: "Hong Kong, Macao, Gibraltar, the British Virgin Islands and
-  # Tuvalu". Named in prose, so a centroid-table rebuild must not leave the
-  # vignette quietly wrong.
+                 nrow(countryatlas::world_tiles), 3L)
+  # beyond-the-choropleth.Rmd names the one country bubble_map()/spike_map()
+  # cannot place, Gibraltar. Named in prose, so a centroid-table rebuild must
+  # not leave the vignette quietly wrong.
   cent <- world_geometry("centroids", geometry = "polygon")
   snap <- countryatlas::world_snapshot$countries
   lost <- sort(snap$iso3c[!snap$iso3c %in% cent$iso3c &
                             !is.na(snap$population)])
-  expect_equal(lost, c("GIB", "HKG", "MAC", "TUV", "VGB"))
+  expect_equal(lost, "GIB")
   # The vignette source is absent from an installed check directory, where
   # these tests run from countryatlas.Rcheck/tests/.
   skip_if_no_source_tree()
@@ -757,23 +767,27 @@ test_that("the row-count and grid-size claims hold", {
               "vignette source not present")
   btc <- paste(readLines("../../vignettes/beyond-the-choropleth.Rmd",
                          warn = FALSE), collapse = " ")
-  for (nm in c("Hong Kong", "Macao", "Gibraltar", "British Virgin Islands",
-               "Tuvalu")) {
-    expect_match(btc, nm, fixed = TRUE)
-  }
-  expect_match(btc, "five countries with population", fixed = TRUE)
+  expect_match(btc, "one country with population, Gibraltar", fixed = TRUE)
+  expect_match(btc, "covers 247 countries", fixed = TRUE)
 })
 
-test_that("the override table fully covers the polygon backend's names", {
-  # The curated table exists mainly to absorb map_data("world") spellings that
-  # countrycode drops. Every region the polygon backend carries should therefore
-  # resolve to an iso3c -- if the maps package renames one, this is where it
-  # shows up, rather than as silently missing countries on a plot.
-  skip_if_not_installed("maps")
+test_that("the polygon backend keys every feature it can", {
+  skip_slow_on_cran()
+  # Every region the polygon backend carries resolves to an iso3c, except the
+  # three Natural Earth features no ISO code covers, which ?world_geometry
+  # names and which are kept so the land is still drawn. A rebuild of the
+  # bundled polygons that loses a key shows up here, rather than as silently
+  # missing countries on a plot.
   poly <- countryatlas:::get_world_polygons()
   expect_true(all(c("region", "iso3c") %in% names(poly)))
-  unresolved <- unique(poly$region[is.na(poly$iso3c)])
-  expect_equal(unresolved, character(0))
+  unresolved <- sort(unique(poly$region[is.na(poly$iso3c)]))
+  expect_equal(unresolved, c("Ashmore and Cartier Islands",
+                             "Indian Ocean Territories", "Somaliland"))
+  # And the maps package's spellings, for the deprecated geometry = "maps",
+  # all resolve through the override table.
+  skip_if_not_installed("maps")
+  md <- countryatlas:::build_world_polygons(source = "maps")
+  expect_equal(unique(md$region[is.na(md$iso3c)]), character(0))
 })
 
 test_that("a custom override changes what the sf backend joins", {
@@ -810,9 +824,8 @@ test_that("?attach_geometry's coverage figures match the backends", {
   # If this test fails after an rnaturalearthdata update, the help page is what
   # needs changing, not the numbers here.
   skip_if_no_sf_geometry()
-  skip_if_not_installed("maps")
   snap <- countryatlas::world_snapshot$countries
-  expect_identical(nrow(snap), 215L)
+  expect_identical(nrow(snap), 216L)
 
   carried <- function(g) {
     length(intersect(snap$iso3c, g$iso3c[!is.na(g$iso3c)]))
@@ -820,16 +833,19 @@ test_that("?attach_geometry's coverage figures match the backends", {
   poly <- world_geometry("countries", geometry = "polygon")
   sf_s <- world_geometry("countries", geometry = "sf", scale = "small")
   sf_m <- world_geometry("countries", geometry = "sf", scale = "medium")
-  expect_identical(carried(poly), 210L)
-  expect_identical(carried(sf_s), 169L)
-  expect_identical(carried(sf_m), 214L)
+  expect_identical(carried(poly), 215L)
+  expect_identical(carried(sf_s), 170L)
+  expect_identical(carried(sf_m), 215L)
+  # Both 1:50m backends carry the same countries.
+  expect_setequal(intersect(snap$iso3c, poly$iso3c),
+                  intersect(snap$iso3c, sf_m$iso3c))
 
   # Gibraltar alone is in none of them.
   absent <- setdiff(snap$iso3c, unique(c(poly$iso3c, sf_s$iso3c, sf_m$iso3c)))
   expect_identical(sort(absent), "GIB")
-  # And these four are carried by the medium sf backend and nothing else.
+  # And these four are carried at 1:50m and not at 1:110m.
   for (cc in c("HKG", "MAC", "TUV", "VGB")) {
-    expect_false(cc %in% poly$iso3c, info = cc)
+    expect_true(cc %in% poly$iso3c, info = cc)
     expect_false(cc %in% sf_s$iso3c, info = cc)
     expect_true(cc %in% sf_m$iso3c, info = cc)
   }
@@ -852,14 +868,12 @@ test_that("the bundled tables are referentially consistent", {
     expect_identical(setdiff(codes, valid), character(0), info = nm)
   }
 
-  # country_meta is the spine: everything else is a subset of it, except the
-  # historical successors, which include Kosovo -- countrycode has no XKX row,
-  # so neither does country_meta. That gap is documented on ?country_meta and
-  # ?distance_between.
+  # country_meta is the spine: everything else is a subset of it, including
+  # the historical successors, now that Kosovo has its curated row.
   expect_identical(setdiff(wt$iso3c, cm$iso3c), character(0))
   expect_identical(setdiff(ws$iso3c, cm$iso3c), character(0))
   expect_identical(setdiff(cg$iso3c, cm$iso3c), character(0))
-  expect_identical(setdiff(hc$iso3c, cm$iso3c), "XKX")
+  expect_identical(setdiff(hc$iso3c, cm$iso3c), character(0))
 
   # Names agree with country_meta wherever the table is built from it...
   same_names <- function(a, b) {
@@ -870,13 +884,17 @@ test_that("the bundled tables are referentially consistent", {
   same_names(cm[, c("iso3c", "country")], wt[, c("iso3c", "country")])
   same_names(cm[, c("iso3c", "country")], cg[, c("iso3c", "country")])
 
-  # ...but world_snapshot carries the World Bank's names, which differ for 38 of
-  # its 215 countries ("Korea, Rep." vs "South Korea"). Both help pages say so;
+  # ...but world_snapshot carries the World Bank's names, which differ for 39 of
+  # its 216 countries ("Korea, Rep." vs "South Korea"). Both help pages say so;
   # if this count moves, they need updating.
   j <- merge(cm[, c("iso3c", "country")], ws[, c("iso3c", "country")],
              by = "iso3c", suffixes = c("_meta", "_snap"))
-  expect_identical(nrow(j), 215L)
-  expect_identical(sum(j$country_meta != j$country_snap), 38L)
+  expect_identical(nrow(j), 216L)
+  expect_identical(sum(j$country_meta != j$country_snap), 39L)
+  # Every one of the World Bank's names resolves back to its own code, so a
+  # frame fetched from the API joins by name: Nauru's is "Naoero" since 2026.
+  expect_identical(
+    suppressWarnings(countryatlas:::wdj_to_iso3c(ws$country)), ws$iso3c)
   expect_identical(j$country_snap[j$iso3c == "KOR"], "Korea, Rep.")
   expect_identical(j$country_meta[j$iso3c == "KOR"], "South Korea")
 })
@@ -985,6 +1003,7 @@ test_that("audit_time_coverage does not flag states that still exist", {
 })
 
 test_that("the data-raw override snapshot still matches the package's table", {
+  skip_slow_on_cran()
   # data-raw/overrides_snapshot.R carries a second copy of the override table
   # with a "Keep in sync" comment and nothing enforcing it. They are identical
   # today; this is what keeps them that way, since a divergence would mean the

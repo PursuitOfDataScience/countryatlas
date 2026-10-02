@@ -15,13 +15,12 @@ knitr::opts_chunk$set(
 library(countryatlas)
 library(ggplot2)
 snap <- world_snapshot$countries
-has_maps <- requireNamespace("maps", quietly = TRUE)
 has_sf <- requireNamespace("sf", quietly = TRUE) &&
   requireNamespace("rnaturalearth", quietly = TRUE) &&
   requireNamespace("rnaturalearthdata", quietly = TRUE)
 ```
 
-```{r setup-data, eval = has_maps}
+```{r setup-data}
 mapdf <- attach_geometry(snap, geometry = "polygon")
 ```
 
@@ -42,27 +41,29 @@ reader concludes.
 
 `classify_compare()` draws the same data under several methods at once.
 
-```{r classify, eval = has_maps, fig.height = 3.2, fig.alt = "GDP per capita under quantile, Jenks, equal-interval and pretty breaks."}
-cmp <- classify_compare(mapdf, gdp_per_capita, ncol = 2)
+```{r classify, fig.height = 3.2, fig.alt = "GDP per capita under quantile, Jenks, equal-interval and pretty breaks."}
+cmp <- classify_compare(mapdf, gdp_per_capita,
+                        methods = c("quantile", "jenks", "equal", "pretty"),
+                        ncol = 2)
 cmp
 ```
 
 The picture is only half of it. The counts are attached to the plot:
 
-```{r classify-report, eval = has_maps}
+```{r classify-report}
 attr(cmp, "countryatlas_classification")
 ```
 
 Equal-interval and pretty breaks put over 90% of countries into a single class,
 because GDP per capita is strongly right-skewed and the top of the range is one
 country. A map like that is technically correct and communicates nothing.
-Quantiles put roughly 38 countries in each class.
+Quantiles put roughly 40 countries in each class.
 
 You do not need the comparison to get the report: any *classified*
 `world_map()` will produce it. (A continuous colourbar has no classes, so
 asking there returns nothing and says why.)
 
-```{r one-report, eval = has_maps}
+```{r one-report}
 p <- world_map(mapdf, gdp_per_capita, style = "quantile",
                classification_report = TRUE)
 attr(p, "countryatlas_classification")
@@ -79,7 +80,7 @@ the wrong inference. `na_style` gives you three alternatives, and `"hatched"`
 (via the optional `ggpattern`) is the one that survives both colour-blindness and
 a black-and-white printer.
 
-```{r na-style, eval = has_maps, fig.alt = "World choropleth with missing countries drawn in diagonal hatching."}
+```{r na-style, fig.alt = "World choropleth with missing countries drawn in diagonal hatching."}
 world_map(mapdf, co2_per_capita, style = "quantile",
           na_style = "hatched", footnote = "auto")
 ```
@@ -89,7 +90,7 @@ quietly overstate what it covers.
 
 When the missingness *is* the story, map it directly:
 
-```{r coverage, eval = has_maps, fig.alt = "Map of which countries report CO2 per capita."}
+```{r coverage, fig.alt = "Map of which countries report CO2 per capita."}
 coverage_map(mapdf, co2_per_capita)
 ```
 
@@ -104,7 +105,7 @@ a billion people. There are two answers. The cartogram distorts geometry until
 area matches the denominator; **value-by-alpha** (Roth, Woodruff & Johnson 2010)
 leaves the geometry alone and spends *opacity* instead.
 
-```{r vba, eval = has_maps, fig.alt = "Value-by-alpha map: GDP per capita in colour, population as opacity, over a dark background."}
+```{r vba, fig.alt = "Value-by-alpha map: GDP per capita in colour, population as opacity, over a dark background."}
 value_by_alpha_map(mapdf, gdp_per_capita, population)
 ```
 
@@ -160,7 +161,7 @@ attach_geometry(snap, geometry = "sf") |>
 Everything above is a decision, and a published map should carry its decisions.
 `map_provenance()` reads them back off the plot.
 
-```{r provenance, eval = has_maps, message = TRUE}
+```{r provenance, message = TRUE}
 world_map(mapdf, gdp_per_capita, style = "quantile", n_bins = 5,
           na_style = "hatched", footnote = "auto") |>
   map_provenance()
@@ -205,11 +206,12 @@ c(`2016` = in_group("United Kingdom", "EU", as_of = 2016),
 
 ## 7. Islands are not missing at random
 
-`morans_i()`'s default weights are land-border contiguity, and an island has no
-land border. On the bundled snapshot that silently removes a quarter of the
-countries with data -- Japan, Australia, Madagascar, New Zealand, the
+Land-border contiguity, `morans_i()`'s default weights before 4.0.0, gives an
+island no neighbours at all. On the bundled snapshot that removes a quarter of
+the countries with data: Japan, Australia, Madagascar, New Zealand, the
 Philippines, Cuba, Sri Lanka, Iceland and every small island state. They are not
-a random quarter.
+a random quarter, and the default is now the five nearest neighbours, so every
+country with data and a centroid takes part.
 
 Not every island goes, either: the United Kingdom keeps its land border with
 Ireland, and Indonesia keeps its borders with Malaysia, Papua New Guinea and
@@ -218,9 +220,9 @@ who dropped out of the statistic.
 
 ```{r weights, eval = has_sf}
 rbind(
-  contiguity = morans_i(snap, gdp_per_capita, n_perm = 0)[c("i", "n", "n_excluded")],
-  knn = morans_i(snap, gdp_per_capita, n_perm = 0,
-                 weights = country_weights("knn", k = 5))[c("i", "n", "n_excluded")]
+  contiguity = morans_i(snap, gdp_per_capita, n_perm = 0,
+                        weights = country_weights("contiguity"))[c("i", "n", "n_excluded")],
+  knn = morans_i(snap, gdp_per_capita, n_perm = 0)[c("i", "n", "n_excluded")]
 )
 ```
 

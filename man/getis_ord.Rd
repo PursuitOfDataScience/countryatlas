@@ -4,16 +4,23 @@
 \alias{getis_ord}
 \title{Getis-Ord G statistics (hot spots)}
 \usage{
-getis_ord(data, value, weights = NULL, local = TRUE)
+getis_ord(
+  data,
+  value,
+  weights = NULL,
+  local = TRUE,
+  p_adjust = c("fdr", "bonferroni", "holm", "none")
+)
 }
 \arguments{
 \item{data}{A country-level frame with \code{iso3c} and the value column.}
 
 \item{value}{The value column (unquoted).}
 
-\item{weights}{A \code{\link[=country_weights]{country_weights()}} object. Defaults to land-border
-contiguity, which excludes islands -- prefer \code{country_weights("knn")} for
-global work.}
+\item{weights}{A \code{\link[=country_weights]{country_weights()}} object. \code{NULL} (default) uses
+\code{country_weights("knn", k = 5)}: every country's five nearest neighbours,
+islands included. \code{country_weights("contiguity")} gives the land-border
+default of earlier versions, which leaves every island out.}
 
 \item{local}{If \code{TRUE} (default) return the per-country \eqn{G_i^*} with
 z-scores; if \code{FALSE} return the single global \eqn{G}.
@@ -23,11 +30,16 @@ values: it compares cross-products, so negating the variable leaves it
 unchanged. Given a negative value it warns and returns \code{NA} rather than a
 number computed outside its domain. \eqn{G_i^*} standardises and is
 defined for signed data.}
+
+\item{p_adjust}{For \code{local = TRUE}, how to adjust the per-country p-values
+for multiple testing: \code{"fdr"} (default), \code{"bonferroni"}, \code{"holm"} or
+\code{"none"}, as in \code{\link[=local_morans]{local_morans()}}. The global form makes one test and
+takes no adjustment.}
 }
 \value{
-With \code{local = TRUE}, a tibble of \code{iso3c}, \code{gi_star}, \code{z_score} and
-\code{p_value} (two-sided, from the normal approximation), one row per country
-used. With \code{local = FALSE}, a one-row tibble of \code{g}, \code{expected}, \code{n}
+With \code{local = TRUE}, a tibble of \code{iso3c}, \code{gi_star}, \code{z_score},
+\code{p_value} (two-sided, from the normal approximation) and \code{p_adjusted},
+one row per country used. With \code{local = FALSE}, a one-row tibble of \code{g}, \code{expected}, \code{n}
 (countries used -- the same count, so the local form returns \code{n} rows) and
 \code{n_links} (non-zero weights).
 }

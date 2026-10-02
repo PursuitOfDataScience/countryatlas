@@ -1,0 +1,38 @@
+---
+title: "Rates and small numbers"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", message = FALSE,
+                      warning = FALSE, fig.width = 8, fig.height = 3.6, dpi = 96)
+library(countryatlas)
+set.seed(3)
+d <- world_snapshot$countries
+d <- d[!is.na(d$population), c("iso3c", "population", "continent")]
+d$deaths <- stats::rpois(nrow(d), d$population * 0.008 *
+                           exp(stats::rnorm(nrow(d), 0, 0.2)))
+```
+
+A rate over eleven thousand people shouts as loudly as one over a billion. Four
+verbs handle that: `rate_check()` flags it, `smooth_rates()` shrinks it,
+`rate_funnel()` shows it, `value_by_alpha_map()` maps it.
+
+```{r}
+head(rate_check(d, deaths, population))
+```
+
+Empirical-Bayes smoothing pulls an unreliable rate toward the global rate,
+or with `method = "local_eb"` toward its neighbourhood's:
+
+```{r}
+s <- smooth_rates(d, deaths, population, method = "local_eb")
+head(s[order(s$population), c("iso3c", "deaths_rate", "deaths_smoothed",
+                              "deaths_shrinkage")])
+```
+
+The funnel plot puts every country against the limits chance alone would give
+a country its size, with Spiegelhalter's overdispersion adjustment:
+
+```{r, fig.alt = "Funnel plot of a made-up death rate against population, with 95% and 99.8% control limits."}
+rate_funnel(d, deaths, population, overdispersion = TRUE)
+```

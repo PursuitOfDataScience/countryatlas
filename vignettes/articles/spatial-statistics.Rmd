@@ -1,0 +1,68 @@
+---
+title: "Spatial statistics on a world of islands"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", message = FALSE,
+                      warning = FALSE, fig.width = 8, fig.height = 3.6, dpi = 96)
+library(countryatlas)
+snap <- world_snapshot$countries
+```
+
+A spatial statistic is only as good as its idea of who is next to whom. On a
+world map, land borders leave Japan, Australia, New Zealand and every island
+state with no neighbours at all, so a statistic on contiguity weights silently
+drops a quarter of the countries with data. The package defaults to the five
+nearest neighbours, so every country with a centroid takes part.
+
+```{r}
+knn <- morans_i(snap, gdp_per_capita, n_perm = 499)
+border <- morans_i(snap, gdp_per_capita, n_perm = 499,
+                   weights = country_weights("contiguity"))
+rbind(knn = knn[, c("i", "n", "n_excluded", "p_value")],
+      contiguity = border[, c("i", "n", "n_excluded", "p_value")])
+```
+
+## Local clusters, with the false discoveries controlled
+
+A local Moran test runs once per country, so about one in twenty comes out
+"significant" by chance at the 5% level. `local_morans()` and `lisa_map()`
+control the false discovery rate by default (Caldas de Castro & Singer 2006),
+on 9,999 conditional permutations so the smallest p-values can clear it.
+
+```{r, fig.alt = "LISA cluster map of GDP per capita with false-discovery-rate control."}
+lisa_map(attach_geometry(snap), gdp_per_capita, n_perm = 999)
+```
+
+Two variables at once: high GDP per capita among long-lived neighbours.
+
+```{r}
+b <- bivariate_lisa(snap, gdp_per_capita, life_expectancy, n_perm = 999)
+table(b$cluster)
+```
+
+## Rates
+
+Moran's I on raw rates mistakes the noise of small denominators for
+clustering. `eb_morans_i()` standardises each rate by its own reliability
+first (Assuncao & Reis 1999); it agrees with `spdep::EBImoran.mc()`.
+
+```{r}
+set.seed(2)
+d <- snap[!is.na(snap$population), ]
+d$births <- stats::rpois(nrow(d), d$population * 0.018)
+eb_morans_i(d, births, population, n_perm = 499)
+```
+
+## Categories and dynamics
+
+Do income groups cluster? Join counts compare the neighbouring pairs in the
+same group with random labelling:
+
+```{r}
+join_counts(snap, income, n_perm = 499)
+```
+
+`spatial_markov()` asks whether a country's neighbours change its odds of
+moving between classes (Rey 2001), with a homogeneity test; see
+`?spatial_markov`.

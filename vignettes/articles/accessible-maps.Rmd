@@ -1,0 +1,45 @@
+---
+title: "Accessible and citable maps"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", message = FALSE,
+                      warning = FALSE, fig.width = 8, fig.height = 3.6, dpi = 96)
+library(countryatlas)
+p <- world_map(attach_geometry(world_snapshot$countries), gdp_per_capita)
+```
+
+A published map should say what it shows to a reader who cannot see it, be
+readable with a colour-vision deficiency, and say where its numbers came from.
+
+## Alt text
+
+Every map verb sets its alt text from the final plot (Lundgard & Satyanarayan's
+levels 1 and 2):
+
+```{r}
+map_alt_text(p)
+```
+
+knitr does not ask ggplot2 for it, so set it on the chunk from a plot built in
+an earlier chunk, as this page does:
+
+```{r, fig.alt = map_alt_text(p)}
+p
+```
+
+## Colour vision
+
+`check_palette()` simulates the three common deficiencies and reports the
+smallest difference between adjacent classes:
+
+```{r}
+check_palette(p)
+```
+
+## Provenance and citation
+
+```{r}
+map_provenance(p)
+cat(map_citation(p), sep = "\n\n")
+```

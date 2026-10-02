@@ -169,9 +169,16 @@ rate_check <- function(data, numerator, denominator, min_denominator = NULL,
 #'
 #' @param data A country-level frame.
 #' @param numerator,denominator The count and its denominator (unquoted).
-#' @param method `"eb"` (default) for empirical-Bayes shrinkage, or `"none"` to
-#'   compute the raw rate only.
+#' @param method `"eb"` (default) shrinks each rate toward the global rate;
+#'   `"local_eb"` toward its neighbourhood's -- its own and its neighbours'
+#'   pooled rate -- so a rate is compared with the places around it rather
+#'   than the whole world (Marshall 1991; Anselin, Lozano & Koschinsky 2006);
+#'   `"none"` computes the raw rate only.
 #' @param suffix Suffix for the new columns (default `"_smoothed"`).
+#' @param weights For `"local_eb"`: who a country's neighbours are, as a
+#'   [country_weights()] object; `NULL` (default) is k-nearest neighbours
+#'   (k = 5). A country with no usable neighbour has no neighbourhood rate,
+#'   so it is `NA`, with a warning.
 #'
 #' @return `data` with `<numerator>_rate` and `<numerator>_smoothed` columns
 #'   added, plus `<numerator>_shrinkage` -- the weight given to the country's own
@@ -193,6 +200,20 @@ rate_check <- function(data, numerator, denominator, min_denominator = NULL,
 #' On a panel the prior is estimated separately for each `year`, so every
 #' rate is shrunk toward its own year's global rate and every row is kept.
 #'
+#' `"local_eb"` estimates the same two moments in each country's neighbourhood
+#' (itself and its neighbours): the local rate \eqn{m_i} and the local
+#' between-country variance \eqn{a_i}, computed from the deviations of the
+#' neighbourhood's rates from \eqn{m_i}. It agrees with
+#' `spdep::EBlocal(geoda = TRUE)` on the same neighbours.
+#'
+#' @references
+#' Marshall, R. J. (1991). Mapping disease and mortality rates using empirical
+#' Bayes estimators. *Journal of the Royal Statistical Society, Series C*
+#' 40(2), 283-294. \doi{10.2307/2347593}
+#'
+#' Anselin, L., Lozano, N. & Koschinsky, J. (2006). Rate transformations and
+#' smoothing. Spatial Analysis Laboratory, University of Illinois.
+#'
 #' @seealso [rate_check()], [per_capita()], [value_by_alpha_map()]
 #' @export
 #' @examples
@@ -203,7 +224,8 @@ rate_check <- function(data, numerator, denominator, min_denominator = NULL,
 #' )
 #' smooth_rates(d, cases, pop)
 smooth_rates <- function(data, numerator, denominator,
-                         method = c("eb", "none"), suffix = "_smoothed") {
+                         method = c("eb", "local_eb", "none"),
+                         suffix = "_smoothed", weights = NULL) {
   method <- rlang::arg_match(method)
   check_string(suffix, "suffix")
   num_name <- quo_arg_name(rlang::enquo(numerator), "numerator")
@@ -292,6 +314,28 @@ smooth_rates <- function(data, numerator, denominator,
   }
   sm <- rep(NA_real_, length(raw))
   shr <- rep(NA_real_, length(raw))
+  if (identical(method, "local_eb")) {
+    lost <- character(0)
+    for (p in unique(period[ok])) {
+      rows <- which(ok & period == p)
+      le <- local_eb(data[rows, , drop = FALSE], num_name, den_name, weights)
+      sm[rows] <- le$smoothed
+      shr[rows] <- le$shrinkage
+      lost <- union(lost, le$lost)
+    }
+    if (length(lost)) {
+      wdj_warn(c(
+        "{length(lost)} countr{?y/ies} ha{?s/ve} no neighbour with a usable
+         rate, so there is no neighbourhood to shrink toward:",
+        "*" = "{.val {utils::head(sort(lost), 8)}}",
+        "i" = "{.field {sm_col}} is {.val {NA}} there; {.code method = \"eb\"}
+               shrinks toward the global rate instead."
+      ), class = "countryatlas_no_neighbours")
+    }
+    data[[sm_col]] <- sm
+    data[[sh_col]] <- shr
+    return(wdj_return_frame(data))
+  }
   for (p in unique(period[ok])) {
     rows <- ok & period == p
     prior <- eb_prior(data[period == p, , drop = FALSE], num_name, den_name,
@@ -310,6 +354,39 @@ smooth_rates <- function(data, numerator, denominator,
   # grouped frame stayed grouped, and the caller's next mutate() then computed
   # per-group without asking. The eleven sibling verbs all normalise here.
   wdj_return_frame(data)
+}
+
+# Local empirical Bayes for one period's usable rows: each country's rate
+# shrunk toward its neighbourhood's (itself and its neighbours), with Marshall's
+# (1991) local moments -- the deviations are from the neighbourhood's own rate,
+# GeoDa's form, which spdep::EBlocal(geoda = TRUE) computes. Row-aligned with
+# `frame`; a country the weights give no usable neighbour is NA.
+local_eb <- function(frame, num_name, den_name, weights) {
+  frame$.wdj_rate <- frame[[num_name]] / frame[[den_name]]
+  one <- distinct_countries(tibble::as_tibble(sf_drop(frame)))
+  al <- suppressWarnings(align_weights(one, ".wdj_rate", weights))
+  keep <- al$iso3c
+  b <- (al$weights$m[keep, keep, drop = FALSE] > 0) * 1
+  diag(b) <- 1
+  at <- match(keep, one$iso3c)
+  y <- one[[num_name]][at]
+  x <- one[[den_name]][at]
+  p <- y / x
+  r_i <- as.numeric(b %*% y)
+  n_i <- as.numeric(b %*% x)
+  nbar <- n_i / rowSums(b)
+  m_i <- r_i / n_i
+  dev <- vapply(seq_along(keep), function(i) {
+    j <- which(b[i, ] > 0)
+    sum(x[j] * (p[j] - m_i[i])^2)
+  }, numeric(1))
+  a_i <- pmax(dev / n_i - m_i / nbar, 0)
+  denom <- a_i + m_i / x
+  w <- ifelse(denom > 0, a_i / denom, 0)
+  est <- m_i + (p - m_i) * w
+  idx <- match(frame$iso3c, keep)
+  list(smoothed = est[idx], shrinkage = w[idx],
+       lost = setdiff(unique(stats::na.omit(frame$iso3c)), keep))
 }
 
 # The empirical-Bayes hyperparameters for one period: the pooled rate `rbar`
@@ -429,13 +506,19 @@ deflate <- function(data, value, base_year, deflator = NULL,
     idx <- fetch_wdi(c(.wdj_defl = "NY.GDP.DEFL.ZS"),
                      start = min(data$year, na.rm = TRUE),
                      end = max(data$year, na.rm = TRUE))
-    data <- dplyr::left_join(data, idx[, c("iso3c", "year", ".wdj_defl")],
-                             by = c("iso3c", "year"), na_matches = "never")
+    data <- dplyr::left_join(data, one_per_key(idx[, c("iso3c", "year", ".wdj_defl")]),
+                             by = c("iso3c", "year"), na_matches = "never",
+                             relationship = "many-to-one")
     defl_name <- ".wdj_defl"
+    # The index is fetched for `year`; a value recorded as coming from
+    # another year is deflated with the wrong year's prices.
+    warn_mixed_years(data, val_name, "the deflator", yb = "year",
+                     what = "deflate")
   } else {
     defl_name <- quo_arg_name(defl_q, "deflator")
     check_cols(data, defl_name)
     check_numeric_col(data, defl_name)
+    warn_mixed_years(data, val_name, defl_name, what = "deflate")
   }
 
   # A country with no usable deflator in base_year has nothing to rebase
@@ -542,13 +625,17 @@ to_ppp <- function(data, value, factor = NULL, suffix = "_ppp") {
     idx <- fetch_wdi(c(.wdj_ppp = "PA.NUS.PPP"),
                      start = min(data$year, na.rm = TRUE),
                      end = max(data$year, na.rm = TRUE))
-    data <- dplyr::left_join(data, idx[, c("iso3c", "year", ".wdj_ppp")],
-                             by = c("iso3c", "year"), na_matches = "never")
+    data <- dplyr::left_join(data, one_per_key(idx[, c("iso3c", "year", ".wdj_ppp")]),
+                             by = c("iso3c", "year"), na_matches = "never",
+                             relationship = "many-to-one")
     fac_name <- ".wdj_ppp"
+    warn_mixed_years(data, val_name, "the PPP factor", yb = "year",
+                     what = "convert")
   } else {
     fac_name <- quo_arg_name(fac_q, "factor")
     check_cols(data, fac_name)
     check_numeric_col(data, fac_name)
+    warn_mixed_years(data, val_name, fac_name, what = "convert")
   }
   fac <- data[[fac_name]]
   new <- paste0(val_name, suffix)
@@ -750,7 +837,8 @@ convergence_club <- function(data, value, min_size = 2, alpha = 0.05) {
     club = c(unname(clubs), rep(NA_integer_, length(incomplete))))
   st <- if (length(stats_out)) dplyr::bind_rows(stats_out) else
     tibble::tibble(club = integer(0), n = integer(0), log_t = numeric(0))
-  out <- dplyr::left_join(out, st[, c("club", "log_t")], by = "club")
+  out <- dplyr::left_join(out, st[, c("club", "log_t")], by = "club",
+                          relationship = "many-to-one")
   attr(out, "countryatlas_clubs") <- st
   dplyr::arrange(out, .data$club, .data$iso3c)
 }
@@ -789,4 +877,163 @@ log_t_stat <- function(y) {
   # HAC would be the textbook choice; the plain t is adequate at these lengths
   # and keeps the dependency footprint at zero.
   unname(cf[2, 3])
+}
+
+# The control limit at probability P for a denominator d around rate
+# `target`: the exact Poisson quantile, interpolated between counts
+# (Spiegelhalter 2005, appendix A.1.1), or with additive overdispersion
+# tau2 > 0 the normal limit on the rate scale.
+funnel_limit <- function(d, P, target, tau2 = 0) {
+  if (tau2 > 0) return(target + stats::qnorm(P) * sqrt(target / d + tau2))
+  E <- target * d
+  r <- stats::qpois(P, E)
+  num <- stats::ppois(r, E) - P
+  den <- stats::ppois(r, E) - stats::ppois(r - 1, E)
+  (r - ifelse(den > 0, num / den, 0)) / d
+}
+
+#' A funnel plot for rates
+#'
+#' Each country's rate against its denominator, inside control limits for the
+#' rate a country of that size would show by chance alone. A small country's
+#' extreme rate falls inside the wide mouth of the funnel; a large country
+#' outside the narrow neck is a real outlier. It completes the rates set:
+#' [rate_check()] flags the unreliable rates, [smooth_rates()] shrinks them,
+#' `rate_funnel()` shows them, [value_by_alpha_map()] maps them.
+#'
+#' @param data A country-level frame with `iso3c`.
+#' @param numerator,denominator The counts and their population at risk
+#'   (unquoted).
+#' @param target The rate the limits are drawn around; `NULL` (default) is
+#'   the pooled rate, `sum(numerator) / sum(denominator)`.
+#' @param limits The coverage of the inner and outer limits (default
+#'   `c(0.95, 0.998)`, Spiegelhalter's "two and three sigma").
+#' @param overdispersion If `TRUE`, widen the limits by the additive
+#'   random-effects adjustment (Spiegelhalter 2005), for rates that vary
+#'   between countries far more than Poisson noise allows -- the usual case
+#'   for country data, where a funnel with exact limits flags most countries.
+#' @param label_outliers Label the countries outside the outer limit with their
+#'   ISO code (default `TRUE`).
+#'
+#' @return A `ggplot`, with the per-country table attached as the
+#'   `"countryatlas_funnel"` attribute: `iso3c`, the two columns, `rate`, `z`
+#'   (the standardised deviation) and `flag` (`"within"`, `"above 95%"`,
+#'   `"above 99.8%"`, `"below 95%"` or `"below 99.8%"`, named after `limits`).
+#'
+#' @section The limits:
+#' For a denominator \eqn{d} the expected count is \eqn{E = t d}, and the
+#' limit at probability \eqn{P} is the exact Poisson quantile, interpolated
+#' so the funnel is smooth: with \eqn{r = F^{-1}(P; E)},
+#' \eqn{y_P = r - (F(r; E) - P) / (F(r; E) - F(r - 1; E))}, and the rate limit
+#' is \eqn{y_P / d}. With `overdispersion = TRUE` the limits are
+#' \eqn{t \pm z_P \sqrt{t / d + \tau^2}}, \eqn{\tau^2} estimated from the
+#' winsorised z-scores.
+#'
+#' @references
+#' Spiegelhalter, D. J. (2005). Funnel plots for comparing institutional
+#' performance. *Statistics in Medicine* 24(8), 1185-1202.
+#' \doi{10.1002/sim.1970}
+#' @seealso [rate_check()], [smooth_rates()]
+#' @export
+#' @examples
+#' set.seed(1)
+#' d <- data.frame(iso3c = c("CHN", "IND", "FRA", "TUV", "NRU", "MLT"),
+#'                 pop = c(1.41e9, 1.39e9, 6.8e7, 1.1e4, 1.2e4, 5.3e5))
+#' d$deaths <- stats::rpois(nrow(d), d$pop * 0.008)
+#' rate_funnel(d, deaths, pop)
+rate_funnel <- function(data, numerator, denominator, target = NULL,
+                        limits = c(0.95, 0.998), overdispersion = FALSE,
+                        label_outliers = TRUE) {
+  num_name <- quo_arg_name(rlang::enquo(numerator), "numerator")
+  den_name <- quo_arg_name(rlang::enquo(denominator), "denominator")
+  check_bool(overdispersion, "overdispersion")
+  check_bool(label_outliers, "label_outliers")
+  if (!is.numeric(limits) || length(limits) != 2L || anyNA(limits) ||
+      any(limits <= 0 | limits >= 1) || limits[1] >= limits[2]) {
+    wdj_abort(c("{.arg limits} must be two increasing probabilities in (0, 1).",
+                "x" = "Got {.val {limits}}."))
+  }
+  check_cols(data, c("iso3c", num_name, den_name))
+  check_numeric_col(data, num_name)
+  check_numeric_col(data, den_name)
+  df <- distinct_countries(tibble::as_tibble(sf_drop(data)))
+  y <- df[[num_name]]
+  x <- df[[den_name]]
+  ok <- is.finite(y) & y >= 0 & is.finite(x) & x > 0
+  if (sum(ok) < 2L) {
+    wdj_abort("A funnel needs at least two countries with a usable count and
+               denominator.")
+  }
+  if (any(!ok)) {
+    wdj_warn("{sum(!ok)} countr{?y/ies} without a usable count or denominator
+              {?is/are} left out.", class = "countryatlas_unusable_rows")
+  }
+  df <- df[ok, , drop = FALSE]
+  y <- y[ok]
+  x <- x[ok]
+  if (is.null(target)) target <- sum(y) / sum(x)
+  check_number(target, "target", lo = 0)
+  rate <- y / x
+  tau2 <- 0
+  if (isTRUE(overdispersion)) {
+    z0 <- (rate - target) / sqrt(target / x)
+    q <- stats::quantile(z0, c(0.1, 0.9), names = FALSE)
+    zw <- pmin(pmax(z0, q[1]), q[2])
+    n <- length(zw)
+    phi <- mean(zw^2)
+    w <- x / target
+    if (n * phi > n - 1) tau2 <- (n * phi - (n - 1)) / (sum(w) - sum(w^2) / sum(w))
+  }
+  lim_at <- function(d, P) funnel_limit(d, P, target, tau2)
+  grid <- exp(seq(log(min(x)), log(max(x)), length.out = 200))
+  probs <- c((1 - limits) / 2, 1 - (1 - limits) / 2)
+  curves <- do.call(rbind, lapply(seq_along(probs), function(k) {
+    data.frame(d = grid, rate = pmax(lim_at(grid, probs[k]), 0),
+               limit = rep(sprintf("%g%%", 100 * limits[(k - 1) %% 2 + 1]),
+                           length(grid)),
+               side = if (k > 2) "upper" else "lower", id = k)
+  }))
+  inner <- sprintf("%g%%", 100 * limits[1])
+  outer <- sprintf("%g%%", 100 * limits[2])
+  hi_out <- rate > lim_at(x, probs[4])
+  hi_in <- rate > lim_at(x, probs[3])
+  lo_out <- rate < lim_at(x, probs[2])
+  lo_in <- rate < lim_at(x, probs[1])
+  flag <- ifelse(hi_out, paste("above", outer), ifelse(hi_in, paste("above", inner),
+          ifelse(lo_out, paste("below", outer), ifelse(lo_in, paste("below", inner),
+          "within"))))
+  tab <- tibble::tibble(iso3c = df$iso3c, "{num_name}" := y, "{den_name}" := x,
+                        rate = rate,
+                        z = (rate - target) / sqrt(target / x + tau2),
+                        flag = flag)
+  pts <- data.frame(d = x, rate = rate, iso3c = df$iso3c,
+                    out = hi_out | lo_out)
+  p <- ggplot2::ggplot() +
+    ggplot2::geom_line(data = curves,
+                       ggplot2::aes(.data$d, .data$rate, group = .data$id,
+                                    linetype = .data$limit),
+                       colour = "grey40", linewidth = 0.4) +
+    ggplot2::geom_hline(yintercept = target, colour = "grey20", linewidth = 0.5) +
+    ggplot2::geom_point(data = pts, ggplot2::aes(.data$d, .data$rate,
+                                                 colour = .data$out),
+                        size = 1.8) +
+    ggplot2::scale_x_log10(name = den_name, labels = scales_format()) +
+    ggplot2::scale_colour_manual(values = c(`FALSE` = "grey35", `TRUE` = "#B2182B"),
+                                 guide = "none") +
+    ggplot2::scale_linetype_manual(name = "Control limit",
+                                   values = stats::setNames(c("dashed", "solid"),
+                                                            c(inner, outer))) +
+    ggplot2::labs(y = paste0(num_name, " per ", den_name),
+                  caption = sprintf("Target %s; %d of %d countries outside the %s limits%s.",
+                                    format(signif(target, 3)), sum(hi_out | lo_out),
+                                    nrow(tab), outer,
+                                    if (tau2 > 0) ", adjusted for overdispersion" else "")) +
+    ggplot2::theme_minimal()
+  if (isTRUE(label_outliers) && any(pts$out)) {
+    p <- p + ggplot2::geom_text(data = pts[pts$out, , drop = FALSE],
+                                ggplot2::aes(.data$d, .data$rate, label = .data$iso3c),
+                                size = 2.6, vjust = -0.7, colour = "#B2182B")
+  }
+  attr(p, "countryatlas_funnel") <- tab
+  p
 }

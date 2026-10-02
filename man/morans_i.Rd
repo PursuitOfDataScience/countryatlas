@@ -4,7 +4,7 @@
 \alias{morans_i}
 \title{Global Moran's I (spatial autocorrelation)}
 \usage{
-morans_i(data, value, scale = "small", n_perm = 999, weights = NULL)
+morans_i(data, value, scale = deprecated(), n_perm = 999, weights = NULL)
 }
 \arguments{
 \item{data}{A country-level data frame with \code{iso3c} (map-ready frames are
@@ -12,14 +12,17 @@ reduced to one row per country first).}
 
 \item{value}{The value column (unquoted).}
 
-\item{scale}{Natural Earth resolution for the default contiguity adjacency
-(see \code{\link[=country_borders]{country_borders()}}). Ignored when \code{weights} is supplied.}
+\item{scale}{\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}} The Natural Earth resolution
+of the contiguity weights that were the default before 4.0.0. Supplying it
+still builds them, with a warning; write
+\code{weights = country_weights("contiguity", scale = )} instead.}
 
 \item{n_perm}{Number of permutations for the pseudo-p-value (default \code{999};
 use \code{0} to skip the test, which leaves \code{p_value} as \code{NA}).}
 
-\item{weights}{A \code{\link[=country_weights]{country_weights()}} object. Defaults to land-border
-contiguity, row-standardised -- which excludes every island. See below.}
+\item{weights}{A \code{\link[=country_weights]{country_weights()}} object. \code{NULL} (default) uses
+\code{country_weights("knn", k = 5)}, row-standardised, so every country with
+data and a centroid takes part. See below.}
 }
 \value{
 A one-row tibble: \code{i} (observed Moran's I), \code{expected}
@@ -38,17 +41,18 @@ countries the dense arithmetic is trivial.
 }
 \section{Which countries are left out}{
 
-The default weights are land-border contiguity, and an island has no land
-border -- so any country with no land neighbour \emph{present in \code{data}} drops out
-entirely. On the bundled \link{world_snapshot} that is around a quarter of the
-countries with data: Japan, the United Kingdom, Australia, Indonesia,
-Madagascar, New Zealand, the Philippines, Iceland, Cuba, Sri Lanka and every
-small island state. The omission is systematic rather than random.
+The default weights are the five nearest neighbours, so every country with
+data and a bundled centroid takes part. Land-border contiguity, the default
+before 4.0.0, is still available and still systematic in what it drops: an
+island has no land border, so any country with no land neighbour \emph{present
+in \code{data}} leaves the statistic -- Japan, the United Kingdom, Australia,
+Indonesia, Madagascar, New Zealand, the Philippines, Iceland, Cuba, Sri Lanka
+and every small island state. On the bundled \link{world_snapshot}'s GDP per
+capita that changes the answer, not only the sample: see the numbers in the
+example below. \code{n_excluded} and \code{excluded} report who is left out under
+either scheme:
 
-\code{n_excluded} and \code{excluded} report it, and \code{\link[=country_weights]{country_weights()}} fixes it --
-\code{"knn"} and \code{"distance"} give every country neighbours:
-
-\if{html}{\out{<div class="sourceCode r">}}\preformatted{morans_i(snap, gdp_per_capita, weights = country_weights("knn", k = 5))
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{morans_i(snap, gdp_per_capita, weights = country_weights("contiguity"))
 }\if{html}{\out{</div>}}
 }
 

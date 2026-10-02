@@ -25,9 +25,18 @@ distortion ellipses for a projection and takes no data of yours.}
 \value{
 A one-row tibble of provenance fields, invisibly printed in a
 human-readable block. Fields: \code{countryatlas}, \code{fill}, \code{backend},
-\code{projection}, \code{style}, \code{n_bins}, \code{na_style}, \code{n_countries}, \code{n_missing},
-\code{n_total}, \code{uncertainty}, \code{disputes}, \code{dispute_policy}, \code{n_imputed},
-\code{breaks}, \code{missing_iso3c} and \code{snapshot_year}.
+\code{projection}, \code{style}, \code{modified}, \code{n_bins}, \code{na_style}, \code{n_countries},
+\code{n_missing}, \code{n_total}, \code{uncertainty}, \code{disputes}, \code{dispute_policy},
+\code{worldview}, \code{n_imputed}, \code{breaks}, \code{missing_iso3c}, \code{snapshot_year}, and
+\code{sources}, the
+\code{\link[=source_info]{source_info()}} record of the fill column when the data carried one --
+which the print names: "World Bank WDI NY.GDP.PCAP.KD (constant 2015
+US$), release 2026-07, fetched 2026-10-01".
+
+\code{projection} and \code{style} describe the plot as it is now, read from its
+coordinate system and fill scale: a map given \code{+ coord_sf(crs = 3035)}
+after the verb drew it reports \code{"custom"}, and \code{modified = TRUE} says the
+plot no longer matches what the verb recorded.
 
 The three counts are: \code{n_countries}, the countries actually drawn with a
 value; \code{n_missing}, those drawn without one; and \code{n_total}, the two added
@@ -57,11 +66,9 @@ attr(p, "countryatlas_classification")
 \examples{
 \donttest{
 snap <- countryatlas::world_snapshot$countries
-if (requireNamespace("maps", quietly = TRUE)) {
-  p <- attach_geometry(snap, geometry = "polygon") |>
-    world_map(gdp_per_capita, style = "quantile")
-  map_provenance(p)
-}
+p <- attach_geometry(snap, geometry = "polygon") |>
+  world_map(gdp_per_capita, style = "quantile")
+map_provenance(p)
 }
 }
 \seealso{

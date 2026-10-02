@@ -11,3 +11,5 @@ inst/doc
 __pycache__/
 *.pyc
 Rplots.pdf
+next_release.md
+tests/testthat/_snaps/visual-regression/

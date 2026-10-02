@@ -20,7 +20,18 @@
 #'   (requires the optional `stringdist` package; default `TRUE`).
 #'
 #' @return A tibble with columns `input`, `iso3c`, `matched`, `historical`,
-#'   `suggestion`.
+#'   `method` and `suggestion`. `method` says how a name was matched, tier by
+#'   tier, each tried only for what is still unmatched: `"override"` (the
+#'   [country_overrides()] table), `"regex_en"` (countrycode's English
+#'   patterns), `"name_de"`, `"name_es"`, `"name_fr"` and `"name_it"` (an
+#'   exact match, ignoring case, accents and punctuation, against
+#'   countrycode's German, Spanish, French and Italian names), `"cldr"` (the
+#'   same against every name, short name and variant in the Unicode CLDR
+#'   tables countrycode carries, in every language), `"ambiguous"` (a CLDR
+#'   name for more than one country, which is left unmatched) or `"none"`.
+#'   Exact rather than countrycode's language patterns, which are unanchored
+#'   and matched Somaliland to Somalia. For an `origin` other than a name it
+#'   is `"code"`.
 #' @export
 #' @seealso [dissolve_country()] for resolving the entities this flags as
 #'   `historical` to their successor states, and [repair_country_names()] for
@@ -38,7 +49,11 @@ check_country_match <- function(x,
   # the guard inside wdj_to_iso3c() below never saw the frame.
   check_country_vector(x)
   x <- as.character(x)
-  iso3c <- wdj_to_iso3c(x, origin = origin, custom_match = custom_match)
+  res <- wdj_to_iso3c(x, origin = origin, custom_match = custom_match,
+                      with_method = TRUE)
+  iso3c <- res$iso3c
+  method <- if (identical(origin, "country.name")) res$method else
+    ifelse(is.na(iso3c), "none", "code")
   matched <- !is.na(iso3c)
   historical <- normalize_historical(x) %in% names(historical_aliases())
 
@@ -74,6 +89,7 @@ check_country_match <- function(x,
     iso3c = iso3c,
     matched = matched,
     historical = historical,
+    method = method,
     suggestion = suggestion
   )
 }
@@ -112,9 +128,9 @@ check_country_match <- function(x,
 #'   counted, not everything present. That is the opposite orientation from
 #'   [map_provenance()], whose `n_countries` is the numerator (countries drawn
 #'   *with* a value) and whose `n_total` is the denominator. The two verbs
-#'   report the same coverage from opposite ends, so on 215 countries with 24
-#'   missing this gives `n = 215` where `map_provenance()` gives
-#'   `n_countries = 191`.
+#'   report the same coverage from opposite ends, so on 216 countries with 17
+#'   missing this gives `n = 216` where `map_provenance()` gives
+#'   `n_countries = 199`.
 #' @export
 #' @examples
 #' audit_coverage(countryatlas::world_snapshot$countries)
@@ -234,10 +250,12 @@ audit_coverage <- function(data,
 #'   default threshold. Neither metric is uniformly better -- Jaro-Winkler also
 #'   repairs `"Maroco"` to Monaco rather than Morocco -- which is the real
 #'   reason to check the reported substitutions rather than to trust either.
-#'   `verbose = TRUE` (the default) prints them, and they are attached as the
+#'   `quiet = FALSE` (the default) prints them, and they are attached as the
 #'   `"repairs"` attribute for programmatic checking.
 #' @param origin countrycode origin scheme (default `"country.name"`).
-#' @param verbose Whether to message the substitutions made (default `TRUE`).
+#' @param quiet If `TRUE`, do not message the substitutions made (default
+#'   `FALSE`), as [audit_time_coverage()] and [check_dispute_coverage()] say it.
+#' @param verbose `r lifecycle::badge("deprecated")` Use `quiet` (inverted).
 #'
 #' @return A character vector the same length as `x`, with confident misses
 #'   replaced by the closest known country name (others left unchanged). The
@@ -249,8 +267,16 @@ audit_coverage <- function(data,
 #' @examples
 #' repair_country_names(c("United States", "Brzil", "Germny"))
 repair_country_names <- function(x, threshold = 0.2, origin = "country.name",
-                                 verbose = TRUE) {
-  check_bool(verbose, "verbose")
+                                 quiet = FALSE, verbose = deprecated()) {
+  if (lifecycle::is_present(verbose)) {
+    lifecycle::deprecate_warn("4.0.0", "repair_country_names(verbose)",
+                              "repair_country_names(quiet)",
+                              details = "`quiet` is the inverse: `verbose = FALSE` is `quiet = TRUE`.")
+    check_bool(verbose, "verbose")
+    quiet <- !verbose
+  }
+  check_bool(quiet, "quiet")
+  verbose <- !quiet
   check_number(threshold, "threshold", lo = 0, hi = 1)
   # Before as.character(), for the same reason as check_country_match(): this
   # coerces first, so the guard there never saw the frame either.

@@ -10,7 +10,8 @@ country_join_all(
   origin = "country.name",
   type = c("full", "left", "inner"),
   key = c("iso3c", "cowc", "cown", "gwn"),
-  warn = TRUE
+  warn = TRUE,
+  also_by = NULL
 )
 }
 \arguments{
@@ -31,6 +32,11 @@ cannot carry.}
 
 \item{warn}{Whether to report values that resolve to no country (default
 \code{TRUE}), per table, as \code{\link[=country_join]{country_join()}} does per side.}
+
+\item{also_by}{Key columns to join on besides the country, present in every
+table. \code{NULL} (default) joins on \code{year} as well wherever both sides of a
+step have one, as \code{\link[=country_join]{country_join()}} does; \code{character()} joins on the
+country alone. See \emph{Panels} in \code{\link[=country_join]{country_join()}}.}
 }
 \value{
 A single tibble joined on \code{key} (clashing non-key columns get

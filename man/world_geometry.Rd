@@ -11,18 +11,23 @@ world_geometry(
   region = NULL,
   projection = "equal_earth",
   recenter = NULL,
-  year = NULL
+  year = NULL,
+  worldview = NULL
 )
 }
 \arguments{
 \item{what}{What to return: \code{"countries"} (default), \code{"centroids"},
 \code{"coastline"}, \code{"borders"}, \code{"graticule"} or \code{"ocean"}.}
 
-\item{geometry}{\code{"polygon"} (a tibble of \code{long}/\code{lat}/\code{group}) or \code{"sf"}.}
+\item{geometry}{\code{"polygon"} (a tibble of \code{long}/\code{lat}/\code{group}: the bundled
+Natural Earth 1:50m countries, which need no extra package) or \code{"sf"}.
+\code{"maps"} draws the polygon backend from the \code{maps} package as releases
+before 4.0.0 did; it is deprecated.}
 
-\item{scale}{Natural Earth resolution for the \code{sf} backend. The polygon
-backend serves one bundled resolution and warns if asked for another:
-\code{"small"} (110m), \code{"medium"} (50m) or \code{"large"} (10m). \code{"large"}
+\item{scale}{Natural Earth resolution for the \code{sf} backend:
+\code{"small"} (110m), \code{"medium"} (50m) or \code{"large"} (10m). The polygon
+backend draws its one bundled resolution, 1:50m, and warns if asked for
+\code{"large"}. \code{"large"}
 additionally needs the \code{rnaturalearthhires} package, which is not on CRAN
 (\verb{install.packages("rnaturalearthhires", repos =}
 \verb{"https://ropensci.r-universe.dev")}); \code{"small"} and \code{"medium"} need
@@ -37,15 +42,25 @@ only drop the vertices outside the box, which leaves a country straddling
 the edge with an approximate outline, so it warns.}
 
 \item{projection}{Projection for the \code{sf} backend (see \code{\link[=world_map]{world_map()}}). The
-polygon backend returns unprojected longitude/latitude and warns if asked
-to project.}
+polygon backend returns longitude/latitude, which the map verbs project
+when they draw, and warns if asked to project here.}
 
-\item{recenter}{Optional central meridian (e.g. \code{150}) for the \code{sf} backend.
-The polygon backend cannot recentre and warns if asked to.}
+\item{recenter}{Optional central meridian (e.g. \code{150}). On the polygon
+backend every ring is cut at the new antimeridian and shifted, so the
+longitudes run from \code{recenter - 180} to \code{recenter + 180}.}
 
 \item{year}{Draw the world as it was in this year, via \code{\link[=historical_geometry]{historical_geometry()}}
 and CShapes (1886-2019). Returns \code{sf} keyed on \code{gwcode}; only
 \code{what = "countries"} is available, and \code{region} cannot be combined with it.}
+
+\item{worldview}{Draw the boundaries as one country's government draws
+them: the viewing country's ISO alpha-3 code (\code{"IND"}, \code{"CHN"}, ...) or
+\code{"ISO"}, for one of the 31 points of view Natural Earth publishes. Needs
+\code{geometry = "sf"}; the file is Natural Earth's 1:10m, downloaded once
+(about 5 MB) into the package's cache. \code{NULL} (default) is the worldview
+set with \code{\link[=dispute_policy]{dispute_policy()}}, if any, and otherwise Natural Earth's own
+de facto boundaries. The package takes no position: you choose, and
+\code{\link[=map_provenance]{map_provenance()}} records the choice.}
 }
 \value{
 A tibble (polygon backend) or \code{sf} object (sf backend), with columns
@@ -76,7 +91,9 @@ The other three azimuthal projections
 (\code{"azimuthal_equal_area"}, \code{"north_polar"}, \code{"south_polar"}) are Lambert
 equal-area and draw the \emph{whole} globe, the far side stretched around the
 rim rather than dropped, so pass \code{region} if you want a polar view of the
-northern countries alone.
+northern countries alone. \code{"north_polar"} leaves out what lies wholly
+south of 60 degrees S (Antarctica), whose pole is its antipode: an empty
+geometry on the sf backend, no rows on the polygon backend.
 
 \code{"ocean"} is a whole-globe background rectangle. It is unavailable in all
 four azimuthal projections -- \code{"orthographic"} has no image for it, and the
@@ -92,8 +109,6 @@ the plotting functions sit on, exposed for power users.
 }
 \examples{
 \donttest{
-if (requireNamespace("maps", quietly = TRUE)) {
-  head(world_geometry("countries", geometry = "polygon"))
-}
+head(world_geometry("countries", geometry = "polygon"))
 }
 }

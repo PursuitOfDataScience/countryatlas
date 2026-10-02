@@ -32,8 +32,28 @@ navbar:
         href: articles/honest-maps.html
       - text: countryatlas and ggsql
         href: articles/countryatlas-and-ggsql.html
+      - text: "Panels done right"
+        href: articles/panels.html
+      - text: "Data you can trace: sources, vintages and provenance"
+        href: articles/data-you-can-trace.html
       - text: "Full introduction (formal)"
         href: articles/countryatlas.html
+      - text: -------
+      - text: "More, on the website"
+      - text: Gallery
+        href: articles/gallery.html
+      - text: Spatial statistics on a world of islands
+        href: articles/spatial-statistics.html
+      - text: Rates and small numbers
+        href: articles/rates-and-small-numbers.html
+      - text: The comparative-development toolkit
+        href: articles/comparative-development.html
+      - text: Disputed territories and worldviews
+        href: articles/disputed-territories.html
+      - text: Flows, networks and subnational data
+        href: articles/flows-networks-subnational.html
+      - text: Accessible and citable maps
+        href: articles/accessible-maps.html
 
 reference:
 - title: Core data assembly
@@ -60,6 +80,10 @@ reference:
   - add_indicator
   - compare_sources
   - source_adapters
+  - fetch_sdmx
+  - source_info
+  - wdi_vintages
+  - compare_vintages
   - clear_country_cache
 
 - title: Time
@@ -95,6 +119,7 @@ reference:
   - country_codes
   - country_groups
   - in_group
+  - classify_countries
   - wdi_search
 
 - title: Analysis helpers
@@ -102,11 +127,13 @@ reference:
   - per_capita
   - rate_check
   - smooth_rates
+  - rate_funnel
   - deflate
   - to_ppp
   - interpolate_missing
   - convergence_club
   - aggregate_regions
+  - aggregate_groups
   - rank_countries
   - complete_years
   - growth_rate
@@ -118,6 +145,10 @@ reference:
   - sigma_convergence
   - gini
   - theil
+  - inequality
+  - transition_matrix
+  - spatial_markov
+  - rank_mobility
 
 - title: Spatial statistics
   desc: >
@@ -127,11 +158,14 @@ reference:
   contents:
   - country_weights
   - morans_i
+  - eb_morans_i
   - local_morans
+  - bivariate_lisa
   - lisa_map
   - gearys_c
   - getis_ord
   - spatial_lag
+  - join_counts
 
 - title: Visualization
   desc: A full vocabulary of projected, area-honest maps.
@@ -143,9 +177,11 @@ reference:
   - bubble_map
   - spike_map
   - bivariate_map
+  - ternary_map
   - cartogram_map
   - dorling_map
   - tile_map
+  - tile_trend_map
   - flow_map
   - animate_world
   - interactive_map
@@ -153,6 +189,8 @@ reference:
   - gridded_cartogram
   - geom_country_labels
   - theme_world_map
+  - zoom_map
+  - project_lonlat
   - simplify_geometry
 
 - title: Honest maps
@@ -168,6 +206,9 @@ reference:
   - tissot_map
   - cartogram_diagnostics
   - map_provenance
+  - map_alt_text
+  - map_citation
+  - check_palette
   - dispute_policy
   - check_dispute_coverage
 
@@ -199,7 +240,7 @@ reference:
   - as_ggsql_source
   - world_query
 
-- title: Performance & caching
+- title: Deprecated
   contents:
   - clear_wdi_cache
 
@@ -212,6 +253,7 @@ reference:
   - world_tiles
   - historical_codes
   - country_groups_history
+  - country_classifications
   - disputed_territories
 
 - title: Package

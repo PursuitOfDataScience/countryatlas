@@ -4,7 +4,7 @@
 \alias{theil}
 \title{Theil index, with between/within decomposition}
 \usage{
-theil(x, weights = NULL, groups = NULL, na.rm = TRUE)
+theil(x, weights = NULL, groups = NULL, na.rm = TRUE, type = c("T", "L"))
 }
 \arguments{
 \item{x}{A positive numeric vector (log scale; zero/negative values are
@@ -17,11 +17,16 @@ same length as \code{x} or length 1.}
 \code{x} (or length 1). When supplied, the decomposition is returned instead of
 the scalar. A row whose group is missing is dropped along with the rows
 whose value is missing, so the decomposition's \code{total} is computed over the
-grouped subset and can differ from the ungrouped \code{theil(x)}. For
-\code{world_snapshot}, Puerto Rico has no \code{region}, which is the whole of the
-difference there.}
+grouped subset and can differ from the ungrouped \code{theil(x)}.}
 
 \item{na.rm}{Whether to drop \code{NA} values (default \code{TRUE}).}
+
+\item{type}{\code{"T"} (default) or \code{"L"}. T is \eqn{\sum_i s_i (x_i/\mu)
+  \log(x_i/\mu)} with population shares \eqn{s_i}; L is \eqn{\sum_i s_i
+  \log(\mu/x_i)}. Their decompositions differ: T's within-group term
+weights each group by its share of income, L's by its share of
+population, which is why L's between and within parts do not depend on
+the order in which they are taken out.}
 }
 \value{
 Without \code{groups}: a single non-negative number (\code{0} = perfect
@@ -36,11 +41,13 @@ missing value or group), the result is a single \code{NA} whatever \code{groups}
 says, so reach for the components only after checking \code{is.data.frame()}.
 }
 \description{
-The Theil T inequality index -- less famous than Gini, but it decomposes
+The Theil inequality indices -- less famous than Gini, but they decompose
 \emph{exactly} into a between-group and a within-group component, answering "how
 much of world inequality is between continents vs within them?" in one
 call. Weight by population to describe inequality between people rather
-than between country units.
+than between country units. \code{type = "T"} (default) is Theil's T, weighted
+by income shares; \code{type = "L"} is Theil's L, the mean log deviation,
+weighted by population shares, whose decomposition is path-independent.
 }
 \examples{
 snap <- countryatlas::world_snapshot$countries

@@ -1,0 +1,32 @@
+---
+title: "Flows, networks and subnational data"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", message = FALSE,
+                      warning = FALSE, fig.width = 8, fig.height = 3.6, dpi = 96)
+library(countryatlas)
+```
+
+Origin-destination data -- trade, migration, remittances -- keys on two
+countries per row. `flow_matrix()` and `country_network()` reconcile both ends
+on the ISO spine; `flow_map()` and `od_map()` draw them.
+
+```{r}
+od <- data.frame(from = c("China", "China", "Germany", "United States"),
+                 to = c("United States", "Japan", "France", "Mexico"),
+                 value = c(500, 200, 80, 300))
+flow_matrix(od, from, to, value)
+```
+
+```{r, fig.alt = "Great-circle arcs between four pairs of countries."}
+flow_map(od, from, to, value)
+```
+
+```{r, fig.height = 2.4, fig.alt = "One small map per origin, shading each destination by flow."}
+od_map(od, from, to, value, origins = 2)
+```
+
+Below the country, `standardize_subnational()`, `nuts_geometry()` and
+`subnational_map()` do the same for regions (NUTS in Europe, ISO 3166-2
+elsewhere); see their help pages.

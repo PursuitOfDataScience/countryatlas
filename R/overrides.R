@@ -2,8 +2,9 @@
 
 #' Curated country-name overrides (replaces the silent drop-list)
 #'
-#' A documented `custom_match` table for entities that map backends
-#' ([ggplot2::map_data()] and Natural Earth) get wrong or leave without an ISO
+#' A documented `custom_match` table for entities that geometry sources
+#' (Natural Earth, and the `maps` package's 2013 copy of it) and data
+#' providers spell in ways name matching gets wrong or leaves without an ISO
 #' code. Earlier versions of the package *deleted* these regions; now they are
 #' *matched* instead, so they stop silently disappearing from maps.
 #'
@@ -45,27 +46,13 @@
 #' @return A named character vector suitable for `countrycode(custom_match=)`.
 #' @export
 #' @examples
-#' # `country_overrides()` is the current name; `wdj_overrides()` warns.
 #' country_overrides()
 #' country_overrides(c(Somaliland = "SOM"))
-wdj_overrides <- function(extra = NULL) {
-  # Soft-deprecated in 2.0.0, and now a real warning: the cycle has run a full
-  # release and an interactive-only note never reaches the scripts that are
-  # actually still calling it. The note belongs to *this* name only -- it used to
-  # live in the shared body, so it fired for country_overrides(), the
-  # replacement it recommends, and for every public function that takes
-  # `overrides = country_overrides()` as a default.
-  wdj_warn(
-    c("{.fn wdj_overrides} is deprecated; use {.fn country_overrides} instead.",
-      "i" = "The two return the same table. {.fn wdj_overrides} is a holdover
-             from the {.pkg worlddatajoin} name and will be removed."),
-    class = "deprecatedWarning", .frequency = "once",
-    .frequency_id = "wdj_overrides-deprecated"
-  )
+country_overrides <- function(extra = NULL) {
   build_overrides(extra)
 }
 
-# The override table itself, with no deprecation notice attached.
+# The override table itself. country_overrides() is its public face.
 build_overrides <- function(extra = NULL, call = rlang::caller_env()) {
   base <- c(
     # map_data("world") spellings the legacy code used to drop.
@@ -96,7 +83,10 @@ build_overrides <- function(extra = NULL, call = rlang::caller_env()) {
     "Virgin Islands, U.S." = "VIR",
     "British Virgin Islands" = "VGB",
     "Channel Islands"  = "GBR",
-    "Kosovo, Republic of" = "XKX"
+    "Kosovo, Republic of" = "XKX",
+    # The World Bank API's name for Nauru since its 2026 releases (the Nauruan
+    # name), which countrycode does not recognise.
+    "Naoero"           = "NRU"
   )
   if (!is.null(extra)) {
     nms <- names(extra)                    # capture before as.character()
@@ -148,17 +138,6 @@ build_overrides <- function(extra = NULL, call = rlang::caller_env()) {
     base[nms] <- extra
   }
   base
-}
-
-#' @description
-#' `country_overrides()` is the current name, as of the package's rename to
-#' countryatlas. **`wdj_overrides()` is deprecated** and warns once per session;
-#' it returns the same table and will be removed. The help page kept describing
-#' it as "a backward-compatible alias" after the code had started warning.
-#' @rdname wdj_overrides
-#' @export
-country_overrides <- function(extra = NULL) {
-  build_overrides(extra)
 }
 
 # Small fallback table for ISO3c codes that `countrycode` does not classify

@@ -163,7 +163,7 @@ remove_country_source <- function(source) {
       "x" = "Got {.obj_type_friendly {source}}."
     ))
   }
-  builtin <- c("wdi", "owid", "eurostat", "oecd", "comtrade")
+  builtin <- c("wdi", "owid", "eurostat", "oecd", "comtrade", "imf", "ilo")
   protected <- intersect(source, builtin)
   if (length(protected)) {
     wdj_abort(c(
@@ -233,8 +233,10 @@ country_sources <- function() {
 # question about installation is both wasteful and -- for comtradr, which
 # creates a cache directory in .onLoad -- a write to the user's home filespace.
 source_available <- function(name) {
-  pkg <- switch(name, wdi = "WDI", owid = "owidR", eurostat = "eurostat",
-                oecd = "OECD", comtrade = "comtradr", NULL)
+  # OWID, the OECD, the IMF and the ILO need nothing installed: their APIs are
+  # read with the package's own client.
+  pkg <- switch(name, wdi = "WDI", eurostat = "eurostat",
+                comtrade = "comtradr", NULL)
   if (is.null(pkg)) TRUE else pkg_installed(pkg)
 }
 
@@ -262,9 +264,13 @@ get_source <- function(source, call = rlang::caller_env()) {
 #'   as in [world_data()]: `c(gdp = "NY.GDP.PCAP.KD")`.
 #' @param countries Optional `iso3c` vector; `NULL` (default) for all.
 #' @param years Optional numeric year vector; `NULL` for the provider's default.
+#' @param vintage For `source = "wdi"`, the release of the World Development
+#'   Indicators to read; see [world_data()]. Other sources have no releases to
+#'   pin and refuse it.
 #' @param ... Passed to the source's own `fetch` function.
 #'
-#' @return A tibble keyed on `iso3c` (and `year`, for a panel).
+#' @return A tibble keyed on `iso3c` (and `year`, for a panel), with a record
+#'   of where each indicator column came from; see [source_info()].
 #' @seealso [add_indicator()], [compare_sources()], [country_sources()]
 #' @export
 #' @examples
@@ -273,9 +279,17 @@ get_source <- function(source, call = rlang::caller_env()) {
 #' fetch_indicator("owid", "life_expectancy", years = 2020)
 #' }
 fetch_indicator <- function(source, indicator, countries = NULL, years = NULL,
-                            ...) {
+                            vintage = NULL, ...) {
   s <- get_source(source)
   check_indicator(indicator)
+  if (!is.null(vintage) && !identical(source, "wdi")) {
+    wdj_abort(c(
+      "{.arg vintage} applies only to {.code source = \"wdi\"}.",
+      "i" = "The World Bank is the one provider whose past releases this
+             package can read back."
+    ))
+  }
+  vintage <- wb_vintage_id(vintage)
   if (!is.null(countries)) {
     countries <- wdj_to_iso3c(countries, origin = "iso3c")
     countries <- unique(stats::na.omit(countries))
@@ -292,9 +306,25 @@ fetch_indicator <- function(source, indicator, countries = NULL, years = NULL,
   # The source name stays in plaintext so clear_country_cache(source = ) can
   # drop just that source's entries without unhashing anything.
   key <- if (isTRUE(s$cache)) {
-    paste0(source, "\r", rlang::hash(list(indicator, countries, years, list(...))))
+    paste0(source, "\r", rlang::hash(list(indicator, countries, years, vintage,
+                                          list(...))))
   } else NULL
   hit <- if (is.null(key)) NULL else .wdj_state$source_memo[[key]]
+  # The built-in adapters also persist to disk, one directory per source, so
+  # an OWID or OECD answer survives the session as the World Bank's always
+  # has. A user's source stays session-only: its fetch function can change
+  # between sessions and the key cannot see that.
+  disk <- if (!is.null(key) && is.null(hit) && source %in% DISK_SOURCES) {
+    wdj_disk_cache(source)
+  }
+  dkey <- if (!is.null(disk)) {
+    rlang::hash(list("countryatlas-4", source, indicator, countries, years,
+                     vintage, list(...)))
+  }
+  if (!is.null(disk)) {
+    got <- tryCatch(disk$get(dkey), error = function(e) cachem::key_missing())
+    if (!cachem::is.key_missing(got)) hit <- got
+  }
   out <- if (!is.null(hit)) hit else {
     # The return value is checked thoroughly below, but the call itself was
     # not. An adapter that failed re-raised its own bare error -- "provider is
@@ -304,7 +334,12 @@ fetch_indicator <- function(source, indicator, countries = NULL, years = NULL,
     # arity. Both are exactly what someone developing an adapter hits, and
     # both are the one place the package knows which source it just called.
     tryCatch(
-      s$fetch(indicator = indicator, countries = countries, years = years, ...),
+      if (is.null(vintage)) {
+        s$fetch(indicator = indicator, countries = countries, years = years, ...)
+      } else {
+        s$fetch(indicator = indicator, countries = countries, years = years,
+                vintage = vintage, ...)
+      },
       error = function(e) {
         msg <- conditionMessage(e)
         if (grepl("unused argument", msg, fixed = TRUE)) {
@@ -336,6 +371,8 @@ fetch_indicator <- function(source, indicator, countries = NULL, years = NULL,
              {.help countryatlas::register_country_source}."
     ))
   }
+  # Read before as_tibble(), which keeps no attribute it does not know.
+  info <- attr(out, "countryatlas_sources")
   out <- tibble::as_tibble(out)
   if (!s$key_col %in% names(out)) {
     wdj_abort(c(
@@ -367,8 +404,8 @@ fetch_indicator <- function(source, indicator, countries = NULL, years = NULL,
   collapsed <- warn_key_collapse(
     raw_key, out$iso3c, sprintf("source %s", encodeString(source, quote = '"')),
     s$key_col, "iso3c",
-    hint = "Aggregate the source's rows to one per country, or the join in
-            {.fn add_indicator} will repeat them."
+    hint = "Aggregate the source's rows to one per country;
+            {.fn add_indicator} refuses to join a repeated key."
   )
   # warn_key_collapse() above only sees a code reached from *more than one*
   # raw value -- that is what it is for. A source that simply returns the same
@@ -385,8 +422,8 @@ fetch_indicator <- function(source, indicator, countries = NULL, years = NULL,
     wdj_warn(c(
       "Source {.val {source}} returned {n_dup} duplicate key row{?s}.",
       "*" = "Keyed on {.field {key_cols}}.",
-      "i" = "Aggregate the source's rows to one per key, or the join in
-             {.fn add_indicator} will repeat them."
+      "i" = "Aggregate the source's rows to one per key;
+             {.fn add_indicator} refuses to join a repeated key."
     ), class = "countryatlas_duplicate_key")
   }
   unresolved <- unique(as.character(raw_key)[is.na(out$iso3c) & !is.na(raw_key)])
@@ -409,14 +446,29 @@ fetch_indicator <- function(source, indicator, countries = NULL, years = NULL,
   # the year is whatever a third-party fetch function returned. as.integer()
   # read a Date as its day count and a "2020-Q1" as NA, both without comment.
   if ("year" %in% names(out)) out$year <- read_year(out$year, "Source {.val {source}}")
+  # A source that says nothing about its columns still gets a record: which
+  # source, which code, when, and its registered citation.
+  if (is.null(info)) {
+    cols <- intersect(names(indicator) %||% unname(indicator), names(out))
+    codes <- unname(indicator)[match(cols, names(indicator) %||% unname(indicator))]
+    info <- source_info_rows(cols, source = source, indicator = codes,
+                             fetched_at = format(Sys.Date()),
+                             citation = s$citation %||% NA_character_)
+  }
+  out <- set_source_info(out, info)
   # Only a non-empty answer is worth remembering: an empty one is as likely to
   # be a failed request as a real "no observations", and it is cheap to retry.
-  if (!is.null(key) && is.null(hit) && nrow(out)) {
+  if (!is.null(key) && nrow(out)) {
     if (is.null(.wdj_state$source_memo)) .wdj_state$source_memo <- list()
     .wdj_state$source_memo[[key]] <- out
+    if (!is.null(disk)) try(disk$set(dkey, out), silent = TRUE)
   }
   out
 }
+
+# The sources whose answers persist on disk, each in its own directory under
+# the cache. "wdi" is cached a level down, by indicator, in fetch_wdi().
+DISK_SOURCES <- c("owid", "oecd", "imf", "ilo", "eurostat", "comtrade")
 
 #' Fetch an indicator and join it to your data
 #'
@@ -513,8 +565,31 @@ add_indicator <- function(data, source, indicator, countries = NULL,
   if (length(clash)) {
     data <- data[, setdiff(names(data), clash), drop = FALSE]
   }
+  # A source that repeats a key would fan the caller's frame out: one row in,
+  # two out, one country holding two values. fetch_indicator() has already
+  # warned about the repeat; joining anyway is what that warning was about, so
+  # refuse here and say which keys, rather than let the join's own
+  # relationship check fail with dplyr's wording.
+  key_cols <- c(by, if (carry_year) "year")
+  dup <- duplicated(new[, key_cols, drop = FALSE]) & !is.na(new$iso3c)
+  if (any(dup)) {
+    keys <- unique(do.call(paste, c(unname(as.list(
+      new[dup, key_cols, drop = FALSE])), sep = " ")))
+    wdj_abort(c(
+      "Source {.val {source}} returned more than one row for
+       {length(keys)} key{?s}, so {.fn add_indicator} cannot add {?it/them}
+       without repeating rows of {.arg data}.",
+      "*" = "{.val {utils::head(keys, 5)}}",
+      "i" = "Aggregate the source to one row per {.field {key_cols}} first."
+    ), class = "countryatlas_many_to_many")
+  }
+  # A multi-year fetch onto a cross-section fans out by design, announced
+  # above as countryatlas_year_fanout; every other shape is a lookup.
   out <- dplyr::left_join(data, new[, unique(c(by, add_cols)), drop = FALSE],
-                          by = by, na_matches = "never")
+                          by = by, na_matches = "never",
+                          relationship = if (carry_year) "many-to-many" else
+                            "many-to-one")
+  out <- carry_source_info(out, data, new)
   # A key that is not standardised matches nothing, so the indicator arrives as
   # a column of pure NA -- which reads as "the provider has no data" rather than
   # "the join failed". Only worth saying when the fetch itself returned rows.
@@ -548,11 +623,24 @@ add_indicator <- function(data, source, indicator, countries = NULL,
 #' @param countries Optional `iso3c` subset.
 #' @param tolerance Relative difference above which a country counts as a
 #'   disagreement (default `0.05`, i.e. 5%).
+#' @param allow_unit_mismatch Compare anyway when the sources state different
+#'   units (default `FALSE`). See below.
 #'
 #' @return A tibble with one row per country: the value from each source,
 #'   `n_sources` (how many reported it), `rel_diff` (max relative spread) and
 #'   `disagrees`. The correlation, coverage and disagreement summary is attached
-#'   as the `"countryatlas_source_summary"` attribute.
+#'   as the `"countryatlas_source_summary"` attribute, with each source's
+#'   stated unit.
+#'
+#' @section Different units are not a disagreement:
+#' GDP per capita in constant 2015 US dollars and in current international
+#' dollars differ for every country, and calling that a disagreement between
+#' the sources would be wrong. Each fetch records the unit its provider states
+#' (see [source_info()]); when two of them state different units the
+#' comparison is refused with class `countryatlas_unit_mismatch`, naming them.
+#' Pass `allow_unit_mismatch = TRUE` to compare anyway -- a ratio that is
+#' constant across countries can still be worth seeing -- and read
+#' `rel_diff` accordingly. A source that states no unit is not checked.
 #'
 #' @seealso [fetch_indicator()], [country_sources()]
 #' @export
@@ -563,7 +651,9 @@ add_indicator <- function(data, source, indicator, countries = NULL,
 #' attr(cmp, "countryatlas_source_summary")
 #' }
 compare_sources <- function(indicator, sources = c("wdi", "owid"), year,
-                            countries = NULL, tolerance = 0.05) {
+                            countries = NULL, tolerance = 0.05,
+                            allow_unit_mismatch = FALSE) {
+  check_bool(allow_unit_mismatch, "allow_unit_mismatch")
   if (missing(year)) wdj_abort("{.arg year} is required.")
   year <- validate_years(year, lo = 1500L)
   if (length(year) != 1L) {
@@ -608,15 +698,21 @@ compare_sources <- function(indicator, sources = c("wdi", "owid"), year,
     stats::setNames(rep(indicator[1], length(sources)), sources)
   }
 
+  units <- stats::setNames(rep(NA_character_, length(sources)), sources)
   vals <- lapply(sources, function(s) {
     d <- fetch_indicator(s, stats::setNames(codes[[s]], s), countries = countries,
                          years = year)
+    info <- source_info(d)
+    # The unit of the column compared: the source's own name for it, or, for
+    # a source that kept the provider's code as the column name, the code.
+    unit_of <- function(col) if (nrow(info)) info$unit[match(col, info$column)] else NA_character_
     # !is.na() first: read_year() deliberately puts NA in this column for a
     # time value it could not parse, and d[NA, ] appends a row of all-NA --
     # a phantom country with no iso3c that then survived the join into the
     # comparison table.
     if ("year" %in% names(d)) d <- d[!is.na(d$year) & d$year == year, ]
     keep <- intersect(c("iso3c", s), names(d))
+    used <- s
     if (!s %in% keep) {
       # A source that renamed the column: take the first non-key numeric one.
       num <- names(d)[vapply(d, is.numeric, logical(1))]
@@ -625,8 +721,14 @@ compare_sources <- function(indicator, sources = c("wdi", "owid"), year,
         wdj_abort("Source {.val {s}} returned no numeric column.",
                   call = verb_env())
       }
-      d[[s]] <- d[[num[1]]]
+      used <- if (codes[[s]] %in% num) codes[[s]] else num[1]
+      d[[s]] <- d[[used]]
     }
+    # A unit recorded for the column that was compared, whichever name it
+    # carries: a registered fetcher states it under its own column name, and
+    # reading the record under the source's name found nothing, so two
+    # sources in different units were "compared" without a word.
+    units[[s]] <<- unit_of(used) %|% unit_of(s)
     # A row whose key did not resolve is not a country to compare, and
     # fetch_indicator() has already named it. Kept, it did three wrong things:
     # distinct() folded several unresolved rows into one and the warning below
@@ -652,7 +754,20 @@ compare_sources <- function(indicator, sources = c("wdi", "owid"), year,
     one
   })
   out <- Reduce(function(a, b) dplyr::full_join(a, b, by = "iso3c",
-                                         na_matches = "never"), vals)
+                                         na_matches = "never",
+                                         relationship = "one-to-one"), vals)
+  stated <- units[!is.na(units)]
+  if (length(unique(stated)) > 1L) {
+    if (!allow_unit_mismatch) {
+      wdj_abort(c(
+        "The sources state different units, so a difference between them is
+         not a disagreement.",
+        "*" = "{.val {paste0(names(stated), ': ', stated)}}",
+        "i" = "Compare series in the same unit, or pass
+               {.code allow_unit_mismatch = TRUE} to compare anyway."
+      ), class = "countryatlas_unit_mismatch")
+    }
+  }
 
   # No non-numeric guard needed here: the per-source reshape above selects the
   # first *numeric* column and aborts with "returned no numeric column" when
@@ -720,6 +835,8 @@ compare_sources <- function(indicator, sources = c("wdi", "owid"), year,
       n_disagree = sum(ok & d > tolerance, na.rm = TRUE)
     )
   }))
+  summ$unit_x <- unname(units[summ$source_x])
+  summ$unit_y <- unname(units[summ$source_y])
   attr(out, "countryatlas_source_summary") <- summ
   out
 }
@@ -732,18 +849,25 @@ compare_sources <- function(indicator, sources = c("wdi", "owid"), year,
 
 #' Built-in source adapters
 #'
-#' Thin wrappers that put a provider's data on the ISO spine. Each is
-#' `Suggests`-gated on that provider's own client package -- `countryatlas` does
-#' not reimplement any of them. All four are registered as sources, so the usual
-#' route is [fetch_indicator()]`("owid", ...)` rather than calling these
-#' directly; they are exported because calling them directly is sometimes what
-#' you want.
+#' Thin wrappers that put a provider's data on the ISO spine. Our World in Data
+#' and the OECD are read straight from their public APIs through the package's
+#' own HTTP client, with a timeout and bounded retries; Eurostat and UN Comtrade
+#' go through their own client packages, which are `Suggests`. All are
+#' registered as sources, so the usual route is [fetch_indicator()]`("owid",
+#' ...)` rather than calling these directly; they are exported because calling
+#' them directly is sometimes what you want.
 #'
 #' @param indicator Indicator code(s), optionally named to rename the output
-#'   columns.
+#'   columns. For `fetch_owid()`, a grapher chart slug (`"life-expectancy"`),
+#'   or `"slug/column"` to take one column of a chart that has several; for
+#'   `fetch_oecd()`, an SDMX dataflow, `"AGENCY,DATAFLOW,VERSION"`.
 #' @param countries Optional `iso3c` vector.
 #' @param years Optional numeric year vector.
-#' @param ... Passed to the underlying client.
+#' @param key For `fetch_oecd()`, the SDMX key selecting the series within the
+#'   dataflow (`"A..B1GQ_R_GR.."`); see [fetch_sdmx()]. `countries` goes into
+#'   its country position, so the OECD filters on its server.
+#' @param ... Passed to the underlying client (`fetch_eurostat()`,
+#'   `fetch_comtrade()`); `fetch_owid()` and `fetch_oecd()` take nothing more.
 #'
 #' @return A tibble on the ISO spine: `iso3c`, `year` and one column per
 #'   indicator.
@@ -751,10 +875,31 @@ compare_sources <- function(indicator, sources = c("wdi", "owid"), year,
 #' @section Which provider needs what:
 #' | Adapter | Needs | Notes |
 #' | --- | --- | --- |
-#' | `fetch_owid()` | `owidR` | Our World in Data; `indicator` is an OWID chart slug |
+#' | `fetch_owid()` | nothing | OWID's Chart API; `indicator` is a grapher slug, keyed on OWID's ISO codes |
+#' | `fetch_oecd()` | nothing | the OECD's SDMX service; `indicator` is a dataflow, `key` selects the series |
 #' | `fetch_eurostat()` | `eurostat` | European coverage only; geo codes are harmonised to `iso3c` |
-#' | `fetch_oecd()` | `OECD` | `indicator` is a dataset id; OECD's own filters go through `...` |
 #' | `fetch_comtrade()` | `comtradr` | UN trade flows; needs an API token (see `comtradr::set_primary_comtrade_key()`) |
+#'
+#' The IMF and the ILO are reachable as `fetch_indicator("imf", flow, key = )`
+#' and `fetch_indicator("ilo", flow, key = )`, through [fetch_sdmx()].
+#'
+#' @section Our World in Data:
+#' A chart's data comes from `https://ourworldindata.org/grapher/<slug>.csv`
+#' and its metadata -- title, unit, citation, last update -- from the matching
+#' `.metadata.json`, which feeds [source_info()]. Rows are keyed on OWID's
+#' `code` column, which is ISO 3166-1 alpha-3 for countries; OWID's own
+#' aggregates (`OWID_WRL`, the continents, the income groups) are not
+#' countries and are dropped, except `OWID_KOS`, which is Kosovo (`XKX`). A
+#' chart with several value columns returns them all, named
+#' `<indicator>_<column>` (or by OWID's short column names when `indicator` is
+#' unnamed), unless `"slug/column"` picks one.
+#'
+#' @section The OECD:
+#' OECD.Stat, which the OECD package's client targets, went offline on
+#' 2024-07-01, so the 3.0.0 adapter could not return data. The OECD Data
+#' Explorer's dataflow ids replace the old dataset codes; find a flow and its
+#' key at `https://data-explorer.oecd.org` (its "Developer API" panel shows
+#' both). The old codes do not exist anywhere any more.
 #'
 #' @name source_adapters
 #' @seealso [fetch_indicator()], [register_country_source()], [compare_sources()]
@@ -769,28 +914,112 @@ NULL
 #' @export
 fetch_owid <- function(indicator, countries = NULL, years = NULL, ...) {
   check_indicator(indicator)
-  need_pkg("owidR", "for fetch_owid()")
-  nms <- names(indicator) %||% indicator
+  warn_adapter_dots(rlang::list2(...), "fetch_owid")
+  nms <- names(indicator)
   frames <- lapply(seq_along(indicator), function(i) {
-    got <- owidR::owid(indicator[[i]], ...)
-    # owidR does not error when it cannot reach the site: it prints "site may be
-    # down" and hands back a one-row blank data.table carrying the class
-    # `owid.no.connection`. Left alone that surfaced downstream as "no numeric
-    # value column found", which sends the reader hunting for the wrong problem.
-    if (inherits(got, "owid.no.connection")) {
+    spec <- indicator[[i]]
+    slug <- sub("/.*$", "", spec)
+    col <- if (grepl("/", spec, fixed = TRUE)) sub("^[^/]*/", "", spec) else NULL
+    if (!grepl("^[a-z0-9][a-z0-9-]*$", slug)) {
       wdj_abort(c(
-        "Our World in Data could not be reached.",
-        "x" = "{.pkg owidR} returned an empty result for {.val {indicator[[i]]}}.",
-        "i" = "This is a connectivity or chart-slug problem, not a data problem.
-               Check the slug at {.url https://ourworldindata.org/charts}."
+        "{.val {spec}} is not an Our World in Data chart slug.",
+        "i" = "A slug is the last part of a chart's address, as in
+               {.url https://ourworldindata.org/grapher/life-expectancy}."
       ), call = verb_env())
     }
-    adapter_reshape(tibble::as_tibble(got), nms[[i]], entity_col = "entity",
-                    year_col = "year", countries = countries, years = years,
-                    call = verb_env())
+    base <- paste0("https://ourworldindata.org/grapher/", slug)
+    res <- tryCatch(
+      wdj_http_get(paste0(base, ".csv?v=1&csvType=full&useColumnShortNames=true"),
+                   accept = "text/csv"),
+      countryatlas_fetch_failed = function(e) e)
+    if (inherits(res, "condition")) {
+      if (identical(res$status, 404L)) {
+        wdj_abort(c(
+          "Our World in Data has no chart {.val {slug}}.",
+          "i" = "Check the slug at {.url https://ourworldindata.org/charts}."
+        ), call = verb_env())
+      }
+      return(fetch_failed(res, sprintf("Our World in Data chart %s", slug), NULL,
+                          call = verb_env()))
+    }
+    raw <- utils::read.csv(text = http_text(res), check.names = FALSE,
+                           stringsAsFactors = FALSE, na.strings = "",
+                           encoding = "UTF-8")
+    value_cols <- setdiff(names(raw), c("entity", "code", "year", "day"))
+    if (!is.null(col)) {
+      if (!col %in% value_cols) {
+        wdj_abort(c(
+          "Chart {.val {slug}} has no column {.val {col}}.",
+          "i" = "Its columns are {.val {value_cols}}."
+        ), call = verb_env())
+      }
+      value_cols <- col
+    }
+    meta <- tryCatch(
+      http_json(wdj_http_get(paste0(base, ".metadata.json"),
+                             accept = "application/json"),
+                simplifyVector = FALSE),
+      error = function(e) NULL)
+    # The ISO code is the key, not the entity's name: OWID's names are
+    # English labels that drift ("Czechia", "Cote d'Ivoire"), while `code` is
+    # alpha-3 for every country. OWID_KOS is Kosovo; every other OWID_ code
+    # is an aggregate OWID built.
+    code <- as.character(raw$code)
+    code[code %in% "OWID_KOS"] <- "XKX"
+    code[grepl("^OWID_", code)] <- NA
+    raw$.wdj_code <- code
+    if (!"year" %in% names(raw) && "day" %in% names(raw)) {
+      raw$year <- read_year(raw$day, "Our World in Data")
+    }
+    out_names <- if (length(value_cols) == 1L) {
+      nms[i] %||% spec
+    } else if (!is.null(nms) && nzchar(nms[i])) {
+      paste(nms[i], value_cols, sep = "_")
+    } else value_cols
+    parts <- lapply(seq_along(value_cols), function(j) {
+      adapter_reshape(raw[!is.na(raw$.wdj_code), , drop = FALSE], out_names[j],
+                      entity_col = ".wdj_code", year_col = "year",
+                      value_col = value_cols[j], countries = countries,
+                      years = years, origin = "iso3c", call = verb_env())
+    })
+    out <- Reduce(function(a, b) dplyr::full_join(a, b, by = c("iso3c", "year"),
+                                                 na_matches = "never",
+                                                 relationship = "one-to-one"),
+                  parts)
+    set_source_info(out, owid_source_info(meta, value_cols, out_names, spec))
   })
-  Reduce(function(a, b) dplyr::full_join(a, b, by = c("iso3c", "year"),
-                                         na_matches = "never"), frames)
+  frames <- Filter(Negate(is.null), frames)
+  if (!length(frames)) {
+    return(tibble::tibble(iso3c = character(), year = integer()))
+  }
+  out <- Reduce(function(a, b) dplyr::full_join(a, b, by = c("iso3c", "year"),
+                                                na_matches = "never",
+                                                relationship = "one-to-one"),
+                frames)
+  do.call(carry_source_info, c(list(out), frames))
+}
+
+# The source_info() rows for an OWID chart, from its metadata.json: its
+# columns are keyed by display title, each carrying its shortName.
+owid_source_info <- function(meta, value_cols, out_names, spec) {
+  cols <- if (is.list(meta)) meta$columns else NULL
+  by_short <- if (length(cols)) {
+    stats::setNames(cols, vapply(cols, function(m) m$shortName %||% "", ""))
+  } else list()
+  rows <- lapply(seq_along(value_cols), function(j) {
+    m <- by_short[[value_cols[j]]] %||% list()
+    source_info_rows(
+      out_names[j], source = "owid",
+      indicator = if (length(value_cols) > 1L) paste0(sub("/.*$", "", spec), "/",
+                                                      value_cols[j]) else spec,
+      label = m$titleShort %||% (meta$chart$title %||% NA),
+      unit = m$unit %||% NA, provider_updated = m$lastUpdated %||% NA,
+      fetched_at = format(Sys.Date()), licence = "CC BY 4.0",
+      citation = paste0(m$citationShort %||% (meta$chart$citation %||%
+                                                "Our World in Data"),
+                        ". Retrieved from Our World in Data."))
+  })
+  dplyr::bind_rows(rows)
 }
 
 #' @rdname source_adapters
@@ -812,29 +1041,26 @@ fetch_eurostat <- function(indicator, countries = NULL, years = NULL, ...) {
                     origin = "eurostat", call = verb_env())
   })
   Reduce(function(a, b) dplyr::full_join(a, b, by = c("iso3c", "year"),
-                                         na_matches = "never"), frames)
+                                         na_matches = "never",
+                                         relationship = "one-to-one"), frames)
 }
 
 #' @rdname source_adapters
 #' @export
-fetch_oecd <- function(indicator, countries = NULL, years = NULL, ...) {
+fetch_oecd <- function(indicator, countries = NULL, years = NULL, key = NULL,
+                       ...) {
   check_indicator(indicator)
-  need_pkg("OECD", "for fetch_oecd()")
+  warn_adapter_dots(rlang::list2(...), "fetch_oecd")
   nms <- names(indicator) %||% indicator
   frames <- lapply(seq_along(indicator), function(i) {
-    raw <- tibble::as_tibble(OECD::get_dataset(indicator[[i]], ...))
-    if ("Time" %in% names(raw)) raw$year <- read_year(raw$Time, "OECD")
-    if ("TIME_PERIOD" %in% names(raw) && !"year" %in% names(raw)) {
-      raw$year <- read_year(raw$TIME_PERIOD, "OECD")
-    }
-    ent <- if ("LOCATION" %in% names(raw)) "LOCATION" else "REF_AREA"
-    adapter_reshape(raw, nms[[i]], entity_col = ent, year_col = "year",
-                    value_col = if ("ObsValue" %in% names(raw)) "ObsValue" else "obsValue",
-                    countries = countries, years = years, origin = "iso3c",
-                    call = verb_env())
+    fetch_sdmx("oecd", stats::setNames(indicator[[i]], nms[[i]]), key = key,
+               countries = countries, years = years)
   })
-  Reduce(function(a, b) dplyr::full_join(a, b, by = c("iso3c", "year"),
-                                         na_matches = "never"), frames)
+  out <- Reduce(function(a, b) dplyr::full_join(a, b, by = c("iso3c", "year"),
+                                                na_matches = "never",
+                                                relationship = "one-to-one"),
+                frames)
+  do.call(carry_source_info, c(list(out), frames))
 }
 
 #' @rdname source_adapters
@@ -893,7 +1119,8 @@ fetch_comtrade <- function(indicator, countries = NULL, years = NULL, ...) {
                     origin = "iso3c", call = verb_env())
   })
   Reduce(function(a, b) dplyr::full_join(a, b, by = c("iso3c", "year"),
-                                         na_matches = "never"), frames)
+                                         na_matches = "never",
+                                         relationship = "one-to-one"), frames)
 }
 
 # Common reshape for the adapters: resolve the provider's entity column to
@@ -1029,10 +1256,18 @@ adapter_reshape <- function(raw, out_name, entity_col, year_col,
 
 # The WDI adapter, which is the one that already existed -- expressed through the
 # same contract so it is not a special case.
-fetch_wdi_source <- function(indicator, countries = NULL, years = NULL, ...) {
+fetch_wdi_source <- function(indicator, countries = NULL, years = NULL,
+                             vintage = NULL, ...) {
   years <- years %||% (as.integer(format(Sys.Date(), "%Y")) - 1L)
   out <- fetch_wdi(normalize_indicator(indicator), start = min(years),
-                   end = max(years), ...)
+                   end = max(years), vintage = vintage, ...)
+  info <- attr(out, "countryatlas_sources")
+  # The World Bank's own aggregates ("AFE", "ARB", "WLD") carry three-letter
+  # codes that are not countries, and every one of them reached
+  # fetch_indicator()'s key check, so each call warned that some fifty values
+  # were "not usable as iso3c" -- on a correct call, about rows nobody asked
+  # for. country_data() has always dropped them; so does the adapter.
+  out <- out[!is.na(out$iso3c) & out$iso3c %in% wdj_known_iso3c(), , drop = FALSE]
   if (!is.null(countries)) out <- out[out$iso3c %in% countries, ]
   # min/max is right for the *request* -- the API takes a contiguous range --
   # but `years` is documented as a year vector, and the four other adapters
@@ -1043,7 +1278,7 @@ fetch_wdi_source <- function(indicator, countries = NULL, years = NULL, ...) {
   if ("year" %in% names(out)) {
     out <- out[is.na(out$year) | out$year %in% years, , drop = FALSE]
   }
-  out
+  set_source_info(out, info)
 }
 
 # Drop a source's memoised answers. Keys are "<source>\r<hash>", the source
@@ -1067,7 +1302,7 @@ register_builtin_sources <- function() {
   )
   register_country_source(
     "owid", fetch_owid,
-    meta = "Our World in Data (via owidR)",
+    meta = "Our World in Data (Chart API)",
     citation = "Our World in Data. https://ourworldindata.org"
   )
   register_country_source(
@@ -1077,8 +1312,22 @@ register_builtin_sources <- function() {
   )
   register_country_source(
     "oecd", fetch_oecd,
-    meta = "OECD statistics (via OECD)",
-    citation = "OECD. https://data.oecd.org"
+    meta = "OECD Data Explorer (SDMX); indicator is a dataflow, key the series",
+    citation = "OECD. OECD Data Explorer. https://data-explorer.oecd.org"
+  )
+  register_country_source(
+    "imf", function(indicator, countries = NULL, years = NULL, key = NULL) {
+      sdmx_source("imf", indicator, countries, years, key)
+    },
+    meta = "IMF data portal (SDMX), e.g. WEO and IFS; indicator is a dataflow",
+    citation = "International Monetary Fund. https://data.imf.org"
+  )
+  register_country_source(
+    "ilo", function(indicator, countries = NULL, years = NULL, key = NULL) {
+      sdmx_source("ilo", indicator, countries, years, key)
+    },
+    meta = "ILOSTAT (SDMX); indicator is a dataflow, key the series",
+    citation = "International Labour Organization. ILOSTAT. https://ilostat.ilo.org"
   )
   register_country_source(
     "comtrade", fetch_comtrade,
@@ -1095,17 +1344,36 @@ register_builtin_sources <- function() {
 #' @section What a global clear releases:
 #' Called with no `source`, this also drops the two cached *geometry* backends:
 #' the Natural Earth `sf` layer held per scale (tens of megabytes at
-#' `scale = "medium"`) and the memoised `map_data("world")` tibble (about
-#' 99,000 rows per override set). Those are the largest things the package
+#' `scale = "medium"`) and the polygon backend's memoised vertex table (about
+#' 98,000 rows per override set). Those are the largest things the package
 #' keeps in memory, and in a long-lived process -- a Shiny app or a plumber
 #' API -- this is the only way to release them. They rebuild on the next map.
 #'
 #' Naming a `source` leaves geometry alone, since it is not a data source.
 #'
 #' @param source Which source's cache to clear, or `NULL` (default) for all.
-#'   Only the World Bank cache is currently persisted to disk; other sources are
-#'   memoised per session.
-#' @param disk Also delete the on-disk cache (default `FALSE`).
+#'   The built-in sources persist to disk, one directory each under the cache
+#'   (`wdi`, `wdi-archive` for pinned World Bank releases, `owid`, `oecd`,
+#'   `imf`, `ilo`, `eurostat`, `comtrade`); a source you registered yourself is
+#'   memoised for the session only.
+#' @param disk Also delete that source's on-disk entries (default `FALSE`).
+#'   Only the cache's own files are removed, and a directory only when that
+#'   leaves it empty.
+#'
+#' @section Where the cache lives:
+#' The persistent cache goes in the standard per-user cache location,
+#' `tools::R_user_dir("countryatlas", "cache")`. Point it elsewhere with
+#' `options(countryatlas.cache_dir = )`, or skip it by passing `cache = FALSE`
+#' to [world_data()] or [country_data()]. Under `R CMD check` the whole cache
+#' moves to the session temp directory, so a check never writes to the user's
+#' file space.
+#'
+#' Entries expire: a fetch from a current release is dropped once it is 30
+#' days old, because providers revise their figures, and past 50 MB per
+#' source the least-recently-used entries go first. Adjust either with
+#' `options(countryatlas.cache_max_age = )` (seconds) and
+#' `options(countryatlas.cache_max_size = )` (bytes). A pinned World Bank
+#' release ([wdi_vintages()]) never changes, so its entries never expire.
 #'
 #' @return Invisibly `TRUE`.
 #' @seealso [country_sources()], [fetch_indicator()]
@@ -1124,8 +1392,27 @@ clear_country_cache <- function(source = NULL, disk = FALSE) {
   } else {
     drop_source_memo(source)
   }
-  if (is.null(source) || identical(source, "wdi")) {
-    return(invisible(clear_wdi_cache(disk = disk)))
+  if (is.null(source) || identical(source, "wdi")) wdi_cache_clear(disk = disk)
+  if (isTRUE(disk)) {
+    for (sub in intersect(source %||% DISK_SOURCES, DISK_SOURCES)) {
+      clear_cache_dir(sub)
+    }
   }
   invisible(TRUE)
+}
+
+
+# A registered SDMX source: one fetch_sdmx() per requested dataflow, joined.
+sdmx_source <- function(provider, indicator, countries, years, key) {
+  check_indicator(indicator)
+  nms <- names(indicator) %||% indicator
+  frames <- lapply(seq_along(indicator), function(i) {
+    fetch_sdmx(provider, stats::setNames(indicator[[i]], nms[[i]]), key = key,
+               countries = countries, years = years)
+  })
+  out <- Reduce(function(a, b) dplyr::full_join(a, b, by = c("iso3c", "year"),
+                                                na_matches = "never",
+                                                relationship = "one-to-one"),
+                frames)
+  do.call(carry_source_info, c(list(out), frames))
 }

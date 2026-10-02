@@ -18,8 +18,8 @@ test_that("overrides match entities the legacy code dropped", {
   expect_false(is.na(out$region[out$iso3c == "XKX"]))
 })
 
-test_that("wdj_overrides is extensible", {
-  ov <- wdj_overrides(c(Somaliland = "SOM"))
+test_that("country_overrides is extensible", {
+  ov <- country_overrides(c(Somaliland = "SOM"))
   expect_equal(unname(ov[["Somaliland"]]), "SOM")
   expect_equal(unname(ov[["Kosovo"]]), "XKX")
 })
@@ -176,7 +176,7 @@ test_that("origin = iso3c trims Unicode whitespace, and keys overrides on it", {
   cm <- c(Somaliland = "SOM", Kosovo = "XKX")
 
   conv <- function(v) {
-    suppressWarnings(convert_country(v, from = "iso3c", to = "iso3c",
+    suppressWarnings(convert_country(v, origin = "iso3c", to = "iso3c",
                                      custom_match = cm))
   }
   # A real code, with each flavour of padding.
@@ -202,11 +202,149 @@ test_that("origin = iso3c trims Unicode whitespace, and keys overrides on it", {
   # Nothing that resolved before may change: every known code, and every name
   # in the shipped override table.
   k <- countryatlas:::wdj_known_iso3c()
-  expect_equal(suppressWarnings(convert_country(k, from = "iso3c", to = "iso3c")), k)
+  expect_equal(suppressWarnings(convert_country(k, origin = "iso3c", to = "iso3c")), k)
   ov <- country_overrides()
   expect_false(any(is.na(suppressWarnings(
-    convert_country(names(ov), from = "iso3c", to = "iso3c", custom_match = ov)))))
+    convert_country(names(ov), origin = "iso3c", to = "iso3c", custom_match = ov)))))
   # Junk is still junk.
   expect_true(is.na(conv("ZZZ")))
   expect_true(is.na(conv("")))
+})
+
+test_that("custom_match must be a name -> iso3c map", {
+  skip_slow_on_cran()
+  # `origin` was checked and the override table was not, though every value in
+  # it lands in the iso3c column -- and wdj_to_iso3c()'s iso3c branch
+  # whitelists those values as valid by construction, so nothing downstream
+  # rejected them either. custom_match = c(Freedonia = 1) put "1" in iso3c.
+  d <- tibble::tibble(n = c("France", "Freedonia"))
+  expect_error(standardize_country(d, n, custom_match = c(Freedonia = 1)),
+               "named character vector")
+  expect_error(standardize_country(d, n, custom_match = c("FRA")),
+               "named character vector")
+  expect_error(standardize_country(d, n, custom_match = c(Freedonia = TRUE)),
+               "named character vector")
+
+  # The shapes that worked still work.
+  ok <- suppressWarnings(
+    standardize_country(d, n, custom_match = c(Freedonia = "FRA")))
+  expect_equal(ok$iso3c, c("FRA", "FRA"))
+  expect_no_error(suppressWarnings(
+    standardize_country(d, n, custom_match = character(0))))
+  expect_no_error(suppressWarnings(standardize_country(d, n)))
+  # Including the bundled table, which is exactly this shape.
+  expect_type(country_overrides(), "character")
+  expect_false(is.null(names(country_overrides())))
+})
+
+test_that("`add` reports its own problems, not countrycode's", {
+  skip_slow_on_cran()
+  # `add` names attributes to derive from iso3c. Unvalidated, its problems came
+  # back under somebody else's argument: countrycode's `destination` for an
+  # unknown name ("must be ... one of the column names in the conversion
+  # directory"), convert_country()'s `to` in locate_country(), and base R's
+  # bare "missing value where TRUE/FALSE needed" for an NA.
+  d <- tibble::tibble(n = "France")
+  expect_error(standardize_country(d, n, add = "nope"), "`add` names")
+  expect_error(standardize_country(d, n, add = 1), "`add` must be a character")
+  expect_error(standardize_country(d, n, add = NA), "`add` must be a character")
+  expect_error(standardize_country(d, n, add = TRUE), "`add` must be a character")
+
+  # Both kinds of valid name still work: the shortcuts and any raw countrycode
+  # destination.
+  expect_no_error(suppressWarnings(standardize_country(d, n, add = "continent")))
+  expect_no_error(suppressWarnings(standardize_country(d, n, add = "iso4217c")))
+  expect_no_error(suppressWarnings(standardize_country(d, n, add = character(0))))
+  expect_equal(ncol(suppressWarnings(standardize_country(d, n))), 5L)
+
+  # locate_country() shares the check.
+  skip_if_no_sf_geometry()
+  expect_error(locate_country(2.35, 48.86, add = "nope"), "`add` names")
+  expect_error(locate_country(2.35, 48.86, add = 1), "`add` must be a character")
+
+  # The shortcut table and the validator cannot drift: check_add() validates
+  # against exactly the map wdj_derive_from_iso3c() uses.
+  expect_true(all(names(countryatlas:::WDJ_DEST_MAP) %in%
+                    c("iso2c", "continent", "region", "region23", "un_region",
+                      "country", "flag", "currency", "tld")))
+})
+
+test_that("standardize_country says when it clobbers columns you did not ask for", {
+  skip_slow_on_cran()
+  # `add` defaults to c("iso3c", "iso2c", "continent", "region"), so the call
+  # everyone makes -- standardize_country(d, country), to get iso3c -- also
+  # replaced any continent/region/iso2c the caller already had, silently. Eleven
+  # other column-adding verbs report exactly this via warn_overwrite(); the
+  # package's headline function did not. A user's own regional classification is
+  # not the package's to discard without a word.
+  d <- data.frame(country = c("France", "Brazil"),
+                  continent = c("MY-EU", "MY-SA"), region = c("R1", "R2"),
+                  v = 1:2)
+  expect_warning(standardize_country(d, country),
+                 class = "countryatlas_unasked_overwrite")
+  expect_warning(standardize_country(d, country), "continent")
+  expect_warning(standardize_country(d, country), "region")
+
+  # Naming `add` yourself means you asked for it: no warning, per the
+  # documented contract that `add` names the columns literally.
+  expect_silent(standardize_country(d, country, add = c("iso3c", "continent")))
+  # And asking only for the code leaves your columns alone.
+  expect_silent(r <- standardize_country(d, country, add = "iso3c"))
+  expect_identical(r$continent, d$continent)
+  expect_identical(r$region, d$region)
+  expect_equal(r$iso3c, c("FRA", "BRA"))
+  # warn = FALSE silences it; a frame with nothing to clobber is quiet anyway.
+  expect_silent(standardize_country(d, country, warn = FALSE))
+  expect_silent(standardize_country(data.frame(country = "France"), country))
+  # iso3c is never counted: replacing it is the point of the function.
+  d2 <- data.frame(country = "France", iso3c = "XXX")
+  expect_silent(s2 <- standardize_country(d2, country, add = "iso3c"))
+  expect_equal(s2$iso3c, "FRA")
+})
+
+test_that("names in other languages match, and say how", {
+  skip_slow_on_cran()
+  # Built with escapes: the package source is ASCII.
+  ru <- "\u0413\u0435\u0440\u043c\u0430\u043d\u0438\u044f"
+  zh <- "\u5fb7\u56fd"
+  ja <- "\u30c9\u30a4\u30c4"
+  x <- c("Allemagne", "Deutschland", "Alemania", "Elfenbeinkueste", ru, zh, ja,
+         "U.K.", "Kosovo", "Wakanda")
+  r <- check_country_match(x, suggest = FALSE)
+  expect_identical(r$iso3c, c("DEU", "DEU", "DEU", "CIV", "DEU", "DEU", "DEU",
+                              "GBR", "XKX", NA))
+  expect_identical(r$method, c("name_fr", "name_de", "name_es", "name_de",
+                               "cldr", "cldr", "cldr", "regex_en", "override",
+                               "none"))
+  # Exact, so a territory the English patterns leave alone stays alone, and
+  # a two-letter code is not taken for a name.
+  guard <- check_country_match(c("Somaliland", "Indian Ocean Territories",
+                                 "FR", "DE"), suggest = FALSE)
+  expect_true(all(is.na(guard$iso3c)))
+  # Lower case in any script, without the locale: Cyrillic too.
+  expect_identical(convert_country(
+    "\u0433\u0435\u0440\u043c\u0430\u043d\u0438\u044f"), "DEU")
+  # The tiers reach every verb that matches names.
+  expect_identical(convert_country(ru), "DEU")
+  # A name the CLDR tables give to more than one country names none.
+  # Russian "Kongo", for both Congos.
+  amb <- "\u041a\u043e\u043d\u0433\u043e"
+  expect_true(countryatlas:::fold_name(amb) %in% countryatlas:::cldr_index()$ambiguous)
+  expect_identical(check_country_match(amb, suggest = FALSE)$method, "ambiguous")
+  # Built once per session, and quickly (measured at about 0.2 s).
+  rm(list = ls(countryatlas:::.name_index), envir = countryatlas:::.name_index)
+  t0 <- proc.time()[["elapsed"]]
+  invisible(countryatlas:::cldr_index())
+  expect_lt(proc.time()[["elapsed"]] - t0, 2)
+})
+
+test_that("standardize_country() derives once per distinct value", {
+  set.seed(2)
+  nm <- c("France", "Germany", "Allemagne", "Wakanda", "U.K.", NA)
+  d <- data.frame(country = sample(nm, 5000, TRUE))
+  got <- suppressWarnings(standardize_country(d, country))
+  ref <- suppressWarnings(countryatlas:::wdj_to_iso3c(d$country))
+  expect_identical(got$iso3c, ref)
+  expect_identical(got$continent[got$iso3c %in% "FRA"][1], "Europe")
+  expect_identical(nrow(got), 5000L)
 })

@@ -39,9 +39,9 @@ Both \code{n} and \code{by_group}'s \code{n_countries} are \strong{denominators}
 counted, not everything present. That is the opposite orientation from
 \code{\link[=map_provenance]{map_provenance()}}, whose \code{n_countries} is the numerator (countries drawn
 \emph{with} a value) and whose \code{n_total} is the denominator. The two verbs
-report the same coverage from opposite ends, so on 215 countries with 24
-missing this gives \code{n = 215} where \code{map_provenance()} gives
-\code{n_countries = 191}.
+report the same coverage from opposite ends, so on 216 countries with 17
+missing this gives \code{n = 216} where \code{map_provenance()} gives
+\code{n_countries = 199}.
 }
 \description{
 What is missing, before you trust the map: which countries are unmatched,

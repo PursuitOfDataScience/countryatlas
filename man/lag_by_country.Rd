@@ -5,19 +5,28 @@
 \alias{diff_by_country}
 \title{Panel lag / difference by country}
 \usage{
-lag_by_country(data, value, n = 1, suffix = NULL)
+lag_by_country(data, value, n = 1, suffix = NULL, by = c("year", "row"))
 
-diff_by_country(data, value, n = 1, suffix = NULL)
+diff_by_country(data, value, n = 1, suffix = NULL, by = c("year", "row"))
 }
 \arguments{
 \item{data}{A panel with \code{iso3c} and \code{year}.}
 
 \item{value}{The value column (unquoted).}
 
-\item{n}{Number of periods to lag / difference over (default \code{1}).}
+\item{n}{Number of years (or, with \code{by = "row"}, observations) to lag /
+difference over (default \code{1}).}
 
 \item{suffix}{Suffix for the new column. Defaults to \code{"_lag"} / \code{"_diff"}
 (with \code{n} appended when \code{n > 1}, e.g. \code{"_lag5"}).}
+
+\item{by}{How "earlier" is found. \code{"year"} (default) takes the value \code{n}
+years earlier for the same country, and \code{NA} where that year is absent,
+so a gap in the panel can never pass for a one-year change. \code{"row"} takes
+the previous observation, whatever its year -- the 3.0.0 behaviour, for a
+panel that is irregular by design -- and warns when the years are not
+consecutive. A period column whose labels are not years (\code{"pre-war"})
+needs \code{"row"}.}
 }
 \value{
 \code{data} with the lagged / differenced column added. Rows come back

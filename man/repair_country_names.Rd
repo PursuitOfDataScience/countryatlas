@@ -8,7 +8,8 @@ repair_country_names(
   x,
   threshold = 0.2,
   origin = "country.name",
-  verbose = TRUE
+  quiet = FALSE,
+  verbose = deprecated()
 )
 }
 \arguments{
@@ -30,12 +31,15 @@ with \code{stringdist} and to Libya without it, and both are accepted at the
 default threshold. Neither metric is uniformly better -- Jaro-Winkler also
 repairs \code{"Maroco"} to Monaco rather than Morocco -- which is the real
 reason to check the reported substitutions rather than to trust either.
-\code{verbose = TRUE} (the default) prints them, and they are attached as the
+\code{quiet = FALSE} (the default) prints them, and they are attached as the
 \code{"repairs"} attribute for programmatic checking.}
 
 \item{origin}{countrycode origin scheme (default \code{"country.name"}).}
 
-\item{verbose}{Whether to message the substitutions made (default \code{TRUE}).}
+\item{quiet}{If \code{TRUE}, do not message the substitutions made (default
+\code{FALSE}), as \code{\link[=audit_time_coverage]{audit_time_coverage()}} and \code{\link[=check_dispute_coverage]{check_dispute_coverage()}} say it.}
+
+\item{verbose}{\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}} Use \code{quiet} (inverted).}
 }
 \value{
 A character vector the same length as \code{x}, with confident misses

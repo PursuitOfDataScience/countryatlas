@@ -4,26 +4,69 @@
 \alias{local_morans}
 \title{Local Moran's I (LISA)}
 \usage{
-local_morans(data, value, weights = NULL, n_perm = 999, alpha = 0.05)
+local_morans(
+  data,
+  value,
+  weights = NULL,
+  n_perm = 9999,
+  alpha = 0.05,
+  p_adjust = c("fdr", "bonferroni", "holm", "none")
+)
 }
 \arguments{
 \item{data}{A country-level frame with \code{iso3c} and the value column.}
 
 \item{value}{The value column (unquoted).}
 
-\item{weights}{A \code{\link[=country_weights]{country_weights()}} object. Defaults to land-border
-contiguity, which excludes islands -- prefer \code{country_weights("knn")} for
-global work.}
+\item{weights}{A \code{\link[=country_weights]{country_weights()}} object. \code{NULL} (default) uses
+\code{country_weights("knn", k = 5)}: every country's five nearest neighbours,
+islands included. \code{country_weights("contiguity")} gives the land-border
+default of earlier versions, which leaves every island out.}
 
-\item{n_perm}{Permutations for the pseudo-p-value (default \code{999}; use \code{0} to
-skip the test, which leaves \code{p_value} as \code{NA}).}
+\item{n_perm}{Permutations for the pseudo-p-value (default \code{9999}; use \code{0}
+to skip the test, which leaves \code{p_value} as \code{NA}). The smallest p-value a
+permutation test can give is \eqn{1/(n_{perm}+1)}, and false-discovery
+control across about 190 countries needs a finer floor than 999
+permutations give; see the section below.}
 
 \item{alpha}{Significance threshold for the \code{cluster} label (default \code{0.05}).}
+
+\item{p_adjust}{How to adjust the per-country p-values for testing about
+190 countries at once: \code{"fdr"} (default; Benjamini-Hochberg false
+discovery rate), \code{"bonferroni"}, \code{"holm"} or \code{"none"}. See the section
+below.}
 }
 \value{
 A tibble, one row per country: \code{iso3c}, \code{value}, \code{lag} (the
-neighbour average), \code{ii} (the local statistic), \code{p_value} and \code{cluster}
-(\code{"High-High"}, \code{"Low-Low"}, \code{"High-Low"}, \code{"Low-High"} or \code{"Not significant"}).
+neighbour average), \code{ii} (the local statistic), \code{p_value}, \code{p_adjusted}
+and \code{cluster} (\code{"High-High"}, \code{"Low-Low"}, \code{"High-Low"}, \code{"Low-High"} or
+\code{"Not significant"}, judged on \code{p_adjusted}). The method is recorded as
+the \code{"countryatlas_p_adjust"} attribute.
+}
+\description{
+Local Indicators of Spatial Association (Anselin 1995): one Moran statistic
+per country, plus the cluster type it belongs to. Where \code{\link[=morans_i]{morans_i()}} answers
+"is there clustering anywhere", this answers "where, and of what kind".
+}
+\section{One test per country}{
+
+A local statistic runs one test per country, about 190 of them, so at
+\code{alpha = 0.05} roughly ten countries are expected to look significant when
+nothing is going on at all. \code{p_adjust = "fdr"} controls the false discovery
+rate instead -- the share of flagged countries that are false alarms --
+which is the standard remedy for exactly this setting (Caldas de Castro &
+Singer 2006) and what GeoDa offers. \code{"bonferroni"} and \code{"holm"} control the
+chance of any false alarm, which is stricter; \code{"none"} reproduces the
+unadjusted labels of earlier versions. \code{p_value} itself is never adjusted,
+so it still matches \code{spdep}.
+
+Adjustment needs resolution. A permutation p-value cannot go below
+\eqn{1/(n_{perm}+1)}, and Benjamini-Hochberg flags the most significant of
+190 tests only when its p-value is below \eqn{0.05/190 \approx 0.00026}.
+With 999 permutations the floor, 0.001, is above that, so nothing short of
+several countries all reaching the floor can be flagged, and an empty map
+would say "no clusters" when it means "not enough permutations". Hence the
+default of 9,999, which takes about a second for the whole world.
 
 \code{p_value} is a \strong{two-sided} pseudo-p from conditional permutation:
 \eqn{(1 + \#\{|I_i^{*}| \ge |I_i|\}) / (n_{perm} + 1)}, so it is never
@@ -34,11 +77,7 @@ as one surrounded by like ones. \code{cluster} is \code{"Not significant"} where
 \code{p_value > alpha}, and everywhere when \code{n_perm = 0} leaves it \code{NA}. Set a
 seed beforehand for a reproducible \code{p_value}.
 }
-\description{
-Local Indicators of Spatial Association (Anselin 1995): one Moran statistic
-per country, plus the cluster type it belongs to. Where \code{\link[=morans_i]{morans_i()}} answers
-"is there clustering anywhere", this answers "where, and of what kind".
-}
+
 \examples{
 \donttest{
 snap <- countryatlas::world_snapshot$countries
@@ -51,6 +90,11 @@ local_morans(snap, gdp_per_capita, weights = country_weights("knn", k = 5),
 Anselin, L. (1995). Local Indicators of Spatial Association -- LISA.
 \emph{Geographical Analysis} 27(2), 93-115.
 \doi{10.1111/j.1538-4632.1995.tb00338.x}
+
+Caldas de Castro, M. & Singer, B. H. (2006). Controlling the false discovery
+rate: a new application to account for multiple and dependent tests in local
+statistics of spatial association. \emph{Geographical Analysis} 38(2), 180-208.
+\doi{10.1111/j.0016-7363.2006.00682.x}
 }
 \seealso{
 \code{\link[=lisa_map]{lisa_map()}}, \code{\link[=morans_i]{morans_i()}}, \code{\link[=country_weights]{country_weights()}}

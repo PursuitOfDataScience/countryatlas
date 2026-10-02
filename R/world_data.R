@@ -1,30 +1,27 @@
 # Core data assembly ------------------------------------------------------------
 
-# Per-country classification (income / region / continent) assembled offline
-# from WDI's bundled country metadata plus countrycode.
+# Per-country classification (income / region / continent), offline: income
+# and region from the bundled, dated country_classifications as of the current
+# fiscal year, continent from countrycode. Income and region used to come from
+# the installed WDI's WDI_data, so they depended on which WDI release happened
+# to be installed -- WDI 2.7.10 disagreed with the World Bank's own API for
+# eight countries -- and nothing said which vintage a frame carried. The record
+# now says so, through source_info().
 country_classification <- function(iso3c, classify) {
   out <- tibble::tibble(iso3c = iso3c)
-  meta <- tryCatch(tibble::as_tibble(WDI::WDI_data$country),
-                   error = function(e) NULL)
+  at <- rep(classification_now(), length(iso3c))
+  info <- list()
   if ("income" %in% classify) {
-    if (!is.null(meta)) {
-      lk <- meta[, c("iso3c", "income")]
-      out <- dplyr::left_join(out, lk, by = "iso3c", na_matches = "never")
-      out$income <- clean_income(out$income)
-    } else {
-      out$income <- factor(NA, levels = income_levels())
-    }
+    inc <- classify_lookup(iso3c, at, "wb_income")
+    # An economy the World Bank lists but has not given a group (no GNI
+    # estimate) is "Not classified", WDI's own convention; a code it does not
+    # list at all stays NA.
+    listed <- !is.na(classify_lookup(iso3c, at, "wb_region"))
+    inc[is.na(inc) & listed] <- "Not classified"
+    out$income <- factor(inc, levels = income_levels())
   }
   if ("region" %in% classify) {
-    if (!is.null(meta) && "region" %in% names(meta)) {
-      lk <- meta[, c("iso3c", "region")]
-      names(lk)[2] <- "region"
-      out <- dplyr::left_join(out, lk, by = "iso3c", na_matches = "never")
-    } else {
-      out$region <- suppressWarnings(
-        countrycode::countrycode(iso3c, "iso3c", "region", warn = FALSE)
-      )
-    }
+    out$region <- classify_lookup(iso3c, at, "wb_region")
   }
   if ("continent" %in% classify) {
     out$continent <- suppressWarnings(
@@ -32,7 +29,17 @@ country_classification <- function(iso3c, classify) {
     )
   }
   out <- apply_code_fallback(out)
-  # Drop the helper iso3c if caller binds separately.
+  vintage <- sprintf("FY%d", fiscal_year(classification_now()))
+  cols <- intersect(c("income", "region"), classify)
+  if (length(cols)) {
+    out <- set_source_info(out, source_info_rows(
+      cols, source = "World Bank classification",
+      indicator = unname(CLASSIFICATION_SCHEMES[cols]),
+      label = c(income = "Income group (GNI per capita, Atlas method)",
+                region = "World Bank region")[cols],
+      vintage = vintage, licence = "CC BY 4.0",
+      citation = "World Bank. World Bank Country and Lending Groups."))
+  }
   out
 }
 
@@ -67,10 +74,20 @@ country_classification <- function(iso3c, classify) {
 #' @param projection,recenter Projection, and optional central meridian, for
 #'   the `sf` backend (see [world_map()] for the projections available). The
 #'   other backends warn if asked, rather than ignoring the request.
-#' @param latest If `TRUE`, use the most recent non-`NA` value per country for a
-#'   single-year request.
+#' @param latest For a single-year request: `TRUE` takes each indicator's most
+#'   recent non-`NA` value per country, and `"common"` the most recent year in
+#'   which *every* requested indicator is present, so arithmetic across them is
+#'   consistent. Either way each indicator gains an `<indicator>_year` column
+#'   saying which year its value comes from. `FALSE` (default) pins the
+#'   requested year.
 #' @param cache Whether to use the memoised / on-disk WDI cache.
 #' @param language WDI language code (default `"en"`).
+#' @param vintage Which release of the World Development Indicators to read:
+#'   `NULL` (default) for the current one, or an archived release such as
+#'   `"2024-07"` from the World Bank's WDI Database Archives (see
+#'   [wdi_vintages()]). An archived release never changes, so its cache
+#'   entries never expire. A series the release does not hold warns and names
+#'   the nearest releases that do.
 #' @param parallel Whether to fetch multiple indicators in parallel. Ignored
 #'   when the cache is memory-only (an unwritable `countryatlas.cache_dir`),
 #'   because a forked worker's memo dies with it and nothing would be cached.
@@ -90,15 +107,10 @@ country_classification <- function(iso3c, classify) {
 #' @export
 #' @examples
 #' \donttest{
-#' # geometry = "polygon", the default, comes from the suggested `maps`
-#' # package, so guard the call: an example may not assume a Suggests is
-#' # installed (R CMD check runs \donttest{} blocks, and CRAN has a
-#' # check flavour with no suggested packages at all).
-#' if (requireNamespace("maps", quietly = TRUE)) {
-#'   world_data(2020)
-#' }
+#' # geometry = "polygon", the default, is bundled: nothing to install.
+#' world_data(2020)
 #'
-#' # geometry = "none" needs nothing beyond the hard dependencies.
+#' # geometry = "none" returns the country table alone.
 #' world_data(2020, indicator = c(life_exp = "SP.DYN.LE00.IN"),
 #'            geometry = "none")
 #' }
@@ -114,11 +126,19 @@ world_data <- function(year,
                        cache = TRUE,
                        language = "en",
                        parallel = TRUE,
-                       overrides = country_overrides()) {
-  check_bool(latest, "latest")
+                       overrides = country_overrides(),
+                       vintage = NULL) {
+  latest <- check_latest(latest)
   check_bool(cache, "cache")
   check_bool(parallel, "parallel")
-  geometry <- rlang::arg_match(geometry)
+  # "maps" passes through to attach_geometry(), deprecated on the caller's
+  # behalf here.
+  if (identical(geometry, "maps")) {
+    user_env <- rlang::caller_env()
+    deprecate_maps_geometry(user_env)
+  } else {
+    geometry <- rlang::arg_match(geometry)
+  }
   scale <- rlang::arg_match(scale)
   year <- validate_years(year)
   # intersect() silently dropped anything unrecognised, so classify = "incomes"
@@ -133,24 +153,8 @@ world_data <- function(year,
   countries <- country_data(
     year = year, indicator = indicator, latest = latest,
     panel = length(year) > 1L, classify = classify, cache = cache,
-    language = language, parallel = parallel
+    language = language, parallel = parallel, vintage = vintage
   )
-
-  # Legacy alias from 1.0.0, opt-in since 2.0.0 and now announcing itself. The
-  # deprecation cycle has run long enough: the option still works, so nothing
-  # breaks today, but a user relying on it now hears about it once per session
-  # instead of discovering the removal later.
-  if ("gdp_per_capita" %in% names(countries) &&
-      !"gdp_per_capita_2015" %in% names(countries) &&
-      isTRUE(getOption("countryatlas.gdp_compat", FALSE))) {
-    wdj_warn(c(
-      "{.code countryatlas.gdp_compat} is deprecated.",
-      "!" = "The {.field gdp_per_capita_2015} alias dates from 1.0.0 and will be
-             removed in a future release.",
-      "i" = "Use {.field gdp_per_capita}, which holds the same values."
-    ), class = "deprecatedWarning")
-    countries$gdp_per_capita_2015 <- countries$gdp_per_capita
-  }
 
   if (geometry == "none") {
     # `region` is documented as a plain "Optional subset", not an sf-backend
@@ -182,9 +186,10 @@ world_data <- function(year,
     return(countries)
   }
 
-  attach_geometry(countries, by = "iso3c", geometry = geometry, scale = scale,
-                  region = region, projection = projection, recenter = recenter,
-                  overrides = overrides)
+  quiet_maps_deprecation(
+    attach_geometry(countries, by = "iso3c", geometry = geometry, scale = scale,
+                    region = region, projection = projection, recenter = recenter,
+                    overrides = overrides))
 }
 
 #' Lightweight one-row-per-country table
@@ -196,7 +201,10 @@ world_data <- function(year,
 #'
 #' @param year A single year or a range (with `panel = TRUE`).
 #' @param indicator A named character vector of WDI codes (or `NULL` for none).
-#' @param latest Use the most recent non-`NA` value per country (single year).
+#' @param latest For a single year: `TRUE` takes each indicator's most recent
+#'   non-`NA` value per country, `"common"` the most recent year in which every
+#'   indicator is present. Both add an `<indicator>_year` column per indicator;
+#'   see the section below.
 #' @param panel Return a panel keyed on `iso3c` + `year` (implied when `year`
 #'   spans multiple years).
 #' @param classify Which classifications to add.
@@ -204,6 +212,19 @@ world_data <- function(year,
 #' @param language WDI language code.
 #' @param parallel Whether to fetch indicators in parallel. Ignored when the
 #'   cache is memory-only; see [world_data()].
+#' @param vintage The release of the World Development Indicators to read;
+#'   see [world_data()].
+#'
+#' @section The most recent value, and which year it is from:
+#' With `latest = TRUE` each indicator takes its own most recent value, so one
+#' row can hold GDP from 2023 beside population from 2021. That is often what
+#' is wanted -- the freshest number for each -- but dividing one by the other
+#' mixes years, so every indicator carries an `<indicator>_year` column, and
+#' [per_capita()], [deflate()] and [to_ppp()] warn (class
+#' `countryatlas_mixed_years`) when the two columns they combine come from
+#' different years. `latest = "common"` instead takes, per country, the most
+#' recent year in which every requested indicator is present, so the row is
+#' internally consistent; a country with no such year gets `NA` throughout.
 #'
 #' @return A tibble, one row per country (or per country-year for a panel).
 #'
@@ -226,19 +247,21 @@ country_data <- function(year,
                          classify = c("income", "continent", "region"),
                          cache = TRUE,
                          language = "en",
-                         parallel = TRUE) {
-  check_bool(latest, "latest")
+                         parallel = TRUE,
+                         vintage = NULL) {
+  latest <- check_latest(latest)
   check_bool(panel, "panel")
   check_bool(cache, "cache")
   check_bool(parallel, "parallel")
   year <- validate_years(year)
-  latest_single <- isTRUE(latest) && length(year) == 1L
+  latest_on <- !isFALSE(latest)
+  latest_single <- latest_on && length(year) == 1L
   # `latest` and a multi-year request are mutually exclusive, and so are `latest`
   # and `panel` -- but which one won was silent and, worse, inconsistent: a range
   # overrode `latest`, while a single year had `latest` override `panel`. Say
   # which argument is being dropped rather than returning a shape nobody asked
   # for. The winner is unchanged; only the silence is.
-  if (isTRUE(latest) && length(year) > 1L) {
+  if (latest_on && length(year) > 1L) {
     wdj_warn(c(
       "{.arg latest} is ignored when {.arg year} spans more than one year.",
       "x" = "Got {length(year)} years, so the full panel is returned.",
@@ -247,7 +270,7 @@ country_data <- function(year,
     ))
   } else if (latest_single && isTRUE(panel)) {
     wdj_warn(c(
-      "{.arg panel} is ignored when {.code latest = TRUE}.",
+      "{.arg panel} is ignored when {.arg latest} is set.",
       "x" = "The most recent value per country is a single row, not a panel.",
       "i" = "Pass a year range for a panel, or {.code latest = FALSE} to pin
              the requested year."
@@ -274,7 +297,11 @@ country_data <- function(year,
   end <- max(year)
 
   wdi <- fetch_wdi(indicator, start = if (latest_single) 1960L else start, end = end,
-                   cache = cache, language = language, parallel = parallel)
+                   cache = cache, language = language, parallel = parallel,
+                   vintage = vintage)
+  # The record of where each column came from, re-attached at the end: the
+  # collapses and joins below rebuild the frame.
+  info <- attr(wdi, "countryatlas_sources")
 
   # Restrict to requested years and drop World Bank aggregates / non-countries.
   if (nrow(wdi)) {
@@ -285,17 +312,9 @@ country_data <- function(year,
     wdi <- dplyr::filter(wdi, .data$iso3c %in% wdj_known_iso3c())
   }
 
-  if (isTRUE(latest) && length(year) == 1L && nrow(wdi)) {
+  if (latest_single && nrow(wdi)) {
     val_cols <- setdiff(names(wdi), c("iso2c", "iso3c", "country", "year"))
-    wdi <- wdi %>%
-      dplyr::group_by(.data$iso3c) %>%
-      dplyr::arrange(year_sort_key(.data$year), .by_group = TRUE) %>%
-      dplyr::summarise(
-        dplyr::across(dplyr::all_of(c("iso2c", "country")), dplyr::last),
-        dplyr::across(dplyr::all_of(val_cols),
-                      ~ dplyr::last(stats::na.omit(.x)) %||% NA),
-        .groups = "drop"
-      )
+    wdi <- latest_values(wdi, val_cols, common = identical(latest, "common"))
     # Already cleared beside the warning above for the single-year case; kept
     # for the path where `latest = TRUE` collapses without having warned.
     panel <- FALSE
@@ -328,11 +347,53 @@ country_data <- function(year,
   cls <- country_classification(unique(base$iso3c), classify)
   drop <- setdiff(intersect(names(cls), names(base)), "iso3c")
   base[drop] <- NULL
-  base <- dplyr::left_join(base, cls, by = "iso3c", na_matches = "never")
+  base <- dplyr::left_join(base, cls, by = "iso3c", na_matches = "never",
+                           relationship = "many-to-one")
+  info <- dplyr::bind_rows(info, attr(cls, "countryatlas_sources"))
 
   # Order columns sensibly.
   lead <- intersect(c("iso3c", "iso2c", "country", "year",
                       "continent", "region", "income"), names(base))
   base <- base[, c(lead, setdiff(names(base), lead)), drop = FALSE]
-  tibble::as_tibble(base)
+  set_source_info(tibble::as_tibble(base), info)
+}
+
+# `latest` is TRUE, FALSE or "common".
+check_latest <- function(latest, call = rlang::caller_env()) {
+  if (identical(latest, "common")) return("common")
+  if (!isTRUE(latest) && !isFALSE(latest)) {
+    wdj_abort(c(
+      "{.arg latest} must be {.code TRUE}, {.code FALSE} or {.val common}.",
+      "x" = "Got {.obj_type_friendly {latest}}."
+    ), call = call)
+  }
+  latest
+}
+
+# The most recent value per country, and the year it is from.
+#
+# Each value column used to take its own last non-NA value and `year` was
+# dropped, so France came back with GDP from 2023 beside population from 2021
+# and nothing recorded either year -- per_capita() on that row divided across
+# years without a word. Every indicator now keeps its year in
+# `<indicator>_year`. With `common = TRUE` the row is the most recent year in
+# which every indicator is present, so the values share one year.
+latest_values <- function(wdi, val_cols, common = FALSE) {
+  wdi <- wdi[order(wdi$iso3c, year_sort_key(wdi$year)), , drop = FALSE]
+  rows <- split(seq_len(nrow(wdi)), wdi$iso3c)
+  last_ok <- function(r, ok) if (any(ok)) r[max(which(ok))] else NA_integer_
+  out <- wdi[vapply(rows, function(r) r[length(r)], 1L),
+             intersect(c("iso3c", "iso2c", "country"), names(wdi)), drop = FALSE]
+  common_row <- if (common) {
+    vapply(rows, function(r) {
+      last_ok(r, stats::complete.cases(wdi[r, val_cols, drop = FALSE]))
+    }, 1L)
+  }
+  for (v in val_cols) {
+    pick <- common_row %||%
+      vapply(rows, function(r) last_ok(r, !is.na(wdi[[v]][r])), 1L)
+    out[[v]] <- wdi[[v]][pick]
+    out[[paste0(v, "_year")]] <- wdi$year[pick]
+  }
+  tibble::as_tibble(out)
 }

@@ -10,23 +10,33 @@ A tibble with one row per country and columns \code{iso3c}, \code{iso2c},
 \code{capital_lat}, \code{capital_lon}, \code{centroid_lat}, \code{centroid_lon}, \code{area_km2},
 \code{currency}, \code{tld}, \code{landlocked}, \code{flag}.
 
-Assembled from \link[countrycode:codelist]{countrycode::codelist}, so Kosovo (\code{XKX}) has no row --
-\code{countrycode} has none either. The geometry backends and
-\code{\link[=convert_country]{convert_country()}} do handle it; \code{\link[=distance_between]{distance_between()}}, which reads its
-centroids from here, does not. Ten further territories have a row but no
-centroid or area.
+Assembled from \link[countrycode:codelist]{countrycode::codelist}, plus a curated row for Kosovo
+(\code{XKX}), which \code{countrycode} does not carry, so \code{\link[=distance_between]{distance_between()}} and
+the k-nearest-neighbour weights can use it. Centroids and areas come
+from the bundled Natural Earth 1:50m polygons, the ones the polygon
+backend draws, with each country's holes taken out; territories drawn as
+part of their country (French Guiana, Svalbard) take theirs from Natural
+Earth's map units. Three territories have a row but no centroid or area,
+because Natural Earth does not draw them at 1:50m: Bouvet Island,
+Gibraltar and the U.S. Minor Outlying Islands.
+
+\code{income} and \code{region} are the World Bank's for the current fiscal year
+(the \code{"classification"} attribute names it, \code{"FY2027"}), from
+\link{country_classifications}, so they agree with what \code{\link[=world_data]{world_data()}}
+returns; \code{region} falls back to \code{countrycode}'s where the World Bank
+lists no region.
 
 \code{country} therefore carries the English names from \code{countrycode}
 ("South Korea", "Congo - Kinshasa"), which differ from the World Bank's for
-38 of the 215 countries in \link{world_snapshot} ("Korea, Rep.",
+39 of the 216 countries in \link{world_snapshot} ("Korea, Rep.",
 "Congo, Dem. Rep."). Each
 table is faithful to its own source, so join on \code{iso3c} and keep whichever
 label you want to display -- reconciling the two is what \code{\link[=country_join]{country_join()}}
 is for.
 }
 \source{
-Assembled from \pkg{countrycode}, \pkg{WDI} metadata and Natural
-Earth geometry.
+Assembled from \pkg{countrycode}, \pkg{WDI} metadata (capitals),
+the World Bank's classifications and Natural Earth geometry.
 }
 \usage{
 country_meta

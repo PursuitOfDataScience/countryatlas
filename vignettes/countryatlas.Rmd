@@ -28,10 +28,6 @@ knitr::opts_chunk$set(
 library(countryatlas)
 library(ggplot2)
 library(dplyr)
-# The polygon backend needs `maps`, which is only in Suggests, so every chunk
-# that attaches or draws polygon geometry is guarded on this. Without it the
-# vignette still builds -- it just skips those maps.
-has_maps <- requireNamespace("maps", quietly = TRUE)
 ```
 
 # Abstract {-}
@@ -55,8 +51,8 @@ The package rests on a single conviction: *if a task does not make it easier to
 get country data onto a map, or to make that map honest, it does not belong
 here*. Concretely, three packages are combined:
 
-* **`ggplot2::map_data("world")`** (or Natural Earth via `sf`) supplies polygon
-  geometry, i.e. *where* countries are;
+* **Natural Earth**, bundled at 1:50m (or through `sf` at three scales),
+  supplies polygon geometry, i.e. *where* countries are;
 * **`WDI`** supplies World Bank indicators, i.e. *what is true* about them;
 * **`countrycode`** supplies the crosswalk of ISO codes, continents and regions
   that makes a reliable join possible.
@@ -104,11 +100,11 @@ on `iso3c` and `year`. The `geometry` argument switches between the classic
 
 ## `country_data()` and `attach_geometry()`
 
-For analysis you usually want one tidy row per country, not ~99,000 polygon
+For analysis you usually want one tidy row per country, not ~98,000 polygon
 vertices. `country_data()` provides exactly that, and geometry is attached only
 at draw time:
 
-```{r eval = has_maps}
+```{r}
 mapdf <- attach_geometry(snapshot, geometry = "polygon")
 dim(mapdf)
 ```
@@ -121,12 +117,12 @@ dim(mapdf)
 styles. A continuous fill on a skewed indicator hides most of the variation, so
 binned and quantile styles are first-class:
 
-```{r eval = has_maps, fig.alt = "World choropleth of GDP per capita in quantile bins."}
+```{r fig.alt = "World choropleth of GDP per capita in quantile bins."}
 world_map(mapdf, gdp_per_capita, style = "quantile",
           title = "GDP per capita (quantile bins)")
 ```
 
-```{r eval = has_maps, fig.alt = "World map with every country coloured by its continent."}
+```{r fig.alt = "World map with every country coloured by its continent."}
 world_map(mapdf, continent, style = "categorical")
 ```
 
@@ -136,7 +132,7 @@ Totals (population, total emissions) are misrepresented by a choropleth because
 large values hide in small countries. A bubble map at country centroids is the
 right idiom:
 
-```{r eval = has_maps, fig.alt = "Bubble map: population drawn as proportional circles at country centroids."}
+```{r fig.alt = "Bubble map: population drawn as proportional circles at country centroids."}
 bubble_map(snapshot, population)
 ```
 
@@ -154,7 +150,7 @@ tile_map(snapshot, life_expectancy)
 Origin–destination data (trade, migration, flights) is drawn as great-circle
 arcs, with both endpoints resolved to centroids automatically:
 
-```{r eval = has_maps, fig.alt = "Flow map: great-circle arcs joining four origin-destination country pairs, width by volume."}
+```{r fig.alt = "Flow map: great-circle arcs joining four origin-destination country pairs, width by volume."}
 flows <- data.frame(
   from   = c("China", "Germany", "Brazil", "India"),
   to     = c("United States", "France", "Japan", "United Kingdom"),
@@ -200,7 +196,7 @@ check_country_match(c("USA", "Cote d'Ivoire", "Yugoslavia", "Wakanda"))
 country name for confident misses only, and attaches a record of every change:
 
 ```{r}
-repair_country_names(c("Brzil", "Germny", "United States"), verbose = FALSE)
+repair_country_names(c("Brzil", "Germny", "United States"), quiet = TRUE)
 ```
 
 ```{r}

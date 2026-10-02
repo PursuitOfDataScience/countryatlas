@@ -85,7 +85,6 @@ test_that("`n_bins` changes the output of every verb that takes it", {
   # declared n_bins handled had reasoned about compute_breaks(). Assert the
   # observable effect per verb instead of the call.
   skip_if_no_sf_geometry()
-  skip_if_not_installed("maps")
   snap <- countryatlas::world_snapshot$countries
   poly <- suppressMessages(attach_geometry(snap, geometry = "polygon"))
   sfd <- suppressMessages(attach_geometry(snap, geometry = "sf"))
@@ -215,7 +214,11 @@ test_that("every column-adding verb honours wdj_return_frame's contract", {
     per_capita = function(d) per_capita(d, v, pop = population),
     share_of_world = function(d) share_of_world(d, v),
     rank_countries = function(d) rank_countries(d, v),
-    spatial_lag = function(d) spatial_lag(d, v)
+    # Weights among the three: the default k-nearest neighbours look across
+    # the whole world, where these three have no value.
+    spatial_lag = function(d) spatial_lag(
+      d, v, weights = country_weights("knn", countries = c("FRA", "DEU", "ITA"),
+                                      k = 2))
   )
   for (nm in names(sf_verbs)) {
     out <- suppressWarnings(suppressMessages(sf_verbs[[nm]](sfd)))

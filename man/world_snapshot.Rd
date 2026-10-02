@@ -18,11 +18,24 @@ same Natural Earth 110m polygons from \code{rnaturalearth}.}
 \item{year}{The reference year.}
 }
 \code{country} carries the World Bank's own names, which differ from the
-\code{countrycode} names used by \link{country_meta} for 38 countries.
+\code{countrycode} names used by \link{country_meta} for 39 countries.
+
+\code{income} and \code{region} are the World Bank's classifications in force on
+1 January of the snapshot year (fiscal year 2024), from
+\link{country_classifications}: the regions are therefore the ones before the
+July 2025 change, with Afghanistan and Pakistan in South Asia. Data
+fetched with \code{\link[=world_data]{world_data()}} carries the current fiscal year's instead, and
+\code{\link[=source_info]{source_info()}} says which each frame holds.
+
+The \code{"provenance"} attribute records the World Development Indicators
+release the values come from, the build date, the package versions used,
+and why the snapshot is on its year: it moves to a newer year only when
+every indicator's coverage there is within five percentage points of the
+current year's. The indicator columns carry a \code{\link[=source_info]{source_info()}} record.
 }
 \source{
-World Bank via \pkg{WDI}; geometry from Natural Earth via
-\pkg{rnaturalearth}. Snapshot year: 2024.
+World Bank World Development Indicators, release 2026-07 (CC BY
+4.0), and the World Bank's classifications. Snapshot year: 2024.
 }
 \usage{
 world_snapshot

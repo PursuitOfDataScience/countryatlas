@@ -12,7 +12,8 @@ country_data(
   classify = c("income", "continent", "region"),
   cache = TRUE,
   language = "en",
-  parallel = TRUE
+  parallel = TRUE,
+  vintage = NULL
 )
 }
 \arguments{
@@ -20,7 +21,10 @@ country_data(
 
 \item{indicator}{A named character vector of WDI codes (or \code{NULL} for none).}
 
-\item{latest}{Use the most recent non-\code{NA} value per country (single year).}
+\item{latest}{For a single year: \code{TRUE} takes each indicator's most recent
+non-\code{NA} value per country, \code{"common"} the most recent year in which every
+indicator is present. Both add an \verb{<indicator>_year} column per indicator;
+see the section below.}
 
 \item{panel}{Return a panel keyed on \code{iso3c} + \code{year} (implied when \code{year}
 spans multiple years).}
@@ -33,6 +37,9 @@ spans multiple years).}
 
 \item{parallel}{Whether to fetch indicators in parallel. Ignored when the
 cache is memory-only; see \code{\link[=world_data]{world_data()}}.}
+
+\item{vintage}{The release of the World Development Indicators to read;
+see \code{\link[=world_data]{world_data()}}.}
 }
 \value{
 A tibble, one row per country (or per country-year for a panel).
@@ -51,6 +58,19 @@ country (\code{iso3c}, \code{iso2c}, \code{country}, classifications and the req
 indicators). This is what you actually \code{join()} / \code{mutate()} / \code{summarise()}
 / \code{rank()} on; attach geometry only at draw time with \code{\link[=attach_geometry]{attach_geometry()}}.
 }
+\section{The most recent value, and which year it is from}{
+
+With \code{latest = TRUE} each indicator takes its own most recent value, so one
+row can hold GDP from 2023 beside population from 2021. That is often what
+is wanted -- the freshest number for each -- but dividing one by the other
+mixes years, so every indicator carries an \verb{<indicator>_year} column, and
+\code{\link[=per_capita]{per_capita()}}, \code{\link[=deflate]{deflate()}} and \code{\link[=to_ppp]{to_ppp()}} warn (class
+\code{countryatlas_mixed_years}) when the two columns they combine come from
+different years. \code{latest = "common"} instead takes, per country, the most
+recent year in which every requested indicator is present, so the row is
+internally consistent; a country with no such year gets \code{NA} throughout.
+}
+
 \examples{
 \donttest{
 country_data(2020, c(co2 = "EN.GHG.CO2.MT.CE.AR5"))

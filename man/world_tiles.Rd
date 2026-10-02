@@ -19,9 +19,8 @@ A statebins-style equal-area tile layout: one square per country, positioned
 on a \code{row}/\code{col} grid derived from country centroids. Used by \code{\link[=tile_map]{tile_map()}}.
 }
 \details{
-The grid holds one row for each of the 239 countries in \link{country_meta} that
-has a bundled centroid; the 10 without one (\code{ALA}, \code{BVT}, \code{GIB}, \code{HKG},
-\code{MAC}, \code{SJM}, \code{TKL}, \code{TUV}, \code{UMI}, \code{VGB} -- see \link{country_meta}) have no tile
-and so cannot be drawn by \code{\link[=tile_map]{tile_map()}}.
+The grid holds one row for each of the 247 countries in \link{country_meta} that
+has a bundled centroid; the 3 without one (\code{BVT}, \code{GIB}, \code{UMI} -- see
+\link{country_meta}) have no tile and so cannot be drawn by \code{\link[=tile_map]{tile_map()}}.
 }
 \keyword{datasets}

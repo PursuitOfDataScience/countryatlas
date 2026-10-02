@@ -15,9 +15,12 @@ nothing until you print it, this one reports as it goes -- a clean panel is
 the common case and worth confirming out loud.)}
 }
 \value{
-A tibble of the offending rows: \code{iso3c}, \code{country}, \code{year}, \code{issue}
-(\code{"before_existence"} or \code{"after_dissolution"}) and \code{existed} (a
-human-readable span). Zero rows means the panel is clean.
+A tibble of the offending rows: \code{iso3c}, \code{country}, \code{year}, \code{issue},
+\code{existed} (a human-readable span) and \code{basis} (where the dates come
+from). \code{issue} is \code{"before_existence"} or \code{"after_dissolution"} -- the
+country did not exist -- or the milder \code{"before_independence"}: it
+existed, but was not yet (or not then) an independent state. Zero rows
+means the panel is clean.
 }
 \description{
 The time-aware counterpart to \code{\link[=audit_coverage]{audit_coverage()}}. A join can succeed and
@@ -28,12 +31,23 @@ had, because the country resolves and the year is a number.
 \section{What it can and cannot see}{
 
 Dissolution dates come from \link{historical_codes}, which covers the entities the
-package curates (USSR, Yugoslavia, Czechoslovakia and the rest). Independence
-dates come from the same table read in reverse: a successor state is treated
-as not existing before its predecessor dissolved. Countries with no entry in
-the crosswalk -- most of the world -- are assumed to have existed throughout,
-so a clean result means "nothing the crosswalk knows about is wrong", not
-"every date is right".
+package curates (USSR, Yugoslavia, Czechoslovakia and the rest), and a
+successor state is treated as not existing before its predecessor
+dissolved (\code{basis = "historical_codes"}).
+
+Independence comes from Gleditsch & Ward's list of independent states since
+1816 (Gleditsch & Ward 1999, through the \code{states} package), with every spell
+of independence: Namibia from 1990, Eritrea from 1993, Timor-Leste from
+2002, and Estonia from 1918 to 1940 and again from 1991. A year inside an
+earlier spell also corrects the crosswalk for a state it dates from a later
+succession (Estonia's interwar years). A year outside
+every spell is \code{"before_independence"} (\code{basis = "gleditsch_ward"}). That
+is statehood, not data availability -- a colony often reports statistics
+before independence, and a World Bank series may legitimately start there --
+so it is a separate, lower-severity issue, for the caller to judge.
+Territories that are not on the list are assumed to have existed
+throughout, so a clean result still means "nothing these lists know about
+is wrong", not "every date is right".
 }
 
 \examples{
@@ -43,6 +57,11 @@ panel <- data.frame(
   gdp   = c(1, 2, 3)
 )
 audit_time_coverage(panel)
+}
+\references{
+Gleditsch, K. S. & Ward, M. D. (1999). A revised list of independent states
+since the congress of Vienna. \emph{International Interactions} 25(4), 393-413.
+\doi{10.1080/03050629908434958}
 }
 \seealso{
 \code{\link[=audit_coverage]{audit_coverage()}}, \code{\link[=dissolve_country]{dissolve_country()}}, \code{\link[=country_timeline]{country_timeline()}}

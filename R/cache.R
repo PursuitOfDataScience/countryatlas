@@ -27,25 +27,33 @@ wdj_cache_dir <- function() {
   tools::R_user_dir("countryatlas", "cache")
 }
 
-# A single, uncached WDI fetch for one indicator. Returns a tidy tibble with
-# columns iso2c, iso3c, country, year, <name>.
-fetch_one_indicator <- function(code, name, start, end, language = "en") {
-  raw <- WDI::WDI(indicator = stats::setNames(code, name),
-                  start = start, end = end,
-                  extra = FALSE, language = language)
+# A single, uncached World Bank fetch for one indicator: the current release,
+# or an archived one when `vintage` is a release id. Returns a tidy tibble with
+# columns iso2c, iso3c, country, year, <name>, carrying the release metadata
+# (label, last update, vintage, fetch time) as attributes, which the cache
+# stores with it -- so a cached answer still says when it was fetched.
+# `.ns` exists to change the cache key: entries written by 3.0.0, which went
+# through WDI::WDI(), are never read back as though they were this.
+fetch_one_indicator <- function(code, name, start, end, language = "en",
+                                vintage = NULL, .ns = "countryatlas-4") {
+  raw <- wb_request(indicator = stats::setNames(code, name),
+                    start = start, end = end, language = language,
+                    vintage = vintage)
+  meta <- attributes(raw)[c("wb_label", "wb_lastupdated", "wb_vintage")]
   raw <- tibble::as_tibble(raw)
   # memoise caches whatever the function returns -- and for the World Bank that
-  # cache is on disk. WDI() answers a failed download by warning and handing
-  # back a zero-row frame, so one call made while the network was down wrote an
-  # empty result to disk and every later session read it back instead of
-  # retrying: the cache stayed poisoned until someone ran
-  # clear_wdi_cache(disk = TRUE) by hand. An error is never memoised, so raise
-  # one; fetch_one_safe() turns it back into "no data for this indicator".
+  # cache is on disk. A request that came back empty -- a failed download that
+  # degraded to nothing, or a series with no observations -- would otherwise
+  # be written to disk and read back by every later session instead of
+  # retrying: the cache stayed poisoned until someone cleared it by hand. An
+  # error is never memoised, so raise one; fetch_one_safe() turns it back into
+  # "no data for this indicator".
   if (!nrow(raw)) {
     wdj_abort("The World Bank returned no rows for {.val {code}}.",
               class = "countryatlas_empty_fetch")
   }
-  # WDI returns iso2c + country + year + the named value column.
+  # The API returns iso2c + country + year + the named value column, and the
+  # current release iso3c as well.
   if (!"iso3c" %in% names(raw)) {
     # countrycode() is handed raw$iso2c directly, so a response carrying
     # neither key raised its own "sourcevar must be a character or numeric
@@ -67,6 +75,11 @@ fetch_one_indicator <- function(code, name, start, end, language = "en") {
       countrycode::countrycode(raw$iso2c, "iso2c", "iso3c", warn = FALSE)
     )
   }
+  attr(raw, "wb_label") <- meta$wb_label %||% NA_character_
+  attr(raw, "wb_lastupdated") <- meta$wb_lastupdated %||% NA_character_
+  attr(raw, "wb_vintage") <- meta$wb_vintage %||% wb_vintage_id(vintage) %||%
+    NA_character_
+  attr(raw, "wb_fetched_at") <- format(Sys.time(), "%Y-%m-%d")
   raw
 }
 
@@ -81,8 +94,9 @@ fetch_one_indicator <- function(code, name, start, end, language = "en") {
 # from the World Bank API" and a table of NAs, blaming the API for a local
 # permission problem. Establish that the directory is usable up front instead,
 # and fall back to the in-session cache when it is not.
-wdj_disk_cache <- function() {
+wdj_disk_cache <- function(subdir = NULL, permanent = FALSE) {
   dir <- wdj_cache_dir()
+  if (length(dir) && nzchar(dir) && !is.null(subdir)) dir <- file.path(dir, subdir)
   # An empty path means "no disk cache". Handle it before touching the
   # filesystem: dir.create("") warns and returns FALSE on R 4.4 but *errors*
   # with "zero-length 'path' argument" on R 4.6, so the graceful fallback was
@@ -116,7 +130,10 @@ wdj_disk_cache <- function() {
   #
   # cachem is already an unconditional dependency of memoise, so this adds
   # nothing to install.
-  age <- cache_limit_option("countryatlas.cache_max_age", 30L * 86400L)
+  # An archived World Bank release never changes, so its entries never go
+  # stale; only the size cap applies to them.
+  age <- if (isTRUE(permanent)) Inf else
+    cache_limit_option("countryatlas.cache_max_age", 30L * 86400L)
   size <- cache_limit_option("countryatlas.cache_max_size", 50L * 1024L^2)
   cache <- tryCatch(
     cachem::cache_disk(dir, max_age = age, max_size = size, evict = "lru",
@@ -131,6 +148,18 @@ wdj_disk_cache <- function() {
   )
   if (is.null(cache)) return(NULL)
   prune_legacy_cache(dir)
+  # 3.0.0 kept the World Bank's entries in the cache root itself. Nothing reads
+  # them now -- the key namespace moved with the client -- so they are swept
+  # like any other outdated entry, by the shape of their names.
+  if (!is.null(subdir)) {
+    root <- dirname(dir)
+    prune_legacy_cache(root)
+    old <- list.files(root, pattern = paste0("^[0-9a-f]{32,128}",
+                                             gsub(".", "\\.", WDJ_CACHE_EXT,
+                                                  fixed = TRUE), "$"),
+                      full.names = TRUE)
+    if (length(old)) unlink(old)
+  }
   cache
 }
 
@@ -199,8 +228,12 @@ prune_legacy_cache <- function(dir) {
   invisible(length(legacy))
 }
 
-get_fetch_fun <- function(cache = TRUE) {
+get_fetch_fun <- function(cache = TRUE, vintage = NULL) {
   if (!isTRUE(cache)) return(fetch_one_indicator)
+  # Archived releases have a memo, and a directory, of their own: they never
+  # change, so they are kept for good, while the current release ages out.
+  archive <- !is.null(vintage)
+  slot <- if (archive) "fetch_memo_archive" else "fetch_memo"
   # Rebuild when the cache location changes. The memoised fetcher used to be
   # built once and kept for the session, so setting
   # options(countryatlas.cache_dir = ) after the first cached call was silently
@@ -209,14 +242,18 @@ get_fetch_fun <- function(cache = TRUE) {
   # page offers that option as the way to relocate the cache and says nothing
   # about having to set it first.
   dir <- wdj_cache_dir()
-  if (!identical(.wdj_state$fetch_dir, dir)) .wdj_state$fetch_memo <- NULL
-  if (is.null(.wdj_state$fetch_memo)) {
+  if (!identical(.wdj_state$fetch_dir, dir)) {
+    .wdj_state$fetch_memo <- NULL
+    .wdj_state$fetch_memo_archive <- NULL
+  }
+  if (is.null(.wdj_state[[slot]])) {
     .wdj_state$fetch_dir <- dir
-    cache_obj <- wdj_disk_cache()
+    cache_obj <- wdj_disk_cache(if (archive) "wdi-archive" else "wdi",
+                                permanent = archive)
     if (is.null(cache_obj)) {
       wdj_inform(
         c("!" = "Cannot write to the cache directory {.path {wdj_cache_dir()}}.",
-          "i" = "Caching for this session only. See {.fn clear_wdi_cache}."),
+          "i" = "Caching for this session only. See {.fn clear_country_cache}."),
         # Per directory, not per session: the message names a specific path, and
         # the fetcher is now rebuilt whenever the path changes, so a second
         # unwritable location would otherwise go unreported.
@@ -226,58 +263,41 @@ get_fetch_fun <- function(cache = TRUE) {
     }
     # Remembered so fetch_wdi() can tell a fork-safe memo (on disk, shared by
     # every process) from one that only lives in this session's memory.
-    .wdj_state$fetch_on_disk <- !is.null(cache_obj)
-    .wdj_state$fetch_memo <- if (is.null(cache_obj)) {
+    if (!archive) .wdj_state$fetch_on_disk <- !is.null(cache_obj)
+    .wdj_state[[slot]] <- if (is.null(cache_obj)) {
       memoise::memoise(fetch_one_indicator)
     } else {
       memoise::memoise(fetch_one_indicator, cache = cache_obj)
     }
   }
-  .wdj_state$fetch_memo
+  .wdj_state[[slot]]
 }
 
-#' Clear the on-disk / in-memory WDI cache
+#' Clear the World Bank cache (deprecated)
 #'
-#' Forget memoised World Bank fetches, both in-session and (optionally) on disk.
+#' @description
+#' `r lifecycle::badge("deprecated")`
 #'
-#' @section Where the cache lives:
-#' The persistent cache goes in the standard per-user cache location,
-#' `tools::R_user_dir("countryatlas", "cache")`. Point it elsewhere with
-#' `options(countryatlas.cache_dir = )`, or skip the disk entirely by passing
-#' `cache = FALSE` to [world_data()] / [country_data()]. The directory itself is
-#' created the first time a cached fetch is attempted, whether or not the World
-#' Bank answers; only a successful fetch leaves a response in it, and reading the
-#' bundled [world_snapshot] never goes near it. Under `R CMD check` the whole
-#' cache moves to the session temp directory, so a check never writes to the
-#' user's file space.
-#'
-#' The directory may hold other files too. The cache only ever writes, expires
-#' and deletes its own entries (named by a hash, with the extension
-#' `.countryatlas`), and `disk = TRUE` removes the directory itself only when
-#' that leaves it empty.
-#'
-#' @section How the cache is managed:
-#' The persistent cache expires its own contents, so it does not grow without
-#' bound and does not serve stale figures indefinitely: an entry is dropped
-#' once it is 30 days old, and if the directory exceeds 50 MB the
-#' least-recently-used entries go first. Both limits are adjustable with
-#' `options(countryatlas.cache_max_age = )` (seconds) and
-#' `options(countryatlas.cache_max_size = )` (bytes). A dropped entry costs a
-#' re-fetch, nothing more.
-#'
-#' Expiry matters beyond disk space: World Bank observations are revised, so a
-#' figure cached long ago is not necessarily the figure the API would return
-#' today.
+#' `clear_wdi_cache()` was generalised into [clear_country_cache()] in 3.0.0,
+#' which clears any source's cache; `clear_wdi_cache(disk)` is
+#' `clear_country_cache("wdi", disk)`. It now says so, and goes in 5.0.0.
 #'
 #' @param disk Whether to also delete the persistent on-disk cache.
 #' @return Invisibly `TRUE`.
+#' @keywords internal
 #' @export
 #' @examples
-#' clear_wdi_cache()              # forget the in-session memo
-#' \dontrun{
-#' clear_wdi_cache(disk = TRUE)   # also delete the persistent cache
-#' }
+#' clear_country_cache("wdi")   # instead of clear_wdi_cache()
 clear_wdi_cache <- function(disk = FALSE) {
+  lifecycle::deprecate_warn("4.0.0", "clear_wdi_cache()",
+                            "clear_country_cache()",
+                            details = "Write `clear_country_cache(\"wdi\")`.")
+  wdi_cache_clear(disk)
+}
+
+# Forget the World Bank fetches: the in-session memos for the current and the
+# archived releases, and with `disk = TRUE` their files.
+wdi_cache_clear <- function(disk = FALSE) {
   check_bool(disk, "disk")
   memo <- .wdj_state$fetch_memo
   # forget() only when the memo lives in memory. On a filesystem-backed memo it
@@ -292,32 +312,47 @@ clear_wdi_cache <- function(disk = FALSE) {
     memoise::forget(memo)
   }
   .wdj_state$fetch_memo <- NULL
+  .wdj_state$fetch_memo_archive <- NULL
   if (isTRUE(disk)) {
-    dir <- wdj_cache_dir()
-    # The cache's own files, then the directory only if that leaves it empty.
-    # This was unlink(dir, recursive = TRUE): with countryatlas.cache_dir set
-    # to a folder the caller also used, "delete the persistent cache" deleted
-    # the folder, every file in it and every subdirectory below it.
-    if (length(dir) && nzchar(dir) && dir.exists(dir)) {
+    for (sub in c("wdi", "wdi-archive")) clear_cache_dir(sub)
+  }
+  invisible(TRUE)
+}
+
+# Delete one source's cache files -- this cache's own, by the shape of their
+# names -- then its directory and the cache root if that leaves them empty.
+# This was unlink(dir, recursive = TRUE): with countryatlas.cache_dir set to a
+# folder the caller also used, "delete the persistent cache" deleted the
+# folder, every file in it and every subdirectory below it.
+clear_cache_dir <- function(subdir = NULL) {
+  root <- wdj_cache_dir()
+  if (!length(root) || !nzchar(root)) return(invisible(FALSE))
+  empty <- function(d) !length(list.files(d, all.files = TRUE, no.. = TRUE))
+  dirs <- if (is.null(subdir)) root else file.path(root, subdir)
+  # The 3.0.0 layout kept the World Bank entries in the root itself; they are
+  # this cache's files too, and are cleared with the World Bank's.
+  if (identical(subdir, "wdi")) dirs <- c(dirs, root)
+  for (dir in dirs) {
+    if (dir.exists(dir)) {
       unlink(wdj_cache_files(dir))
-      if (!length(list.files(dir, all.files = TRUE, no.. = TRUE))) {
-        unlink(dir, recursive = TRUE)
-      }
+      if (!identical(dir, root) && empty(dir)) unlink(dir, recursive = TRUE)
     }
   }
+  if (dir.exists(root) && empty(root)) unlink(root, recursive = TRUE)
   invisible(TRUE)
 }
 
 # Fetch (possibly many) indicators and merge into one tidy panel keyed on
 # iso3c + year. Indicators are fetched in parallel when there is more than one.
 fetch_wdi <- function(indicator, start, end, cache = TRUE,
-                      language = "en", parallel = TRUE) {
+                      language = "en", parallel = TRUE, vintage = NULL) {
   indicator <- normalize_indicator(indicator)
   if (is.null(indicator)) {
     return(tibble::tibble(iso3c = character(), iso2c = character(),
                           country = character(), year = integer()))
   }
-  fetch_fun <- get_fetch_fun(cache)
+  vintage <- wb_vintage_id(vintage)
+  fetch_fun <- get_fetch_fun(cache, vintage)
   codes <- unname(indicator)
   names_ <- names(indicator)
 
@@ -333,7 +368,7 @@ fetch_wdi <- function(indicator, start, end, cache = TRUE,
   captured <- wdj_lapply(
     seq_along(indicator),
     function(i) fetch_one_captured(fetch_fun, codes[i], names_[i],
-                                   start, end, language),
+                                   start, end, language, vintage),
     parallel = parallel
   )
   replay_conditions(captured)
@@ -362,7 +397,16 @@ fetch_wdi <- function(indicator, start, end, cache = TRUE,
     return(tibble::tibble(iso3c = character(), iso2c = character(),
                           country = character(), year = integer()))
   }
-  out
+  # What each column is, from where, in which release, fetched when: the
+  # record source_info() reads and the maps cite.
+  info <- dplyr::bind_rows(lapply(seq_along(parts), function(i) {
+    if (is.null(parts[[i]])) return(NULL)
+    wb_source_info(names_[i], codes[i], parts[[i]])
+  }))
+  for (a in c("wb_label", "wb_lastupdated", "wb_vintage", "wb_fetched_at")) {
+    attr(out, a) <- NULL
+  }
+  set_source_info(out, info)
 }
 
 # Does this error come from reading the cache rather than from the network?
@@ -384,10 +428,11 @@ looks_like_cache_read_error <- function(msg) {
 # indicator is what makes fetch_wdi() fork in the first place. A single bad
 # indicator dropped its column from the result and said nothing at all. The
 # serial path captures too, so both report identically.
-fetch_one_captured <- function(fetch_fun, code, name, start, end, language) {
+fetch_one_captured <- function(fetch_fun, code, name, start, end, language,
+                               vintage = NULL) {
   conds <- list()
   value <- withCallingHandlers(
-    fetch_one_safe(fetch_fun, code, name, start, end, language),
+    fetch_one_safe(fetch_fun, code, name, start, end, language, vintage),
     warning = function(w) {
       conds[[length(conds) + 1L]] <<- w
       invokeRestart("muffleWarning")
@@ -417,12 +462,28 @@ replay_conditions <- function(captured) {
 }
 
 # Wrap a fetch so a single indicator failure degrades gracefully.
-fetch_one_safe <- function(fetch_fun, code, name, start, end, language) {
+fetch_one_safe <- function(fetch_fun, code, name, start, end, language,
+                           vintage = NULL) {
   tryCatch(
-    fetch_fun(code, name, start, end, language),
+    # The vintage is passed only when there is one, so a fetcher written
+    # before releases could be pinned -- a test stub, say -- still fits.
+    if (is.null(vintage)) fetch_fun(code, name, start, end, language) else
+      fetch_fun(code, name, start, end, language, vintage),
     error = function(e) {
       msg <- conditionMessage(e)
-      if (inherits(e, "countryatlas_empty_fetch")) {
+      # A pipeline that must not go on with data missing asked for errors.
+      if (inherits(e, "countryatlas_fetch_failed") && fetch_strict()) {
+        rlang::cnd_signal(e)
+      }
+      if (inherits(e, "countryatlas_vintage_missing")) {
+        near <- wb_nearest_vintages(vintage, code, start)
+        wdj_warn(c(
+          "{msg}",
+          "i" = if (length(near)) "The nearest releases that hold it are
+                 {.val {wb_vintage_label(near)}}." else "{.fn wdi_vintages}
+                 lists the releases."
+        ), class = "countryatlas_vintage_missing")
+      } else if (inherits(e, "countryatlas_empty_fetch")) {
         wdj_warn(c(
           "No data returned for indicator {.val {code}}.",
           "i" = "Either the indicator has no observations for the years asked
@@ -453,7 +514,8 @@ fetch_one_safe <- function(fetch_fun, code, name, start, end, language) {
         wdj_warn(c(
           "Could not fetch indicator {.val {code}} from the World Bank API.",
           "x" = "{msg}"
-        ))
+        ), class = if (inherits(e, "countryatlas_fetch_failed"))
+          "countryatlas_fetch_failed")
       }
       NULL
     }

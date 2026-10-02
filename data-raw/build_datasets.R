@@ -3,8 +3,10 @@
 #   Rscript data-raw/build_datasets.R
 # Re-run whenever the curated data or the snapshot year changes.
 #
-# Geometry-derived fields (centroids, area) are computed from the `maps`
-# polygon backend so this script runs on any machine, with or without `sf`.
+# Geometry-derived fields (centroids, area) are computed from the bundled
+# Natural Earth polygons (R/sysdata.rda, built by
+# data-raw/natural_earth_polygons.R) -- the polygon backend's own geometry -- so
+# this script runs on any machine, with or without `sf`.
 # The optional low-resolution `sf` snapshot is built only when `sf` and
 # `rnaturalearth` are available.
 
@@ -13,10 +15,44 @@ suppressPackageStartupMessages({
   library(tibble)
   library(countrycode)
 })
+# The package itself, for its World Bank client (which records the release a
+# value came from) and its dated classifications. Build those first:
+# Rscript data-raw/country_classifications.R
+pkgload::load_all(".", quiet = TRUE)
 
 dir.create("data", showWarnings = FALSE)
-SNAPSHOT_YEAR <- 2024L
 MEMBERSHIP_AS_OF <- "2026-06-01"  # documented point-in-time for memberships
+
+# The snapshot year (decision Q10 of the 4.0.0 plan): move to the newer year
+# only if every curated indicator's coverage there is within 5 percentage
+# points of the current year's; otherwise stay, and record why.
+SNAPSHOT_CURRENT <- 2024L
+SNAPSHOT_CANDIDATE <- 2025L
+snap_indicators <- c(gdp_per_capita = "NY.GDP.PCAP.KD",
+                     population = "SP.POP.TOTL",
+                     life_expectancy = "SP.DYN.LE00.IN",
+                     co2_per_capita = "EN.GHG.CO2.PC.CE.AR5")
+countries_iso <- c(unique(na.omit(codelist$iso3c)), "XKX")
+both_years <- fetch_wdi(snap_indicators, SNAPSHOT_CURRENT, SNAPSHOT_CANDIDATE,
+                        cache = FALSE, parallel = FALSE)
+both_years <- both_years[both_years$iso3c %in% countries_iso, ]
+coverage <- sapply(names(snap_indicators), function(v) {
+  sapply(c(SNAPSHOT_CURRENT, SNAPSHOT_CANDIDATE),
+         function(y) mean(!is.na(both_years[[v]][both_years$year == y])))
+})
+drop_pp <- 100 * (coverage[1, ] - coverage[2, ])
+SNAPSHOT_YEAR <- if (all(drop_pp <= 5)) SNAPSHOT_CANDIDATE else SNAPSHOT_CURRENT
+year_rule <- if (SNAPSHOT_YEAR == SNAPSHOT_CANDIDATE) {
+  sprintf("Moved to %d: every indicator's coverage is within 5 points of %d's.",
+          SNAPSHOT_CANDIDATE, SNAPSHOT_CURRENT)
+} else {
+  short <- names(drop_pp)[drop_pp > 5]
+  sprintf("Stayed on %d: in %d, %s.", SNAPSHOT_CURRENT, SNAPSHOT_CANDIDATE,
+          paste(sprintf("%s coverage is %.1f%% against %.1f%%", short,
+                        100 * coverage[2, short], 100 * coverage[1, short]),
+                collapse = "; "))
+}
+message(year_rule)
 
 iso_of <- function(names) {
   countrycode(names, "country.name", "iso3c", warn = FALSE)
@@ -80,7 +116,29 @@ groups <- list(
   GCC = c("Bahrain","Kuwait","Oman","Qatar","Saudi Arabia",
           "United Arab Emirates"),
   Nordic = c("Denmark","Finland","Iceland","Norway","Sweden"),
-  Visegrad = c("Czechia","Hungary","Poland","Slovakia")
+  Visegrad = c("Czechia","Hungary","Poland","Slovakia"),
+  # The 4.0.0 groups, dated in data-raw/country_groups_history.R with sources.
+  SCO = c("China","Kazakhstan","Kyrgyzstan","Russia","Tajikistan","Uzbekistan",
+          "India","Pakistan","Iran","Belarus"),
+  CPTPP = c("Australia","Brunei","Canada","Chile","Japan","Malaysia","Mexico",
+            "New Zealand","Peru","Singapore","United Kingdom","Vietnam"),
+  RCEP = c("Australia","Brunei","Cambodia","China","Indonesia","Japan","Laos",
+           "Malaysia","New Zealand","Philippines","Singapore","South Korea",
+           "Thailand","Vietnam"),
+  EAC = c("Burundi","Congo - Kinshasa","Kenya","Rwanda","Somalia",
+          "South Sudan","Tanzania","Uganda"),
+  SADC = c("Angola","Botswana","Comoros","Congo - Kinshasa","Eswatini",
+           "Lesotho","Madagascar","Malawi","Mauritius","Mozambique","Namibia",
+           "Seychelles","South Africa","Tanzania","Zambia","Zimbabwe"),
+  APEC = c("Australia","Brunei","Canada","Chile","China","Hong Kong SAR China",
+           "Indonesia","Japan","Malaysia","Mexico","New Zealand",
+           "Papua New Guinea","Peru","Philippines","Russia","Singapore",
+           "South Korea","Taiwan","Thailand","United States","Vietnam"),
+  ArabLeague = c("Algeria","Bahrain","Comoros","Djibouti","Egypt","Iraq",
+                 "Jordan","Kuwait","Lebanon","Libya","Mauritania","Morocco",
+                 "Oman","Palestinian Territories","Qatar","Saudi Arabia",
+                 "Somalia","Sudan","Syria","Tunisia","United Arab Emirates",
+                 "Yemen")
 )
 
 country_groups_tbl <- do.call(rbind, lapply(names(groups), function(g) {
@@ -183,25 +241,20 @@ local({
   }
 })
 
-md <- ggplot2::map_data("world")
-md$iso3c <- wdj_overrides_iso(md$region)
-md <- md[!is.na(md$iso3c), ]
-
-geo <- md |>
-  group_by(iso3c, group) |>
-  summarise(
-    g_area = ring_area_km2(long, lat),
-    g_clon = mean(range(long)),
-    g_clat = mean(range(lat)),
-    .groups = "drop"
-  ) |>
-  group_by(iso3c) |>
-  summarise(
-    area_km2 = sum(g_area),
-    centroid_lon = g_clon[which.max(g_area)],
-    centroid_lat = g_clat[which.max(g_area)],
-    .groups = "drop"
-  )
+# The centroids by the same largest-piece rule polygon_centroids() applies to
+# the live geometry, so the two cannot drift; the areas with each country's
+# holes taken out.
+poly <- build_world_polygons(source = "ne")
+geo <- polygon_centroids(poly)
+area <- attr(ne_polygons, "area_km2")
+geo$area_km2 <- unname(area[geo$iso3c])
+# Plus the territories drawn as part of their country (French Guiana inside
+# France), from Natural Earth's map units.
+units <- attr(ne_polygons, "units")
+geo <- dplyr::bind_rows(geo, units[!units$iso3c %in% geo$iso3c, names(geo)])
+stopifnot(!anyNA(geo$area_km2), all(geo$area_km2 > 0),
+          # Holes out: South Africa without Lesotho, Italy without San Marino.
+          abs(geo$area_km2[geo$iso3c == "ZAF"] / 1.22e6 - 1) < 0.02)
 
 # --- country_meta -------------------------------------------------------------
 
@@ -234,11 +287,39 @@ landlocked_iso <- iso_of(c("Afghanistan","Andorra","Armenia","Austria",
   "Switzerland","Tajikistan","Turkmenistan","Uganda","Uzbekistan","Vatican City",
   "Zambia","Zimbabwe"))
 
+# Kosovo has no row in countrycode::codelist, so the codelist-built table had
+# none either, and distance_between() and the k-nearest weights could not use
+# it. A curated row, held to the same checks as the rest; its centroid and area
+# come from the same polygons as every other country's.
+kosovo <- tibble(iso3c = "XKX", iso2c = "XK", country = "Kosovo",
+                 continent = "Europe", region = NA_character_,
+                 un_region = NA_character_, currency = "EUR", tld = NA_character_,
+                 flag = "\U0001F1FD\U0001F1F0")
+cl <- bind_rows(cl, kosovo)
+wdi_meta <- bind_rows(
+  wdi_meta[wdi_meta$iso3c != "XKX", , drop = FALSE],
+  tibble(iso3c = "XKX", capital = "Pristina", capital_lat = 42.6629,
+         capital_lon = 21.1655))
+
 country_meta <- cl |>
-  left_join(wdi_meta, by = "iso3c") |>
+  left_join(wdi_meta |> select(-any_of("income")), by = "iso3c") |>
   left_join(geo, by = "iso3c") |>
-  mutate(landlocked = iso3c %in% landlocked_iso) |>
+  mutate(landlocked = iso3c %in% c(landlocked_iso, "XKX")) |>
   as_tibble()
+# Income and region from the dated World Bank table, as of the current fiscal
+# year -- the answer world_data() gives -- rather than from whichever WDI
+# release was installed. countrycode's region stays where the World Bank lists
+# no region (a territory it does not cover).
+now_cls <- country_classification(country_meta$iso3c, c("income", "region"))
+country_meta$income <- now_cls$income
+country_meta$region <- dplyr::coalesce(now_cls$region, country_meta$region)
+attr(country_meta, "classification") <- sprintf(
+  "FY%d", fiscal_year(classification_now()))
+stopifnot(!anyDuplicated(country_meta$iso3c),
+          country_meta$region[country_meta$iso3c == "PAK"] ==
+            "Middle East, North Africa, Afghanistan & Pakistan",
+          !is.na(country_meta$centroid_lon[country_meta$iso3c == "XKX"]),
+          !is.na(country_meta$area_km2[country_meta$iso3c == "XKX"]))
 
 # --- world_tiles: equal-area grid from centroids ------------------------------
 
@@ -309,77 +390,65 @@ world_tiles <- build_tiles(country_meta)
 
 # --- world_snapshot (needs network) -------------------------------------------
 
-snap_indicators <- c(gdp_per_capita = "NY.GDP.PCAP.KD",
-                     population = "SP.POP.TOTL",
-                     life_expectancy = "SP.DYN.LE00.IN",
-                     co2_per_capita = "EN.GHG.CO2.PC.CE.AR5")
+snap <- fetch_wdi(snap_indicators, SNAPSHOT_YEAR, SNAPSHOT_YEAR, cache = FALSE,
+                  parallel = FALSE)
+snap_info <- attr(snap, "countryatlas_sources")
+release <- unique(snap_info$vintage)
+stopifnot(length(release) == 1L)
+countries_snap <- snap |>
+  filter(!is.na(iso3c), iso3c %in% countries_iso) |>
+  # One row per country: the cross-section every verb reads it as.
+  distinct(iso3c, .keep_all = TRUE)
+# The classifications in force on 1 January of the snapshot year, the
+# package's rule for a bare year, from the dated table. An economy the World
+# Bank lists but did not classify that year is "Not classified".
+cls <- classify_countries(tibble(iso3c = countries_snap$iso3c),
+                          c("income", "region"), as_of = SNAPSHOT_YEAR)
+inc <- as.character(cls$income)
+inc[is.na(inc) & !is.na(cls$region)] <- "Not classified"
+countries_snap <- countries_snap |>
+  mutate(
+    income = factor(inc, levels = income_levels()),
+    continent = countrycode(iso3c, "iso3c", "continent", warn = FALSE),
+    region = dplyr::coalesce(cls$region,
+                             countrycode(iso3c, "iso3c", "region", warn = FALSE))
+  ) |>
+  apply_code_fallback() |>
+  select(iso3c, iso2c, country, continent, region, income,
+         any_of(names(snap_indicators))) |>
+  arrange(country)
+countries_snap <- set_source_info(countries_snap, dplyr::bind_rows(
+  snap_info,
+  source_info_rows(c("income", "region"), source = "World Bank classification",
+                   indicator = c("wb_income", "wb_region"),
+                   vintage = sprintf("FY%d", SNAPSHOT_YEAR), licence = "CC BY 4.0",
+                   citation = "World Bank. World Bank Country and Lending Groups.")))
+# The bundled snapshot is a cross-section and every verb reads it as one, and
+# its classes must be the dated table's for its year.
+check <- classify_countries(tibble(iso3c = countries_snap$iso3c),
+                            c("income", "region"), as_of = SNAPSHOT_YEAR)
+stopifnot(
+  !anyDuplicated(countries_snap$iso3c),
+  !anyNA(countries_snap$iso3c),
+  nrow(countries_snap) > 150L,
+  identical(as.character(check$income)[!is.na(check$income)],
+            as.character(countries_snap$income)[!is.na(check$income)]),
+  identical(check$region[!is.na(check$region)],
+            countries_snap$region[!is.na(check$region)])
+)
 
-fetch_one <- function(nm, code) {
-  tryCatch({
-    raw <- WDI::WDI(indicator = setNames(code, nm),
-                    start = SNAPSHOT_YEAR, end = SNAPSHOT_YEAR, extra = FALSE)
-    as_tibble(raw)
-  }, error = function(e) {
-    message("  indicator ", code, " failed: ", conditionMessage(e)); NULL
-  })
-}
-
-parts <- Filter(Negate(is.null),
-                Map(fetch_one, names(snap_indicators), snap_indicators))
-countries_snap <- NULL
-if (length(parts)) {
-  base <- parts[[1]]
-  # relationship = "one-to-one": the runtime equivalent in R/cache.R declares
-  # "many-to-many" because two iso2c codes can map to one iso3c, and follows
-  # the join with a distinct(). This loop had neither guard, so a repeated
-  # iso2c-year pair from the API would have fanned out silently and shipped
-  # duplicate country rows -- and every verb would then read the bundled
-  # dataset as a malformed panel and start warning about repeated countries.
-  # One year per fetch means one row per iso2c, so state that and let the join
-  # fail loudly if the API ever says otherwise.
-  if (length(parts) > 1) for (j in 2:length(parts)) {
-    vc <- setdiff(names(parts[[j]]), c("iso2c","country","year"))
-    base <- left_join(base, parts[[j]][, c("iso2c","year",vc)],
-                      by = c("iso2c","year"), relationship = "one-to-one")
-  }
-  base$iso3c <- countrycode(base$iso2c, "iso2c", "iso3c", warn = FALSE)
-  valid <- unique(na.omit(codelist$iso3c))
-  countries_snap <- base |>
-    filter(!is.na(iso3c), iso3c %in% c(valid, "XKX")) |>
-    left_join(wdi_meta |> select(iso3c, income), by = "iso3c") |>
-    mutate(
-      income = factor(income, levels = c("Not classified","Low income",
-        "Lower middle income","Upper middle income","High income")),
-      continent = countrycode(iso3c, "iso3c", "continent", warn = FALSE),
-      region = countrycode(iso3c, "iso3c", "region", warn = FALSE)
-    ) |>
-    select(iso3c, iso2c, country, continent, region, income,
-           any_of(names(snap_indicators))) |>
-    arrange(country)
-  # The bundled snapshot is a cross-section, and every verb reads it as one.
-  # Nothing asserted that: two iso2c codes mapping to one iso3c (the case
-  # R/cache.R's distinct() exists for) would have produced two rows for one
-  # country, which reads as a duplicated country-year everywhere downstream.
-  stopifnot(
-    !anyDuplicated(countries_snap$iso3c),
-    !anyNA(countries_snap$iso3c),
-    nrow(countries_snap) > 150L
-  )
-}
-
-snap_sf <- NULL
-have_sf <- requireNamespace("sf", quietly = TRUE) &&
-  requireNamespace("rnaturalearth", quietly = TRUE)
-if (have_sf && !is.null(countries_snap)) {
-  ne2 <- rnaturalearth::ne_countries(scale = 110, returnclass = "sf")
-  iso3c <- ne2$iso_a3; iso3c[iso3c %in% c("-99","-099","")] <- NA
-  needs <- is.na(iso3c); iso3c[needs] <- iso_of(ne2$admin[needs])
-  ne2$iso3c <- iso3c
-  ne2 <- ne2[!is.na(ne2$iso3c), c("iso3c","geometry")]
-  snap_sf <- dplyr::left_join(ne2, countries_snap, by = "iso3c")
-}
-
-world_snapshot <- list(countries = countries_snap, sf = snap_sf, year = SNAPSHOT_YEAR)
+world_snapshot <- list(countries = countries_snap, sf = NULL, year = SNAPSHOT_YEAR)
+attr(world_snapshot, "provenance") <- list(
+  wdi_release = release,
+  wdi_lastupdated = unique(snap_info$provider_updated),
+  classification = sprintf("FY%d (in force on 1 January %d)", SNAPSHOT_YEAR,
+                           SNAPSHOT_YEAR),
+  year_rule = year_rule,
+  built = format(Sys.Date()),
+  packages = c(countryatlas = as.character(utils::packageVersion("countryatlas")),
+               countrycode = as.character(utils::packageVersion("countrycode")),
+               WDI = as.character(utils::packageVersion("WDI")),
+               R = as.character(getRversion())))
 
 # --- historical_codes ----------------------------------------------------------
 # Curated crosswalk of dissolved entities -> successor states (one row per
@@ -466,4 +535,4 @@ cat(" country_meta:", nrow(country_meta), "rows (",
     sum(!is.na(country_meta$centroid_lon)), "with centroids )\n")
 cat(" world_tiles:", nrow(world_tiles), "rows\n")
 cat(" world_snapshot$countries:", if (is.null(countries_snap)) "NULL" else nrow(countries_snap), "rows\n")
-cat(" world_snapshot$sf:", if (is.null(snap_sf)) "NULL" else nrow(snap_sf), "rows\n")
+cat(" ", world_snapshot$year, ":", attr(world_snapshot, "provenance")$year_rule, "\n")

@@ -1,0 +1,37 @@
+---
+title: "Disputed territories and worldviews"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", message = FALSE,
+                      warning = FALSE, dpi = 96)
+library(countryatlas)
+```
+
+Every world map takes a position on disputed territory, including the ones
+that think they do not. The package takes none of its own: it records which
+disputes your data touches, lets you state your convention, and draws a
+published point of view when you choose one.
+
+```{r}
+check_dispute_coverage(world_snapshot$countries)
+```
+
+`dispute_policy()` states the convention, and the map verbs record it:
+
+```{r}
+old <- dispute_policy("neutral")
+dispute_policy()
+dispute_policy(old)
+```
+
+Natural Earth publishes its countries under 31 points of view at 1:10m. Set
+one, by the viewing country's ISO code, and the `sf` backend draws it (the file
+is downloaded once into the package cache):
+
+```{r, eval = FALSE}
+dispute_policy("de_jure", worldview = "IND")
+world_map(attach_geometry(world_snapshot$countries, geometry = "sf"),
+          gdp_per_capita)
+dispute_policy(worldview = NA)                     # back to the default view
+```

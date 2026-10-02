@@ -1,3 +1,340 @@
+# countryatlas (development version)
+
+## Highlights
+
+* **Maps are equal-area by default, on both backends, with nothing to
+  install.** The polygon backend draws the bundled Natural Earth 1:50m
+  countries in Equal Earth, through `coord_sf()` when `sf` loads and with the
+  package's own spherical Equal Earth when it does not; every projection,
+  `recenter` and `zoom_map()` work on it.
+* **Honest defaults:** quantile classes, a caption that states coverage and
+  source, small states drawn as points rather than dropped, alt text on every
+  map, legend titles with units, and fixed `breaks` and diverging `midpoint`s
+  when you want them.
+* **Panels that keep their dates:** dated World Bank income groups and
+  regions (`classify_countries()`), group membership with spells and
+  suspensions for nineteen groups, lags and growth keyed on the year, joins
+  on the year, and aggregates that report their coverage.
+* **Data you can trace:** every fetched column carries its source, unit,
+  release and licence (`source_info()`); World Bank releases can be pinned
+  (`vintage =`) and compared; any SDMX provider reads without a client
+  package (`fetch_sdmx()`).
+* **Statistics for a world of islands:** k-nearest-neighbour weights by
+  default, false-discovery-rate LISA, empirical-Bayes Moran's I and local
+  smoothing, Markov transition and spatial Markov chains, `inequality()`,
+  funnel plots, bivariate LISA and join counts.
+* **Names in any language:** "Allemagne", "Deutschland" and the Russian,
+  Chinese and Japanese names for Germany all resolve, and
+  `check_country_match()` says which tier matched each one.
+
+## Breaking changes
+
+* **The polygon backend is projected, in Equal Earth by default.** It drew
+  unprojected longitude and latitude whatever `projection` said. Way back:
+  `projection = "none"`.
+* **The polygon backend draws the bundled Natural Earth 1:50m countries**
+  instead of `maps::map_data("world")` (Natural Earth 1:50m as imported in
+  2013), so the default map needs nothing installed and carries 215 of the
+  snapshot's 216 countries where it carried 211. `country_meta`'s centroids
+  and areas, and `world_tiles`, are rebuilt from the same polygons (247 tiles;
+  only Bouvet Island, Gibraltar and the U.S. Minor Outlying Islands lack a
+  centroid now). Way back, for one release: `geometry = "maps"`, deprecated.
+* **`world_map()`, `globe_map()`, `facet_map()`, `animate_world()` and
+  `interactive_map()` default to `style = "quantile"`.** Way back:
+  `style = "continuous"`. A factor or character fill still draws its
+  categories.
+* **Every map verb adds a caption by default** (`footnote = "auto"`): the
+  coverage line and, where the data carries a record, the source. Way back:
+  `footnote = FALSE`.
+* **Small states are drawn as points** (`small_states = "auto"`): a country
+  with a value and no polygon at the chosen scale, most small states on the
+  `sf` backend at 1:110m, is a filled point at its centroid on the same fill
+  scale, counted in the coverage. Way back: `small_states = "none"`.
+* **Class labels read `"1.68K to 4.65K"`** rather than `cut()`'s
+  `"(1684,4655]"`, and **legend titles default to the source's label and unit**
+  ("GDP per capita (constant 2015 US$)") when the data carries one. Way back:
+  `legend = "gdp_per_capita"`.
+* **The categorical default palette is the HCL qualitative `"Dark 3"`**, not
+  the `"turbo"` rainbow. Way back: `palette = "turbo"`.
+* **`lag_by_country()`, `diff_by_country()` and `growth_rate(type = "yoy")`
+  are keyed on the year** (`by = "year"`): the value a year earlier, `NA`
+  across a gap, where 3.0.0 took the previous row and warned. Way back:
+  `by = "row"`.
+* **Arguments renamed for consistency**, the old names deprecated and still
+  working for a release: `convert_country(from)` is `origin`,
+  `classify_compare(n)` is `n_bins`, `flow_map(n)` is `arc_points`, and
+  `repair_country_names(verbose)` is `quiet` (inverted).
+* **`check_country_match()` gains a `method` column**, and name matching
+  tries German, Spanish, French and Italian names and every CLDR name after
+  the English patterns, so names 3.0.0 left unmatched now resolve.
+* **`country_join()` and `country_join_all()` also join on a shared `year`.**
+  Two country-year panels were joined on the country alone, so two countries
+  by two years came back as eight rows with `year.x` and `year.y`, and no
+  warning: dplyr shows its many-to-many warning only for joins made at the
+  console, never from inside a package. Now, when both tables have a `year`
+  column, it becomes part of the key and a message says so. Way back:
+  `also_by = character()`.
+* **`aggregate_regions()` reports coverage, and withholds partial aggregates.**
+  Every row gains `n_countries`, `n_reporting` and `coverage` (and
+  `coverage_weighted` with a coverage weight), and a group below two-thirds
+  coverage is `NA` with a `countryatlas_low_coverage` warning naming it, the
+  World Bank's rule for its own aggregates. Way back: `min_coverage = 0`.
+* **Spatial statistics default to k-nearest-neighbour weights (k = 5).**
+  `weights = NULL` in `morans_i()`, `gearys_c()`, `getis_ord()`,
+  `local_morans()`, `lisa_map()` and `spatial_lag()` meant land-border
+  contiguity, which deletes every island: on the bundled snapshot's GDP per
+  capita, Moran's I was 0.61 on 142 countries (49 of the 191 with data left
+  out) and is 0.47 on 189. `country_weights()`'s own default `type` is now
+  `"knn"` too. Way back: `weights = country_weights("contiguity")`.
+  `morans_i(scale =)`, which only set the old default's resolution, is
+  deprecated; supplying it still builds contiguity weights, with a warning.
+* **Local statistics adjust their p-values for multiple testing.**
+  `local_morans()`, `getis_ord(local = TRUE)` and `lisa_map()` gain
+  `p_adjust` (default `"fdr"`, Benjamini-Hochberg) and return `p_adjusted`
+  beside the unchanged `p_value`; the cluster labels and the LISA map's
+  significance mask use the adjusted value, and the map's caption names the
+  method. About 190 tests at `alpha = 0.05` expect ten false clusters under
+  the null. Way back: `p_adjust = "none"`.
+* **`local_morans()` and `lisa_map()` default to 9,999 permutations.** With
+  999 the smallest attainable p-value, 0.001, is above the first
+  Benjamini-Hochberg cutoff for 190 tests (0.00026), so an adjusted map could
+  almost never show anything. The conditional permutation now draws every
+  neighbour set at once, so 9,999 permutations take under a second for the
+  whole world (999 took 1.2 s before, 0.14 s now). Way back: `n_perm = 999`.
+* **`country_data(latest = TRUE)` and `world_data(latest = TRUE)` add an
+  `<indicator>_year` column per indicator**, the year each value comes from.
+  Each indicator took its own most recent value and `year` was dropped, so a
+  row could hold GDP from 2023 beside population from 2021 with nothing to
+  say so. Way back: drop the columns.
+* **`rank_countries()` warns on a panel with no `within`** (class
+  `countryatlas_panel`): ranks there pool every country-year, so a country's
+  2020 and its 2000 compete and `z_score` carries the time trend. Way back:
+  `within = year`, or muffle the class.
+* **`income` and `region` come from a bundled, dated World Bank table**, not
+  from the installed WDI release. `world_data()`, `country_data()` and
+  `country_meta` carry the current fiscal year's classes (FY2027), including
+  the July 2025 region change that moved Afghanistan and Pakistan into
+  "Middle East, North Africa, Afghanistan & Pakistan"; `world_snapshot`
+  carries the classes in force in its year (FY2024). WDI 2.7.10 disagreed
+  with the World Bank's own API for eight countries, so two users with
+  different WDI versions got different income groups from the same call.
+  No way back is needed: the old values were an accident of which WDI was
+  installed.
+* **`fetch_owid()` takes grapher chart slugs and `fetch_oecd()` SDMX
+  dataflows.** Neither could return data in 3.0.0: owidR stopped working when
+  Our World in Data changed its API, and the OECD package's client targets
+  OECD.Stat, offline since 2024-07-01. `owidR` and `OECD` leave Suggests.
+* **`wdj_overrides()` and `options(countryatlas.gdp_compat)` are removed**,
+  after warning for a release. Use `country_overrides()`, and the
+  `gdp_per_capita` column the alias copied.
+* **`add_indicator()` refuses a source that repeats a key.** A source
+  returning two rows for one country-year fanned the caller's frame out, one
+  row in and two out. It now aborts with class `countryatlas_many_to_many`,
+  naming the keys; aggregate the source first.
+
+## Maps
+
+* New `breaks` (fixed class boundaries, open-ended end classes with a
+  warning) and `midpoint` (a diverging palette centred on a value) in
+  `world_map()`, `globe_map()` and `value_by_alpha_map()`; `facet_map()` and
+  `animate_world()` gain `breaks_by = "panel"` to classify each panel on its
+  own values.
+* New styles `"fisher"`, `"headtails"`, `"sd"` and `"equal"`; their breaks
+  equal classInt's. `classify_compare()` adds Fisher and head/tail breaks and
+  reports the goodness of variance fit, the tabular accuracy index and the
+  fullest class's share.
+* `bubble_map()`, `spike_map()`, `flow_map()`, `gridded_cartogram()` and
+  `value_by_alpha_map()` project on the polygon backend too; `spike_map()`
+  and `gridded_cartogram()` lay their spikes and cells out in projected
+  metres, so a spike's height and a cell's size do not depend on latitude.
+  New `project_lonlat()` places your own layers on the built-in Equal Earth,
+  and `zoom_map()` zooms by longitude and latitude keeping the projection.
+* New `tile_trend_map()`: a sparkline per country on the tile grid.
+* New `ternary_map()` for three-part compositions (sector shares of GDP, age
+  structure): each part has a primary colour and a country mixes them in
+  proportion to its shares, centred by default on the average country so that
+  grey means average (Schoeley 2021). The key is the colour triangle with
+  every country on it.
+* Every map verb sets its alt text from the final plot, and new
+  `map_alt_text()` returns it (Lundgard & Satyanarayan's levels 1 and 2).
+  New `check_palette()` simulates three colour-vision deficiencies and warns
+  when adjacent classes are too close. New `map_citation()` returns the
+  references for exactly the data and methods a map used.
+* `map_provenance()` reads the final plot: a coord or fill scale added after
+  the verb drew it is reported, with `modified = TRUE`.
+* `projection = "north_polar"` on the `sf` backend painted the whole disc
+  grey: Natural Earth closes Antarctica along the South Pole, the
+  projection's antipode, so its ring closed around every other country. What
+  lies wholly south of 60 degrees S is now left out of that view, on both
+  backends.
+* `classify_compare()` labels missing values "No data", as every other map
+  does, rather than "NA"; `flow_map()`'s lightest arcs no longer vanish into
+  the basemap; and `geom_country_labels()` on a frame without `group` no
+  longer places one "NA" label for every uncoded piece.
+* The 32 worldviews Natural Earth publishes, 31 countries' and ISO's:
+  `world_geometry(worldview = )`, `attach_geometry(worldview = )` and
+  `dispute_policy(worldview = )` draw the boundaries as the viewing country
+  publishes them, on the `sf` backend.
+
+## Matching and reference data
+
+* `standardize_country()` matches and derives once per distinct value rather
+  than once per row, so the new tiers cost nothing per repeated name.
+* The World Bank API now names Nauru "Naoero"; the override table resolves it.
+* `convert_country("XK", origin = "iso2c")` reads back the code the package
+  writes for Kosovo.
+* `country_groups_history` gains `status` and several spells per country,
+  and seven dated groups: SCO, CPTPP, RCEP, EAC, SADC, APEC and the Arab
+  League, every date sourced in `data-raw/`. Suspended spells are not counted
+  as membership.
+* `audit_time_coverage()` dates independence from Gleditsch & Ward's list,
+  flagging `"before_independence"` (Namibia before 1990, Timor-Leste before
+  2002) with the basis of each flag.
+
+## Panels
+
+* `country_join()` and `country_join_all()` gain `also_by`, extra key columns
+  besides the country: a character vector, or a named one when the two tables
+  name the column differently (`also_by = c(year = "yr")`). A panel joined to
+  a cross-section repeats the cross-section's values across the years, with a
+  message. A key repeated on both sides now warns with class
+  `countryatlas_many_to_many`, naming up to five keys.
+* `in_group(as_of =)` takes one date per element as well as one for all, so
+  `mutate(eu = in_group(iso3c, "EU", "iso3c", as_of = year))` asks each row
+  about its own year. A missing date answers `NA`. The lookup is one
+  vectorised interval join, so a 50,000-row panel takes a fraction of a
+  second. `country_groups(as_of =)` stays scalar, since it returns one table.
+* New `aggregate_groups()` aggregates by dated group membership: an "EU" or
+  "OECD" series built from the members of each row's own year, with coverage
+  measured against the full membership on that date, so a member with no row
+  counts as missing.
+* `aggregate_regions()` gains `min_coverage` and `coverage_weight`. A weighted
+  mean follows the World Bank's weight rule by default, using `weight` as the
+  coverage weight.
+* New `latest = "common"` in `country_data()` and `world_data()`: per country,
+  the most recent year in which every requested indicator is present, so
+  arithmetic across them is consistent.
+* `per_capita()`, `deflate()` and `to_ppp()` read those `<column>_year`
+  columns and warn (class `countryatlas_mixed_years`) when the two columns
+  they combine come from different years. `per_capita()` with no `pop` now
+  fetches the population of the year each value comes from, rather than of
+  last year.
+* `correlate_indicators()` gains `by_year`, one correlation table per year of
+  a panel instead of the earliest year alone, and `weight`, for a
+  population-weighted correlation (the average person rather than the average
+  country).
+
+## Data you can trace
+
+* Every fetch goes through one HTTP client with a per-request timeout
+  (`options(countryatlas.timeout)`, default 60 s) and bounded retries
+  (`options(countryatlas.retries)`, default 3) with exponential backoff and
+  jitter on 429, 5xx and dropped connections, honouring `Retry-After`. A
+  World Bank outage on 2026-10-01 had held a fetch for 450 seconds; the worst
+  case is now bounded and documented. A failed download is still a warning
+  and an empty result, as CRAN asks, unless `options(countryatlas.strict =
+  TRUE)` makes it an error (class `countryatlas_fetch_failed`).
+* World Bank data comes through the package's own client rather than
+  `WDI::WDI()`, in pages of 5,000 rows instead of the single 32,500-row page
+  that failed. On recorded responses it returns the same keys, columns and
+  values as 3.0.0's path did. `WDI` stays for `wdi_search()`.
+* Pinnable World Bank releases: `vintage = "2024-07"` in
+  `fetch_indicator("wdi", ...)`, `country_data()` and `world_data()` reads an
+  archived release of the World Development Indicators (API source 57); a
+  series the release does not hold warns and names the nearest releases that
+  do. New `wdi_vintages()` lists the 142 releases since 1989, and
+  `compare_vintages()` shows how much a series was revised between them
+  (Johnson, Larson, Papageorgiou & Subramanian 2013). An archived release
+  never changes, so its cache entries never expire.
+* New `source_info()` and `source_info<-`: every fetch records, per value
+  column, the source, indicator, label, unit, provider update date, fetch
+  date, release, licence and citation. The package's verbs carry the record
+  through joins and geometry, `map_provenance()` prints it ("World Bank WDI
+  NY.GDP.PCAP.KD (constant 2015 US$), release 2026-07, fetched 2026-10-01"),
+  and `footnote = "auto"` adds a one-line source note to the caption.
+* `compare_sources()` refuses to call two series in different units a
+  disagreement (class `countryatlas_unit_mismatch`) unless
+  `allow_unit_mismatch = TRUE`, reading the unit a registered fetcher states
+  under its own column name as well as under the source's.
+* New `fetch_sdmx()` reads any SDMX service as SDMX-CSV with no client
+  package: the OECD, the IMF, the ILO, Eurostat, the ECB, the BIS and UNICEF
+  by name, or any SDMX 2.1 service by URL. Where the provider publishes the
+  dataflow's structure, `countries` goes into the key and the server filters.
+  A dimension that still varies within a country-year aborts and names the
+  dimension, rather than keeping a first row. `"imf"` and `"ilo"` are new
+  built-in sources.
+* `fetch_owid()` reads OWID's Chart API, keyed on OWID's ISO codes (Kosovo
+  included), and takes `"slug/column"` to pick one column of a chart.
+* The cache persists every built-in source to disk, one directory each, and
+  `clear_country_cache(source, disk = TRUE)` clears just that source. The
+  cache key moved with the client, so 3.0.0's entries are swept, not read.
+* `fetch_indicator("wdi", ...)` no longer warns on every call that some fifty
+  of the World Bank's aggregate codes are "not usable as iso3c"; the
+  aggregates are dropped, as `country_data()` always did.
+* New `country_classifications` dataset: the World Bank's income groups for
+  every economy and fiscal year since FY1989 (from its historical
+  classification, OGHIST), its regions with the July 2025 change dated, and
+  the FY2027 lending categories. New `classify_countries()` adds them to a
+  frame as in force on each row's date, with the fiscal-year rule stated:
+  `basis = "in_effect"` gives the class in force, `basis = "data_year"` the
+  class computed from that year's income, two fiscal years later.
+* `world_snapshot` is refreshed from the 2026-07 release and stays on 2024,
+  by the rule recorded in its `"provenance"` attribute: in 2025, life
+  expectancy and CO2 have no values yet and GDP per capita covers 86% of
+  countries against 92%. It gains Kosovo (216 countries). `country_meta`
+  gains a curated Kosovo row, so `distance_between()` and the k-nearest
+  weights include it.
+
+## Statistics
+
+* `local_morans()`, `getis_ord()` and `lisa_map()`: `p_adjust` accepts
+  `"fdr"`, `"bonferroni"`, `"holm"` or `"none"`. The method is recorded as an
+  attribute of the result and in `lisa_map()`'s provenance.
+* New `eb_morans_i()`, Moran's I for rates (Assuncao & Reis 1999), equal to
+  `spdep::EBImoran.mc()`; `smooth_rates(method = "local_eb")` shrinks toward
+  each neighbourhood's rate (Marshall 1991), equal to
+  `spdep::EBlocal(geoda = TRUE)`.
+* New `transition_matrix()`, `spatial_markov()` (with a homogeneity test) and
+  `rank_mobility()` for distribution dynamics.
+* New `inequality()`: Gini, Theil T and L, Atkinson, CV, Palma and p90/p10,
+  unweighted or population-weighted; `theil(type = "L")` decomposes the mean
+  log deviation.
+* New `rate_funnel()` with exact Poisson limits and Spiegelhalter's
+  overdispersion adjustment; new `bivariate_lisa()` and `join_counts()`.
+
+## Documentation
+
+* The README is rewritten short: three examples, four setup steps and the
+  gotchas; the visual tour moved to a Gallery article. Two new vignettes,
+  "Panels done right" and "Data you can trace", and seven articles on the
+  website only. `inst/CITATION` carries the methods added in this release.
+
+## Deprecations
+
+* `clear_wdi_cache()` is deprecated in favour of `clear_country_cache()`,
+  which it has been an alias of since 3.0.0. It warns, and goes in 5.0.0.
+  Deprecations now go through lifecycle, which is added to Imports.
+
+## Internals
+
+* New scheduled workflows: weekly live contract tests make one real request
+  per provider and upload re-recorded fixtures for review; a monthly dry run
+  rebuilds every dataset from its source; a budget check fails the build when
+  the CRAN-mode tests, the vignette rebuild or the whole check outgrows the
+  time that got 3.0.0 through CRAN. The adapter tests replay real recorded
+  responses instead of mocking the client function, which is how two dead
+  adapters had passed every test.
+
+* Every internal join now declares its cardinality (`relationship =`), so a
+  lookup that unexpectedly repeats a key errors instead of multiplying rows. A
+  test parses `R/` and fails on any join without one.
+* `R/visualization.R` (3,328 lines) is split into `map-core.R`,
+  `map-symbols.R`, `map-cartograms.R`, `map-globe.R`, `map-interactive.R`,
+  `map-panels.R` and `labels.R`; interpolation moves to `time.R` and the
+  value-suppressing palette to `honest-maps.R`. The tests move from
+  release-named files to one `test-<file>.R` per source file. Both are pure
+  moves.
+
 # countryatlas 3.0.0
 
 The whole of the roadmap tracked in

@@ -4,7 +4,14 @@
 \alias{fetch_indicator}
 \title{Fetch an indicator from any registered source}
 \usage{
-fetch_indicator(source, indicator, countries = NULL, years = NULL, ...)
+fetch_indicator(
+  source,
+  indicator,
+  countries = NULL,
+  years = NULL,
+  vintage = NULL,
+  ...
+)
 }
 \arguments{
 \item{source}{A registered source name (see \code{\link[=country_sources]{country_sources()}}).}
@@ -16,10 +23,15 @@ as in \code{\link[=world_data]{world_data()}}: \code{c(gdp = "NY.GDP.PCAP.KD")}.
 
 \item{years}{Optional numeric year vector; \code{NULL} for the provider's default.}
 
+\item{vintage}{For \code{source = "wdi"}, the release of the World Development
+Indicators to read; see \code{\link[=world_data]{world_data()}}. Other sources have no releases to
+pin and refuse it.}
+
 \item{...}{Passed to the source's own \code{fetch} function.}
 }
 \value{
-A tibble keyed on \code{iso3c} (and \code{year}, for a panel).
+A tibble keyed on \code{iso3c} (and \code{year}, for a panel), with a record
+of where each indicator column came from; see \code{\link[=source_info]{source_info()}}.
 }
 \description{
 One verb, many providers. Whatever the source, the result comes back on the

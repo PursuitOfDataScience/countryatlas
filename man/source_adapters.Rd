@@ -12,40 +12,73 @@ fetch_owid(indicator, countries = NULL, years = NULL, ...)
 
 fetch_eurostat(indicator, countries = NULL, years = NULL, ...)
 
-fetch_oecd(indicator, countries = NULL, years = NULL, ...)
+fetch_oecd(indicator, countries = NULL, years = NULL, key = NULL, ...)
 
 fetch_comtrade(indicator, countries = NULL, years = NULL, ...)
 }
 \arguments{
 \item{indicator}{Indicator code(s), optionally named to rename the output
-columns.}
+columns. For \code{fetch_owid()}, a grapher chart slug (\code{"life-expectancy"}),
+or \code{"slug/column"} to take one column of a chart that has several; for
+\code{fetch_oecd()}, an SDMX dataflow, \code{"AGENCY,DATAFLOW,VERSION"}.}
 
 \item{countries}{Optional \code{iso3c} vector.}
 
 \item{years}{Optional numeric year vector.}
 
-\item{...}{Passed to the underlying client.}
+\item{...}{Passed to the underlying client (\code{fetch_eurostat()},
+\code{fetch_comtrade()}); \code{fetch_owid()} and \code{fetch_oecd()} take nothing more.}
+
+\item{key}{For \code{fetch_oecd()}, the SDMX key selecting the series within the
+dataflow (\code{"A..B1GQ_R_GR.."}); see \code{\link[=fetch_sdmx]{fetch_sdmx()}}. \code{countries} goes into
+its country position, so the OECD filters on its server.}
 }
 \value{
 A tibble on the ISO spine: \code{iso3c}, \code{year} and one column per
 indicator.
 }
 \description{
-Thin wrappers that put a provider's data on the ISO spine. Each is
-\code{Suggests}-gated on that provider's own client package -- \code{countryatlas} does
-not reimplement any of them. All four are registered as sources, so the usual
-route is \code{\link[=fetch_indicator]{fetch_indicator()}}\verb{("owid", ...)} rather than calling these
-directly; they are exported because calling them directly is sometimes what
-you want.
+Thin wrappers that put a provider's data on the ISO spine. Our World in Data
+and the OECD are read straight from their public APIs through the package's
+own HTTP client, with a timeout and bounded retries; Eurostat and UN Comtrade
+go through their own client packages, which are \code{Suggests}. All are
+registered as sources, so the usual route is \code{\link[=fetch_indicator]{fetch_indicator()}}\verb{("owid", ...)} rather than calling these directly; they are exported because calling
+them directly is sometimes what you want.
 }
 \section{Which provider needs what}{
 \tabular{lll}{
    Adapter \tab Needs \tab Notes \cr
-   \code{fetch_owid()} \tab \code{owidR} \tab Our World in Data; \code{indicator} is an OWID chart slug \cr
+   \code{fetch_owid()} \tab nothing \tab OWID's Chart API; \code{indicator} is a grapher slug, keyed on OWID's ISO codes \cr
+   \code{fetch_oecd()} \tab nothing \tab the OECD's SDMX service; \code{indicator} is a dataflow, \code{key} selects the series \cr
    \code{fetch_eurostat()} \tab \code{eurostat} \tab European coverage only; geo codes are harmonised to \code{iso3c} \cr
-   \code{fetch_oecd()} \tab \code{OECD} \tab \code{indicator} is a dataset id; OECD's own filters go through \code{...} \cr
    \code{fetch_comtrade()} \tab \code{comtradr} \tab UN trade flows; needs an API token (see \code{comtradr::set_primary_comtrade_key()}) \cr
 }
+
+
+The IMF and the ILO are reachable as \code{fetch_indicator("imf", flow, key = )}
+and \code{fetch_indicator("ilo", flow, key = )}, through \code{\link[=fetch_sdmx]{fetch_sdmx()}}.
+}
+
+\section{Our World in Data}{
+
+A chart's data comes from \verb{https://ourworldindata.org/grapher/<slug>.csv}
+and its metadata -- title, unit, citation, last update -- from the matching
+\code{.metadata.json}, which feeds \code{\link[=source_info]{source_info()}}. Rows are keyed on OWID's
+\code{code} column, which is ISO 3166-1 alpha-3 for countries; OWID's own
+aggregates (\code{OWID_WRL}, the continents, the income groups) are not
+countries and are dropped, except \code{OWID_KOS}, which is Kosovo (\code{XKX}). A
+chart with several value columns returns them all, named
+\verb{<indicator>_<column>} (or by OWID's short column names when \code{indicator} is
+unnamed), unless \code{"slug/column"} picks one.
+}
+
+\section{The OECD}{
+
+OECD.Stat, which the OECD package's client targets, went offline on
+2024-07-01, so the 3.0.0 adapter could not return data. The OECD Data
+Explorer's dataflow ids replace the old dataset codes; find a flow and its
+key at \verb{https://data-explorer.oecd.org} (its "Developer API" panel shows
+both). The old codes do not exist anywhere any more.
 }
 
 \examples{

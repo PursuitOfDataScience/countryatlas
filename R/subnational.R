@@ -147,7 +147,7 @@ subnational_lookup <- function(region, iso3c) {
   code <- ascii_upper(trimws(region, whitespace = "[\\h\\v]"))
   looks_code <- !is.na(code) & grepl("^[A-Z]{2}-[A-Z0-9]{1,3}$", code)
   prefix <- substr(code, 1L, 2L)
-  expect <- suppressWarnings(convert_country(iso3c, "iso2c", from = "iso3c",
+  expect <- suppressWarnings(convert_country(iso3c, "iso2c", origin = "iso3c",
                                              warn = FALSE))
   # A row whose country did not resolve has nothing to check against, so the
   # code is taken at face value there rather than thrown away.
@@ -382,7 +382,7 @@ subnational_map <- function(data, fill, by = "nuts_id", level = 2, year = 2021,
   drop <- setdiff(intersect(names(geom), names(dat)), ".wdj_nuts_key")
   geom <- geom[, setdiff(names(geom), drop), drop = FALSE]
   joined <- dplyr::left_join(geom, dat, by = ".wdj_nuts_key",
-                             na_matches = "never")
+                             na_matches = "never", relationship = "one-to-many")
   joined[[".wdj_nuts_key"]] <- NULL
   # Counted on the join KEY, not on the fill value: sum(!is.na(fill)) called a
   # panel whose indicator is entirely NA -- a real thing to map, and one this

@@ -154,7 +154,7 @@ country_network <- function(data, from, to, weight = NULL,
 
   nodes <- tibble::tibble(
     iso3c = iso,
-    country = suppressWarnings(convert_country(iso, from = "iso3c",
+    country = suppressWarnings(convert_country(iso, origin = "iso3c",
                                                to = "country", warn = FALSE)),
     # unname(): rowSums() on a named matrix carries the dimnames into the
     # column, so every value came back as a named length-1 vector.
@@ -208,9 +208,7 @@ country_network <- function(data, from, to, weight = NULL,
 #'            "Mexico", "Canada", "Japan"),
 #'   value = c(500, 200, 90, 80, 70, 60, 300, 280, 120)
 #' )
-#' if (requireNamespace("maps", quietly = TRUE)) {
-#'   od_map(od, from, to, value, origins = 3)
-#' }
+#' od_map(od, from, to, value, origins = 3)
 #' }
 od_map <- function(data, from, to, weight = NULL, origin = "country.name",
                    origins = 6, direction = c("out", "in"), ...) {
@@ -281,7 +279,7 @@ od_map <- function(data, from, to, weight = NULL, origin = "country.name",
   }
   if (!length(panels)) wdj_abort("None of the chosen origins send any flow.")
 
-  lab <- suppressWarnings(convert_country(panels, from = "iso3c",
+  lab <- suppressWarnings(convert_country(panels, origin = "iso3c",
                                           to = "country", warn = FALSE))
   lab[is.na(lab)] <- panels[is.na(lab)]
   # Each panel carries every country the basemap knows, not only the ones in
@@ -289,12 +287,12 @@ od_map <- function(data, from, to, weight = NULL, origin = "country.name",
   # with an NA panel and ggplot2 drew an extra, empty facet for them.
   world_iso <- unique(stats::na.omit(
     world_geometry("countries", geometry = "polygon")$iso3c))
-  # The basemap does not carry every code: Hong Kong, Macao, Tuvalu, the
-  # British Virgin Islands and Gibraltar have no polygon on this backend. A
-  # flow to one of them had nowhere to be drawn and vanished from its panel --
-  # China's largest destination, Hong Kong, simply absent from China's map,
-  # with nothing said. Name them, as bubble_map() names the countries it has
-  # no centroid for.
+  # The basemap does not carry every code: Gibraltar has no polygon at 1:50m,
+  # and the 3.0.0 basemap also lacked Hong Kong, Macao, Tuvalu and the British
+  # Virgin Islands. A flow to one of them had nowhere to be drawn and vanished
+  # from its panel -- China's largest destination, Hong Kong, simply absent
+  # from China's map, with nothing said. Name them, as bubble_map() names the
+  # countries it has no centroid for.
   sent <- m[panels, , drop = FALSE]
   undrawn <- setdiff(colnames(sent)[colSums(sent > 0) > 0], world_iso)
   if (length(undrawn)) {
@@ -314,7 +312,11 @@ od_map <- function(data, from, to, weight = NULL, origin = "country.name",
                    .wdj_panel = factor(lab[i], levels = lab))
   }))
 
-  mapped <- attach_geometry(long, geometry = "polygon")
+  # Land the basemap draws with no ISO code (Somaliland, ...) joins to no
+  # panel, and ggplot2 gave it a facet of its own labelled NA. Draw it in every
+  # panel, as no data.
+  mapped <- spread_undated(attach_geometry(long, geometry = "polygon"),
+                           ".wdj_panel")
   flow_sym <- rlang::sym(".wdj_flow")
   p <- world_map(mapped, !!flow_sym,
                  legend = if (identical(direction, "out")) "flow out" else "flow in",

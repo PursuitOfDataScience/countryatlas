@@ -94,7 +94,6 @@ test_that("the geometric kernels handle poles, antipodes and collinearity", {
 
 test_that("plotting verbs cope with all-NA and all-zero columns", {
   skip_slow_on_cran()
-  skip_if_not_installed("maps")
   d <- snap
   d$all_na <- NA_real_
   d$all_zero <- 0
@@ -329,7 +328,6 @@ test_that("the plotting verbs handle an empty frame without leaking", {
   # value", and geom_country_labels ran polygon_centroids() over nothing, where
   # range() warns twice and dplyr adds a deprecation note.
   skip_if_no_sf_geometry()
-  skip_if_not_installed("maps")
   snap <- countryatlas::world_snapshot$countries
   sfd <- attach_geometry(snap, geometry = "sf")
   poly <- attach_geometry(snap, geometry = "polygon")
@@ -544,7 +542,7 @@ test_that("audit_time_coverage's three message paths read correctly", {
   r <- suppressMessages(
     audit_time_coverage(data.frame(iso3c = character(0), year = integer(0))))
   expect_equal(nrow(r), 0L)
-  expect_named(r, c("iso3c", "country", "year", "issue", "existed"))
+  expect_named(r, c("iso3c", "country", "year", "issue", "existed", "basis"))
 })
 
 test_that("interpolate_missing rejects duplicate column names once", {
@@ -757,34 +755,38 @@ test_that("a gap in year is reported by the verbs that read neighbouring rows", 
                        value = c(100, 110, 140, 150))
 
   # The bug: 2005's "year-on-year" growth is the change since 2002, and nothing
-  # said so. The number stays; the warning is what was missing.
-  expect_warning(growth_rate(gappy, value), "spans more than one year")
-  expect_warning(lag_by_country(gappy, value), "spans more than one year")
-  expect_warning(diff_by_country(gappy, value), "spans more than one year")
-  expect_equal(suppressWarnings(growth_rate(gappy, value))$value_growth,
+  # said so. 3.0.0 kept the number and warned; since 4.0.0 the default is keyed
+  # on the year, so a change with no year one earlier is NA and nothing needs
+  # saying. The row-keyed lag, by name, still warns.
+  expect_no_warning(g <- growth_rate(gappy, value))
+  expect_equal(g$value_growth, c(NA, NA, NA, 10 / 140))
+  expect_warning(growth_rate(gappy, value, by = "row"), "spans more than one year")
+  expect_warning(lag_by_country(gappy, value, by = "row"), "spans more than one year")
+  expect_warning(diff_by_country(gappy, value, by = "row"), "spans more than one year")
+  expect_equal(suppressWarnings(growth_rate(gappy, value, by = "row"))$value_growth,
                c(NA, 0.1, 30 / 110, 10 / 140))
 
   # cagr divides by the real year span, so a gap is already handled there.
   expect_no_warning(growth_rate(gappy, value, type = "cagr"))
-  expect_no_warning(growth_rate(annual, value))
-  expect_no_warning(lag_by_country(annual, value))
+  expect_no_warning(growth_rate(annual, value, by = "row"))
+  expect_no_warning(lag_by_country(annual, value, by = "row"))
 
   # Names only the countries that actually have gaps.
   mixed <- data.frame(iso3c = c("FRA", "FRA", "DEU", "DEU", "ITA", "ITA"),
                       year = c(2000, 2002, 2000, 2001, 2000, 2004),
                       value = 1:6)
-  w <- tryCatch(lag_by_country(mixed, value), warning = conditionMessage)
+  w <- tryCatch(lag_by_country(mixed, value, by = "row"), warning = conditionMessage)
   expect_match(w, "FRA")
   expect_match(w, "ITA")
   expect_no_match(w, "DEU")
 
   # Row order must not matter -- the check sorts, like the verbs do.
-  expect_warning(lag_by_country(gappy[c(3, 1, 4, 2), ], value),
+  expect_warning(lag_by_country(gappy[c(3, 1, 4, 2), ], value, by = "row"),
                  "spans more than one year")
   # One row per country has no predecessor at all; the existing all-NA warning
   # covers that, and this check must stay quiet rather than double-report.
   single <- data.frame(iso3c = c("FRA", "DEU"), year = c(2000, 2005), value = 1:2)
-  w2 <- tryCatch(lag_by_country(single, value), warning = conditionMessage)
+  w2 <- tryCatch(lag_by_country(single, value, by = "row"), warning = conditionMessage)
   expect_no_match(w2, "spans more than one year")
 
   # A repeated country-year is a step of 0, not a gap. check_panel_unique()
@@ -793,7 +795,7 @@ test_that("a gap in year is reported by the verbs that read neighbouring rows", 
   dup <- data.frame(iso3c = rep("FRA", 4), year = c(2000, 2001, 2001, 2002),
                     value = c(1, 2, 9, 3))
   msgs <- character(0)
-  withCallingHandlers(invisible(lag_by_country(dup, value)),
+  withCallingHandlers(invisible(lag_by_country(dup, value, by = "row")),
     warning = function(w) { msgs <<- c(msgs, conditionMessage(w))
                             invokeRestart("muffleWarning") })
   expect_length(msgs, 1L)
@@ -891,7 +893,7 @@ test_that("a character year is refused only where a year is arithmetic", {
   expect_no_error(suppressWarnings(convergence_club(dc, value)))
   expect_no_error(interpolate_missing(dc, "value"))
   expect_no_error(share_of_world(dc, value))
-  expect_no_error(rank_countries(dc, value))
+  expect_no_error(rank_countries(dc, value, within = "year"))
   # ... and give the same answer as the numeric-year panel.
   expect_equal(growth_rate(dc, value)$value_growth, growth_rate(d, value)$value_growth)
 })
@@ -912,7 +914,12 @@ test_that("an infinite value never silently produces NaN", {
     expect_true(all(is.na(rk$z_score)))
     expect_false(anyNA(rk$rank))
     expect_false(anyNA(rk$percentile))
-    expect_warning(rank_countries(bad, value), "infinite")
+    # Pooled on purpose (the z_score check above is about the whole column),
+    # so the panel warning is muffled by class.
+    expect_warning(withCallingHandlers(
+      rank_countries(bad, value),
+      countryatlas_panel = function(w) invokeRestart("muffleWarning")),
+      "infinite")
 
     # sigma_convergence: Inf passed the !is.na() filter into sd(log(x)).
     sg <- suppressWarnings(sigma_convergence(bad, value))
@@ -1304,8 +1311,8 @@ test_that("repair_country_names() reports exactly what it changed", {
 
   # verbose controls the message but not the result.
   expect_message(repair_country_names(mixed), "Repaired")
-  expect_silent(repair_country_names(mixed, verbose = FALSE))
-  expect_equal(repair_country_names(mixed, verbose = FALSE), out)
+  expect_silent(repair_country_names(mixed, quiet = TRUE))
+  expect_equal(repair_country_names(mixed, quiet = TRUE), out)
 
   # The transposition case, both ways round: it depends on the metric, so it is
   # asserted only where stringdist decides the answer.
@@ -1359,11 +1366,15 @@ test_that("a misbehaving custom source is reported as the source's fault", {
   reg(function(indicator, countries, years) data.frame(country = "FRA", gdp = 1))
   expect_error(go(), "no iso3c column", class = "countryatlas_error")
 
-  # A duplicate key is reported by add_indicator(), as the contract promises.
+  # A duplicate key is reported by the fetch, as the contract promises, and
+  # add_indicator() then refuses to fan the caller's frame out over it.
   reg(function(indicator, countries, years)
     data.frame(iso3c = c("FRA", "FRA", "DEU"), gdp = c(1, 2, 3)))
   expect_warning(
-    add_indicator(data.frame(iso3c = c("FRA", "DEU"), v = 1:2), "zz_probe", "gdp"),
+    expect_error(
+      add_indicator(data.frame(iso3c = c("FRA", "DEU"), v = 1:2), "zz_probe",
+                    "gdp"),
+      class = "countryatlas_many_to_many"),
     "duplicate key")
 })
 
@@ -1482,7 +1493,7 @@ test_that("the irregular-year warning reads a factor year by label, not level", 
   irregular <- function(d) {
     hit <- FALSE
     withCallingHandlers(
-      suppressMessages(lag_by_country(d, "value")),
+      suppressMessages(lag_by_country(d, "value", by = "row")),
       warning = function(w) {
         if (inherits(w, "countryatlas_irregular_years")) hit <<- TRUE
         invokeRestart("muffleWarning")
@@ -1693,7 +1704,7 @@ test_that("the panel guards key on the unit, not on iso3c alone", {
   warns <- function(d) {
     seen <- character(0)
     withCallingHandlers(
-      suppressMessages(lag_by_country(d, "value")),
+      suppressMessages(lag_by_country(d, "value", by = "row")),
       warning = function(w) { seen <<- c(seen, class(w)[1]); invokeRestart("muffleWarning") })
     unique(seen)
   }

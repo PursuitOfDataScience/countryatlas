@@ -11,9 +11,10 @@ gearys_c(data, value, weights = NULL, n_perm = 999)
 
 \item{value}{The value column (unquoted).}
 
-\item{weights}{A \code{\link[=country_weights]{country_weights()}} object. Defaults to land-border
-contiguity, which excludes islands -- prefer \code{country_weights("knn")} for
-global work.}
+\item{weights}{A \code{\link[=country_weights]{country_weights()}} object. \code{NULL} (default) uses
+\code{country_weights("knn", k = 5)}: every country's five nearest neighbours,
+islands included. \code{country_weights("contiguity")} gives the land-border
+default of earlier versions, which leaves every island out.}
 
 \item{n_perm}{Permutations for the pseudo-p-value (default \code{999}; use \code{0} to
 skip the test, which leaves \code{p_value} as \code{NA}).}

@@ -53,8 +53,6 @@ result straight into \code{\link[=world_map]{world_map()}}.
 rates <- data.frame(country = c("United States", "Brazil", "Kenya"),
                     vaccination_pct = c(0.7, 0.8, 0.6))
 \donttest{
-if (requireNamespace("maps", quietly = TRUE)) {
-  joined <- join_world(rates, country)
-}
+joined <- join_world(rates, country)
 }
 }

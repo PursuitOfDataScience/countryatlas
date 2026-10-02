@@ -19,9 +19,22 @@
 #'   \item{year}{The reference year.}
 #' }
 #'   `country` carries the World Bank's own names, which differ from the
-#'   `countrycode` names used by [country_meta] for 38 countries.
-#' @source World Bank via \pkg{WDI}; geometry from Natural Earth via
-#'   \pkg{rnaturalearth}. Snapshot year: 2024.
+#'   `countrycode` names used by [country_meta] for 39 countries.
+#'
+#'   `income` and `region` are the World Bank's classifications in force on
+#'   1 January of the snapshot year (fiscal year 2024), from
+#'   [country_classifications]: the regions are therefore the ones before the
+#'   July 2025 change, with Afghanistan and Pakistan in South Asia. Data
+#'   fetched with [world_data()] carries the current fiscal year's instead, and
+#'   [source_info()] says which each frame holds.
+#'
+#'   The `"provenance"` attribute records the World Development Indicators
+#'   release the values come from, the build date, the package versions used,
+#'   and why the snapshot is on its year: it moves to a newer year only when
+#'   every indicator's coverage there is within five percentage points of the
+#'   current year's. The indicator columns carry a [source_info()] record.
+#' @source World Bank World Development Indicators, release 2026-07 (CC BY
+#'   4.0), and the World Bank's classifications. Snapshot year: 2024.
 "world_snapshot"
 
 #' Static per-country metadata
@@ -34,21 +47,31 @@
 #'   `capital_lat`, `capital_lon`, `centroid_lat`, `centroid_lon`, `area_km2`,
 #'   `currency`, `tld`, `landlocked`, `flag`.
 #'
-#'   Assembled from [countrycode::codelist], so Kosovo (`XKX`) has no row --
-#'   `countrycode` has none either. The geometry backends and
-#'   [convert_country()] do handle it; [distance_between()], which reads its
-#'   centroids from here, does not. Ten further territories have a row but no
-#'   centroid or area.
+#'   Assembled from [countrycode::codelist], plus a curated row for Kosovo
+#'   (`XKX`), which `countrycode` does not carry, so [distance_between()] and
+#'   the k-nearest-neighbour weights can use it. Centroids and areas come
+#'   from the bundled Natural Earth 1:50m polygons, the ones the polygon
+#'   backend draws, with each country's holes taken out; territories drawn as
+#'   part of their country (French Guiana, Svalbard) take theirs from Natural
+#'   Earth's map units. Three territories have a row but no centroid or area,
+#'   because Natural Earth does not draw them at 1:50m: Bouvet Island,
+#'   Gibraltar and the U.S. Minor Outlying Islands.
+#'
+#'   `income` and `region` are the World Bank's for the current fiscal year
+#'   (the `"classification"` attribute names it, `"FY2027"`), from
+#'   [country_classifications], so they agree with what [world_data()]
+#'   returns; `region` falls back to `countrycode`'s where the World Bank
+#'   lists no region.
 #'
 #'   `country` therefore carries the English names from `countrycode`
 #'   ("South Korea", "Congo - Kinshasa"), which differ from the World Bank's for
-#'   38 of the 215 countries in [world_snapshot] ("Korea, Rep.",
+#'   39 of the 216 countries in [world_snapshot] ("Korea, Rep.",
 #'   "Congo, Dem. Rep."). Each
 #'   table is faithful to its own source, so join on `iso3c` and keep whichever
 #'   label you want to display -- reconciling the two is what [country_join()]
 #'   is for.
-#' @source Assembled from \pkg{countrycode}, \pkg{WDI} metadata and Natural
-#'   Earth geometry.
+#' @source Assembled from \pkg{countrycode}, \pkg{WDI} metadata (capitals),
+#'   the World Bank's classifications and Natural Earth geometry.
 "country_meta"
 
 #' Curated indicator catalogue
@@ -93,10 +116,9 @@
 #' A statebins-style equal-area tile layout: one square per country, positioned
 #' on a `row`/`col` grid derived from country centroids. Used by [tile_map()].
 #'
-#' The grid holds one row for each of the 239 countries in [country_meta] that
-#' has a bundled centroid; the 10 without one (`ALA`, `BVT`, `GIB`, `HKG`,
-#' `MAC`, `SJM`, `TKL`, `TUV`, `UMI`, `VGB` -- see [country_meta]) have no tile
-#' and so cannot be drawn by [tile_map()].
+#' The grid holds one row for each of the 247 countries in [country_meta] that
+#' has a bundled centroid; the 3 without one (`BVT`, `GIB`, `UMI` -- see
+#' [country_meta]) have no tile and so cannot be drawn by [tile_map()].
 #'
 #' @format A tibble with columns `iso3c`, `country`, `row`, `col`; one row per
 #'   country, with `row`/`col` unique across the grid.
@@ -140,9 +162,9 @@
 
 #' Dated country-group membership
 #'
-#' When each country joined -- and where applicable left -- each of twelve
-#' international groups. The dated counterpart to [country_groups_tbl], which is
-#' a single current snapshot.
+#' When each country joined -- and where applicable left, or was suspended
+#' from -- each of nineteen international groups. The dated counterpart to
+#' [country_groups_tbl], which is a single current snapshot.
 #'
 #' A snapshot silently misstates any panel that spans an accession: an EU panel
 #' over 2015-2020 either includes the United Kingdom throughout or excludes it
@@ -154,23 +176,33 @@
 #'   \item{group}{Group name.}
 #'   \item{iso3c}{ISO 3166-1 alpha-3 code.}
 #'   \item{country}{Country name.}
-#'   \item{from}{Date membership took effect.}
-#'   \item{to}{The first date on which the country was no longer a member
-#'     (membership runs up to the day before), or `NA` for a current member.
-#'     The United Kingdom's EU `to` is therefore 2020-02-01: it left at the
-#'     end of 31 January 2020.}
+#'   \item{from}{Date the spell took effect.}
+#'   \item{to}{The first date on which it no longer held (it runs up to the
+#'     day before), or `NA` for one still in force. The United Kingdom's EU
+#'     `to` is therefore 2020-02-01: it left at the end of 31 January 2020.}
+#'   \item{status}{`"member"` or `"suspended"`. A country can have several
+#'     spells in a group: Seychelles left SADC in 2004 and rejoined in 2008,
+#'     and Syria was suspended from the Arab League from 2011 to 2023.
+#'     [country_groups()] and [in_group()] count the member spells only.}
 #' }
 #'
 #' @section Scope, and what is deliberately absent:
-#' Twelve groups are dated: EU, EuroZone, NATO, OECD, ASEAN, EFTA, GCC,
-#' Mercosur, Nordic, Visegrad, BRICS and G7. **Commonwealth, G20 and OPEC are
-#' not**, and that is a decision rather than an omission -- their histories
-#' involve suspensions, readmissions and contested dates that would have to be
-#' sourced case by case, and a fabricated date is worse than an absent one.
+#' Nineteen groups are dated: EU, EuroZone, NATO, OECD, ASEAN, EFTA, GCC,
+#' Mercosur, Nordic, Visegrad, BRICS, G7, and since 4.0.0 SCO, CPTPP, RCEP,
+#' EAC, SADC, APEC (member economies, so Hong Kong and Taiwan too) and the
+#' Arab League (`"ArabLeague"`). Every date carries its source in
+#' `data-raw/country_groups_history.R`. **Commonwealth, G20 and OPEC are
+#' not**, and that is a decision rather than an omission: the Commonwealth's
+#' and OPEC's suspensions, lapses and readmissions are dated unevenly by the
+#' sources, and G20's members include the EU and the African Union, which are
+#' not countries. A fabricated date is worse than an absent one, so
 #' `country_groups(as_of =)` warns and falls back to the snapshot for those.
+#' RCEP leaves out Myanmar, whose ratification the ASEAN Secretariat
+#' questioned and whose date of entry into force is disputed.
 #'
-#' Dates are the treaty or accession date where one exists, otherwise 1 January
-#' of the accession year. The table is validated at build time against
+#' Dates are the treaty, accession or decision date where one exists; where
+#' the sources give only the month, the 1st of that month (APEC's
+#' accessions). The table is validated at build time against
 #' [country_groups_tbl]: the members current today must reproduce the snapshot
 #' exactly, for every group covered.
 #'
@@ -245,3 +277,46 @@
 #' @examples
 #' disputed_territories[, c("territory", "iso3c", "status")]
 "disputed_territories"
+
+#' Dated World Bank classifications
+#'
+#' The World Bank's income groups, regions and lending categories, each row
+#' dated, so a country can be classified as it was on any day the table
+#' covers. [classify_countries()] reads it; [world_data()] and
+#' [country_data()] take their `income` and `region` from it, as of the
+#' current fiscal year.
+#'
+#' @format A tibble with one row per classification spell: `iso3c`, `scheme`
+#'   (`"wb_income"`, `"wb_region"` or `"wb_lending"`), `value`, `from` and
+#'   `to` (the spell runs from `from` up to but not including `to`; `NA` means
+#'   open-ended, or, for `from`, in force since before the table's records
+#'   begin), `source` and `note`.
+#'   \describe{
+#'     \item{`wb_income`}{One row per economy per World Bank fiscal year from
+#'       FY1989 to FY2027, from the historical classification by income
+#'       (OGHIST). Fiscal year *t* runs from 1 July *t*-1 to 30 June *t* and is
+#'       set from GNI per capita for calendar year *t*-2; see
+#'       [classify_countries()]. An economy the World Bank did not classify in a
+#'       year has no row for it.}
+#'     \item{`wb_region`}{The current regions, with the July 2025 change dated:
+#'       Afghanistan and Pakistan are in South Asia until 1 July 2025 and in
+#'       "Middle East, North Africa, Afghanistan & Pakistan" from then on, and
+#'       the other members of that region carry its former name, "Middle East &
+#'       North Africa", until the same date. No earlier region change is
+#'       recorded.}
+#'     \item{`wb_lending`}{The FY2027 lending categories (IDA, IBRD, Blend).
+#'       Earlier years are not recorded.}
+#'   }
+#'
+#'   The World Bank's codes for two former entities are recoded to ISO
+#'   3166-3's (its `YUG`, Serbia and Montenegro, is `SCG`; its `YUGf`,
+#'   Yugoslavia, is `YUG`), and the Channel Islands, which have no ISO code,
+#'   are left out. The fiscal year the table reaches is its `"vintage"`
+#'   attribute.
+#' @source World Bank, "World Bank Country and Lending Groups" (CLASS) and the
+#'   historical classification by income (OGHIST), both licensed CC BY 4.0;
+#'   the July 2025 region change from the World Bank DataBank Metadata Glossary.
+#'   Built by `data-raw/country_classifications.R`, which checks one class per
+#'   economy per fiscal year, agreement with OGHIST's thresholds sheet, and the
+#'   current classes against the World Bank API.
+"country_classifications"

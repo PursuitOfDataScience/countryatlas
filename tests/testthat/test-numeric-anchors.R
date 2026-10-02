@@ -280,7 +280,8 @@ test_that("morans_i matches an independently built row-standardised statistic", 
   skip_slow_on_cran()
   skip_if_no_sf_geometry()
   snap <- countryatlas::world_snapshot$countries
-  got <- morans_i(snap, gdp_per_capita, n_perm = 0)
+  got <- morans_i(snap, gdp_per_capita, n_perm = 0,
+                  weights = country_weights("contiguity"))
 
   # Rebuild the statistic from scratch: adjacency -> binary W -> row-standardise
   # -> I = (n / S0) * sum_ij w_ij z_i z_j / sum_i z_i^2.
@@ -313,7 +314,6 @@ test_that("quantile breaks are computed per country, not per polygon vertex", {
   # backend repeats a country's value once per boundary point, so breaking on
   # the raw column weights each country by its geometric complexity and a
   # "quantile" map stops holding roughly equal countries per colour.
-  skip_if_not_installed("maps")
   snap <- countryatlas::world_snapshot$countries
   mapdf <- attach_geometry(snap, geometry = "polygon")
   vals <- mapdf$gdp_per_capita
@@ -329,11 +329,9 @@ test_that("quantile breaks are computed per country, not per polygon vertex", {
   got <- countryatlas:::apply_binned_fill(
     mapdf, "gdp_per_capita", "quantile", 5)
   expect_equal(levels(got$data$.wdj_bin),
-               levels(cut(vals, breaks = right, include.lowest = TRUE,
-                          dig.lab = 4)))
+               countryatlas:::class_labels(right))
   expect_false(identical(levels(got$data$.wdj_bin),
-                         levels(cut(vals, breaks = naive, include.lowest = TRUE,
-                                    dig.lab = 4))))
+                         countryatlas:::class_labels(naive)))
 
   # The property that matters: roughly equal COUNTRIES per colour.
   one_per <- dplyr::distinct(tibble::as_tibble(got$data), .data$iso3c,
@@ -346,7 +344,6 @@ test_that("quantile breaks are computed per country, not per polygon vertex", {
 test_that("world_map wires the de-duplication flag to the right backend", {
   skip_slow_on_cran()
   # Catches the flag being flipped at the call site, not just inside the helper.
-  skip_if_not_installed("maps")
   snap <- countryatlas::world_snapshot$countries
   mapdf <- attach_geometry(snap, geometry = "polygon")
   per_country <- dplyr::distinct(tibble::as_tibble(mapdf), .data$iso3c,
@@ -357,8 +354,7 @@ test_that("world_map wires the de-duplication flag to the right backend", {
     world_map(mapdf, gdp_per_capita, style = "quantile", n_bins = 5))
   # The legend keys are the bin levels the plot actually used.
   used <- levels(droplevels(factor(built$plot$data$.wdj_bin)))
-  expected <- levels(cut(mapdf$gdp_per_capita, breaks = right,
-                         include.lowest = TRUE, dig.lab = 4))
+  expected <- countryatlas:::class_labels(right)
   expect_true(all(used %in% expected))
   expect_gt(length(used), 1L)
 })
@@ -380,8 +376,7 @@ test_that("the sf backend de-duplicates divided countries before breaking", {
   got <- countryatlas:::apply_binned_fill(
     sfd, "gdp_per_capita", "quantile", 5)
   expect_equal(levels(got$data$.wdj_bin),
-               levels(cut(vals, breaks = right, include.lowest = TRUE,
-                          dig.lab = 4)))
+               countryatlas:::class_labels(right))
 })
 
 test_that("globe_map's polygon backend also de-duplicates before breaking", {
@@ -389,7 +384,6 @@ test_that("globe_map's polygon backend also de-duplicates before breaking", {
   # globe_map attaches polygon geometry internally, so it needs the same
   # per-country de-duplication world_map does -- and it passes the flag
   # separately, so it needs its own check.
-  skip_if_not_installed("maps")
   skip_if_not_installed("mapproj")
   snap <- countryatlas::world_snapshot$countries
   # Reproduce the frame globe_map builds internally.
@@ -406,10 +400,8 @@ test_that("globe_map's polygon backend also de-duplicates before breaking", {
     globe_map(snap, gdp_per_capita, backend = "polygon", style = "quantile",
               n_bins = 5))
   used <- levels(built$plot$data$.wdj_bin)
-  expect_equal(used, levels(cut(poly$gdp_per_capita, breaks = right,
-                                include.lowest = TRUE, dig.lab = 4)))
-  expect_false(identical(used, levels(cut(poly$gdp_per_capita, breaks = naive,
-                                          include.lowest = TRUE, dig.lab = 4))))
+  expect_equal(used, countryatlas:::class_labels(right))
+  expect_false(identical(used, countryatlas:::class_labels(naive)))
 })
 
 # gini() computed the weighted mean absolute difference with outer(), i.e. an
@@ -551,8 +543,10 @@ test_that("the permutation p-value respects its own floor", {
 test_that("theil is anchored on the bundled snapshot", {
   snap <- countryatlas::world_snapshot$countries
   x <- snap$gdp_per_capita
-  expect_equal(theil(x), 0.740384576223, tolerance = 1e-9)
-  expect_equal(theil(x, weights = snap$population), 0.677915582736,
+  # Pinned from the closed forms, T = mean((x/mu) log(x/mu)) and its
+  # population-weighted counterpart, computed directly on the 2024 snapshot.
+  expect_equal(theil(x), 0.745576301238, tolerance = 1e-9)
+  expect_equal(theil(x, weights = snap$population), 0.685819270744,
                tolerance = 1e-9)
   # Weighting between people rather than between countries lowers it here.
   expect_lt(theil(x, weights = snap$population), theil(x))
@@ -570,12 +564,16 @@ test_that("the theil decomposition adds up, over the grouped subset", {
   # The defining property: the two parts sum exactly to the whole.
   expect_equal(between + within, total)
   expect_equal(sum(d$share[d$component %in% c("between", "within")]), 1)
+  expect_equal(total, theil(x))
   # And the documented subtlety: a row with no group is dropped, so `total` is
-  # theil over the grouped subset -- not over everything. Puerto Rico has no
-  # region in the snapshot, which is the entire difference.
+  # theil over the grouped subset -- not over everything. One ungrouped
+  # country is the entire difference.
+  g[snap$iso3c == "PRI"] <- NA
+  d <- theil(x, groups = g)
+  total <- d$value[d$component == "total"]
   expect_equal(total, theil(x[!is.na(g)]))
   expect_false(isTRUE(all.equal(total, theil(x))))
-  expect_equal(sum(is.na(g)), 1L)
+  expect_equal(sum(d$value[d$component %in% c("between", "within")]), total)
 })
 
 test_that("Moran's I matches the standard statistic's properties", {
@@ -616,9 +614,9 @@ test_that("every reversible convert_country destination round-trips", {
   reversible <- c("iso2c", "iso3n", "country.name", "cown", "cowc", "p4n",
                   "p5n", "gwn", "vdem", "imf", "fao", "fips", "gaul", "wb", "un")
   for (d in reversible) {
-    fwd <- suppressWarnings(convert_country(iso, to = d, from = "iso3c",
+    fwd <- suppressWarnings(convert_country(iso, to = d, origin = "iso3c",
                                            warn = FALSE))
-    back <- suppressWarnings(convert_country(fwd, to = "iso3c", from = d,
+    back <- suppressWarnings(convert_country(fwd, to = "iso3c", origin = d,
                                             warn = FALSE))
     keep <- !is.na(fwd) & !is.na(back)
     expect_gt(sum(keep), 150L)                       # the scheme really resolved
@@ -683,7 +681,6 @@ test_that("attach_geometry refuses a frame that already has geometry", {
   # country, which is N-squared: the bundled snapshot went from 99,338 rows to
   # 310,977,360. The join sets relationship = "many-to-many" -- correct, one
   # country has many vertices -- so dplyr's guard against this is switched off.
-  skip_if_not_installed("maps")
   snap <- countryatlas::world_snapshot$countries
   poly <- attach_geometry(snap, geometry = "polygon")
   expect_error(attach_geometry(poly, geometry = "polygon"),
@@ -898,7 +895,6 @@ test_that("ring_area_km2 measures wrapped and encircling rings correctly", {
 
   # And the property that actually matters: every bundled centroid is the
   # midpoint of the country's largest piece, unchanged by the fix.
-  skip_if_not_installed("maps")
   poly <- attach_geometry(countryatlas::world_snapshot$countries,
                           geometry = "polygon")
   cm <- countryatlas::country_meta
@@ -1283,10 +1279,15 @@ test_that("gridded_cartogram() allocates cells exactly and reports the overlap h
   # The documented overlap: blocks are centred on centroids with no collision
   # avoidance, so crowded neighbours are drawn on top of one another. Counted
   # by binning at the tile pitch, since only same-or-adjacent bins can overlap.
-  overlap_cells <- function(cells, cell_size) {
+  # The cells are laid out in the projection's metres (cell_size degrees of
+  # ground distance each), or in degrees with projection = "none".
+  overlap_cells <- function(cells, cell_size, projection = "equal_earth") {
     d <- suppressWarnings(suppressMessages(
-      gridded_cartogram(snap, population, cells = cells, cell_size = cell_size)$data))
-    tile <- cell_size * 0.9
+      gridded_cartogram(snap, population, cells = cells, cell_size = cell_size,
+                        projection = projection)$data))
+    unit <- if (identical(projection, "none")) 1 else
+      countryatlas:::METRES_PER_DEGREE
+    tile <- cell_size * unit * 0.9
     bx <- floor(d$x / tile); by <- floor(d$y / tile)
     hit <- rep(FALSE, nrow(d))
     idx <- split(seq_len(nrow(d)), paste(bx, by))
@@ -1382,7 +1383,9 @@ test_that("audit_coverage()'s counts are denominators, and correct", {
   # by_group's n_countries is also a denominator, and the groups partition the
   # data.
   expect_equal(sum(bg$n_countries), nrow(d))
-  reg <- countryatlas::country_meta$region[match(d$iso3c, countryatlas::country_meta$iso3c)]
+  # The groups are the data's own column: the snapshot's regions are those
+  # in force in its year, which need not be country_meta's current ones.
+  reg <- d$region
   for (i in seq_len(nrow(bg))) {
     g <- bg$region[i]
     k <- if (is.na(g)) is.na(reg) else !is.na(reg) & reg == g

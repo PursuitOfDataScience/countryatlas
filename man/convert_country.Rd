@@ -7,9 +7,10 @@
 convert_country(
   x,
   to = "iso3c",
-  from = "country.name",
+  origin = "country.name",
   custom_match = country_overrides(),
-  warn = TRUE
+  warn = TRUE,
+  from = deprecated()
 )
 }
 \arguments{
@@ -22,7 +23,8 @@ localized name
 language in countrycode's CLDR tables), or any raw countrycode
 destination.}
 
-\item{from}{Origin scheme (default \code{"country.name"}).}
+\item{origin}{Origin scheme (default \code{"country.name"}), as every other
+function that reads country identifiers calls it.}
 
 \item{custom_match}{Optional overrides (default \code{\link[=country_overrides]{country_overrides()}}).}
 
@@ -30,6 +32,8 @@ destination.}
 \code{TRUE}). A recognised country whose destination value is genuinely
 missing -- countrycode has no currency for Kosovo -- returns \code{NA}
 without warning.}
+
+\item{from}{\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}} Use \code{origin}.}
 }
 \value{
 A vector of converted codes.

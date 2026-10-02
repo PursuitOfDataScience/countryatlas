@@ -8,10 +8,14 @@ clear_country_cache(source = NULL, disk = FALSE)
 }
 \arguments{
 \item{source}{Which source's cache to clear, or \code{NULL} (default) for all.
-Only the World Bank cache is currently persisted to disk; other sources are
-memoised per session.}
+The built-in sources persist to disk, one directory each under the cache
+(\code{wdi}, \code{wdi-archive} for pinned World Bank releases, \code{owid}, \code{oecd},
+\code{imf}, \code{ilo}, \code{eurostat}, \code{comtrade}); a source you registered yourself is
+memoised for the session only.}
 
-\item{disk}{Also delete the on-disk cache (default \code{FALSE}).}
+\item{disk}{Also delete that source's on-disk entries (default \code{FALSE}).
+Only the cache's own files are removed, and a directory only when that
+leaves it empty.}
 }
 \value{
 Invisibly \code{TRUE}.
@@ -23,12 +27,29 @@ Empties the memoised in-session cache and, optionally, the on-disk one.
 
 Called with no \code{source}, this also drops the two cached \emph{geometry} backends:
 the Natural Earth \code{sf} layer held per scale (tens of megabytes at
-\code{scale = "medium"}) and the memoised \code{map_data("world")} tibble (about
-99,000 rows per override set). Those are the largest things the package
+\code{scale = "medium"}) and the polygon backend's memoised vertex table (about
+98,000 rows per override set). Those are the largest things the package
 keeps in memory, and in a long-lived process -- a Shiny app or a plumber
 API -- this is the only way to release them. They rebuild on the next map.
 
 Naming a \code{source} leaves geometry alone, since it is not a data source.
+}
+
+\section{Where the cache lives}{
+
+The persistent cache goes in the standard per-user cache location,
+\code{tools::R_user_dir("countryatlas", "cache")}. Point it elsewhere with
+\code{options(countryatlas.cache_dir = )}, or skip it by passing \code{cache = FALSE}
+to \code{\link[=world_data]{world_data()}} or \code{\link[=country_data]{country_data()}}. Under \verb{R CMD check} the whole cache
+moves to the session temp directory, so a check never writes to the user's
+file space.
+
+Entries expire: a fetch from a current release is dropped once it is 30
+days old, because providers revise their figures, and past 50 MB per
+source the least-recently-used entries go first. Adjust either with
+\code{options(countryatlas.cache_max_age = )} (seconds) and
+\code{options(countryatlas.cache_max_size = )} (bytes). A pinned World Bank
+release (\code{\link[=wdi_vintages]{wdi_vintages()}}) never changes, so its entries never expire.
 }
 
 \examples{

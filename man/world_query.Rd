@@ -24,8 +24,12 @@ world_query(
 \item{source}{The table/source name registered with ggsql (default
 \code{"countryatlas_world"}).}
 
-\item{projection}{A projection ggsql's \verb{PROJECT TO} understands (e.g.
-\code{"equal_earth"}, \code{"orthographic"}), or \code{NULL} to omit the clause.}
+\item{projection}{A projection: one of the package's own names (see
+\code{\link[=projection_info]{projection_info()}}), translated to ggsql's where the two differ
+(\code{"plate_carree"} becomes \code{equirectangular}, \code{"natural_earth"} becomes
+\code{natural}, \code{"azimuthal_equal_area"} becomes \code{lambert}), or any other name
+ggsql's \verb{PROJECT TO} understands, passed through. \code{NULL} omits the
+clause.}
 
 \item{palette}{A scale ggsql's \verb{SCALE ... TO} understands (default
 \code{"viridis"}), or \code{NULL} to omit.}
@@ -61,12 +65,16 @@ builder with no dependencies; pair it with \code{\link[=as_ggsql_source]{as_ggsq
 \section{Executing the query}{
 
 Building the string needs nothing installed. \emph{Running} it needs
-\code{ggsql} >= 0.4.1, the version that added the \verb{DRAW spatial} clause; older
-\code{ggsql} releases parse the query and reject that clause. As of August 2026
-that clause has shipped in the ggsql \emph{engine} but not yet in the ggsql R
-package (still 0.3.3), so \code{\link[=interactive_map]{interactive_map()}}\code{(engine = "ggsql")} will refuse
-until the bindings catch up. \verb{PROJECT TO} additionally needs a spatial
-backend -- for DuckDB, its \code{spatial} extension.
+\code{ggsql} >= 0.4.1, the version that added the \verb{DRAW spatial} clause and map
+projections; older \code{ggsql} releases parse the query and reject that clause.
+Projections arrived in the engine at different versions -- \code{equal_earth},
+the default here, only in 0.5.0 -- so the query records the version it
+needs as its \code{"countryatlas_ggsql_version"} attribute, and
+\code{\link[=interactive_map]{interactive_map()}}\code{(engine = "ggsql")} refuses an installed \code{ggsql} older
+than that, naming the projection. As of October 2026 the ggsql \emph{engine} is
+at 0.5.2 while the ggsql R package on CRAN is still 0.3.3, so execution
+waits for the bindings to catch up. \verb{PROJECT TO} additionally needs a
+spatial backend -- for DuckDB, its \code{spatial} extension.
 }
 
 \examples{

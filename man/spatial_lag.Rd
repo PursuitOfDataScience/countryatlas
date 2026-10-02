@@ -11,9 +11,10 @@ spatial_lag(data, value, weights = NULL, suffix = "_lag")
 
 \item{value}{The value column (unquoted).}
 
-\item{weights}{A \code{\link[=country_weights]{country_weights()}} object. Defaults to land-border
-contiguity, which excludes islands -- prefer \code{country_weights("knn")} for
-global work.}
+\item{weights}{A \code{\link[=country_weights]{country_weights()}} object. \code{NULL} (default) uses
+\code{country_weights("knn", k = 5)}: every country's five nearest neighbours,
+islands included. \code{country_weights("contiguity")} gives the land-border
+default of earlier versions, which leaves every island out.}
 
 \item{suffix}{Suffix for the new column (default \code{"_lag"}).}
 }

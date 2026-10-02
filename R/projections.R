@@ -98,9 +98,9 @@ projection_info <- function(projection = NULL) {
 #' a projection choice is visible rather than asserted. The data and the
 #' classification are held fixed; only the CRS varies.
 #'
-#' @param data An `sf` map-ready frame (projections are an `sf`-backend
-#'   feature; the polygon backend draws in `coord_quickmap()` and cannot
-#'   reproject).
+#' @param data An `sf` map-ready frame: the comparison reprojects the
+#'   geometry itself. To draw one polygon-backend map in another projection,
+#'   pass `projection` to [world_map()].
 #' @param fill The fill column (unquoted).
 #' @param projections Projections to compare (default: Equal Earth, Robinson,
 #'   Winkel tripel and Mercator -- an equal-area, two compromises and a
@@ -212,7 +212,7 @@ projection_compare <- function(data, fill,
     }
     # The one projection with a far side: cut it off first, as world_map()
     # does, or a country on the horizon projects to a broken ring.
-    if (identical(p, "orthographic")) src <- clip_to_hemisphere(src, 0, ORTHO_LAT0)
+    src <- clip_for_projection(src, p)
     g <- quietly_sf(sf::st_set_crs(sf::st_transform(src, wdj_crs(p)), NA))
     # Each projection lands in its own units and extent -- Mercator's y range is
     # orders of magnitude larger than Equal Earth's -- so at a shared scale
@@ -319,9 +319,7 @@ tissot_map <- function(projection = "equal_earth", spacing = 30,
   # On the orthographic globe an indicatrix on the far side has no image and
   # one on the horizon projects to a broken ring; cut them there, as the
   # basemap is (see clip_to_hemisphere()).
-  if (identical(projection, "orthographic")) {
-    ind <- clip_to_hemisphere(ind, 0, ORTHO_LAT0)
-  }
+  ind <- clip_for_projection(ind, projection)
 
   base <- world_geometry("countries", geometry = "sf", projection = projection)
   ggplot2::ggplot() +
