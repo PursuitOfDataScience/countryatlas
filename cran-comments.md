@@ -57,19 +57,21 @@ behaviour. The ones that change output for existing code:
 
 ## R CMD check results
 
-To be re-run on the release commit. On the development tree (still versioned
-3.0.0) `R CMD check --as-cran --run-donttest` on R 4.4.1 with every Suggest
-gives 0 errors, and nothing that would remain at submission:
+`R CMD check --as-cran --run-donttest` of the 4.0.0 tarball on R 4.4.1, with
+every Suggest that installs there, gives 0 errors. The URL and spelling checks
+are clean, and the rest is the maintainer's machine or `--run-donttest`:
 
-* WARNING, CRAN incoming feasibility: "Insufficient package version" (the
-  version is bumped in the release commit) and three README links to new
-  website articles, which resolve once the site is rebuilt from that commit.
 * WARNING, `qpdf` is not installed on the maintainer's machine.
 * NOTEs of the machine: `ggsql` and `magick` cannot be installed there, no
   `tidy` binary, "unable to verify current time".
 * NOTE, examples over 5 s under `--run-donttest`: `cartogram_diagnostics()`
   (18 s, building a contiguous cartogram) and `spin_globe()` (7 s). Both are
   inside `\donttest{}`.
+* NOTE, new files in other directories: `~/.cache/fontconfig` only, which the
+  system fontconfig library creates the first time R's cairo PNG device draws
+  (here, while the vignettes are rebuilt). It appears because the check ran
+  with an empty `HOME` so that any stray write would show; the package writes
+  nothing outside `tempdir()`.
 
 The depends-only configuration (R 4.6.0, every Suggest absent,
 `_R_CHECK_DEPENDS_ONLY_=true`) passes the tests, examples and vignettes.

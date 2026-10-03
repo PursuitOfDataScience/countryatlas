@@ -1,7 +1,7 @@
 Package: countryatlas
 Type: Package
 Title: Join World Bank Data, Country Codes and Maps on the ISO Spine
-Version: 3.0.0
+Version: 4.0.0
 Authors@R:
     person(given = "Youzhi",
            family = "Yu",

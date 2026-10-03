@@ -1,4 +1,4 @@
-# countryatlas (development version)
+# countryatlas 4.0.0
 
 ## Highlights
 
