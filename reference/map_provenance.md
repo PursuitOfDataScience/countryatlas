@@ -102,7 +102,7 @@ p <- attach_geometry(snap, geometry = "polygon") |>
 map_provenance(p)
 #> 
 #> ── countryatlas map provenance 
-#> package: countryatlas 3.0.0 (snapshot 2024)
+#> package: countryatlas 4.0.0 (snapshot 2024)
 #> fill: gdp_per_capita
 #> geometry: polygon backend, equal_earth
 #> classification: quantile, 5 bins

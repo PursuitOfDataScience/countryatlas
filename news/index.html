@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">countryatlas</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -54,9 +54,9 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="development version" id="countryatlas-development-version">countryatlas (development version)<a class="anchor" aria-label="anchor" href="#countryatlas-development-version"></a></h2>
+<h2 class="pkg-version" data-toc-text="4.0.0" id="countryatlas-400">countryatlas 4.0.0<a class="anchor" aria-label="anchor" href="#countryatlas-400"></a></h2>
 <div class="section level3">
-<h3 id="highlights-development-version">Highlights<a class="anchor" aria-label="anchor" href="#highlights-development-version"></a></h3>
+<h3 id="highlights-4-0-0">Highlights<a class="anchor" aria-label="anchor" href="#highlights-4-0-0"></a></h3>
 <ul><li>
 <strong>Maps are equal-area by default, on both backends, with nothing to install.</strong> The polygon backend draws the bundled Natural Earth 1:50m countries in Equal Earth, through <code><a href="https://ggplot2.tidyverse.org/reference/ggsf.html" class="external-link">coord_sf()</a></code> when <code>sf</code> loads and with the package’s own spherical Equal Earth when it does not; every projection, <code>recenter</code> and <code><a href="../reference/zoom_map.html">zoom_map()</a></code> work on it.</li>
 <li>
@@ -71,7 +71,7 @@
 <strong>Names in any language:</strong> “Allemagne”, “Deutschland” and the Russian, Chinese and Japanese names for Germany all resolve, and <code><a href="../reference/check_country_match.html">check_country_match()</a></code> says which tier matched each one.</li>
 </ul></div>
 <div class="section level3">
-<h3 id="breaking-changes-development-version">Breaking changes<a class="anchor" aria-label="anchor" href="#breaking-changes-development-version"></a></h3>
+<h3 id="breaking-changes-4-0-0">Breaking changes<a class="anchor" aria-label="anchor" href="#breaking-changes-4-0-0"></a></h3>
 <ul><li>
 <strong>The polygon backend is projected, in Equal Earth by default.</strong> It drew unprojected longitude and latitude whatever <code>projection</code> said. Way back: <code>projection = "none"</code>.</li>
 <li>
@@ -116,7 +116,7 @@
 <strong><code><a href="../reference/add_indicator.html">add_indicator()</a></code> refuses a source that repeats a key.</strong> A source returning two rows for one country-year fanned the caller’s frame out, one row in and two out. It now aborts with class <code>countryatlas_many_to_many</code>, naming the keys; aggregate the source first.</li>
 </ul></div>
 <div class="section level3">
-<h3 id="maps-development-version">Maps<a class="anchor" aria-label="anchor" href="#maps-development-version"></a></h3>
+<h3 id="maps-4-0-0">Maps<a class="anchor" aria-label="anchor" href="#maps-4-0-0"></a></h3>
 <ul><li>New <code>breaks</code> (fixed class boundaries, open-ended end classes with a warning) and <code>midpoint</code> (a diverging palette centred on a value) in <code><a href="../reference/world_map.html">world_map()</a></code>, <code><a href="../reference/globe_map.html">globe_map()</a></code> and <code><a href="../reference/value_by_alpha_map.html">value_by_alpha_map()</a></code>; <code><a href="../reference/facet_map.html">facet_map()</a></code> and <code><a href="../reference/animate_world.html">animate_world()</a></code> gain <code>breaks_by = "panel"</code> to classify each panel on its own values.</li>
 <li>New styles <code>"fisher"</code>, <code>"headtails"</code>, <code>"sd"</code> and <code>"equal"</code>; their breaks equal classInt’s. <code><a href="../reference/classify_compare.html">classify_compare()</a></code> adds Fisher and head/tail breaks and reports the goodness of variance fit, the tabular accuracy index and the fullest class’s share.</li>
 <li>
@@ -133,7 +133,7 @@
 <li>The 32 worldviews Natural Earth publishes, 31 countries’ and ISO’s: <code>world_geometry(worldview = )</code>, <code>attach_geometry(worldview = )</code> and <code>dispute_policy(worldview = )</code> draw the boundaries as the viewing country publishes them, on the <code>sf</code> backend.</li>
 </ul></div>
 <div class="section level3">
-<h3 id="matching-and-reference-data-development-version">Matching and reference data<a class="anchor" aria-label="anchor" href="#matching-and-reference-data-development-version"></a></h3>
+<h3 id="matching-and-reference-data-4-0-0">Matching and reference data<a class="anchor" aria-label="anchor" href="#matching-and-reference-data-4-0-0"></a></h3>
 <ul><li>
 <code><a href="../reference/standardize_country.html">standardize_country()</a></code> matches and derives once per distinct value rather than once per row, so the new tiers cost nothing per repeated name.</li>
 <li>The World Bank API now names Nauru “Naoero”; the override table resolves it.</li>
@@ -147,7 +147,7 @@
 </ol></li>
 </ul></div>
 <div class="section level3">
-<h3 id="panels-development-version">Panels<a class="anchor" aria-label="anchor" href="#panels-development-version"></a></h3>
+<h3 id="panels-4-0-0">Panels<a class="anchor" aria-label="anchor" href="#panels-4-0-0"></a></h3>
 <ul><li>
 <code><a href="../reference/country_join.html">country_join()</a></code> and <code><a href="../reference/country_join_all.html">country_join_all()</a></code> gain <code>also_by</code>, extra key columns besides the country: a character vector, or a named one when the two tables name the column differently (<code>also_by = c(year = "yr")</code>). A panel joined to a cross-section repeats the cross-section’s values across the years, with a message. A key repeated on both sides now warns with class <code>countryatlas_many_to_many</code>, naming up to five keys.</li>
 <li>
@@ -162,7 +162,7 @@
 <code><a href="../reference/correlate_indicators.html">correlate_indicators()</a></code> gains <code>by_year</code>, one correlation table per year of a panel instead of the earliest year alone, and <code>weight</code>, for a population-weighted correlation (the average person rather than the average country).</li>
 </ul></div>
 <div class="section level3">
-<h3 id="data-you-can-trace-development-version">Data you can trace<a class="anchor" aria-label="anchor" href="#data-you-can-trace-development-version"></a></h3>
+<h3 id="data-you-can-trace-4-0-0">Data you can trace<a class="anchor" aria-label="anchor" href="#data-you-can-trace-4-0-0"></a></h3>
 <ul><li>Every fetch goes through one HTTP client with a per-request timeout (<code>options(countryatlas.timeout)</code>, default 60 s) and bounded retries (<code>options(countryatlas.retries)</code>, default 3) with exponential backoff and jitter on 429, 5xx and dropped connections, honouring <code>Retry-After</code>. A World Bank outage on 2026-10-01 had held a fetch for 450 seconds; the worst case is now bounded and documented. A failed download is still a warning and an empty result, as CRAN asks, unless <code>options(countryatlas.strict = TRUE)</code> makes it an error (class <code>countryatlas_fetch_failed</code>).</li>
 <li>World Bank data comes through the package’s own client rather than <code><a href="https://rdrr.io/pkg/WDI/man/WDI.html" class="external-link">WDI::WDI()</a></code>, in pages of 5,000 rows instead of the single 32,500-row page that failed. On recorded responses it returns the same keys, columns and values as 3.0.0’s path did. <code>WDI</code> stays for <code><a href="../reference/wdi_search.html">wdi_search()</a></code>.</li>
 <li>Pinnable World Bank releases: <code>vintage = "2024-07"</code> in <code>fetch_indicator("wdi", ...)</code>, <code><a href="../reference/country_data.html">country_data()</a></code> and <code><a href="../reference/world_data.html">world_data()</a></code> reads an archived release of the World Development Indicators (API source 57); a series the release does not hold warns and names the nearest releases that do. New <code><a href="../reference/wdi_vintages.html">wdi_vintages()</a></code> lists the 142 releases since 1989, and <code><a href="../reference/compare_vintages.html">compare_vintages()</a></code> shows how much a series was revised between them (Johnson, Larson, Papageorgiou &amp; Subramanian 2013). An archived release never changes, so its cache entries never expire.</li>
@@ -180,7 +180,7 @@
 <code>world_snapshot</code> is refreshed from the 2026-07 release and stays on 2024, by the rule recorded in its <code>"provenance"</code> attribute: in 2025, life expectancy and CO2 have no values yet and GDP per capita covers 86% of countries against 92%. It gains Kosovo (216 countries). <code>country_meta</code> gains a curated Kosovo row, so <code><a href="../reference/distance_between.html">distance_between()</a></code> and the k-nearest weights include it.</li>
 </ul></div>
 <div class="section level3">
-<h3 id="statistics-development-version">Statistics<a class="anchor" aria-label="anchor" href="#statistics-development-version"></a></h3>
+<h3 id="statistics-4-0-0">Statistics<a class="anchor" aria-label="anchor" href="#statistics-4-0-0"></a></h3>
 <ul><li>
 <code><a href="../reference/local_morans.html">local_morans()</a></code>, <code><a href="../reference/getis_ord.html">getis_ord()</a></code> and <code><a href="../reference/lisa_map.html">lisa_map()</a></code>: <code>p_adjust</code> accepts <code>"fdr"</code>, <code>"bonferroni"</code>, <code>"holm"</code> or <code>"none"</code>. The method is recorded as an attribute of the result and in <code><a href="../reference/lisa_map.html">lisa_map()</a></code>’s provenance.</li>
 <li>New <code><a href="../reference/eb_morans_i.html">eb_morans_i()</a></code>, Moran’s I for rates (Assuncao &amp; Reis 1999), equal to <code><a href="https://r-spatial.github.io/spdep/reference/EBImoran.mc.html" class="external-link">spdep::EBImoran.mc()</a></code>; <code>smooth_rates(method = "local_eb")</code> shrinks toward each neighbourhood’s rate (Marshall 1991), equal to <code>spdep::EBlocal(geoda = TRUE)</code>.</li>
@@ -189,16 +189,16 @@
 <li>New <code><a href="../reference/rate_funnel.html">rate_funnel()</a></code> with exact Poisson limits and Spiegelhalter’s overdispersion adjustment; new <code><a href="../reference/bivariate_lisa.html">bivariate_lisa()</a></code> and <code><a href="../reference/join_counts.html">join_counts()</a></code>.</li>
 </ul></div>
 <div class="section level3">
-<h3 id="documentation-development-version">Documentation<a class="anchor" aria-label="anchor" href="#documentation-development-version"></a></h3>
+<h3 id="documentation-4-0-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-4-0-0"></a></h3>
 <ul><li>The README is rewritten short: three examples, four setup steps and the gotchas; the visual tour moved to a Gallery article. Two new vignettes, “Panels done right” and “Data you can trace”, and seven articles on the website only. <code>inst/CITATION</code> carries the methods added in this release.</li>
 </ul></div>
 <div class="section level3">
-<h3 id="deprecations-development-version">Deprecations<a class="anchor" aria-label="anchor" href="#deprecations-development-version"></a></h3>
+<h3 id="deprecations-4-0-0">Deprecations<a class="anchor" aria-label="anchor" href="#deprecations-4-0-0"></a></h3>
 <ul><li>
 <code><a href="../reference/clear_wdi_cache.html">clear_wdi_cache()</a></code> is deprecated in favour of <code><a href="../reference/clear_country_cache.html">clear_country_cache()</a></code>, which it has been an alias of since 3.0.0. It warns, and goes in 5.0.0. Deprecations now go through lifecycle, which is added to Imports.</li>
 </ul></div>
 <div class="section level3">
-<h3 id="internals-development-version">Internals<a class="anchor" aria-label="anchor" href="#internals-development-version"></a></h3>
+<h3 id="internals-4-0-0">Internals<a class="anchor" aria-label="anchor" href="#internals-4-0-0"></a></h3>
 <ul><li><p>New scheduled workflows: weekly live contract tests make one real request per provider and upload re-recorded fixtures for review; a monthly dry run rebuilds every dataset from its source; a budget check fails the build when the CRAN-mode tests, the vignette rebuild or the whole check outgrows the time that got 3.0.0 through CRAN. The adapter tests replay real recorded responses instead of mocking the client function, which is how two dead adapters had passed every test.</p></li>
 <li><p>Every internal join now declares its cardinality (<code>relationship =</code>), so a lookup that unexpectedly repeats a key errors instead of multiplying rows. A test parses <code>R/</code> and fails on any join without one.</p></li>
 <li><p><code>R/visualization.R</code> (3,328 lines) is split into <code>map-core.R</code>, <code>map-symbols.R</code>, <code>map-cartograms.R</code>, <code>map-globe.R</code>, <code>map-interactive.R</code>, <code>map-panels.R</code> and <code>labels.R</code>; interpolation moves to <code>time.R</code> and the value-suppressing palette to <code>honest-maps.R</code>. The tests move from release-named files to one <code>test-&lt;file&gt;.R</code> per source file. Both are pure moves.</p></li>
