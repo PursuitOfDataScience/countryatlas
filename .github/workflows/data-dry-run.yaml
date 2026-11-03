@@ -24,9 +24,13 @@ jobs:
         with:
           use-public-rspm: true
 
+      # usethis because country_groups_history.R ends in usethis::use_data(). It is
+      # in neither Imports nor Suggests, so nothing else installs it, and both runs
+      # of this workflow before it was added stopped there with "there is no
+      # package called 'usethis'", before build_datasets.R had run at all.
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::pkgload, any::readxl, any::jsonlite, any::maps
+          extra-packages: any::pkgload, any::readxl, any::jsonlite, any::maps, any::usethis
           needs: check
 
       - name: Rebuild every dataset from its source
