@@ -569,7 +569,7 @@ area-honest maps.
 ``` r
 
 sessionInfo()
-#> R version 4.6.1 (2026-06-24)
+#> R version 4.6.2 (2026-10-29)
 #> Platform: x86_64-pc-linux-gnu
 #> Running under: Ubuntu 24.04.5 LTS
 #> 
@@ -594,19 +594,19 @@ sessionInfo()
 #> 
 #> loaded via a namespace (and not attached):
 #>  [1] tidyr_1.3.2        utf8_1.2.6         sass_0.4.10        generics_0.1.4    
-#>  [5] class_7.3-23       KernSmooth_2.23-26 digest_0.6.39      magrittr_2.0.5    
-#>  [9] countrycode_1.9.0  evaluate_1.0.5     grid_4.6.1         RColorBrewer_1.1-3
+#>  [5] class_7.3-24       KernSmooth_2.23-27 digest_0.6.39      magrittr_2.0.5    
+#>  [9] countrycode_1.9.0  evaluate_1.0.5     grid_4.6.2         RColorBrewer_1.1-3
 #> [13] fastmap_1.2.0      jsonlite_2.0.0     e1071_1.7-17       DBI_1.3.0         
 #> [17] purrr_1.2.2        viridisLite_0.4.3  scales_1.4.0       stringdist_0.9.17 
 #> [21] textshaping_1.0.5  jquerylib_0.1.4    cli_3.6.6          rlang_1.3.0       
 #> [25] units_1.0-1        withr_3.0.3        cachem_1.1.0       yaml_2.3.12       
-#> [29] otel_0.2.0         parallel_4.6.1     tools_4.6.1        memoise_2.0.1     
+#> [29] otel_0.2.0         parallel_4.6.2     tools_4.6.2        memoise_2.0.1     
 #> [33] vctrs_0.7.3        R6_2.6.1           proxy_0.4-29       lifecycle_1.0.5   
 #> [37] classInt_0.4-11    fs_2.1.0           htmlwidgets_1.6.4  ragg_1.5.2        
 #> [41] pkgconfig_2.0.3    desc_1.4.3         pkgdown_2.2.1      pillar_1.11.1     
 #> [45] bslib_0.12.0       gtable_0.3.6       glue_1.8.1         Rcpp_1.1.2        
-#> [49] sf_1.1-3           systemfonts_1.3.2  xfun_0.61          tibble_3.3.1      
+#> [49] sf_1.1-3           systemfonts_1.3.2  xfun_0.62          tibble_3.3.1      
 #> [53] tidyselect_1.2.1   knitr_1.52         farver_2.1.2       htmltools_0.5.9   
-#> [57] labeling_0.4.3     rmarkdown_2.32     compiler_4.6.1     WDI_2.8.0         
+#> [57] labeling_0.4.3     rmarkdown_2.32     compiler_4.6.2     WDI_2.8.0         
 #> [61] S7_0.2.2
 ```
