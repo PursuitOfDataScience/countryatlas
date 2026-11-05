@@ -62,7 +62,7 @@
 <li>
 <strong>Honest defaults:</strong> quantile classes, a caption that states coverage and source, small states drawn as points rather than dropped, alt text on every map, legend titles with units, and fixed <code>breaks</code> and diverging <code>midpoint</code>s when you want them.</li>
 <li>
-<strong>Panels that keep their dates:</strong> dated World Bank income groups and regions (<code><a href="../reference/classify_countries.html">classify_countries()</a></code>), group membership with spells and suspensions for nineteen groups, lags and growth keyed on the year, joins on the year, and aggregates that report their coverage.</li>
+<strong>Panels that keep their dates:</strong> dated World Bank income groups and regions (<code><a href="../reference/classify_countries.html">classify_countries()</a></code>), group membership with spells and suspensions for twenty groups, lags and growth keyed on the year, joins on the year, and aggregates that report their coverage.</li>
 <li>
 <strong>Data you can trace:</strong> every fetched column carries its source, unit, release and licence (<code><a href="../reference/source_info.html">source_info()</a></code>); World Bank releases can be pinned (<code>vintage =</code>) and compared; any SDMX provider reads without a client package (<code><a href="../reference/fetch_sdmx.html">fetch_sdmx()</a></code>).</li>
 <li>
@@ -113,6 +113,8 @@
 <li>
 <strong><code>wdj_overrides()</code> and <code>options(countryatlas.gdp_compat)</code> are removed</strong>, after warning for a release. Use <code><a href="../reference/country_overrides.html">country_overrides()</a></code>, and the <code>gdp_per_capita</code> column the alias copied.</li>
 <li>
+<strong><code><a href="../reference/as_ggsql_source.html">as_ggsql_source()</a></code> returns a ggsql reader by default</strong> (<code>format = "reader"</code>): the object <code><a href="https://r.ggsql.org/reference/ggsql_execute.html" class="external-link">ggsql::ggsql_execute()</a></code> takes in ggsql 0.5, with the table registered and DuckDB’s spatial extension loaded. The DuckDB connection it returned before is not one ggsql can read. Way back: <code>format = "duckdb"</code>, or pass <code>con</code>.</li>
+<li>
 <strong><code><a href="../reference/add_indicator.html">add_indicator()</a></code> refuses a source that repeats a key.</strong> A source returning two rows for one country-year fanned the caller’s frame out, one row in and two out. It now aborts with class <code>countryatlas_many_to_many</code>, naming the keys; aggregate the source first.</li>
 </ul></div>
 <div class="section level3">
@@ -127,9 +129,22 @@
 <li>
 <code><a href="../reference/map_provenance.html">map_provenance()</a></code> reads the final plot: a coord or fill scale added after the verb drew it is reported, with <code>modified = TRUE</code>.</li>
 <li>
+<code><a href="../reference/world_query.html">world_query()</a></code> writes the grammar of ggsql 0.5, checked against 0.5.2, the first release on CRAN with the spatial layer (2026-10-08), by validating and executing every form. ggsql 0.5.2 rejected every query it wrote before. The geometry column is mapped (new <code>geometry</code> argument), a facet is <code>FACET &lt;column&gt;</code>, <code>layer = "binned"</code> is a binned scale, <code>layer = "bubble"</code> draws a point at each country’s centroid over the countries, all thirteen projections translate, the polar views and Gall-Peters included, and an apostrophe in <code>title</code> is escaped with a backslash, as ggsql reads it, rather than doubled.</li>
+<li>
+<code><a href="../reference/as_ggsql_source.html">as_ggsql_source()</a></code> writes geometry in longitude and latitude. The <code>sf</code> frames <code><a href="../reference/attach_geometry.html">attach_geometry()</a></code> returns are in Equal Earth metres, which ggsql read as degrees, so every map it drew came back empty. It also adds <code>centroid_lon</code> and <code>centroid_lat</code> for the bubble layer, and gains <code>format = "frame"</code> for a <a href="https://r.ggsql.org" class="external-link">ggsql</a> chunk to read as <code>r:&lt;object&gt;</code>.</li>
+<li>
+<code>interactive_map(engine = "ggsql")</code> returns ggsql’s widget rather than the plot specification, and needs ggsql &gt;= 0.5.0.</li>
+<li>New <code><a href="../reference/world_map_ui.html">world_map_ui()</a></code> and <code><a href="../reference/world_map_ui.html">world_map_server()</a></code>: a Shiny module that draws <code><a href="../reference/world_map.html">world_map()</a></code> with inputs for the fill column, the classification, the number of classes and the projection, announces the map’s alt text to screen readers, and returns the map as a reactive. <code>shiny</code> joins Suggests.</li>
+<li>
 <code>projection = "north_polar"</code> on the <code>sf</code> backend painted the whole disc grey: Natural Earth closes Antarctica along the South Pole, the projection’s antipode, so its ring closed around every other country. What lies wholly south of 60 degrees S is now left out of that view, on both backends.</li>
 <li>
 <code><a href="../reference/classify_compare.html">classify_compare()</a></code> labels missing values “No data”, as every other map does, rather than “NA”; <code><a href="../reference/flow_map.html">flow_map()</a></code>’s lightest arcs no longer vanish into the basemap; and <code><a href="../reference/geom_country_labels.html">geom_country_labels()</a></code> on a frame without <code>group</code> no longer places one “NA” label for every uncoded piece.</li>
+<li>Legends show the colour of every class they list. Since ggplot2 3.5 a legend key for a class no country falls in is drawn empty, so fixed <code>breaks</code> with an empty class, the value-suppressing palette’s grid, <code><a href="../reference/classify_compare.html">classify_compare()</a></code> and <code><a href="../reference/lisa_map.html">lisa_map()</a></code>’s four cluster types showed labels with no swatch beside them. <code><a href="../reference/lisa_map.html">lisa_map()</a></code> labels its missing key “No data”, as the other maps do.</li>
+<li>
+<code><a href="../reference/value_by_alpha_map.html">value_by_alpha_map()</a></code>’s opacity legend shows the equalising variable’s own values at each step (“9.65K”, “6.92M”, “1.45B” for population) rather than the normalised opacity, which read as a population of 0.25.</li>
+<li>Captions wrap at 80 characters and align to the whole plot rather than the panel. ggplot2 does not wrap text, so a caption longer than the panel was cut off at its left edge: at the default 7-inch width <code><a href="../reference/lisa_map.html">lisa_map()</a></code>’s 170-character caption lost the coverage statement it starts with.</li>
+<li>
+<code><a href="../reference/geom_country_labels.html">geom_country_labels()</a></code> on a zoomed map (<code><a href="../reference/zoom_map.html">zoom_map()</a></code>, or any coord with limits) labels only the countries the map shows. ggrepel keeps every label inside the panel, so a map of Europe had the United States, Japan and the rest of the frame piled along its edges. The example that zoomed with <code><a href="https://ggplot2.tidyverse.org/reference/coord_map.html" class="external-link">coord_quickmap()</a></code>, which would also have dropped the projection, uses <code><a href="../reference/zoom_map.html">zoom_map()</a></code>.</li>
 <li>The 32 worldviews Natural Earth publishes, 31 countries’ and ISO’s: <code>world_geometry(worldview = )</code>, <code>attach_geometry(worldview = )</code> and <code>dispute_policy(worldview = )</code> draw the boundaries as the viewing country publishes them, on the <code>sf</code> backend.</li>
 </ul></div>
 <div class="section level3">
@@ -140,7 +155,10 @@
 <li>
 <code>convert_country("XK", origin = "iso2c")</code> reads back the code the package writes for Kosovo.</li>
 <li>
-<code>country_groups_history</code> gains <code>status</code> and several spells per country, and seven dated groups: SCO, CPTPP, RCEP, EAC, SADC, APEC and the Arab League, every date sourced in <code>data-raw/</code>. Suspended spells are not counted as membership.</li>
+<code>country_groups_history</code> gains <code>status</code> and several spells per country, and eight dated groups: the G20 (its nineteen countries), SCO, CPTPP, RCEP, EAC, SADC, APEC and the Arab League, every date sourced in <code>data-raw/</code>. Suspended spells are not counted as membership.</li>
+<li>Four groups join <code>country_groups_tbl</code>: the African Union (<code>"AU"</code>), <code>"ECOWAS"</code>, <code>"CARICOM"</code> and the Pacific Islands Forum (<code>"PIF"</code>). They hold current membership only; <code><a href="../reference/country_groups_history.html">?country_groups_history</a></code> gives the reason each, like the Commonwealth and OPEC, is not dated.</li>
+<li>
+<code>country_groups_tbl</code> is dated 2026-11-01 and carries three changes its earlier 2026-06-01 stamp had missed: Bulgaria in the euro area (from 1 January 2026), Timor-Leste in ASEAN (from 26 October 2025) and the United Arab Emirates out of OPEC (from 1 May 2026). <code>country_groups_history</code> dates the first two.</li>
 <li>
 <code><a href="../reference/audit_time_coverage.html">audit_time_coverage()</a></code> dates independence from Gleditsch &amp; Ward’s list, flagging <code>"before_independence"</code> (Namibia before 1990, Timor-Leste before
 <ol start="2002" style="list-style-type: decimal"><li>with the basis of each flag.</li>
@@ -190,7 +208,7 @@
 </ul></div>
 <div class="section level3">
 <h3 id="documentation-4-0-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-4-0-0"></a></h3>
-<ul><li>The README is rewritten short: three examples, four setup steps and the gotchas; the visual tour moved to a Gallery article. Two new vignettes, “Panels done right” and “Data you can trace”, and seven articles on the website only. <code>inst/CITATION</code> carries the methods added in this release.</li>
+<ul><li>The README is rewritten short: three examples, four setup steps and a table of tips; the visual tour moved to a Gallery article. Two new vignettes, “Panels done right” and “Data you can trace”, and seven articles on the website only. <code>inst/CITATION</code> carries the methods added in this release.</li>
 </ul></div>
 <div class="section level3">
 <h3 id="deprecations-4-0-0">Deprecations<a class="anchor" aria-label="anchor" href="#deprecations-4-0-0"></a></h3>

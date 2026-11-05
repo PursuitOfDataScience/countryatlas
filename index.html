@@ -85,10 +85,8 @@
 </div>
 <!-- badges: start -->
 
-<blockquote>
-<p><strong>Country data onto honest maps: joined on ISO codes, never on country names.</strong></p>
-</blockquote>
-<p>🔑 Messy names in, one key out, in any of a dozen languages:</p>
+<p><strong>Country data from any source, joined on ISO codes and drawn as equal-area maps that state their coverage and source.</strong></p>
+<p>🔑 <strong>One key for every spelling</strong>, in a dozen languages:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://pursuitofdatascience.github.io/countryatlas/">countryatlas</a></span><span class="op">)</span></span>
 <span><span class="va">d</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>country <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Cote d'Ivoire"</span>, <span class="st">"Korea, Rep."</span>, <span class="st">"Deutschland"</span>, <span class="st">"U.K."</span><span class="op">)</span><span class="op">)</span></span>
@@ -100,11 +98,11 @@
 <span><span class="co">#&gt; 2 Korea, Rep.   KOR  </span></span>
 <span><span class="co">#&gt; 3 Deutschland   DEU  </span></span>
 <span><span class="co">#&gt; 4 U.K.          GBR</span></span></code></pre></div>
-<p>🗺️ An equal-area map that states its coverage and its source:</p>
+<p>🗺️ <strong>An equal-area map</strong> with its coverage and source in the caption:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/world_map.html">world_map</a></span><span class="op">(</span><span class="fu"><a href="reference/attach_geometry.html">attach_geometry</a></span><span class="op">(</span><span class="va">world_snapshot</span><span class="op">$</span><span class="va">countries</span><span class="op">)</span>, <span class="va">gdp_per_capita</span><span class="op">)</span></span></code></pre></div>
 <p><img src="reference/figures/README-map-1.png" alt="World map of GDP per capita in five quantile classes, Equal Earth projection, with a caption giving coverage and source." width="100%"></p>
-<p>🕰️ Membership and classification as they were, not as they are:</p>
+<p>🕰️ <strong>Memberships and income groups as of any date</strong>, row by row:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/in_group.html">in_group</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"GBR"</span>, <span class="st">"GBR"</span><span class="op">)</span>, <span class="st">"EU"</span>, origin <span class="op">=</span> <span class="st">"iso3c"</span>, as_of <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2016</span>, <span class="fl">2021</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1]  TRUE FALSE</span></span>
@@ -118,51 +116,16 @@
 <ol style="list-style-type: decimal">
 <li><code>install.packages("countryatlas")</code></li>
 <li>
-<code><a href="https://pursuitofdatascience.github.io/countryatlas/">library(countryatlas)</a></code>: the bundled <code>world_snapshot</code> and the maps work offline.</li>
-<li>Optional, for the <code>sf</code> backend and every projection: <code>install.packages(c("sf", "rnaturalearth", "rnaturalearthdata"))</code>
+<code><a href="https://pursuitofdatascience.github.io/countryatlas/">library(countryatlas)</a></code>: the bundled <code>world_snapshot</code> and every map work offline, in Equal Earth.</li>
+<li>For the <code>sf</code> backend and every other projection: <code>install.packages(c("sf", "rnaturalearth", "rnaturalearthdata"))</code>
 </li>
 <li>Live data: <code>world_data(2020)</code> from the World Bank, or any provider in <code><a href="reference/country_sources.html">country_sources()</a></code> through <code><a href="reference/fetch_indicator.html">fetch_indicator()</a></code>.</li>
 </ol>
-</div>
-<div class="section level2">
-<h2 id="warning-gotchas">⚠️ Gotchas<a class="anchor" aria-label="anchor" href="#warning-gotchas"></a>
-</h2>
-<table class="table">
-<colgroup>
-<col width="50%">
-<col width="50%">
-</colgroup>
-<thead><tr>
-<th align="left">What bites</th>
-<th align="left">What to do</th>
-</tr></thead>
-<tbody>
-<tr>
-<td align="left">Fetching needs the network</td>
-<td align="left">
-<code>world_snapshot</code> is offline; the fetchers call the providers.</td>
-</tr>
-<tr>
-<td align="left">World Bank releases revise old values</td>
-<td align="left">Pin one: <code>world_data(2020, vintage = "2024-07")</code>.</td>
-</tr>
-<tr>
-<td align="left">The cache lives in <code>tools::R_user_dir("countryatlas", "cache")</code>
-</td>
-<td align="left">
-<code><a href="reference/clear_country_cache.html">clear_country_cache()</a></code> empties it.</td>
-</tr>
-<tr>
-<td align="left">TLS errors behind a proxy</td>
-<td align="left">Point <code>CURL_CA_BUNDLE</code> at your CA bundle; never turn verification off.</td>
-</tr>
-<tr>
-<td align="left">
-<code>sf</code> will not load</td>
-<td align="left">Maps still draw: the polygon backend and its Equal Earth are built in.</td>
-</tr>
-</tbody>
-</table>
+<ul>
+<li>💡 To reproduce a figure exactly, pin the World Bank release: <code>world_data(2020, vintage = "2024-07")</code>.</li>
+<li>💡 Downloads are cached in <code>tools::R_user_dir("countryatlas", "cache")</code>; <code><a href="reference/clear_country_cache.html">clear_country_cache()</a></code> empties it.</li>
+<li>💡 Fetching through a proxy: point <code>CURL_CA_BUNDLE</code> at your organisation’s certificate bundle.</li>
+</ul>
 </div>
 <div class="section level2">
 <h2 id="books-learn-more">📚 Learn more<a class="anchor" aria-label="anchor" href="#books-learn-more"></a>

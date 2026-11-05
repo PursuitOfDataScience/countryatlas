@@ -176,7 +176,7 @@ aggregate_groups(world_snapshot$countries, gdp_per_capita,
 #> # A tibble: 3 × 6
 #>   group gdp_per_capita n_countries n_reporting coverage coverage_weighted
 #>   <chr>          <dbl>       <int>       <int>    <dbl>             <dbl>
-#> 1 ASEAN          5105.          10          10        1                 1
+#> 1 ASEAN          5097.          11          11        1                 1
 #> 2 EU            34927.          27          27        1                 1
 #> 3 SADC           1831.          16          16        1                 1
 ```

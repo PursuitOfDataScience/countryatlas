@@ -1,12 +1,14 @@
 # Emit a ggsql spatial query for a country map
 
 Build a [ggsql](https://ggsql.org) query string that draws a choropleth
-from a registered countryatlas source – the same idea as
+from a registered countryatlas source: the same idea as
 [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md),
-but the map is rendered **in the database** (DuckDB) and returned as a
-web-ready Vega-Lite widget, so the geometry never has to come back into
-R. Pure string builder with no dependencies; pair it with
-[`as_ggsql_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/as_ggsql_source.md) +
+but the map is rendered **in the database** (DuckDB) by ggsql, which
+returns a plot specification it can draw as SVG or as an interactive
+widget, so the geometry never has to come back into R. Pure string
+builder with no dependencies; pair it with
+[`as_ggsql_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/as_ggsql_source.md)
+and
 [`ggsql::ggsql_execute()`](https://r.ggsql.org/reference/ggsql_execute.html),
 or drop the string into a `{ggsql}` chunk.
 
@@ -24,7 +26,8 @@ world_query(
   layer = c("choropleth", "bubble", "binned"),
   facet = NULL,
   size = NULL,
-  n_bins = NULL
+  n_bins = NULL,
+  geometry = "geometry"
 )
 ```
 
@@ -43,10 +46,12 @@ world_query(
 
   A projection: one of the package's own names (see
   [`projection_info()`](https://pursuitofdatascience.github.io/countryatlas/reference/projection_info.md)),
-  translated to ggsql's where the two differ (`"plate_carree"` becomes
+  all thirteen translated to ggsql's (`"plate_carree"` becomes
   `equirectangular`, `"natural_earth"` becomes `natural`,
-  `"azimuthal_equal_area"` becomes `lambert`), or any other name ggsql's
-  `PROJECT TO` understands, passed through. `NULL` omits the clause.
+  `"azimuthal_equal_area"` becomes `lambert`, the polar views become
+  `lambert` centred on a pole, and `"gall_peters"` a cylindrical
+  equal-area CRS), or any other name ggsql's `PROJECT TO` understands,
+  passed through. `NULL` omits the clause.
 
 - palette:
 
@@ -63,12 +68,13 @@ world_query(
 
 - draw:
 
-  The spatial layer (default `"spatial"`).
+  The layer that draws the countries (default `"spatial"`).
 
 - layer:
 
-  `"choropleth"` (default), `"bubble"` (proportional symbols – needs
-  `size`) or `"binned"` (classed fill – see `n_bins`).
+  `"choropleth"` (default), `"bubble"` (proportional symbols at each
+  country's centroid over the countries, which needs `size`) or
+  `"binned"` (a classed fill, see `n_bins`).
 
 - facet:
 
@@ -81,7 +87,14 @@ world_query(
 
 - n_bins:
 
-  Number of classes for `layer = "binned"` (default `5`).
+  Number of classes for `layer = "binned"` (default `5`); ggsql places
+  the breaks, as close to this many as round numbers allow.
+
+- geometry:
+
+  The source's geometry column (default `"geometry"`, the name
+  [`as_ggsql_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/as_ggsql_source.md)
+  writes).
 
 ## Value
 
@@ -90,18 +103,18 @@ A `ggsql_query` string (prints as the formatted query).
 ## Executing the query
 
 Building the string needs nothing installed. *Running* it needs `ggsql`
-\>= 0.4.1, the version that added the `DRAW spatial` clause and map
-projections; older `ggsql` releases parse the query and reject that
-clause. Projections arrived in the engine at different versions –
-`equal_earth`, the default here, only in 0.5.0 – so the query records
-the version it needs as its `"countryatlas_ggsql_version"` attribute,
-and
+\>= 0.5.0; the grammar was checked against 0.5.2, the first release on
+CRAN with the `DRAW spatial` layer (2026-10-08). The query records that
+version as its `"countryatlas_ggsql_version"` attribute, and
 [`interactive_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/interactive_map.md)`(engine = "ggsql")`
-refuses an installed `ggsql` older than that, naming the projection. As
-of October 2026 the ggsql *engine* is at 0.5.2 while the ggsql R package
-on CRAN is still 0.3.3, so execution waits for the bindings to catch up.
-`PROJECT TO` additionally needs a spatial backend – for DuckDB, its
-`spatial` extension.
+refuses an older `ggsql`. The spatial layer also needs DuckDB's
+`spatial` extension, which
+[`as_ggsql_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/as_ggsql_source.md)`(format = "reader")`
+loads; ggsql's DuckDB downloads it once per session, into the session's
+temporary directory. For `layer = "bubble"` the source needs
+`centroid_lon` and `centroid_lat` columns, which
+[`as_ggsql_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/as_ggsql_source.md)
+adds for a frame keyed on `iso3c`.
 
 ## Examples
 
@@ -109,10 +122,17 @@ on CRAN is still 0.3.3, so execution waits for the bindings to catch up.
 world_query(gdp_per_capita, projection = "equal_earth",
             palette = "magma", transform = "log10",
             title = "GDP per capita")
-#> VISUALISE gdp_per_capita AS fill
-#> FROM countryatlas_world
+#> VISUALISE gdp_per_capita AS fill, geometry FROM countryatlas_world
 #> DRAW spatial
 #> PROJECT TO equal_earth
 #> SCALE fill TO magma VIA log10
 #> LABEL title => 'GDP per capita'
+world_query(gdp_per_capita, layer = "bubble", size = "population")
+#> VISUALISE FROM countryatlas_world
+#> DRAW spatial
+#>   MAPPING geometry
+#> DRAW point
+#>   MAPPING centroid_lon AS lon, centroid_lat AS lat, population AS size, gdp_per_capita AS fill
+#> PROJECT TO equal_earth
+#> SCALE fill TO viridis
 ```

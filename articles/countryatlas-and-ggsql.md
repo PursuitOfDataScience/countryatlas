@@ -2,16 +2,11 @@
 
 [ggsql](https://ggsql.org) is a grammar of graphics for SQL: you
 describe a plot *inside a SQL query* and it renders in the database
-(DuckDB), returning a web-ready Vega-Lite widget, with no ggplot2 or
-`sf` runtime required. The spatial layer this vignette targets
-(`DRAW spatial`, which reads WKB geometry) arrived in the ggsql *engine*
-at 0.4.0, and `countryatlas` requires the ggsql **R package** at \>=
-0.4.1, the first release that exposes it – which is the version
-\[interactive_map()\] checks for. At the time of writing the R package
-is still at 0.3.3, so the bridge below is forward-looking:
-[`world_query()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_query.md)
-builds the query today, and the chunks that would execute one are shown
-but not evaluated.
+(DuckDB), returning a plot that draws as SVG or as an interactive
+widget, with no ggplot2 runtime required. Its spatial layer,
+`DRAW spatial`, reached CRAN with ggsql 0.5.2 on 2026-10-08, and
+countryatlas needs ggsql \>= 0.5.0, the version \[interactive_map()\]
+checks for.
 
 countryatlas and ggsql fit together cleanly:
 
@@ -21,8 +16,7 @@ countryatlas and ggsql fit together cleanly:
   ([`country_overrides()`](https://pursuitofdatascience.github.io/countryatlas/reference/country_overrides.md)),
   and join World Bank indicators onto geometry.
 - **ggsql** does the part countryatlas doesn’t: push the rendering down
-  into the database and emit Vega-Lite, so the geometry never has to
-  come back into R.
+  into the database, so the geometry never has to come back into R.
 
 So countryatlas becomes the *data layer* and ggsql the *renderer*.
 
@@ -41,59 +35,90 @@ world_query(
   transform  = "log10",
   title      = "GDP per capita"
 )
-#> VISUALISE gdp_per_capita AS fill
-#> FROM countryatlas_world
+#> VISUALISE gdp_per_capita AS fill, geometry FROM countryatlas_world
 #> DRAW spatial
 #> PROJECT TO equal_earth
 #> SCALE fill TO magma VIA log10
 #> LABEL title => 'GDP per capita'
 ```
 
+Every projection the package knows has a translation, and the other
+layers are a word away:
+
+``` r
+
+world_query(gdp_per_capita, projection = "north_polar", layer = "binned")
+#> VISUALISE gdp_per_capita AS fill, geometry FROM countryatlas_world
+#> DRAW spatial
+#> PROJECT TO lambert SETTING origin => (0, 90)
+#> SCALE BINNED fill TO viridis SETTING breaks => 5
+world_query(gdp_per_capita, layer = "bubble", size = "population")
+#> VISUALISE FROM countryatlas_world
+#> DRAW spatial
+#>   MAPPING geometry
+#> DRAW point
+#>   MAPPING centroid_lon AS lon, centroid_lat AS lat, population AS size, gdp_per_capita AS fill
+#> PROJECT TO equal_earth
+#> SCALE fill TO viridis
+```
+
 ## Render in the database
 
 [`as_ggsql_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/as_ggsql_source.md)
-exports a curated countryatlas table (with `sf` geometry WKB-encoded) to
-a DuckDB connection, a Parquet file, or a nanoarrow stream that ggsql
-can read. The one-call path is `interactive_map(engine = "ggsql")`:
+hands a curated countryatlas table to ggsql: by default as a ggsql
+reader with the table registered, `sf` geometry encoded as WKB in
+longitude and latitude, and DuckDB’s `spatial` extension loaded. ggsql’s
+DuckDB downloads that extension once per session, into the session’s
+temporary directory. The one-call path is
+`interactive_map(engine = "ggsql")`:
 
 ``` r
 
-# needs: ggsql, duckdb, DBI, sf
-world_data(2020, geometry = "sf") |>
-  interactive_map(gdp_per_capita, engine = "ggsql", transform = "log10")
+d <- attach_geometry(world_snapshot$countries, geometry = "sf")
+interactive_map(d, gdp_per_capita, engine = "ggsql", transform = "log10")
 ```
 
 Under the hood that is just the two building blocks, which you can also
-drive yourself for full control over the query:
+drive yourself for full control over the query and the output:
 
 ``` r
 
-src <- world_data(2020, geometry = "sf") |>
-  as_ggsql_source(format = "duckdb")          # a DuckDB connection
-
-q <- world_query(gdp_per_capita, projection = "orthographic", palette = "viridis")
-
-ggsql::ggsql_execute(src, q)                  # -> Vega-Lite widget
+reader <- as_ggsql_source(d)
+spec <- ggsql::ggsql_execute(
+  reader,
+  world_query(gdp_per_capita, projection = "orthographic", palette = "viridis")
+)
+ggsql::ggsql_widget(spec)
 ```
+
+`ggsql::ggsql_render(ggsql::svg_writer(), spec)` returns the same map as
+SVG markup, and `ggsql::ggsql_save(spec, "map.png")` writes it to a
+file.
 
 ## In a Quarto / R Markdown document
 
-Loading `ggsql` registers a chunk engine. Export the source once, then
-chart it in a ```` ```{ggsql} ```` block, referencing the registered
-table by name:
+Loading `ggsql` registers a chunk engine, and a ```` ```{ggsql} ````
+block reads R data as `r:<object>`. `as_ggsql_source(format = "frame")`
+returns the prepared frame for that; load DuckDB’s `spatial` extension
+once, then chart it:
 
 ```` default
 ```{r}
 library(countryatlas)
 library(ggsql)
 
-src <- world_data(2020, geometry = "sf") |>
-  as_ggsql_source(format = "duckdb")          # registers countryatlas_world
+world <- world_data(2020, geometry = "sf") |>
+  as_ggsql_source(format = "frame")
 ```
 
-```{ggsql connection=src}
-VISUALISE gdp_per_capita AS fill
-FROM countryatlas_world
+```{ggsql}
+SET extension_directory = 'duckdb-extensions';
+INSTALL spatial;
+LOAD spatial;
+```
+
+```{ggsql}
+VISUALISE gdp_per_capita AS fill, geometry FROM r:world
 DRAW spatial
 PROJECT TO equal_earth
 SCALE fill TO magma VIA log10

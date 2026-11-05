@@ -53,24 +53,25 @@ try again.
 if (requireNamespace("sf", quietly = TRUE) &&
     requireNamespace("cartogram", quietly = TRUE) &&
     requireNamespace("rnaturalearth", quietly = TRUE)) {
-  sfd <- attach_geometry(countryatlas::world_snapshot$countries,
-                         geometry = "sf")
-  cg <- cartogram_map(sfd, population)
+  # One continent keeps the example quick; the world takes 20 seconds.
+  africa <- subset(countryatlas::world_snapshot$countries,
+                   continent == "Africa")
+  cg <- cartogram_map(attach_geometry(africa, geometry = "sf"), population)
   cartogram_diagnostics(cg)
 }
-#> # A tibble: 171 × 4
+#> # A tibble: 49 × 4
 #>    iso3c target_share actual_share area_error
 #>    <chr>        <dbl>        <dbl>      <dbl>
-#>  1 GRL     0.00000702    0.00261      371.   
-#>  2 BTN     0.0000978     0.000506       4.18 
-#>  3 RUS     0.0177        0.0496         1.80 
-#>  4 GUY     0.000103      0.000257       1.50 
-#>  5 ISL     0.0000477     0.000101       1.12 
-#>  6 NOR     0.000688      0.00144        1.10 
-#>  7 CAN     0.00510       0.0103         1.03 
-#>  8 NZL     0.000653      0.00132        1.03 
-#>  9 LAO     0.000960      0.00176        0.838
-#> 10 BHS     0.0000496     0.0000903      0.822
-#> # ℹ 161 more rows
+#>  1 NAM        0.00201      0.00332     0.653 
+#>  2 RWA        0.00945      0.00386    -0.591 
+#>  3 BDI        0.00931      0.00431    -0.537 
+#>  4 CAF        0.00353      0.00454     0.286 
+#>  5 LBY        0.00489      0.00616     0.259 
+#>  6 COG        0.00420      0.00510     0.216 
+#>  7 TGO        0.00557      0.00643     0.154 
+#>  8 MRT        0.00343      0.00375     0.0959
+#>  9 ERI        0.00234      0.00252     0.0775
+#> 10 NGA        0.154        0.145      -0.0620
+#> # ℹ 39 more rows
 # }
 ```

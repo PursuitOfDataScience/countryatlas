@@ -94,9 +94,11 @@ it already attached.</p></dd>
 <dd><p><code>"plotly"</code> (default), <code>"ggiraph"</code>, <code>"leaflet"</code>, <code>"mapgl"</code> or
 <code>"ggsql"</code>. <code>"mapgl"</code> renders through MapLibre GL – vector tiles, smooth
 zoom and a genuine interactive globe, which is what turns <code><a href="globe_map.html">globe_map()</a></code>
-from a static novelty into something you can turn. It needs an <code>sf</code> frame
-(database-side rendering to a Vega-Lite widget; needs an <code>sf</code> frame and
-<code>ggsql</code> &gt;= 0.4.1, the version that added the <code>DRAW spatial</code> clause).
+from a static novelty into something you can turn. It needs an <code>sf</code>
+frame. <code>"ggsql"</code> renders in the database, through <code><a href="world_query.html">world_query()</a></code> and
+<code><a href="as_ggsql_source.html">as_ggsql_source()</a></code>, and returns ggsql's own widget; it needs an <code>sf</code>
+frame, <code>ggsql</code> &gt;= 0.5.0, and on its first use in a session a network
+connection, to download DuckDB's <code>spatial</code> extension.
 <code>tooltip</code> is honoured by the <code>"ggiraph"</code> and <code>"leaflet"</code> engines (defaults
 to <code>fill</code> when omitted); <code>"plotly"</code>'s hover is controlled by <code><a href="world_map.html">world_map()</a></code>
 aesthetics instead, and <code>"ggsql"</code> has no hover concept.</p></dd>

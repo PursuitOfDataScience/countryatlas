@@ -1,10 +1,12 @@
 # Export a countryatlas table as a ggsql source
 
 Hand countryatlas's curated, ISO-reconciled, WDI-joined spatial table to
-[ggsql](https://ggsql.org) so it can be charted with `DRAW spatial` –
-the bridge that lets ggsql draw maps of *your* override-corrected data
-instead of its static bundled world. `sf` geometry is WKB-encoded so
-ggsql can decode it.
+[ggsql](https://ggsql.org) so it can be charted with `DRAW spatial`: the
+bridge that lets ggsql draw maps of *your* override-corrected data
+instead of its static bundled world. `sf` geometry is WKB-encoded in
+longitude and latitude, which is what ggsql reads, and a frame keyed on
+`iso3c` gains `centroid_lon` and `centroid_lat` for
+[`world_query()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_query.md)`(layer = "bubble")`.
 
 ## Usage
 
@@ -12,7 +14,7 @@ ggsql can decode it.
 as_ggsql_source(
   data,
   name = "countryatlas_world",
-  format = c("duckdb", "parquet", "arrow"),
+  format = c("reader", "frame", "duckdb", "parquet", "arrow"),
   con = NULL,
   path = NULL,
   geometry_col = "geometry"
@@ -31,9 +33,14 @@ as_ggsql_source(
 
 - format:
 
-  `"duckdb"` (write to a DuckDB connection and return it), `"parquet"`
-  (write a Parquet file and return its path) or `"arrow"` (return a
-  nanoarrow array stream ggsql can read directly).
+  `"reader"` (the default: a ggsql reader with the table registered,
+  which is what
+  [`ggsql::ggsql_execute()`](https://r.ggsql.org/reference/ggsql_execute.html)
+  takes), `"frame"` (the prepared data frame itself, which a `{ggsql}`
+  chunk reads as `FROM r:<object>`), `"duckdb"` (write to a DuckDB
+  connection and return it), `"parquet"` (write a Parquet file and
+  return its path) or `"arrow"` (return a nanoarrow array stream).
+  Passing `con` without `format` means `"duckdb"`.
 
 - con:
 
@@ -54,8 +61,16 @@ as_ggsql_source(
 
 ## Value
 
-Depending on `format`: a DuckDB connection (with the table written), a
-Parquet file path, or a nanoarrow array stream.
+Depending on `format`: a ggsql reader, a data frame, a DuckDB connection
+(with the table written), a Parquet file path, or a nanoarrow array
+stream.
+
+`format = "reader"` with an `sf` frame also loads DuckDB's `spatial`
+extension into the reader, which `DRAW spatial` needs. ggsql's DuckDB
+downloads it once per session, into the session's temporary directory,
+so the first call needs a network connection; without one, the reader is
+returned with a warning (class `countryatlas_ggsql_spatial`) and only
+non-spatial queries run.
 
 **You own the connection** that `format = "duckdb"` returns, and duckdb
 keeps its in-memory database alive until the handle is released, so
@@ -73,7 +88,8 @@ in every case, since it was never ours to close.
 ``` r
 if (FALSE) { # \dontrun{
 # Curate in R, render in the database:
-src <- world_data(2020, geometry = "sf") |> as_ggsql_source(format = "duckdb")
-ggsql::ggsql_execute(src, world_query(gdp_per_capita))
+reader <- world_data(2020, geometry = "sf") |> as_ggsql_source()
+spec <- ggsql::ggsql_execute(reader, world_query(gdp_per_capita))
+ggsql::ggsql_widget(spec)
 } # }
 ```

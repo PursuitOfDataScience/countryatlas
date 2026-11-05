@@ -80,8 +80,10 @@ particular date, which is what a panel needs.</p>
 <dd><p>One or more group names: any of <code>"EU"</code>, <code>"OECD"</code>, <code>"G7"</code>,
 <code>"G20"</code>, <code>"BRICS"</code>, <code>"ASEAN"</code>, <code>"EFTA"</code>, <code>"Commonwealth"</code>, <code>"OPEC"</code>,
 <code>"EuroZone"</code>, <code>"NATO"</code>, <code>"Mercosur"</code>, <code>"GCC"</code>, <code>"Nordic"</code>, <code>"Visegrad"</code>,
-<code>"SCO"</code>, <code>"CPTPP"</code>, <code>"RCEP"</code>, <code>"EAC"</code>, <code>"SADC"</code>, <code>"APEC"</code> and
-<code>"ArabLeague"</code>. If <code>NULL</code>, the whole table is returned.</p></dd>
+<code>"SCO"</code>, <code>"CPTPP"</code>, <code>"RCEP"</code>, <code>"EAC"</code>, <code>"SADC"</code>, <code>"APEC"</code>,
+<code>"ArabLeague"</code>, <code>"AU"</code> (the African Union), <code>"ECOWAS"</code>, <code>"CARICOM"</code> and
+<code>"PIF"</code> (the Pacific Islands Forum). If <code>NULL</code>, the whole table is
+returned.</p></dd>
 
 
 <dt id="arg-as-of">as_of<a class="anchor" aria-label="anchor" href="#arg-as-of"></a></dt>
@@ -107,14 +109,16 @@ over 2015-2020 either includes the United Kingdom throughout or excludes it
 throughout, and both are wrong:</p>
 <p></p><div class="sourceCode r"><pre><code><span><span class="st">"GBR"</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="../reference/country_groups.html">country_groups</a></span><span class="op">(</span><span class="st">"EU"</span>, as_of <span class="op">=</span> <span class="fl">2016</span><span class="op">)</span><span class="op">$</span><span class="va">iso3c</span>   <span class="co"># TRUE</span></span>
 <span><span class="st">"GBR"</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="../reference/country_groups.html">country_groups</a></span><span class="op">(</span><span class="st">"EU"</span>, as_of <span class="op">=</span> <span class="fl">2021</span><span class="op">)</span><span class="op">$</span><span class="va">iso3c</span>   <span class="co"># FALSE</span></span></code></pre><p></p></div>
-<p><a href="country_groups_history.html">country_groups_history</a> carries dated membership for nineteen groups: EU,
+<p><a href="country_groups_history.html">country_groups_history</a> carries dated membership for twenty groups: EU,
 EuroZone, NATO, OECD, ASEAN, EFTA, GCC, Mercosur, Nordic, Visegrad, BRICS,
-G7, SCO, CPTPP, RCEP, EAC, SADC, APEC and the Arab League, with
+G7, G20, SCO, CPTPP, RCEP, EAC, SADC, APEC and the Arab League, with
 suspensions as spells of their own: Syria is not counted in the Arab League
-from 2011 to 2023. Commonwealth, G20 and OPEC are <strong>not</strong> dated – their
-histories involve suspensions, readmissions and contested dates the sources
-give unevenly, and a fabricated date is worse than an absent one. Asking for
-<code>as_of</code> on those warns and falls back to the snapshot.</p>
+from 2011 to 2023. The Commonwealth, OPEC, the African Union, ECOWAS,
+CARICOM and the Pacific Islands Forum are <strong>not</strong> dated: their histories
+involve suspensions, readmissions and dates the sources give unevenly, and
+a fabricated date is worse than an absent one (<a href="country_groups_history.html">country_groups_history</a>
+gives the reason for each). Asking for <code>as_of</code> on those warns and falls
+back to the snapshot.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

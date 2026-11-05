@@ -38,11 +38,15 @@ interactive_map(
   smooth zoom and a genuine interactive globe, which is what turns
   [`globe_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/globe_map.md)
   from a static novelty into something you can turn. It needs an `sf`
-  frame (database-side rendering to a Vega-Lite widget; needs an `sf`
-  frame and `ggsql` \>= 0.4.1, the version that added the `DRAW spatial`
-  clause). `tooltip` is honoured by the `"ggiraph"` and `"leaflet"`
-  engines (defaults to `fill` when omitted); `"plotly"`'s hover is
-  controlled by
+  frame. `"ggsql"` renders in the database, through
+  [`world_query()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_query.md)
+  and
+  [`as_ggsql_source()`](https://pursuitofdatascience.github.io/countryatlas/reference/as_ggsql_source.md),
+  and returns ggsql's own widget; it needs an `sf` frame, `ggsql` \>=
+  0.5.0, and on its first use in a session a network connection, to
+  download DuckDB's `spatial` extension. `tooltip` is honoured by the
+  `"ggiraph"` and `"leaflet"` engines (defaults to `fill` when omitted);
+  `"plotly"`'s hover is controlled by
   [`world_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map.md)
   aesthetics instead, and `"ggsql"` has no hover concept.
 

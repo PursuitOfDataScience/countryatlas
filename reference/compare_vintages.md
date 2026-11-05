@@ -66,13 +66,8 @@ estimates. *Journal of Monetary Economics* 60(2), 255-274.
 ## Examples
 
 ``` r
-# \donttest{
+if (FALSE) { # \dontrun{
+# Needs the World Bank API: two releases of one series, fetched live.
 compare_vintages("SP.POP.TOTL", c("2019-07", "current"), year = 2015)
-#> Warning: Release "2019-07" does not hold "SP.POP.TOTL".
-#> ℹ The nearest releases are "2019-06", "2019-09", and "2019-04".
-#> Warning: Fewer than two releases returned data, so there is nothing to compare.
-#> # A tibble: 0 × 6
-#> # ℹ 6 variables: iso3c <chr>, country <chr>, vintage <chr>, value <dbl>,
-#> #   revision <dbl>, rel_revision <dbl>
-# }
+} # }
 ```

@@ -72,8 +72,9 @@ row is counted as missing. That is the difference from
 [`aggregate_regions()`](https://pursuitofdatascience.github.io/countryatlas/reference/aggregate_regions.md),
 which can only count what it is given. For `fun = "weighted_mean"` the
 weighted share is computed over the members present, since an absent
-member's weight is unknown. A group with no dated history (Commonwealth,
-G20, OPEC) warns and uses the current membership for every year.
+member's weight is unknown. A group with no dated history (the
+Commonwealth, OPEC, AU, ECOWAS, CARICOM and PIF) warns and uses the
+current membership for every year.
 
 ## See also
 

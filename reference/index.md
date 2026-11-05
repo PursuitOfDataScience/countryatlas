@@ -227,6 +227,9 @@ A full vocabulary of projected, area-honest maps.
   : Animate a choropleth over time
 - [`interactive_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/interactive_map.md)
   : Web-ready interactive choropleth
+- [`world_map_ui()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map_ui.md)
+  [`world_map_server()`](https://pursuitofdatascience.github.io/countryatlas/reference/world_map_ui.md)
+  : A Shiny module that draws a world map
 - [`value_by_alpha_map()`](https://pursuitofdatascience.github.io/countryatlas/reference/value_by_alpha_map.md)
   : Value-by-alpha: equalise a rate by its denominator
 - [`gridded_cartogram()`](https://pursuitofdatascience.github.io/countryatlas/reference/gridded_cartogram.md)
