@@ -40,9 +40,8 @@
 #' # ... or zoom in, where there is room for every label.
 #' europe <- attach_geometry(
 #'   dplyr::filter(snap, continent == "Europe"), geometry = "polygon")
-#' world_map(europe, gdp_per_capita) +
-#'   geom_country_labels(size = 2.5) +
-#'   coord_quickmap(xlim = c(-25, 45), ylim = c(34, 72))
+#' p <- world_map(europe, gdp_per_capita) + geom_country_labels(size = 2.5)
+#' zoom_map(p, xlim = c(-25, 45), ylim = c(34, 72))
 #' }
 geom_country_labels <- function(mapping = NULL, data = NULL, repel = TRUE,
                                 flag = FALSE, size = 3, ...) {
@@ -174,8 +173,10 @@ geom_country_labels <- function(mapping = NULL, data = NULL, repel = TRUE,
                                 mapping %||% ggplot2::aes())
 
   if (isTRUE(repel) && has_pkg("ggrepel")) {
-    ggrepel::geom_text_repel(mapping = full_map, data = label_data, size = size,
-                             inherit.aes = FALSE, ...)
+    layer <- ggrepel::geom_text_repel(mapping = full_map, data = label_data,
+                                      size = size, inherit.aes = FALSE, ...)
+    layer$geom <- repel_in_view_geom()
+    layer
   } else {
     # Asking for repelling and silently not getting it was the one degraded
     # backend the package did not announce (classInt, gganimate and rmapshaper
@@ -190,4 +191,37 @@ geom_country_labels <- function(mapping = NULL, data = NULL, repel = TRUE,
     ggplot2::geom_text(mapping = full_map, data = label_data, size = size,
                        inherit.aes = FALSE, ...)
   }
+}
+
+# ggrepel keeps every label inside the panel, including the labels of points
+# the panel does not show: on a map zoomed to Europe (zoom_map(), or any coord
+# with limits) the United States, Japan and the rest of the frame were not
+# dropped but piled along the panel's edges, each with a segment pointing off
+# the map. The geom below drops what the coord places outside the panel before
+# the labels are repelled. It is built at call time, since ggrepel is in
+# Suggests, and once per session.
+repel_in_view_geom <- function() {
+  if (is.null(.wdj_state$geom_label_repel)) {
+    .wdj_state$geom_label_repel <- ggplot2::ggproto(
+      "GeomCountryLabelRepel", ggrepel::GeomTextRepel,
+      draw_panel = function(self, data, panel_params, coord, ...) {
+        data <- labels_in_view(data, panel_params, coord)
+        ggplot2::ggproto_parent(ggrepel::GeomTextRepel, self)$draw_panel(
+          data, panel_params, coord, ...
+        )
+      }
+    )
+  }
+  .wdj_state$geom_label_repel
+}
+
+# The rows whose position the coord maps inside the panel: coord$transform()
+# rescales a position to [0, 1] across the panel for every coord, and gives a
+# non-finite value for one that has no image (the far side of a globe).
+labels_in_view <- function(data, panel_params, coord) {
+  if (!nrow(data)) return(data)
+  at <- coord$transform(data[, c("x", "y"), drop = FALSE], panel_params)
+  keep <- is.finite(at$x) & is.finite(at$y) &
+    at$x >= 0 & at$x <= 1 & at$y >= 0 & at$y <= 1
+  data[keep, , drop = FALSE]
 }

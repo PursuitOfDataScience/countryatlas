@@ -217,7 +217,7 @@ globe_map <- function(data, fill, lon = 0, lat = 20,
 #' @return The path to the written GIF, invisibly.
 #' @export
 #' @examples
-#' # Six frames rather than the default 60, so this stays quick enough to be
+#' # Four frames rather than the default 60, so this stays quick enough to be
 #' # checked: \dontrun{} meant the example was never executed by anything, and
 #' # an example nothing runs is an example free to rot.
 #' \donttest{
@@ -227,7 +227,7 @@ globe_map <- function(data, fill, lon = 0, lat = 20,
 #'   # No sf required on the polygon backend.
 #'   gif <- spin_globe(world_snapshot$countries, continent,
 #'                     backend = "polygon", style = "categorical",
-#'                     n_frames = 6, width = 200, height = 200)
+#'                     n_frames = 4, width = 200, height = 200)
 #'   file.exists(gif)   # written to a temporary file
 #' }
 #' }

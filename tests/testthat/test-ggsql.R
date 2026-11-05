@@ -4,8 +4,8 @@ test_that("world_query builds a valid ggsql spatial query string", {
                    title = "GDP per capita")
   expect_s3_class(q, "ggsql_query")
   qs <- unclass(q)
-  expect_match(qs, "VISUALISE gdp_per_capita AS fill", fixed = TRUE)
-  expect_match(qs, "FROM countryatlas_world", fixed = TRUE)
+  expect_match(qs, "VISUALISE gdp_per_capita AS fill, geometry FROM countryatlas_world",
+               fixed = TRUE)
   expect_match(qs, "DRAW spatial", fixed = TRUE)
   expect_match(qs, "PROJECT TO equal_earth", fixed = TRUE)
   expect_match(qs, "SCALE fill TO magma VIA log10", fixed = TRUE)
@@ -28,7 +28,7 @@ test_that("world_query accepts a custom source name", {
 
 test_that("world_query handles apostrophes in titles", {
   q <- world_query(gdp_per_capita, title = "World's GDP")
-  expect_match(unclass(q), "title => 'World''s GDP'", fixed = TRUE)
+  expect_match(unclass(q), "title => 'World\\'s GDP'", fixed = TRUE)
 })
 
 test_that("print.ggsql_query prints the query", {
@@ -110,7 +110,7 @@ test_that("world_query omits all optional clauses and escapes quotes", {
                    title = "it's a map")
   expect_false(grepl("PROJECT", q))
   expect_false(grepl("SCALE", q))
-  expect_match(q, "LABEL title => 'it''s a map'")
+  expect_match(q, "LABEL title => 'it\\'s a map'", fixed = TRUE)
 })
 
 test_that("ggsql helpers error cleanly without the optional stack", {
@@ -153,15 +153,23 @@ test_that("a parquet export defaults into the session temp dir, not getwd()", {
 })
 
 test_that("world_query gained layers, faceting and binning", {
+  # In ggsql 0.5's grammar: binning is a scale, a facet is FACET <column>, and
+  # bubbles are a point layer at each country's centroid over the countries.
   q <- world_query(gdp, layer = "binned", n_bins = 4, facet = "year")
-  expect_match(q, "BIN fill INTO 4")
-  expect_match(q, "FACET BY year")
+  expect_match(q, "SCALE BINNED fill TO viridis SETTING breaks => 4", fixed = TRUE)
+  expect_match(q, "FACET year", fixed = TRUE)
+  expect_false(grepl("FACET BY", q, fixed = TRUE))
   b <- world_query(gdp, layer = "bubble", size = "population")
-  expect_match(b, "population AS size")
-  expect_match(b, "DRAW spatial_point")
+  expect_match(b, "VISUALISE FROM countryatlas_world", fixed = TRUE)
+  expect_match(b, "DRAW spatial\n  MAPPING geometry\nDRAW point", fixed = TRUE)
+  expect_match(b, "centroid_lon AS lon, centroid_lat AS lat, population AS size, gdp AS fill",
+               fixed = TRUE)
   expect_error(world_query(gdp, layer = "bubble"), "needs a .*size. column")
   # The default is unchanged.
   expect_match(world_query(gdp), "DRAW spatial")
+  # A geometry column of another name is mapped by name.
+  expect_match(world_query(gdp, geometry = "geom"), "gdp AS fill, geom AS geometry FROM",
+               fixed = TRUE)
 })
 
 test_that("counts coerced with as.integer() carry an upper bound", {
@@ -179,7 +187,8 @@ test_that("counts coerced with as.integer() carry an upper bound", {
   expect_error(od_map(od, from, to, w, origins = 3e9), "origins")
   expect_error(convergence_club(panel, v, min_size = 3e9), "min_size")
   # Ordinary values are unaffected.
-  expect_match(world_query(gdp, layer = "binned", n_bins = 5), "BIN fill INTO 5")
+  expect_match(world_query(gdp, layer = "binned", n_bins = 5), "SETTING breaks => 5",
+               fixed = TRUE)
 })
 
 test_that("as_ggsql_source is explicit about who owns the connection", {
@@ -231,33 +240,108 @@ test_that("world_query stays a dependency-free string builder", {
   expect_match(as.character(q), "DRAW spatial", fixed = TRUE)
   expect_match(as.character(q), "PROJECT TO equal_earth", fixed = TRUE)
   expect_match(as.character(q), "SCALE fill TO magma VIA log10", fixed = TRUE)
-  # A quote in the title is SQL-escaped, not injected.
-  expect_match(as.character(q), "'It''s a test'", fixed = TRUE)
+  # A quote in the title is escaped the way ggsql reads it, not injected.
+  expect_match(as.character(q), "'It\\'s a test'", fixed = TRUE)
   # Omitting the optional clauses omits the lines.
   bare <- world_query(x, projection = NULL, palette = NULL)
   expect_false(grepl("PROJECT TO", bare, fixed = TRUE))
   expect_false(grepl("SCALE", bare, fixed = TRUE))
 })
 
-test_that("world_query() records the ggsql engine version its projection needs", {
-  # PROJECT TO equal_earth was emitted by default and execution was gated on
-  # 0.4.1, the DRAW spatial version -- but the engine added Equal Earth in
-  # 0.5.0, so the gate would have let an unknown projection through.
+test_that("world_query() records the ggsql version and translates every projection", {
+  # Every query is written for ggsql 0.5 (GGSQL_VERSION), the first release on
+  # CRAN with DRAW spatial; the 0.4.x versions this used to gate on never
+  # reached CRAN, and 0.5.2 rejected every query written for them.
   ver <- function(...) attr(world_query(gdp, ...), "countryatlas_ggsql_version")
   expect_identical(ver(), "0.5.0")
-  expect_identical(ver(projection = "mercator"), "0.4.1")
-  expect_identical(ver(projection = NULL), "0.4.1")
+  expect_identical(ver(projection = "mercator"), "0.5.0")
+  expect_identical(ver(projection = NULL), "0.5.0")
   # The package's names are translated where ggsql spells them differently.
   q <- function(p) unclass(world_query(gdp, projection = p))
   expect_match(q("plate_carree"), "PROJECT TO equirectangular", fixed = TRUE)
   expect_match(q("natural_earth"), "PROJECT TO natural", fixed = TRUE)
   expect_match(q("azimuthal_equal_area"), "PROJECT TO lambert", fixed = TRUE)
-  # ggsql's own names pass through, and a name neither side lists makes no
-  # version claim beyond DRAW spatial's.
+  expect_match(q("north_polar"), "PROJECT TO lambert SETTING origin => (0, 90)",
+               fixed = TRUE)
+  expect_match(q("south_polar"), "PROJECT TO lambert SETTING origin => (0, -90)",
+               fixed = TRUE)
+  expect_match(q("gall_peters"), "PROJECT TO crs SETTING target => '+proj=cea +lat_ts=45'",
+               fixed = TRUE)
+  expect_match(q("orthographic"), "PROJECT TO orthographic SETTING origin => (0, 20)",
+               fixed = TRUE)
+  # ggsql's own names pass through.
   expect_match(q("sinusoidal"), "PROJECT TO sinusoidal", fixed = TRUE)
-  expect_identical(ver(projection = "equirectangular"), "0.4.1")
-  expect_identical(ver(projection = "sinusoidal"), "0.4.1")
-  # Every name the table translates is one the package itself knows.
+  # The table covers exactly the package's projections.
   tab <- countryatlas:::ggsql_projection_table()
-  expect_true(all(tab$projection %in% projection_info()$projection))
+  expect_setequal(tab$projection, countryatlas:::wdj_projections())
+})
+
+test_that("every query world_query() writes is valid ggsql", {
+  # Parsing only, no data and no network: ggsql_validate() checks the syntax
+  # and the layer's required aesthetics. Every one of these was rejected by
+  # ggsql 0.5.2 before the grammar was rewritten.
+  skip_on_cran()
+  skip_if_not_installed("ggsql", "0.5.0")
+  valid <- function(q) ggsql::ggsql_is_valid(ggsql::ggsql_validate(unclass(q)))
+  for (p in countryatlas:::wdj_projections()) {
+    expect_true(valid(world_query(gdp_per_capita, projection = p)), label = p)
+  }
+  expect_true(valid(world_query(gdp_per_capita, palette = "magma",
+                                transform = "log10", title = "It's GDP")))
+  expect_true(valid(world_query(gdp_per_capita, layer = "binned", n_bins = 4)))
+  expect_true(valid(world_query(gdp_per_capita, layer = "bubble",
+                                size = "population")))
+  expect_true(valid(world_query(gdp_per_capita, facet = "year")))
+  expect_true(valid(world_query(gdp_per_capita, projection = NULL, palette = NULL)))
+})
+
+test_that("ggsql draws the map a countryatlas source hands it", {
+  # The end-to-end check: register an sf frame, load DuckDB's spatial
+  # extension (a download, once per session), execute and render. The WKB used
+  # to be written in Equal Earth metres, which ggsql read as degrees, so every
+  # map came back as an empty panel: count the country paths in the SVG.
+  skip_on_cran()
+  skip_if_offline()
+  skip_if_not_installed("ggsql", "0.5.0")
+  skip_if_no_sf_geometry()
+  sfd <- attach_geometry(world_snapshot$countries, geometry = "sf")
+  # The extension comes from DuckDB's own host, which a runner may not reach
+  # even when it is online.
+  reader <- withCallingHandlers(
+    as_ggsql_source(sfd),
+    countryatlas_ggsql_spatial = function(w) {
+      skip("DuckDB's spatial extension could not be downloaded")
+    }
+  )
+  paths <- function(q) {
+    svg <- ggsql::ggsql_render(ggsql::svg_writer(),
+                               ggsql::ggsql_execute(reader, unclass(q)))
+    lengths(regmatches(svg, gregexpr("<path", svg, fixed = TRUE)))
+  }
+  expect_gt(paths(world_query(gdp_per_capita, transform = "log10")), 150)
+  expect_gt(paths(world_query(gdp_per_capita, projection = "north_polar",
+                              layer = "binned")), 150)
+  expect_gt(paths(world_query(gdp_per_capita, layer = "bubble",
+                              size = "population")), 300)
+  w <- interactive_map(sfd, gdp_per_capita, engine = "ggsql")
+  expect_s3_class(w, "htmlwidget")
+})
+
+test_that("the frame handed to ggsql is in longitude/latitude, with centroids", {
+  skip_if_no_sf_geometry()
+  sfd <- attach_geometry(world_snapshot$countries[1:20, ], geometry = "sf")
+  expect_false(isTRUE(sf::st_is_longlat(sfd)))     # Equal Earth metres
+  out <- as_ggsql_source(sfd, format = "frame")
+  expect_s3_class(out, "tbl_df")
+  back <- sf::st_as_sfc(structure(out$geometry, class = "WKB"), EWKB = FALSE)
+  bb <- sf::st_bbox(back)
+  expect_true(all(abs(bb[c("xmin", "xmax")]) <= 180))
+  expect_true(all(abs(bb[c("ymin", "ymax")]) <= 90))
+  expect_true(all(c("centroid_lon", "centroid_lat") %in% names(out)))
+  # A frame keyed on iso3c gets the centroids without any geometry at all.
+  plain <- as_ggsql_source(data.frame(iso3c = c("FRA", "XXX"), v = 1:2),
+                           format = "frame")
+  expect_equal(plain$centroid_lon[1],
+               country_meta$centroid_lon[country_meta$iso3c == "FRA"])
+  expect_true(is.na(plain$centroid_lon[2]))
 })

@@ -5,7 +5,7 @@
 \alias{country_groups_history}
 \title{Dated country-group membership}
 \format{
-A tibble with 288 rows:
+A tibble with 309 rows:
 \describe{
 \item{group}{Group name.}
 \item{iso3c}{ISO 3166-1 alpha-3 code.}
@@ -25,7 +25,7 @@ country_groups_history
 }
 \description{
 When each country joined -- and where applicable left, or was suspended
-from -- each of nineteen international groups. The dated counterpart to
+from -- each of twenty international groups. The dated counterpart to
 \link{country_groups_tbl}, which is a single current snapshot.
 }
 \details{
@@ -36,15 +36,19 @@ table when given \code{as_of}.
 }
 \section{Scope, and what is deliberately absent}{
 
-Nineteen groups are dated: EU, EuroZone, NATO, OECD, ASEAN, EFTA, GCC,
-Mercosur, Nordic, Visegrad, BRICS, G7, and since 4.0.0 SCO, CPTPP, RCEP,
-EAC, SADC, APEC (member economies, so Hong Kong and Taiwan too) and the
-Arab League (\code{"ArabLeague"}). Every date carries its source in
-\code{data-raw/country_groups_history.R}. \strong{Commonwealth, G20 and OPEC are
-not}, and that is a decision rather than an omission: the Commonwealth's
-and OPEC's suspensions, lapses and readmissions are dated unevenly by the
-sources, and G20's members include the EU and the African Union, which are
-not countries. A fabricated date is worse than an absent one, so
+Twenty groups are dated: EU, EuroZone, NATO, OECD, ASEAN, EFTA, GCC,
+Mercosur, Nordic, Visegrad, BRICS, G7, and since 4.0.0 G20 (its nineteen
+member countries), SCO, CPTPP, RCEP, EAC, SADC, APEC (member economies, so
+Hong Kong and Taiwan too) and the Arab League (\code{"ArabLeague"}). Every date
+carries its source in \code{data-raw/country_groups_history.R}. \strong{Six groups are
+not dated}, and that is a decision rather than an omission, made again for
+each of them in 4.0.0: the Commonwealth's own record of its suspensions
+gives months only and the other sources differ from it by days; OPEC dates
+its accessions to the year; the African Union's table of joining dates
+contradicts itself and its suspensions after coups, like ECOWAS's, are
+dated unevenly; CARICOM's suspension of Haiti ends in June or July 2006
+depending on the source; and the Pacific Islands Forum dates its
+accessions to the year. A fabricated date is worse than an absent one, so
 \code{country_groups(as_of =)} warns and falls back to the snapshot for those.
 RCEP leaves out Myanmar, whose ratification the ASEAN Secretariat
 questioned and whose date of entry into force is disputed.

@@ -244,7 +244,7 @@ test_that("world_query validates every clause it interpolates", {
   # An empty title is legal SQL and stays allowed.
   expect_match(world_query(gdp, title = ""), "LABEL title => ''", fixed = TRUE)
   # Quote-doubling still protects a title containing an apostrophe.
-  expect_match(world_query(gdp, title = "O'Brien"), "'O''Brien'", fixed = TRUE)
+  expect_match(world_query(gdp, title = "O'Brien"), "'O\\'Brien'", fixed = TRUE)
 })
 
 test_that("as_ggsql_source validates its names and path", {
@@ -1271,8 +1271,10 @@ test_that("as_ggsql_source() checks its data and its connection", {
                class = "countryatlas_error")
 
   # What already worked keeps working.
-  expect_no_error(suppressWarnings(suppressMessages(as_ggsql_source(snap))))
-  expect_no_error(suppressWarnings(suppressMessages(as_ggsql_source(snap[0, ]))))
+  expect_no_error(suppressWarnings(suppressMessages(
+    as_ggsql_source(snap, format = "duckdb"))))
+  expect_no_error(suppressWarnings(suppressMessages(
+    as_ggsql_source(snap[0, ], format = "duckdb"))))
 })
 
 # quo_arg_name() tells the user a column may be passed unquoted "or as a

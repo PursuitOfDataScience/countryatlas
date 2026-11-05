@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# countryatlas <img src="man/figures/logo.png" align="right" height="130" alt="countryatlas hex logo: an orthographic globe choropleth with population spikes rising off the horizon" />
+# countryatlas <img src="man/figures/logo.png" align="right" height="139" alt="countryatlas hex logo: an orthographic globe choropleth with population spikes rising off the horizon" />
 
 <!-- badges: start -->
 
@@ -10,10 +10,10 @@ status](https://www.r-pkg.org/badges/version/countryatlas)](https://CRAN.R-proje
 [![R-CMD-check](https://github.com/PursuitOfDataScience/countryatlas/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/PursuitOfDataScience/countryatlas/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
-> **Country data onto honest maps: joined on ISO codes, never on country
-> names.**
+**Country data from any source, joined on ISO codes and drawn as
+equal-area maps that state their coverage and source.**
 
-🔑 Messy names in, one key out, in any of a dozen languages:
+🔑 **One key for every spelling**, in a dozen languages:
 
 ``` r
 library(countryatlas)
@@ -28,7 +28,7 @@ standardize_country(d, country, add = "iso3c")
 #> 4 U.K.          GBR
 ```
 
-🗺️ An equal-area map that states its coverage and its source:
+🗺️ **An equal-area map** with its coverage and source in the caption:
 
 ``` r
 world_map(attach_geometry(world_snapshot$countries), gdp_per_capita)
@@ -36,7 +36,7 @@ world_map(attach_geometry(world_snapshot$countries), gdp_per_capita)
 
 <img src="man/figures/README-map-1.png" alt="World map of GDP per capita in five quantile classes, Equal Earth projection, with a caption giving coverage and source." width="100%" />
 
-🕰️ Membership and classification as they were, not as they are:
+🕰️ **Memberships and income groups as of any date**, row by row:
 
 ``` r
 in_group(c("GBR", "GBR"), "EU", origin = "iso3c", as_of = c(2016, 2021))
@@ -50,22 +50,20 @@ classify_countries(data.frame(iso3c = "VNM", year = c(2026, 2027)), "income")
 ## 🚀 Setup
 
 1.  `install.packages("countryatlas")`
-2.  `library(countryatlas)`: the bundled `world_snapshot` and the maps
-    work offline.
-3.  Optional, for the `sf` backend and every projection:
+2.  `library(countryatlas)`: the bundled `world_snapshot` and every map
+    work offline, in Equal Earth.
+3.  For the `sf` backend and every other projection:
     `install.packages(c("sf", "rnaturalearth", "rnaturalearthdata"))`
 4.  Live data: `world_data(2020)` from the World Bank, or any provider
     in `country_sources()` through `fetch_indicator()`.
 
-## ⚠️ Gotchas
-
-| What bites | What to do |
-|:---|:---|
-| Fetching needs the network | `world_snapshot` is offline; the fetchers call the providers. |
-| World Bank releases revise old values | Pin one: `world_data(2020, vintage = "2024-07")`. |
-| The cache lives in `tools::R_user_dir("countryatlas", "cache")` | `clear_country_cache()` empties it. |
-| TLS errors behind a proxy | Point `CURL_CA_BUNDLE` at your CA bundle; never turn verification off. |
-| `sf` will not load | Maps still draw: the polygon backend and its Equal Earth are built in. |
+- 💡 To reproduce a figure exactly, pin the World Bank release:
+  `world_data(2020, vintage = "2024-07")`.
+- 💡 Downloads are cached in
+  `tools::R_user_dir("countryatlas", "cache")`; `clear_country_cache()`
+  empties it.
+- 💡 Fetching through a proxy: point `CURL_CA_BUNDLE` at your
+  organisation’s certificate bundle.
 
 ## 📚 Learn more
 

@@ -185,6 +185,7 @@ reference:
   - flow_map
   - animate_world
   - interactive_map
+  - world_map_ui
   - value_by_alpha_map
   - gridded_cartogram
   - geom_country_labels

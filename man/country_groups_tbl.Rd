@@ -19,13 +19,27 @@ country_groups_tbl
 \description{
 A curated, dated membership table for the common country groups.
 }
+\section{The groups}{
+
+Twenty-six groups: \code{"EU"}, \code{"EuroZone"}, \code{"NATO"}, \code{"OECD"}, \code{"G7"},
+\code{"G20"}, \code{"BRICS"}, \code{"ASEAN"}, \code{"EFTA"}, \code{"Commonwealth"}, \code{"OPEC"},
+\code{"Mercosur"}, \code{"GCC"}, \code{"Nordic"}, \code{"Visegrad"}, \code{"SCO"}, \code{"CPTPP"},
+\code{"RCEP"}, \code{"EAC"}, \code{"SADC"}, \code{"APEC"}, \code{"ArabLeague"}, and since 4.0.0 the
+African Union (\code{"AU"}), \code{"ECOWAS"}, \code{"CARICOM"} (full members) and the
+Pacific Islands Forum (\code{"PIF"}). Only countries and territories with an ISO
+3166-1 code are listed: the G20's European Union and African Union members
+are not, and neither is the African Union's Sahrawi Arab Democratic
+Republic, which has no code of its own. A suspended member is a member
+here; \link{country_groups_history} records the suspensions it can date.
+}
+
 \section{As of when}{
 
-Membership is a snapshot taken on \strong{2026-06-01}, carried on the table
+Membership is a snapshot taken on \strong{2026-11-01}, carried on the table
 itself:
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{attr(country_groups_tbl, "as_of")
-#> [1] "2026-06-01"
+#> [1] "2026-11-01"
 }\if{html}{\out{</div>}}
 
 Read the attribute rather than this paragraph if you need the date in code;

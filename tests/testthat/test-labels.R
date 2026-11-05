@@ -120,3 +120,29 @@ test_that("geom_country_labels rejects an sf frame with an actionable message", 
     ggplot2::geom_sf_text(ggplot2::aes(label = iso3c), size = 2)
   expect_no_error(ggplot2::ggplot_build(alt))
 })
+
+test_that("a zoomed map labels what it shows, not the whole frame", {
+  # ggrepel keeps every label inside the panel, so on a map zoomed to Europe
+  # the United States, Japan and every other country in the frame were piled
+  # along the panel's edges, each with a segment pointing off the map.
+  skip_if_not_installed("ggrepel")
+  skip_slow_on_cran()
+  eu <- attach_geometry(dplyr::filter(snap, continent == "Europe"),
+                        geometry = "polygon")
+  p <- zoom_map(world_map(eu, gdp_per_capita) + geom_country_labels(size = 2),
+                xlim = c(-25, 45), ylim = c(34, 72))
+  i <- which(vapply(p$layers, function(l) inherits(l$geom, "GeomCountryLabelRepel"),
+                    logical(1)))
+  expect_length(i, 1L)
+  b <- ggplot2::ggplot_build(p)
+  d <- b$data[[i]]
+  kept <- countryatlas:::labels_in_view(d, b$layout$panel_params[[1]],
+                                        b$layout$coord)
+  expect_true(all(c("FRA", "DEU", "ITA", "POL") %in% kept$label))
+  expect_false(any(c("USA", "JPN", "BRA", "AUS", "CAN") %in% kept$label))
+  # And it draws.
+  f <- tempfile(fileext = ".png")
+  grDevices::png(f, width = 600, height = 500)
+  on.exit({ grDevices::dev.off(); unlink(f) }, add = TRUE)
+  expect_no_error(print(p))
+})

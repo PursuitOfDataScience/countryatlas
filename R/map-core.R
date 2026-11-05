@@ -31,7 +31,11 @@ theme_world_map <- function(base_size = 12, base_family = "") {
       panel.grid = ggplot2::element_blank(),
       panel.background = ggplot2::element_blank(),
       legend.position = "right",
-      plot.title = ggplot2::element_text(face = "bold")
+      plot.title = ggplot2::element_text(face = "bold"),
+      # Aligned to the whole plot rather than the panel, which the legend
+      # narrows to about two-thirds of the figure: the coverage and source
+      # caption ran off the panel's left edge at the default 7-inch width.
+      plot.caption.position = "plot"
     )
 }
 
@@ -422,11 +426,16 @@ world_map <- function(data, fill,
   # anyway (every row is kept), and before the hatch and dispute layers, which
   # draw from this frame too.
   if (sf_mode) data <- clip_for_projection(data, projection, recenter)
+  # show.legend = TRUE on the fill layer: since ggplot2 3.5 a legend key for a
+  # level no country falls in is drawn empty unless the layer insists, and the
+  # legends that keep such levels on purpose (fixed breaks, the VSUP grid,
+  # classify_compare(), lisa_map()'s four cluster types) showed a label with
+  # no colour beside it.
   if (sf_mode) {
     p <- ggplot2::ggplot(data) +
       ggplot2::geom_sf(ggplot2::aes(fill = !!fill_mapped),
                        color = if (borders) "grey30" else NA,
-                       linewidth = 0.1) +
+                       linewidth = 0.1, show.legend = TRUE) +
       wdj_coord_sf(projection, recenter)
   } else {
     # Recentring cuts the rings at the new antimeridian first; the built-in
@@ -440,7 +449,8 @@ world_map <- function(data, fill,
                    fill = !!fill_mapped)
     ) +
       ggplot2::geom_polygon(
-        color = if (borders) "grey30" else NA, linewidth = 0.1
+        color = if (borders) "grey30" else NA, linewidth = 0.1,
+        show.legend = TRUE
       ) +
       pc$coord
   }
@@ -506,7 +516,7 @@ world_map <- function(data, fill,
              imputed_note(data))
   src_note <- if (auto) source_caption(fill_source_info(data_full, fill_name))
   cap <- paste(stats::na.omit(c(cap, notes, src_note)), collapse = " ")
-  if (nzchar(cap)) p <- p + ggplot2::labs(caption = cap)
+  if (nzchar(cap)) p <- p + ggplot2::labs(caption = wrap_caption(cap))
 
   # Provenance travels on the object, not in a print side effect, so it survives
   # being saved, faceted or handed to map_provenance() later.

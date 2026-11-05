@@ -1,13 +1,30 @@
 # ggsql bridge -----------------------------------------------------------------
 # Make countryatlas the curated, ISO-reconciled, WDI-joined data layer for
-# ggsql's database-side spatial rendering (DRAW spatial, 0.4.1+). ggsql, duckdb,
-# DBI, nanoarrow and sf are all optional Suggests, gated by check_installed().
+# ggsql's database-side spatial rendering (DRAW spatial). ggsql, duckdb, DBI,
+# nanoarrow and sf are all optional Suggests, gated by check_installed().
+
+# The ggsql R package release whose grammar world_query() emits. 0.5.2, on CRAN
+# since 2026-10-08, is the first release there with DRAW spatial, and every
+# query this file emits was checked against it, by ggsql_validate() and by
+# executing it (tests/testthat/test-ggsql.R). The 0.4.x releases never reached
+# CRAN, and the queries 4.0.0 first wrote for them were rejected by 0.5.2 in
+# every form: the spatial layer wanted its geometry mapped, facets are
+# `FACET <col>`, binning is a scale, and there is no spatial_point layer.
+GGSQL_VERSION <- "0.5.0"
 
 # WKB-encode an sf frame's geometry into a BLOB column so ggsql's DRAW spatial
-# can read it; pass non-sf frames through unchanged.
+# can read it, with each country's centroid alongside for the bubble layer;
+# pass non-sf frames through with the centroids added.
 ggsql_wkb_frame <- function(data, geometry_col = "geometry") {
-  if (!is_sf(data)) return(tibble::as_tibble(data))
+  if (!is_sf(data)) return(tibble::as_tibble(ggsql_add_centroids(data)))
   need_pkg("sf", "to WKB-encode geometry for ggsql")
+  # WKB carries no CRS, and ggsql reads it as longitude/latitude unless told
+  # otherwise. attach_geometry(geometry = "sf") returns Equal Earth metres,
+  # which ggsql took for degrees, so every map drew as an empty panel: go back
+  # to longitude/latitude, and let the query's PROJECT TO project.
+  if (!is.na(sf::st_crs(data)) && !isTRUE(sf::st_is_longlat(data))) {
+    data <- sf::st_transform(data, 4326)
+  }
   geom <- sf::st_geometry(data)
   df <- sf::st_drop_geometry(data)
   # st_as_binary() returns a classed "WKB" object, which tibble rejects ("all
@@ -18,63 +35,85 @@ ggsql_wkb_frame <- function(data, geometry_col = "geometry") {
   # frame that already had a column of this name lost it in silence.
   warn_overwrite(df, geometry_col)
   df[[geometry_col]] <- unclass(sf::st_as_binary(geom, EWKB = FALSE))
-  tibble::as_tibble(df)
+  tibble::as_tibble(ggsql_add_centroids(df))
+}
+
+# A point per country for world_query(layer = "bubble"), in degrees: the
+# country_meta centroids bubble_map() places its symbols at. Added only where
+# the frame is keyed on iso3c and has no columns of these names already.
+ggsql_add_centroids <- function(df) {
+  if (!"iso3c" %in% names(df) ||
+      any(c("centroid_lon", "centroid_lat") %in% names(df))) {
+    return(df)
+  }
+  meta <- countryatlas::country_meta
+  i <- match(df$iso3c, meta$iso3c)
+  df$centroid_lon <- meta$centroid_lon[i]
+  df$centroid_lat <- meta$centroid_lat[i]
+  df
 }
 
 #' Emit a ggsql spatial query for a country map
 #'
 #' Build a [ggsql](https://ggsql.org) query string that draws a choropleth from
-#' a registered countryatlas source -- the same idea as [world_map()], but the
-#' map is rendered **in the database** (DuckDB) and returned as a web-ready
-#' Vega-Lite widget, so the geometry never has to come back into R. Pure string
-#' builder with no dependencies; pair it with [as_ggsql_source()] +
-#' `ggsql::ggsql_execute()`, or drop the string into a ````{ggsql}```` chunk.
+#' a registered countryatlas source: the same idea as [world_map()], but the
+#' map is rendered **in the database** (DuckDB) by ggsql, which returns a plot
+#' specification it can draw as SVG or as an interactive widget, so the
+#' geometry never has to come back into R. Pure string builder with no
+#' dependencies; pair it with [as_ggsql_source()] and `ggsql::ggsql_execute()`,
+#' or drop the string into a ````{ggsql}```` chunk.
 #'
 #' @param fill The fill column (unquoted or a string).
 #' @param source The table/source name registered with ggsql (default
 #'   `"countryatlas_world"`).
 #' @param projection A projection: one of the package's own names (see
-#'   [projection_info()]), translated to ggsql's where the two differ
-#'   (`"plate_carree"` becomes `equirectangular`, `"natural_earth"` becomes
-#'   `natural`, `"azimuthal_equal_area"` becomes `lambert`), or any other name
-#'   ggsql's `PROJECT TO` understands, passed through. `NULL` omits the
-#'   clause.
+#'   [projection_info()]), all thirteen translated to ggsql's (`"plate_carree"`
+#'   becomes `equirectangular`, `"natural_earth"` becomes `natural`,
+#'   `"azimuthal_equal_area"` becomes `lambert`, the polar views become
+#'   `lambert` centred on a pole, and `"gall_peters"` a cylindrical equal-area
+#'   CRS), or any other name ggsql's `PROJECT TO` understands, passed through.
+#'   `NULL` omits the clause.
 #' @param palette A scale ggsql's `SCALE ... TO` understands (default
 #'   `"viridis"`), or `NULL` to omit.
 #' @param transform Optional scale transform for `SCALE ... VIA` (e.g.
 #'   `"log10"`).
 #' @param title Optional plot title (`LABEL title => ...`).
-#' @param draw The spatial layer (default `"spatial"`).
-#' @param layer `"choropleth"` (default), `"bubble"` (proportional symbols --
-#'   needs `size`) or `"binned"` (classed fill -- see `n_bins`).
+#' @param draw The layer that draws the countries (default `"spatial"`).
+#' @param layer `"choropleth"` (default), `"bubble"` (proportional symbols at
+#'   each country's centroid over the countries, which needs `size`) or
+#'   `"binned"` (a classed fill, see `n_bins`).
 #' @param facet Optional column to facet the query by, e.g. `"year"` for a
 #'   small-multiple panel rendered in the database.
 #' @param size Column driving symbol size for `layer = "bubble"`.
-#' @param n_bins Number of classes for `layer = "binned"` (default `5`).
+#' @param n_bins Number of classes for `layer = "binned"` (default `5`); ggsql
+#'   places the breaks, as close to this many as round numbers allow.
+#' @param geometry The source's geometry column (default `"geometry"`, the
+#'   name [as_ggsql_source()] writes).
 #'
 #' @return A `ggsql_query` string (prints as the formatted query).
 #' @section Executing the query:
-#' Building the string needs nothing installed. *Running* it needs
-#' `ggsql` >= 0.4.1, the version that added the `DRAW spatial` clause and map
-#' projections; older `ggsql` releases parse the query and reject that clause.
-#' Projections arrived in the engine at different versions -- `equal_earth`,
-#' the default here, only in 0.5.0 -- so the query records the version it
-#' needs as its `"countryatlas_ggsql_version"` attribute, and
-#' [interactive_map()]`(engine = "ggsql")` refuses an installed `ggsql` older
-#' than that, naming the projection. As of October 2026 the ggsql *engine* is
-#' at 0.5.2 while the ggsql R package on CRAN is still 0.3.3, so execution
-#' waits for the bindings to catch up. `PROJECT TO` additionally needs a
-#' spatial backend -- for DuckDB, its `spatial` extension.
+#' Building the string needs nothing installed. *Running* it needs `ggsql` >=
+#' 0.5.0; the grammar was checked against 0.5.2, the first release on CRAN with
+#' the `DRAW spatial` layer (2026-10-08). The query records that version as
+#' its `"countryatlas_ggsql_version"` attribute, and
+#' [interactive_map()]`(engine = "ggsql")` refuses an older `ggsql`. The
+#' spatial layer also needs DuckDB's `spatial` extension, which
+#' [as_ggsql_source()]`(format = "reader")` loads; ggsql's DuckDB downloads it
+#' once per session, into the session's temporary directory. For
+#' `layer = "bubble"` the source needs `centroid_lon` and `centroid_lat`
+#' columns, which [as_ggsql_source()] adds for a frame keyed on `iso3c`.
 #' @export
 #' @examples
 #' world_query(gdp_per_capita, projection = "equal_earth",
 #'             palette = "magma", transform = "log10",
 #'             title = "GDP per capita")
+#' world_query(gdp_per_capita, layer = "bubble", size = "population")
 world_query <- function(fill, source = "countryatlas_world",
                         projection = "equal_earth", palette = "viridis",
                         transform = NULL, title = NULL, draw = "spatial",
                         layer = c("choropleth", "bubble", "binned"),
-                        facet = NULL, size = NULL, n_bins = NULL) {
+                        facet = NULL, size = NULL, n_bins = NULL,
+                        geometry = "geometry") {
   fill_name <- quo_arg_name(rlang::enquo(fill), "fill")
   layer <- rlang::arg_match(layer)
   check_string(source, "source")
@@ -141,81 +180,96 @@ world_query <- function(fill, source = "countryatlas_world",
   # is a letter or underscore followed by letters, digits or underscores.
   check_sql_ident(fill_name, "fill")
   check_sql_ident(source, "source")
+  check_sql_ident(draw, "draw")
+  check_sql_ident(geometry, "geometry")
   if (!is.null(size)) check_sql_ident(size, "size")
   if (!is.null(facet)) check_sql_ident(facet, "facet")
   if (!is.null(projection)) check_sql_ident(projection, "projection")
   if (!is.null(palette)) check_sql_ident(palette, "palette")
   if (!is.null(transform)) check_sql_ident(transform, "transform")
-  head_line <- sprintf("VISUALISE %s AS fill", fill_name)
-  if (!is.null(size)) {
-    head_line <- paste0(head_line, ", ", size, " AS size")
+  geom_map <- if (identical(geometry, "geometry")) "geometry" else
+    paste(geometry, "AS geometry")
+  lines <- if (identical(layer, "bubble")) {
+    # The countries underneath, then a point per country at its centroid: the
+    # map coordinate system's position aesthetics are lon and lat.
+    c(sprintf("VISUALISE FROM %s", source),
+      sprintf("DRAW %s", draw),
+      sprintf("  MAPPING %s", geom_map),
+      "DRAW point",
+      sprintf("  MAPPING centroid_lon AS lon, centroid_lat AS lat, %s AS size, %s AS fill",
+              size, fill_name))
+  } else {
+    # The geometry is mapped explicitly. ggsql finds a geometry column by
+    # itself when the query runs, but ggsql_validate() has no data to look in
+    # and rejects the query without it.
+    c(sprintf("VISUALISE %s AS fill, %s FROM %s", fill_name, geom_map, source),
+      sprintf("DRAW %s", draw))
   }
-  lines <- c(
-    head_line,
-    sprintf("FROM %s", source),
-    # "bubble" draws symbols rather than filled shapes; the spatial layer name
-    # is the one thing that changes, so the rest of the query is untouched.
-    sprintf("DRAW %s", if (identical(layer, "bubble")) "spatial_point" else draw)
-  )
-  needs <- "0.4.1"
   if (!is.null(projection)) {
-    gp <- ggsql_projection(projection)
-    lines <- c(lines, sprintf("PROJECT TO %s", gp$ggsql))
-    if (!is.na(gp$since)) needs <- gp$since
+    lines <- c(lines, paste("PROJECT TO", ggsql_projection(projection)))
   }
-  if (!is.null(palette) || !is.null(transform)) {
-    scale_line <- if (!is.null(palette)) sprintf("SCALE fill TO %s", palette) else "SCALE fill"
-    if (!is.null(transform)) scale_line <- paste0(scale_line, " VIA ", transform)
+  binned <- identical(layer, "binned")
+  if (!is.null(palette) || !is.null(transform) || binned) {
+    scale_line <- paste0("SCALE ", if (binned) "BINNED ", "fill")
+    if (!is.null(palette)) scale_line <- paste(scale_line, "TO", palette)
+    if (!is.null(transform)) scale_line <- paste(scale_line, "VIA", transform)
+    if (binned) {
+      scale_line <- paste(scale_line, "SETTING breaks =>", as.integer(n_bins))
+    }
     lines <- c(lines, scale_line)
   }
-  if (identical(layer, "binned")) {
-    lines <- c(lines, sprintf("BIN fill INTO %d", as.integer(n_bins)))
-  }
   if (!is.null(facet)) {
-    lines <- c(lines, sprintf("FACET BY %s", facet))
+    lines <- c(lines, sprintf("FACET %s", facet))
   }
   if (!is.null(title)) {
-    lines <- c(lines, sprintf("LABEL title => '%s'", gsub("'", "''", title)))
+    lines <- c(lines, sprintf("LABEL title => '%s'", ggsql_string(title)))
   }
   structure(paste(lines, collapse = "\n"), class = c("ggsql_query", "character"),
-            countryatlas_ggsql_version = needs)
+            countryatlas_ggsql_version = GGSQL_VERSION)
 }
 
-# The projections the ggsql engine knows, by the engine version that added
-# them, read from posit-dev/ggsql's own source (map_projections.rs at v0.4.1
-# and v0.5.2). world_query() emitted `PROJECT TO equal_earth` by default and
-# gated execution on 0.4.1, the version that added DRAW spatial -- but Equal
-# Earth arrived only in 0.5.0, so the gate would have let an unknown
-# projection through the day a 0.4.x binding reached CRAN. Names on the left
-# are this package's; ggsql spells three of them differently. eckert4,
-# gall_peters and the two polar views have no named counterpart there.
+# The package's thirteen projections in ggsql's PROJECT TO vocabulary, read
+# from ggsql 0.5.2's map coordinate system documentation
+# (https://ggsql.org/syntax/coord/crs.html) and drawn by it in
+# tests/testthat/test-ggsql.R. ggsql spells three of them differently, the
+# polar views are its Lambert azimuthal centred on a pole, the orthographic
+# view is centred where the package's is (ORTHO_LAT0), and Gall-Peters, which
+# has no name there, is given as a PROJ string.
 ggsql_projection_table <- function() {
   tibble::tribble(
-    ~projection,             ~ggsql,            ~since,
-    "equal_earth",           "equal_earth",     "0.5.0",
-    "robinson",              "robinson",        "0.4.1",
-    "mollweide",             "mollweide",       "0.4.1",
-    "natural_earth",         "natural",         "0.4.1",
-    "plate_carree",          "equirectangular", "0.4.1",
-    "mercator",              "mercator",        "0.4.1",
-    "winkel_tripel",         "winkel_tripel",   "0.4.1",
-    "orthographic",          "orthographic",    "0.4.1",
-    "azimuthal_equal_area",  "lambert",         "0.4.1"
+    ~projection,             ~ggsql,
+    "equal_earth",           "equal_earth",
+    "robinson",              "robinson",
+    "mollweide",             "mollweide",
+    "natural_earth",         "natural",
+    "plate_carree",          "equirectangular",
+    "mercator",              "mercator",
+    "winkel_tripel",         "winkel_tripel",
+    "eckert4",               "eckert4",
+    "gall_peters",           "crs SETTING target => '+proj=cea +lat_ts=45'",
+    "orthographic",          sprintf("orthographic SETTING origin => (0, %d)",
+                                     as.integer(ORTHO_LAT0)),
+    "azimuthal_equal_area",  "lambert",
+    "north_polar",           "lambert SETTING origin => (0, 90)",
+    "south_polar",           "lambert SETTING origin => (0, -90)"
   )
 }
 
-# One projection name, resolved: the package's name translated to ggsql's,
-# and the engine version it needs; a name the table does not know is passed
-# through unchanged with no version claim, since ggsql may know it.
+# One projection name, resolved to what follows PROJECT TO: the package's name
+# translated, and any other name passed through unchanged, since ggsql may
+# know it.
 ggsql_projection <- function(projection) {
   tab <- ggsql_projection_table()
   i <- match(projection, tab$projection)
-  if (is.na(i)) {
-    j <- match(projection, tab$ggsql)
-    if (!is.na(j)) return(list(ggsql = projection, since = tab$since[j]))
-    return(list(ggsql = projection, since = NA_character_))
-  }
-  list(ggsql = tab$ggsql[i], since = tab$since[i])
+  if (is.na(i)) projection else tab$ggsql[i]
+}
+
+# The body of a single-quoted ggsql string. ggsql escapes with a backslash, not
+# by doubling the quote as SQL does: the doubled form this used to write,
+# 'World''s GDP', is a parse error in ggsql 0.5.2, so any title with an
+# apostrophe broke the query. Backslashes first, so an escape is not doubled.
+ggsql_string <- function(x) {
+  gsub("'", "\\'", gsub("\\", "\\\\", x, fixed = TRUE), fixed = TRUE)
 }
 
 # Refuse anything that is not a bare SQL identifier. This builder emits a
@@ -277,15 +331,21 @@ wdj_duckdb <- function() {
 #' Export a countryatlas table as a ggsql source
 #'
 #' Hand countryatlas's curated, ISO-reconciled, WDI-joined spatial table to
-#' [ggsql](https://ggsql.org) so it can be charted with `DRAW spatial` -- the
-#' bridge that lets ggsql draw maps of *your* override-corrected data instead of
-#' its static bundled world. `sf` geometry is WKB-encoded so ggsql can decode it.
+#' [ggsql](https://ggsql.org) so it can be charted with `DRAW spatial`: the
+#' bridge that lets ggsql draw maps of *your* override-corrected data instead
+#' of its static bundled world. `sf` geometry is WKB-encoded in longitude and
+#' latitude, which is what ggsql reads, and a frame keyed on `iso3c` gains
+#' `centroid_lon` and `centroid_lat` for [world_query()]`(layer = "bubble")`.
 #'
 #' @param data A map-ready frame (ideally `sf`, so `DRAW spatial` has geometry).
 #' @param name The table name to register/write (default `"countryatlas_world"`).
-#' @param format `"duckdb"` (write to a DuckDB connection and return it),
-#'   `"parquet"` (write a Parquet file and return its path) or `"arrow"` (return
-#'   a nanoarrow array stream ggsql can read directly).
+#' @param format `"reader"` (the default: a ggsql reader with the table
+#'   registered, which is what `ggsql::ggsql_execute()` takes), `"frame"` (the
+#'   prepared data frame itself, which a ````{ggsql}```` chunk reads as
+#'   `FROM r:<object>`), `"duckdb"` (write to a DuckDB connection and return
+#'   it), `"parquet"` (write a Parquet file and return its path) or `"arrow"`
+#'   (return a nanoarrow array stream). Passing `con` without `format` means
+#'   `"duckdb"`.
 #' @param con An existing DuckDB `DBIConnection` to write into (`format =
 #'   "duckdb"`); a fresh in-memory one is created if `NULL`.
 #' @param path Output path for `format = "parquet"`. Defaults to a file named
@@ -295,8 +355,16 @@ wdj_duckdb <- function() {
 #'   this used to default to did.
 #' @param geometry_col Name for the WKB geometry column (default `"geometry"`).
 #'
-#' @return Depending on `format`: a DuckDB connection (with the table written),
-#'   a Parquet file path, or a nanoarrow array stream.
+#' @return Depending on `format`: a ggsql reader, a data frame, a DuckDB
+#'   connection (with the table written), a Parquet file path, or a nanoarrow
+#'   array stream.
+#'
+#'   `format = "reader"` with an `sf` frame also loads DuckDB's `spatial`
+#'   extension into the reader, which `DRAW spatial` needs. ggsql's DuckDB
+#'   downloads it once per session, into the session's temporary directory, so
+#'   the first call needs a network connection; without one, the reader is
+#'   returned with a warning (class `countryatlas_ggsql_spatial`) and only
+#'   non-spatial queries run.
 #'
 #'   **You own the connection** that `format = "duckdb"` returns, and duckdb
 #'   keeps its in-memory database alive until the handle is released, so close
@@ -312,12 +380,16 @@ wdj_duckdb <- function() {
 #' @examples
 #' \dontrun{
 #' # Curate in R, render in the database:
-#' src <- world_data(2020, geometry = "sf") |> as_ggsql_source(format = "duckdb")
-#' ggsql::ggsql_execute(src, world_query(gdp_per_capita))
+#' reader <- world_data(2020, geometry = "sf") |> as_ggsql_source()
+#' spec <- ggsql::ggsql_execute(reader, world_query(gdp_per_capita))
+#' ggsql::ggsql_widget(spec)
 #' }
 as_ggsql_source <- function(data, name = "countryatlas_world",
-                            format = c("duckdb", "parquet", "arrow"),
+                            format = c("reader", "frame", "duckdb", "parquet",
+                                       "arrow"),
                             con = NULL, path = NULL, geometry_col = "geometry") {
+  # A connection handed in is a connection to write into.
+  if (missing(format) && !is.null(con)) format <- "duckdb"
   format <- rlang::arg_match(format)
   check_string(name, "name")
   # Same bare-column guard as the verbs in analysis.R: this argument takes a
@@ -342,6 +414,17 @@ as_ggsql_source <- function(data, name = "countryatlas_world",
     ))
   }
   df <- ggsql_wkb_frame(data, geometry_col)
+
+  if (format == "frame") return(df)
+
+  if (format == "reader") {
+    need_pkg("ggsql", 'for as_ggsql_source(format = "reader")',
+             version = GGSQL_VERSION)
+    reader <- ggsql::duckdb_reader()
+    ggsql::ggsql_register(reader, as.data.frame(df), name)
+    if (is_sf(data)) ggsql_load_spatial(reader)
+    return(reader)
+  }
 
   if (format == "arrow") {
     need_pkg("nanoarrow", "for as_ggsql_source(format = \"arrow\")")
@@ -402,4 +485,30 @@ as_ggsql_source <- function(data, name = "countryatlas_world",
   }
   if (own_con) written <- TRUE
   invisible(con)
+}
+
+
+# Load DuckDB's spatial extension into a ggsql reader: DRAW spatial needs it.
+# ggsql's DuckDB keeps its home in the session's temporary directory but does
+# not create it, so INSTALL failed with "Can't find the home directory"; point
+# the extension directory at a folder made here instead. INSTALL downloads the
+# extension the first time in a session; LOAD alone is enough after that.
+ggsql_load_spatial <- function(reader) {
+  dir <- file.path(tempdir(), "duckdb-extensions")
+  dir.create(dir, showWarnings = FALSE, recursive = TRUE)
+  dir <- gsub("'", "''", normalizePath(dir, winslash = "/", mustWork = FALSE))
+  sql <- sprintf("SET extension_directory = '%s'; INSTALL spatial; LOAD spatial;",
+                 dir)
+  res <- tryCatch(ggsql::ggsql_execute_sql(reader, sql), error = identity)
+  if (inherits(res, "error")) {
+    wdj_warn(c(
+      "DuckDB's {.val spatial} extension could not be loaded, so
+       {.code DRAW spatial} cannot run on this reader.",
+      "i" = "ggsql's DuckDB downloads the extension once per session, into
+             the session's temporary directory, which needs a network
+             connection.",
+      "x" = conditionMessage(res)
+    ), class = "countryatlas_ggsql_spatial")
+  }
+  invisible(reader)
 }

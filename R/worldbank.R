@@ -210,7 +210,8 @@ wb_parse_json <- function(res, code) {
 #' @seealso [compare_vintages()]
 #' @export
 #' @examples
-#' \donttest{
+#' \dontrun{
+#' # Needs the World Bank API.
 #' tail(wdi_vintages())
 #' }
 wdi_vintages <- function() {
@@ -300,7 +301,8 @@ wb_nearest_vintages <- function(id, code = NULL, year = NULL, n = 3L,
 #' @seealso [wdi_vintages()], [compare_sources()]
 #' @export
 #' @examples
-#' \donttest{
+#' \dontrun{
+#' # Needs the World Bank API: two releases of one series, fetched live.
 #' compare_vintages("SP.POP.TOTL", c("2019-07", "current"), year = 2015)
 #' }
 compare_vintages <- function(indicator, vintages, year = NULL,

@@ -89,13 +89,24 @@
 #' A curated, dated membership table for the common country groups.
 #'
 #' @format A tibble with columns `group`, `iso3c`, `country`.
+#' @section The groups:
+#' Twenty-six groups: `"EU"`, `"EuroZone"`, `"NATO"`, `"OECD"`, `"G7"`,
+#' `"G20"`, `"BRICS"`, `"ASEAN"`, `"EFTA"`, `"Commonwealth"`, `"OPEC"`,
+#' `"Mercosur"`, `"GCC"`, `"Nordic"`, `"Visegrad"`, `"SCO"`, `"CPTPP"`,
+#' `"RCEP"`, `"EAC"`, `"SADC"`, `"APEC"`, `"ArabLeague"`, and since 4.0.0 the
+#' African Union (`"AU"`), `"ECOWAS"`, `"CARICOM"` (full members) and the
+#' Pacific Islands Forum (`"PIF"`). Only countries and territories with an ISO
+#' 3166-1 code are listed: the G20's European Union and African Union members
+#' are not, and neither is the African Union's Sahrawi Arab Democratic
+#' Republic, which has no code of its own. A suspended member is a member
+#' here; [country_groups_history] records the suspensions it can date.
 #' @section As of when:
-#' Membership is a snapshot taken on **2026-06-01**, carried on the table
+#' Membership is a snapshot taken on **2026-11-01**, carried on the table
 #' itself:
 #'
 #' ```r
 #' attr(country_groups_tbl, "as_of")
-#' #> [1] "2026-06-01"
+#' #> [1] "2026-11-01"
 #' ```
 #'
 #' Read the attribute rather than this paragraph if you need the date in code;
@@ -163,7 +174,7 @@
 #' Dated country-group membership
 #'
 #' When each country joined -- and where applicable left, or was suspended
-#' from -- each of nineteen international groups. The dated counterpart to
+#' from -- each of twenty international groups. The dated counterpart to
 #' [country_groups_tbl], which is a single current snapshot.
 #'
 #' A snapshot silently misstates any panel that spans an accession: an EU panel
@@ -187,15 +198,19 @@
 #' }
 #'
 #' @section Scope, and what is deliberately absent:
-#' Nineteen groups are dated: EU, EuroZone, NATO, OECD, ASEAN, EFTA, GCC,
-#' Mercosur, Nordic, Visegrad, BRICS, G7, and since 4.0.0 SCO, CPTPP, RCEP,
-#' EAC, SADC, APEC (member economies, so Hong Kong and Taiwan too) and the
-#' Arab League (`"ArabLeague"`). Every date carries its source in
-#' `data-raw/country_groups_history.R`. **Commonwealth, G20 and OPEC are
-#' not**, and that is a decision rather than an omission: the Commonwealth's
-#' and OPEC's suspensions, lapses and readmissions are dated unevenly by the
-#' sources, and G20's members include the EU and the African Union, which are
-#' not countries. A fabricated date is worse than an absent one, so
+#' Twenty groups are dated: EU, EuroZone, NATO, OECD, ASEAN, EFTA, GCC,
+#' Mercosur, Nordic, Visegrad, BRICS, G7, and since 4.0.0 G20 (its nineteen
+#' member countries), SCO, CPTPP, RCEP, EAC, SADC, APEC (member economies, so
+#' Hong Kong and Taiwan too) and the Arab League (`"ArabLeague"`). Every date
+#' carries its source in `data-raw/country_groups_history.R`. **Six groups are
+#' not dated**, and that is a decision rather than an omission, made again for
+#' each of them in 4.0.0: the Commonwealth's own record of its suspensions
+#' gives months only and the other sources differ from it by days; OPEC dates
+#' its accessions to the year; the African Union's table of joining dates
+#' contradicts itself and its suspensions after coups, like ECOWAS's, are
+#' dated unevenly; CARICOM's suspension of Haiti ends in June or July 2006
+#' depending on the source; and the Pacific Islands Forum dates its
+#' accessions to the year. A fabricated date is worse than an absent one, so
 #' `country_groups(as_of =)` warns and falls back to the snapshot for those.
 #' RCEP leaves out Myanmar, whose ratification the ASEAN Secretariat
 #' questioned and whose date of entry into force is disputed.

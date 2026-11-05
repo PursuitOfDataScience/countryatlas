@@ -7,7 +7,7 @@
 as_ggsql_source(
   data,
   name = "countryatlas_world",
-  format = c("duckdb", "parquet", "arrow"),
+  format = c("reader", "frame", "duckdb", "parquet", "arrow"),
   con = NULL,
   path = NULL,
   geometry_col = "geometry"
@@ -18,9 +18,13 @@ as_ggsql_source(
 
 \item{name}{The table name to register/write (default \code{"countryatlas_world"}).}
 
-\item{format}{\code{"duckdb"} (write to a DuckDB connection and return it),
-\code{"parquet"} (write a Parquet file and return its path) or \code{"arrow"} (return
-a nanoarrow array stream ggsql can read directly).}
+\item{format}{\code{"reader"} (the default: a ggsql reader with the table
+registered, which is what \code{ggsql::ggsql_execute()} takes), \code{"frame"} (the
+prepared data frame itself, which a \code{{ggsql}} chunk reads as
+\verb{FROM r:<object>}), \code{"duckdb"} (write to a DuckDB connection and return
+it), \code{"parquet"} (write a Parquet file and return its path) or \code{"arrow"}
+(return a nanoarrow array stream). Passing \code{con} without \code{format} means
+\code{"duckdb"}.}
 
 \item{con}{An existing DuckDB \code{DBIConnection} to write into (\code{format = "duckdb"}); a fresh in-memory one is created if \code{NULL}.}
 
@@ -33,8 +37,16 @@ this used to default to did.}
 \item{geometry_col}{Name for the WKB geometry column (default \code{"geometry"}).}
 }
 \value{
-Depending on \code{format}: a DuckDB connection (with the table written),
-a Parquet file path, or a nanoarrow array stream.
+Depending on \code{format}: a ggsql reader, a data frame, a DuckDB
+connection (with the table written), a Parquet file path, or a nanoarrow
+array stream.
+
+\code{format = "reader"} with an \code{sf} frame also loads DuckDB's \code{spatial}
+extension into the reader, which \verb{DRAW spatial} needs. ggsql's DuckDB
+downloads it once per session, into the session's temporary directory, so
+the first call needs a network connection; without one, the reader is
+returned with a warning (class \code{countryatlas_ggsql_spatial}) and only
+non-spatial queries run.
 
 \strong{You own the connection} that \code{format = "duckdb"} returns, and duckdb
 keeps its in-memory database alive until the handle is released, so close
@@ -50,14 +62,17 @@ in every case, since it was never ours to close.
 }
 \description{
 Hand countryatlas's curated, ISO-reconciled, WDI-joined spatial table to
-\href{https://ggsql.org}{ggsql} so it can be charted with \verb{DRAW spatial} -- the
-bridge that lets ggsql draw maps of \emph{your} override-corrected data instead of
-its static bundled world. \code{sf} geometry is WKB-encoded so ggsql can decode it.
+\href{https://ggsql.org}{ggsql} so it can be charted with \verb{DRAW spatial}: the
+bridge that lets ggsql draw maps of \emph{your} override-corrected data instead
+of its static bundled world. \code{sf} geometry is WKB-encoded in longitude and
+latitude, which is what ggsql reads, and a frame keyed on \code{iso3c} gains
+\code{centroid_lon} and \code{centroid_lat} for \code{\link[=world_query]{world_query()}}\code{(layer = "bubble")}.
 }
 \examples{
 \dontrun{
 # Curate in R, render in the database:
-src <- world_data(2020, geometry = "sf") |> as_ggsql_source(format = "duckdb")
-ggsql::ggsql_execute(src, world_query(gdp_per_capita))
+reader <- world_data(2020, geometry = "sf") |> as_ggsql_source()
+spec <- ggsql::ggsql_execute(reader, world_query(gdp_per_capita))
+ggsql::ggsql_widget(spec)
 }
 }

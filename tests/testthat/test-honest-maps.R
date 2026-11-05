@@ -164,3 +164,18 @@ test_that("value_by_alpha_map() ranks opacity once per country, not per vertex",
     , c("iso3c", ".wdj_alpha")])
   expect_equal(eq_drawn$.wdj_alpha, drawn$.wdj_alpha)
 })
+
+test_that("the opacity legend shows the equalising variable's values", {
+  # It labelled the normalised opacity, so a map equalised by population had
+  # a legend reading "population: 0.00, 0.25, 0.50, 0.75, 1.00".
+  skip_slow_on_cran()
+  poly <- attach_geometry(world_snapshot$countries)
+  per_country <- poly$population[!duplicated(poly$iso3c) & is.finite(poly$population)]
+  for (tr in c("rank", "log10", "identity")) {
+    p <- value_by_alpha_map(poly, gdp_per_capita, population, transform = tr)
+    lab <- ggplot2::get_guide_data(p, "alpha")$.label
+    expect_length(lab, 5L)
+    expect_identical(lab[c(1, 5)],
+                     countryatlas:::si_label(range(per_country)), label = tr)
+  }
+})

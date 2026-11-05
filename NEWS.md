@@ -13,7 +13,7 @@
   when you want them.
 * **Panels that keep their dates:** dated World Bank income groups and
   regions (`classify_countries()`), group membership with spells and
-  suspensions for nineteen groups, lags and growth keyed on the year, joins
+  suspensions for twenty groups, lags and growth keyed on the year, joins
   on the year, and aggregates that report their coverage.
 * **Data you can trace:** every fetched column carries its source, unit,
   release and licence (`source_info()`); World Bank releases can be pinned
@@ -127,6 +127,11 @@
 * **`wdj_overrides()` and `options(countryatlas.gdp_compat)` are removed**,
   after warning for a release. Use `country_overrides()`, and the
   `gdp_per_capita` column the alias copied.
+* **`as_ggsql_source()` returns a ggsql reader by default** (`format =
+  "reader"`): the object `ggsql::ggsql_execute()` takes in ggsql 0.5, with the
+  table registered and DuckDB's spatial extension loaded. The DuckDB
+  connection it returned before is not one ggsql can read. Way back:
+  `format = "duckdb"`, or pass `con`.
 * **`add_indicator()` refuses a source that repeats a key.** A source
   returning two rows for one country-year fanned the caller's frame out, one
   row in and two out. It now aborts with class `countryatlas_many_to_many`,
@@ -162,6 +167,26 @@
   references for exactly the data and methods a map used.
 * `map_provenance()` reads the final plot: a coord or fill scale added after
   the verb drew it is reported, with `modified = TRUE`.
+* `world_query()` writes the grammar of ggsql 0.5, checked against 0.5.2, the
+  first release on CRAN with the spatial layer (2026-10-08), by validating and
+  executing every form. ggsql 0.5.2 rejected every query it wrote before. The
+  geometry column is mapped (new `geometry` argument), a facet is
+  `FACET <column>`, `layer = "binned"` is a binned scale, `layer = "bubble"`
+  draws a point at each country's centroid over the countries, all thirteen
+  projections translate, the polar views and Gall-Peters included, and an
+  apostrophe in `title` is escaped with a backslash, as ggsql reads it, rather
+  than doubled.
+* `as_ggsql_source()` writes geometry in longitude and latitude. The `sf`
+  frames `attach_geometry()` returns are in Equal Earth metres, which ggsql
+  read as degrees, so every map it drew came back empty. It also adds
+  `centroid_lon` and `centroid_lat` for the bubble layer, and gains
+  `format = "frame"` for a `{ggsql}` chunk to read as `r:<object>`.
+* `interactive_map(engine = "ggsql")` returns ggsql's widget rather than the
+  plot specification, and needs ggsql >= 0.5.0.
+* New `world_map_ui()` and `world_map_server()`: a Shiny module that draws
+  `world_map()` with inputs for the fill column, the classification, the
+  number of classes and the projection, announces the map's alt text to
+  screen readers, and returns the map as a reactive. `shiny` joins Suggests.
 * `projection = "north_polar"` on the `sf` backend painted the whole disc
   grey: Natural Earth closes Antarctica along the South Pole, the
   projection's antipode, so its ring closed around every other country. What
@@ -171,6 +196,25 @@
   does, rather than "NA"; `flow_map()`'s lightest arcs no longer vanish into
   the basemap; and `geom_country_labels()` on a frame without `group` no
   longer places one "NA" label for every uncoded piece.
+* Legends show the colour of every class they list. Since ggplot2 3.5 a
+  legend key for a class no country falls in is drawn empty, so fixed
+  `breaks` with an empty class, the value-suppressing palette's grid,
+  `classify_compare()` and `lisa_map()`'s four cluster types showed labels
+  with no swatch beside them. `lisa_map()` labels its missing key "No data",
+  as the other maps do.
+* `value_by_alpha_map()`'s opacity legend shows the equalising variable's
+  own values at each step ("9.65K", "6.92M", "1.45B" for population) rather
+  than the normalised opacity, which read as a population of 0.25.
+* Captions wrap at 80 characters and align to the whole plot rather than the
+  panel. ggplot2 does not wrap text, so a caption longer than the panel was
+  cut off at its left edge: at the default 7-inch width `lisa_map()`'s
+  170-character caption lost the coverage statement it starts with.
+* `geom_country_labels()` on a zoomed map (`zoom_map()`, or any coord with
+  limits) labels only the countries the map shows. ggrepel keeps every label
+  inside the panel, so a map of Europe had the United States, Japan and the
+  rest of the frame piled along its edges. The example that zoomed with
+  `coord_quickmap()`, which would also have dropped the projection, uses
+  `zoom_map()`.
 * The 32 worldviews Natural Earth publishes, 31 countries' and ISO's:
   `world_geometry(worldview = )`, `attach_geometry(worldview = )` and
   `dispute_policy(worldview = )` draw the boundaries as the viewing country
@@ -184,9 +228,18 @@
 * `convert_country("XK", origin = "iso2c")` reads back the code the package
   writes for Kosovo.
 * `country_groups_history` gains `status` and several spells per country,
-  and seven dated groups: SCO, CPTPP, RCEP, EAC, SADC, APEC and the Arab
-  League, every date sourced in `data-raw/`. Suspended spells are not counted
-  as membership.
+  and eight dated groups: the G20 (its nineteen countries), SCO, CPTPP, RCEP,
+  EAC, SADC, APEC and the Arab League, every date sourced in `data-raw/`.
+  Suspended spells are not counted as membership.
+* Four groups join `country_groups_tbl`: the African Union (`"AU"`),
+  `"ECOWAS"`, `"CARICOM"` and the Pacific Islands Forum (`"PIF"`). They hold
+  current membership only; `?country_groups_history` gives the reason each,
+  like the Commonwealth and OPEC, is not dated.
+* `country_groups_tbl` is dated 2026-11-01 and carries three changes its
+  earlier 2026-06-01 stamp had missed: Bulgaria in the euro area (from
+  1 January 2026), Timor-Leste in ASEAN (from 26 October 2025) and the United
+  Arab Emirates out of OPEC (from 1 May 2026). `country_groups_history` dates
+  the first two.
 * `audit_time_coverage()` dates independence from Gleditsch & Ward's list,
   flagging `"before_independence"` (Namibia before 1990, Timor-Leste before
   2002) with the basis of each flag.
@@ -304,8 +357,8 @@
 
 ## Documentation
 
-* The README is rewritten short: three examples, four setup steps and the
-  gotchas; the visual tour moved to a Gallery article. Two new vignettes,
+* The README is rewritten short: three examples, four setup steps and a
+  table of tips; the visual tour moved to a Gallery article. Two new vignettes,
   "Panels done right" and "Data you can trace", and seven articles on the
   website only. `inst/CITATION` carries the methods added in this release.
 

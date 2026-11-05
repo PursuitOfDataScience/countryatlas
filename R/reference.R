@@ -252,8 +252,10 @@ country_codes <- function(codes = NULL) {
 #' @param group One or more group names: any of `"EU"`, `"OECD"`, `"G7"`,
 #'   `"G20"`, `"BRICS"`, `"ASEAN"`, `"EFTA"`, `"Commonwealth"`, `"OPEC"`,
 #'   `"EuroZone"`, `"NATO"`, `"Mercosur"`, `"GCC"`, `"Nordic"`, `"Visegrad"`,
-#'   `"SCO"`, `"CPTPP"`, `"RCEP"`, `"EAC"`, `"SADC"`, `"APEC"` and
-#'   `"ArabLeague"`. If `NULL`, the whole table is returned.
+#'   `"SCO"`, `"CPTPP"`, `"RCEP"`, `"EAC"`, `"SADC"`, `"APEC"`,
+#'   `"ArabLeague"`, `"AU"` (the African Union), `"ECOWAS"`, `"CARICOM"` and
+#'   `"PIF"` (the Pacific Islands Forum). If `NULL`, the whole table is
+#'   returned.
 #' @param as_of A date (or a year) at which to evaluate membership. `NULL`
 #'   (default) uses the current snapshot. **A bare year means 1 January of that
 #'   year**, not "at some point during it": `as_of = 2013` is 2013-01-01, so
@@ -272,14 +274,16 @@ country_codes <- function(codes = NULL) {
 #' "GBR" %in% country_groups("EU", as_of = 2016)$iso3c   # TRUE
 #' "GBR" %in% country_groups("EU", as_of = 2021)$iso3c   # FALSE
 #' ```
-#' [country_groups_history] carries dated membership for nineteen groups: EU,
+#' [country_groups_history] carries dated membership for twenty groups: EU,
 #' EuroZone, NATO, OECD, ASEAN, EFTA, GCC, Mercosur, Nordic, Visegrad, BRICS,
-#' G7, SCO, CPTPP, RCEP, EAC, SADC, APEC and the Arab League, with
+#' G7, G20, SCO, CPTPP, RCEP, EAC, SADC, APEC and the Arab League, with
 #' suspensions as spells of their own: Syria is not counted in the Arab League
-#' from 2011 to 2023. Commonwealth, G20 and OPEC are **not** dated -- their
-#' histories involve suspensions, readmissions and contested dates the sources
-#' give unevenly, and a fabricated date is worse than an absent one. Asking for
-#' `as_of` on those warns and falls back to the snapshot.
+#' from 2011 to 2023. The Commonwealth, OPEC, the African Union, ECOWAS,
+#' CARICOM and the Pacific Islands Forum are **not** dated: their histories
+#' involve suspensions, readmissions and dates the sources give unevenly, and
+#' a fabricated date is worse than an absent one ([country_groups_history]
+#' gives the reason for each). Asking for `as_of` on those warns and falls
+#' back to the snapshot.
 #'
 #' @seealso [in_group()], [country_groups_history], [country_timeline()]
 #' @export

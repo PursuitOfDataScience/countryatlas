@@ -805,7 +805,8 @@ lisa_map <- function(data, value, weights = NULL, n_perm = 9999, alpha = 0.05,
         values = c("High-High" = "#B2182B", "Low-Low" = "#2166AC",
                    "High-Low" = "#EF8A62", "Low-High" = "#67A9CF",
                    "Not significant" = "grey88"),
-        na.value = "grey96", drop = FALSE
+        na.value = "grey96", drop = FALSE,
+        labels = discrete_na_labels("No data")
       )
   )
   attr(p, "countryatlas_lisa") <- lisa
@@ -816,9 +817,9 @@ lisa_map <- function(data, value, weights = NULL, n_perm = 9999, alpha = 0.05,
     sig <- sprintf("Clusters significant at %s, unadjusted for %d tests.",
                    fmt_num(alpha), sum(!is.na(lisa$p_value)))
   }
-  cap <- gg_caption(p)
-  p <- p + ggplot2::labs(caption = paste(stats::na.omit(c(cap, sig)),
-                                         collapse = " "))
+  cap <- flat_caption(gg_caption(p))
+  p <- p + ggplot2::labs(caption = wrap_caption(
+    paste(stats::na.omit(c(cap, sig)), collapse = " ")))
   # Shown means "has a cluster", not "has a value": a country the weights
   # cannot connect keeps its value and is drawn as no-data.
   p <- restate_provenance(p, data, val_name,

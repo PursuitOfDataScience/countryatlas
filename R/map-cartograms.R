@@ -716,9 +716,10 @@ gridded_cartogram <- function(data, value, cells = 1000, fill = NULL,
 #' if (requireNamespace("sf", quietly = TRUE) &&
 #'     requireNamespace("cartogram", quietly = TRUE) &&
 #'     requireNamespace("rnaturalearth", quietly = TRUE)) {
-#'   sfd <- attach_geometry(countryatlas::world_snapshot$countries,
-#'                          geometry = "sf")
-#'   cg <- cartogram_map(sfd, population)
+#'   # One continent keeps the example quick; the world takes 20 seconds.
+#'   africa <- subset(countryatlas::world_snapshot$countries,
+#'                    continent == "Africa")
+#'   cg <- cartogram_map(attach_geometry(africa, geometry = "sf"), population)
 #'   cartogram_diagnostics(cg)
 #' }
 #' }

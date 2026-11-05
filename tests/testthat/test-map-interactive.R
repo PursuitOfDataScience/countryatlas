@@ -85,11 +85,11 @@ test_that("the tmap engine names an older tmap instead of failing opaquely", {
 })
 
 test_that("the ggsql engine states the version it needs", {
-  # `DRAW spatial` landed in ggsql 0.4.1; CRAN currently ships 0.3.3, which
-  # would accept the call and then reject the clause inside its own SQL front
-  # end. The gate must name the version, not just the package.
+  # The queries are written in ggsql 0.5's grammar; an older ggsql would
+  # accept the call and then reject the clauses inside its own SQL front end.
+  # The gate must name the version, not just the package.
   skip_if(requireNamespace("ggsql", quietly = TRUE) &&
-            utils::packageVersion("ggsql") >= "0.4.1")
+            utils::packageVersion("ggsql") >= "0.5.0")
   skip_if_no_sf_geometry()
   # Must be an *sf* frame: the sf check now runs ahead of the package gates, so a
   # country-level frame is (correctly) rejected for its shape before ggsql is
@@ -98,7 +98,7 @@ test_that("the ggsql engine states the version it needs", {
   err <- tryCatch(interactive_map(sfd, gdp_per_capita, engine = "ggsql"),
                   condition = function(e) conditionMessage(e))
   expect_match(err, "ggsql", fixed = TRUE)
-  expect_match(err, "0.4.1", fixed = TRUE)
+  expect_match(err, "0.5.0", fixed = TRUE)
 })
 
 # `tooltip =` was documented but silently ignored by every engine before 2.0.0.

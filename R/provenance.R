@@ -263,9 +263,12 @@ restate_provenance <- function(p, data, value_name, shown = NULL) {
   if (identical(prov$footnote, "auto") && !is.null(prov$caption)) {
     cap <- map_caption("auto", prov$coverage, prov$caption_notes, prov$sources,
                        lead = prov$caption_lead)
-    cur <- gg_caption(p)
-    if (!is.null(cap) && !is.null(cur) && grepl(prov$caption, cur, fixed = TRUE)) {
-      p <- p + ggplot2::labs(caption = sub(prov$caption, cap, cur, fixed = TRUE))
+    # Compared flat: the plot's caption is wrapped (wrap_caption()), the
+    # recorded one is not.
+    cur <- flat_caption(gg_caption(p))
+    old <- flat_caption(prov$caption)
+    if (!is.null(cap) && !is.null(cur) && grepl(old, cur, fixed = TRUE)) {
+      p <- p + ggplot2::labs(caption = wrap_caption(sub(old, cap, cur, fixed = TRUE)))
       prov$caption <- cap
     }
   }
@@ -320,10 +323,10 @@ wdj_provenance <- function(p, data, fill, backend, projection = NA_character_,
   ), extra)
   p <- with_alt_text(p)
   if (!is.null(footnote) && !isFALSE(footnote)) {
-    own <- gg_caption(p)
+    own <- flat_caption(gg_caption(p))
     lead <- if (length(own) && !is.na(own[1]) && nzchar(own[1])) own[1]
     cap <- map_caption(footnote, prov$coverage, notes, prov$sources, lead = lead)
-    if (!is.null(cap)) p <- p + ggplot2::labs(caption = cap)
+    if (!is.null(cap)) p <- p + ggplot2::labs(caption = wrap_caption(cap))
     prov$footnote <- if (identical(footnote, "auto") || isTRUE(footnote)) "auto" else "custom"
     prov$caption_notes <- notes
     prov$caption_lead <- lead

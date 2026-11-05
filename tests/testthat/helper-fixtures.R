@@ -18,11 +18,14 @@ renders <- function(p) {
   invisible(p)
 }
 
-# A plot's caption, whichever ggplot2 is installed.
+# A plot's caption, whichever ggplot2 is installed, with the line breaks
+# wrap_caption() inserts read as spaces, so a phrase can be matched wherever
+# the wrap fell.
 gg_caption_of <- function(p) {
-  if ("get_labs" %in% getNamespaceExports("ggplot2")) {
+  cap <- if ("get_labs" %in% getNamespaceExports("ggplot2")) {
     ggplot2::get_labs(p)$caption
   } else {
     p$labels$caption
   }
+  if (is.character(cap)) gsub("[ \t]*\n[ \t]*", " ", cap) else cap
 }

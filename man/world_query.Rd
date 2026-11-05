@@ -15,7 +15,8 @@ world_query(
   layer = c("choropleth", "bubble", "binned"),
   facet = NULL,
   size = NULL,
-  n_bins = NULL
+  n_bins = NULL,
+  geometry = "geometry"
 )
 }
 \arguments{
@@ -25,11 +26,12 @@ world_query(
 \code{"countryatlas_world"}).}
 
 \item{projection}{A projection: one of the package's own names (see
-\code{\link[=projection_info]{projection_info()}}), translated to ggsql's where the two differ
-(\code{"plate_carree"} becomes \code{equirectangular}, \code{"natural_earth"} becomes
-\code{natural}, \code{"azimuthal_equal_area"} becomes \code{lambert}), or any other name
-ggsql's \verb{PROJECT TO} understands, passed through. \code{NULL} omits the
-clause.}
+\code{\link[=projection_info]{projection_info()}}), all thirteen translated to ggsql's (\code{"plate_carree"}
+becomes \code{equirectangular}, \code{"natural_earth"} becomes \code{natural},
+\code{"azimuthal_equal_area"} becomes \code{lambert}, the polar views become
+\code{lambert} centred on a pole, and \code{"gall_peters"} a cylindrical equal-area
+CRS), or any other name ggsql's \verb{PROJECT TO} understands, passed through.
+\code{NULL} omits the clause.}
 
 \item{palette}{A scale ggsql's \verb{SCALE ... TO} understands (default
 \code{"viridis"}), or \code{NULL} to omit.}
@@ -39,46 +41,52 @@ clause.}
 
 \item{title}{Optional plot title (\verb{LABEL title => ...}).}
 
-\item{draw}{The spatial layer (default \code{"spatial"}).}
+\item{draw}{The layer that draws the countries (default \code{"spatial"}).}
 
-\item{layer}{\code{"choropleth"} (default), \code{"bubble"} (proportional symbols --
-needs \code{size}) or \code{"binned"} (classed fill -- see \code{n_bins}).}
+\item{layer}{\code{"choropleth"} (default), \code{"bubble"} (proportional symbols at
+each country's centroid over the countries, which needs \code{size}) or
+\code{"binned"} (a classed fill, see \code{n_bins}).}
 
 \item{facet}{Optional column to facet the query by, e.g. \code{"year"} for a
 small-multiple panel rendered in the database.}
 
 \item{size}{Column driving symbol size for \code{layer = "bubble"}.}
 
-\item{n_bins}{Number of classes for \code{layer = "binned"} (default \code{5}).}
+\item{n_bins}{Number of classes for \code{layer = "binned"} (default \code{5}); ggsql
+places the breaks, as close to this many as round numbers allow.}
+
+\item{geometry}{The source's geometry column (default \code{"geometry"}, the
+name \code{\link[=as_ggsql_source]{as_ggsql_source()}} writes).}
 }
 \value{
 A \code{ggsql_query} string (prints as the formatted query).
 }
 \description{
 Build a \href{https://ggsql.org}{ggsql} query string that draws a choropleth from
-a registered countryatlas source -- the same idea as \code{\link[=world_map]{world_map()}}, but the
-map is rendered \strong{in the database} (DuckDB) and returned as a web-ready
-Vega-Lite widget, so the geometry never has to come back into R. Pure string
-builder with no dependencies; pair it with \code{\link[=as_ggsql_source]{as_ggsql_source()}} +
-\code{ggsql::ggsql_execute()}, or drop the string into a \code{{ggsql}} chunk.
+a registered countryatlas source: the same idea as \code{\link[=world_map]{world_map()}}, but the
+map is rendered \strong{in the database} (DuckDB) by ggsql, which returns a plot
+specification it can draw as SVG or as an interactive widget, so the
+geometry never has to come back into R. Pure string builder with no
+dependencies; pair it with \code{\link[=as_ggsql_source]{as_ggsql_source()}} and \code{ggsql::ggsql_execute()},
+or drop the string into a \code{{ggsql}} chunk.
 }
 \section{Executing the query}{
 
-Building the string needs nothing installed. \emph{Running} it needs
-\code{ggsql} >= 0.4.1, the version that added the \verb{DRAW spatial} clause and map
-projections; older \code{ggsql} releases parse the query and reject that clause.
-Projections arrived in the engine at different versions -- \code{equal_earth},
-the default here, only in 0.5.0 -- so the query records the version it
-needs as its \code{"countryatlas_ggsql_version"} attribute, and
-\code{\link[=interactive_map]{interactive_map()}}\code{(engine = "ggsql")} refuses an installed \code{ggsql} older
-than that, naming the projection. As of October 2026 the ggsql \emph{engine} is
-at 0.5.2 while the ggsql R package on CRAN is still 0.3.3, so execution
-waits for the bindings to catch up. \verb{PROJECT TO} additionally needs a
-spatial backend -- for DuckDB, its \code{spatial} extension.
+Building the string needs nothing installed. \emph{Running} it needs \code{ggsql} >=
+0.5.0; the grammar was checked against 0.5.2, the first release on CRAN with
+the \verb{DRAW spatial} layer (2026-10-08). The query records that version as
+its \code{"countryatlas_ggsql_version"} attribute, and
+\code{\link[=interactive_map]{interactive_map()}}\code{(engine = "ggsql")} refuses an older \code{ggsql}. The
+spatial layer also needs DuckDB's \code{spatial} extension, which
+\code{\link[=as_ggsql_source]{as_ggsql_source()}}\code{(format = "reader")} loads; ggsql's DuckDB downloads it
+once per session, into the session's temporary directory. For
+\code{layer = "bubble"} the source needs \code{centroid_lon} and \code{centroid_lat}
+columns, which \code{\link[=as_ggsql_source]{as_ggsql_source()}} adds for a frame keyed on \code{iso3c}.
 }
 
 \examples{
 world_query(gdp_per_capita, projection = "equal_earth",
             palette = "magma", transform = "log10",
             title = "GDP per capita")
+world_query(gdp_per_capita, layer = "bubble", size = "population")
 }

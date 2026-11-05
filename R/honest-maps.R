@@ -65,11 +65,11 @@ coverage_map <- function(data, value, by = NULL, title = NULL, ...) {
       ) +
       ggplot2::labs(
         title = title %||% paste0("Coverage of ", value_name),
-        caption = paste(stats::na.omit(c(
+        caption = wrap_caption(paste(stats::na.omit(c(
           sprintf("%d of %d %s report a value; %d missing.",
                   cov$n_shown, cov$n_total, countries_noun(cov$n_total),
                   cov$n_missing),
-          source_caption(fill_source_info(data, value_name)))), collapse = " ")
+          source_caption(fill_source_info(data, value_name)))), collapse = " "))
       )
   )
   if (!rlang::quo_is_null(by_q)) {
@@ -400,6 +400,25 @@ value_by_alpha_map <- function(data, value, equalize,
     ), class = "countryatlas_no_equalize")
   }
   data[[".wdj_alpha"]] <- a
+  # The opacity legend says what the opacity encodes: the equalising
+  # variable's own value at each step. It labelled the normalised position
+  # instead, so a map of population had a legend reading "population: 0.00,
+  # 0.25, 0.50", a population of a quarter.
+  alpha_breaks <- c(0, 0.25, 0.5, 0.75, 1)
+  per_unit <- eq[!duplicated(unit_ids(data)) & is.finite(eq)]
+  alpha_labels <- if (length(unique(per_unit)) >= 2L) {
+    si_label(switch(
+      transform,
+      rank = stats::quantile(per_unit, alpha_breaks, names = FALSE),
+      log10 = {
+        lv <- range(log10(pmax(per_unit, 0) + 1))
+        10^(lv[1] + alpha_breaks * diff(lv)) - 1
+      },
+      identity = min(per_unit) + alpha_breaks * diff(range(per_unit))
+    ))
+  } else {
+    ggplot2::waiver()
+  }
 
   pf <- prepare_fill(data, value_name, style, n_bins, breaks, midpoint,
                      small_states, small_area_km2)
@@ -466,7 +485,8 @@ value_by_alpha_map <- function(data, value, equalize,
     # happens to have. Without it a degenerate frame rescaled to the midpoint,
     # and two maps of different subsets were not comparable.
     ggplot2::scale_alpha_continuous(name = eq_name, range = alpha_range,
-                                    limits = c(0, 1),
+                                    limits = c(0, 1), breaks = alpha_breaks,
+                                    labels = alpha_labels,
                                     guide = ggplot2::guide_legend(order = 2)) +
     theme_world_map() +
     # The dark ground the faded countries sink into, as the panel itself. An

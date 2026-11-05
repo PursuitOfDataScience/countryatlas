@@ -24,9 +24,11 @@ it already attached.}
 \item{engine}{\code{"plotly"} (default), \code{"ggiraph"}, \code{"leaflet"}, \code{"mapgl"} or
 \code{"ggsql"}. \code{"mapgl"} renders through MapLibre GL -- vector tiles, smooth
 zoom and a genuine interactive globe, which is what turns \code{\link[=globe_map]{globe_map()}}
-from a static novelty into something you can turn. It needs an \code{sf} frame
-(database-side rendering to a Vega-Lite widget; needs an \code{sf} frame and
-\code{ggsql} >= 0.4.1, the version that added the \verb{DRAW spatial} clause).
+from a static novelty into something you can turn. It needs an \code{sf}
+frame. \code{"ggsql"} renders in the database, through \code{\link[=world_query]{world_query()}} and
+\code{\link[=as_ggsql_source]{as_ggsql_source()}}, and returns ggsql's own widget; it needs an \code{sf}
+frame, \code{ggsql} >= 0.5.0, and on its first use in a session a network
+connection, to download DuckDB's \code{spatial} extension.
 \code{tooltip} is honoured by the \code{"ggiraph"} and \code{"leaflet"} engines (defaults
 to \code{fill} when omitted); \code{"plotly"}'s hover is controlled by \code{world_map()}
 aesthetics instead, and \code{"ggsql"} has no hover concept.}

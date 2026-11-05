@@ -12,17 +12,31 @@ knitr::opts_chunk$set(
   collapse = TRUE, comment = "#>", message = FALSE, warning = FALSE
 )
 library(countryatlas)
+# Rendering in the database needs ggsql >= 0.5.0, sf, and a network connection
+# the first time in a session, for DuckDB's spatial extension. So the chunks
+# that render run when the website is built, and are shown as code elsewhere,
+# including on CRAN.
+render <- identical(Sys.getenv("IN_PKGDOWN"), "true") &&
+  requireNamespace("ggsql", quietly = TRUE) &&
+  utils::packageVersion("ggsql") >= "0.5.0" &&
+  requireNamespace("sf", quietly = TRUE) &&
+  requireNamespace("rnaturalearth", quietly = TRUE)
+# And only when DuckDB's spatial extension can actually be fetched.
+if (render) {
+  render <- tryCatch({
+    as_ggsql_source(attach_geometry(world_snapshot$countries[1, ],
+                                    geometry = "sf"))
+    TRUE
+  }, warning = function(w) FALSE)
+}
 ```
 
 [ggsql](https://ggsql.org) is a grammar of graphics for SQL: you describe a plot
-*inside a SQL query* and it renders in the database (DuckDB), returning a
-web-ready Vega-Lite widget, with no ggplot2 or `sf` runtime required. The spatial
-layer this vignette targets (`DRAW spatial`, which reads WKB geometry) arrived in
-the ggsql *engine* at 0.4.0, and `countryatlas` requires the ggsql **R package**
-at >= 0.4.1, the first release that exposes it -- which is the version
-[interactive_map()] checks for. At the time of writing the R package is still at
-0.3.3, so the bridge below is forward-looking: `world_query()` builds the query
-today, and the chunks that would execute one are shown but not evaluated.
+*inside a SQL query* and it renders in the database (DuckDB), returning a plot
+that draws as SVG or as an interactive widget, with no ggplot2 runtime required.
+Its spatial layer, `DRAW spatial`, reached CRAN with ggsql 0.5.2 on
+2026-10-08, and countryatlas needs ggsql >= 0.5.0, the version
+[interactive_map()] checks for.
 
 countryatlas and ggsql fit together cleanly:
 
@@ -30,7 +44,7 @@ countryatlas and ggsql fit together cleanly:
   messy country names to the ISO spine, repair the entities map backends get
   wrong (`country_overrides()`), and join World Bank indicators onto geometry.
 * **ggsql** does the part countryatlas doesn't: push the rendering down into the
-  database and emit Vega-Lite, so the geometry never has to come back into R.
+  database, so the geometry never has to come back into R.
 
 So countryatlas becomes the *data layer* and ggsql the *renderer*.
 
@@ -49,47 +63,65 @@ world_query(
 )
 ```
 
+Every projection the package knows has a translation, and the other layers are
+a word away:
+
+```{r}
+world_query(gdp_per_capita, projection = "north_polar", layer = "binned")
+world_query(gdp_per_capita, layer = "bubble", size = "population")
+```
+
 ## Render in the database
 
-`as_ggsql_source()` exports a curated countryatlas table (with `sf` geometry
-WKB-encoded) to a DuckDB connection, a Parquet file, or a nanoarrow stream that
-ggsql can read. The one-call path is `interactive_map(engine = "ggsql")`:
+`as_ggsql_source()` hands a curated countryatlas table to ggsql: by default as
+a ggsql reader with the table registered, `sf` geometry encoded as WKB in
+longitude and latitude, and DuckDB's `spatial` extension loaded. ggsql's DuckDB
+downloads that extension once per session, into the session's temporary
+directory. The one-call path is `interactive_map(engine = "ggsql")`:
 
-```{r eval = FALSE}
-# needs: ggsql, duckdb, DBI, sf
-world_data(2020, geometry = "sf") |>
-  interactive_map(gdp_per_capita, engine = "ggsql", transform = "log10")
+```{r, eval = render}
+d <- attach_geometry(world_snapshot$countries, geometry = "sf")
+interactive_map(d, gdp_per_capita, engine = "ggsql", transform = "log10")
 ```
 
 Under the hood that is just the two building blocks, which you can also drive
-yourself for full control over the query:
+yourself for full control over the query and the output:
 
-```{r eval = FALSE}
-src <- world_data(2020, geometry = "sf") |>
-  as_ggsql_source(format = "duckdb")          # a DuckDB connection
-
-q <- world_query(gdp_per_capita, projection = "orthographic", palette = "viridis")
-
-ggsql::ggsql_execute(src, q)                  # -> Vega-Lite widget
+```{r, eval = render}
+reader <- as_ggsql_source(d)
+spec <- ggsql::ggsql_execute(
+  reader,
+  world_query(gdp_per_capita, projection = "orthographic", palette = "viridis")
+)
+ggsql::ggsql_widget(spec)
 ```
+
+`ggsql::ggsql_render(ggsql::svg_writer(), spec)` returns the same map as SVG
+markup, and `ggsql::ggsql_save(spec, "map.png")` writes it to a file.
 
 ## In a Quarto / R Markdown document
 
-Loading `ggsql` registers a chunk engine. Export the source once, then chart it
-in a ` ```{ggsql} ` block, referencing the registered table by name:
+Loading `ggsql` registers a chunk engine, and a ` ```{ggsql} ` block reads R
+data as `r:<object>`. `as_ggsql_source(format = "frame")` returns the prepared
+frame for that; load DuckDB's `spatial` extension once, then chart it:
 
 ````{verbatim}
 ```{r}
 library(countryatlas)
 library(ggsql)
 
-src <- world_data(2020, geometry = "sf") |>
-  as_ggsql_source(format = "duckdb")          # registers countryatlas_world
+world <- world_data(2020, geometry = "sf") |>
+  as_ggsql_source(format = "frame")
 ```
 
-```{ggsql connection=src}
-VISUALISE gdp_per_capita AS fill
-FROM countryatlas_world
+```{ggsql}
+SET extension_directory = 'duckdb-extensions';
+INSTALL spatial;
+LOAD spatial;
+```
+
+```{ggsql}
+VISUALISE gdp_per_capita AS fill, geometry FROM r:world
 DRAW spatial
 PROJECT TO equal_earth
 SCALE fill TO magma VIA log10

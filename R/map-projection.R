@@ -107,9 +107,9 @@ project_lonlat <- function(lon, lat, projection = "equal_earth",
 # 4. sf does not load: the built-in spherical Equal Earth, applied to the
 #    vertices, under coord_fixed(). Any other projection falls back to it with
 #    a classed warning: equal-area beats unprojected as the fallback.
-# Set while interactive_map(engine = "plotly") builds its map: plotly ignores
+# .wdj_state$project_vertices (the environment is defined in cache.R) is set
+# while interactive_map(engine = "plotly") builds its map: plotly ignores
 # coord_sf() on ordinary layers, so the vertices are projected instead.
-.wdj_state <- new.env(parent = emptyenv())
 
 wdj_polygon_coord <- function(projection = "equal_earth", recenter = NULL,
                               vertices = isTRUE(.wdj_state$project_vertices),

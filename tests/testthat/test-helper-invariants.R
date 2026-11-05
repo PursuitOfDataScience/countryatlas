@@ -147,9 +147,9 @@ test_that("`n_bins` changes the output of every verb that takes it", {
 
   # world_query emits it as text.
   expect_match(world_query(value, layer = "binned", n_bins = 3),
-               "BIN fill INTO 3")
+               "SETTING breaks => 3", fixed = TRUE)
   expect_match(world_query(value, layer = "binned", n_bins = 7),
-               "BIN fill INTO 7")
+               "SETTING breaks => 7", fixed = TRUE)
 })
 
 test_that("every column-adding verb honours wdj_return_frame's contract", {

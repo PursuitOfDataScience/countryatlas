@@ -59,8 +59,7 @@ world_map(mapdf, gdp_per_capita) +
 # ... or zoom in, where there is room for every label.
 europe <- attach_geometry(
   dplyr::filter(snap, continent == "Europe"), geometry = "polygon")
-world_map(europe, gdp_per_capita) +
-  geom_country_labels(size = 2.5) +
-  coord_quickmap(xlim = c(-25, 45), ylim = c(34, 72))
+p <- world_map(europe, gdp_per_capita) + geom_country_labels(size = 2.5)
+zoom_map(p, xlim = c(-25, 45), ylim = c(34, 72))
 }
 }

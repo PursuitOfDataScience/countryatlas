@@ -9,15 +9,26 @@
 # the groups whose accession, departure and suspension dates are documented,
 # unambiguous and stable, and every date below carries its source. The rule
 # stands: a fabricated date is worse than an absent one, so a group is dated
-# only where every date is sourced. Not dated, and why:
-#   * Commonwealth, OPEC, the African Union, ECOWAS, CARICOM and the Pacific
-#     Islands Forum: long histories of suspensions, lapses and readmissions
-#     whose dates the sources give unevenly (often to the year, or not at all
-#     for the end of a suspension). country_groups(as_of =) falls back to the
-#     snapshot for those, with a warning, rather than pretending.
-#   * G20: its members are countries plus the EU and the AU, which are not; the
-#     table holds countries only, and the 1999 founding has no single
-#     accession date.
+# only where every date is sourced. Not dated, and why (each was checked again
+# for 4.0.0; country_groups(as_of =) falls back to the snapshot for them, with a
+# warning, rather than pretending):
+#   * Commonwealth: the Secretariat's own record of its suspensions
+#     (https://thecommonwealth.org/sites/default/files/inline/SuspensionHistory.pdf)
+#     gives months only, and the other sources differ from it and from each
+#     other by days (Nigeria's suspension: 11 or 12 November 1995).
+#   * OPEC: its member list (https://www.opec.org/opec_web/en/about_us/25.htm)
+#     dates accessions to the year.
+#   * African Union: its own table of joining dates
+#     (https://sportscouncil.au.int/en/member-states) contradicts itself,
+#     Angola and South Sudan "joining" before they were independent, and the
+#     dates of its suspensions after coups are given unevenly.
+#   * ECOWAS: the same for its suspensions after coups.
+#   * CARICOM: Haiti's suspension of 2004 ends in June or in July 2006,
+#     depending on the source.
+#   * Pacific Islands Forum: accessions are dated to the year of the Forum
+#     meeting.
+# The G20 is dated, for its nineteen member countries only: the EU and the
+# African Union are members too, but the table holds countries.
 #
 # A row is a spell: `from` is the date it took effect; `to` is the first date
 # on which it no longer held (it runs up to the day before), or NA for one
@@ -64,7 +75,10 @@ eurozone <- bind_rows(
   m("EuroZone", "EST", "2011-01-01"),
   m("EuroZone", "LVA", "2014-01-01"),
   m("EuroZone", "LTU", "2015-01-01"),
-  m("EuroZone", "HRV", "2023-01-01")
+  m("EuroZone", "HRV", "2023-01-01"),
+  # Source: https://www.ecb.europa.eu/press/pr/date/2026/html/ecb.pr260101~c830245e42.en.html
+  # (Bulgaria introduces the euro, 1 January 2026).
+  m("EuroZone", "BGR", "2026-01-01")
 )
 
 nato <- bind_rows(
@@ -108,7 +122,11 @@ asean <- bind_rows(
   m("ASEAN", "BRN", "1984-01-07"),
   m("ASEAN", "VNM", "1995-07-28"),
   m("ASEAN", c("LAO", "MMR"), "1997-07-23"),
-  m("ASEAN", "KHM", "1999-04-30")
+  m("ASEAN", "KHM", "1999-04-30"),
+  # Source: https://asean.org/forging-a-new-era-timor-leste-admitted-into-asean/
+  # (the Declaration on the Admission of Timor-Leste was signed at the opening
+  # of the 47th ASEAN Summit, 26 October 2025).
+  m("ASEAN", "TLS", "2025-10-26")
 )
 
 # EFTA is the instructive one: most of its founders left, for the EU.
@@ -155,6 +173,19 @@ g7 <- bind_rows(
   m("G7", c("FRA", "DEU", "ITA", "JPN", "GBR", "USA"), "1975-11-15"),
   m("G7", "CAN", "1976-06-27")
 )
+
+# G20: the nineteen member countries, unchanged since the finance ministers and
+# central bank governors first met, in Berlin on 15-16 December 1999. The
+# group's creation was announced by the G7 finance ministers that September
+# (the sources disagree on the 25th or the 26th), so the inaugural meeting is
+# the date every source agrees on. The European Union (a member from the start)
+# and the African Union (from 9 September 2023) are not countries and are not
+# listed.
+# Sources: https://www.g20.utoronto.ca/g20whatisit.html ;
+# https://g7g20-documents.org/database/document/1999-g20-germany-finance-track-ministers-language-communique-meeting-of-g20-finance-ministers-and-central-bank-governours
+g20 <- m("G20", c("ARG", "AUS", "BRA", "CAN", "CHN", "FRA", "DEU", "IND",
+                  "IDN", "ITA", "JPN", "KOR", "MEX", "RUS", "SAU", "ZAF",
+                  "TUR", "GBR", "USA"), "1999-12-15")
 
 # Shanghai Cooperation Organisation.
 # Source: https://en.wikipedia.org/wiki/Shanghai_Cooperation_Organisation
@@ -281,7 +312,7 @@ arab <- bind_rows(
 
 country_groups_history <- bind_rows(
   eu, eurozone, nato, oecd, asean, efta, gcc, mercosur, nordic, visegrad,
-  brics, g7, sco, cptpp, rcep, eac, sadc, apec, arab
+  brics, g7, g20, sco, cptpp, rcep, eac, sadc, apec, arab
 ) |>
   arrange(group, from, iso3c) |>
   mutate(country = countrycode::countrycode(iso3c, "iso3c", "country.name",

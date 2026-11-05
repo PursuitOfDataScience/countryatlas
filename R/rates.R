@@ -1024,10 +1024,10 @@ rate_funnel <- function(data, numerator, denominator, target = NULL,
                                    values = stats::setNames(c("dashed", "solid"),
                                                             c(inner, outer))) +
     ggplot2::labs(y = paste0(num_name, " per ", den_name),
-                  caption = sprintf("Target %s; %d of %d countries outside the %s limits%s.",
-                                    format(signif(target, 3)), sum(hi_out | lo_out),
-                                    nrow(tab), outer,
-                                    if (tau2 > 0) ", adjusted for overdispersion" else "")) +
+                  caption = wrap_caption(sprintf(
+                    "Target %s; %d of %d countries outside the %s limits%s.",
+                    format(signif(target, 3)), sum(hi_out | lo_out), nrow(tab),
+                    outer, if (tau2 > 0) ", adjusted for overdispersion" else ""))) +
     ggplot2::theme_minimal()
   if (isTRUE(label_outliers) && any(pts$out)) {
     p <- p + ggplot2::geom_text(data = pts[pts$out, , drop = FALSE],

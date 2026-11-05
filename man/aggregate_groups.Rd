@@ -53,8 +53,8 @@ be in \code{data}: a member with no row is counted as missing. That is the
 difference from \code{\link[=aggregate_regions]{aggregate_regions()}}, which can only count what it is
 given. For \code{fun = "weighted_mean"} the weighted share is computed over the
 members present, since an absent member's weight is unknown. A group with no
-dated history (Commonwealth, G20, OPEC) warns and uses the current
-membership for every year.
+dated history (the Commonwealth, OPEC, AU, ECOWAS, CARICOM and PIF) warns
+and uses the current membership for every year.
 }
 
 \examples{

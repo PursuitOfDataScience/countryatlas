@@ -15,9 +15,11 @@
 #' @param engine `"plotly"` (default), `"ggiraph"`, `"leaflet"`, `"mapgl"` or
 #'   `"ggsql"`. `"mapgl"` renders through MapLibre GL -- vector tiles, smooth
 #'   zoom and a genuine interactive globe, which is what turns [globe_map()]
-#'   from a static novelty into something you can turn. It needs an `sf` frame
-#'   (database-side rendering to a Vega-Lite widget; needs an `sf` frame and
-#'   `ggsql` >= 0.4.1, the version that added the `DRAW spatial` clause).
+#'   from a static novelty into something you can turn. It needs an `sf`
+#'   frame. `"ggsql"` renders in the database, through [world_query()] and
+#'   [as_ggsql_source()], and returns ggsql's own widget; it needs an `sf`
+#'   frame, `ggsql` >= 0.5.0, and on its first use in a session a network
+#'   connection, to download DuckDB's `spatial` extension.
 #'   `tooltip` is honoured by the `"ggiraph"` and `"leaflet"` engines (defaults
 #'   to `fill` when omitted); `"plotly"`'s hover is controlled by `world_map()`
 #'   aesthetics instead, and `"ggsql"` has no hover concept.
@@ -60,11 +62,12 @@ interactive_map <- function(data, fill, tooltip = NULL,
       "i" = 'Build one with {.code world_data(..., geometry = "sf")} or {.fn attach_geometry}.'
     ))
   }
-  # `DRAW spatial` -- the clause world_query() emits -- arrived in ggsql 0.4.1.
-  # Older ggsql accepts the call and then fails inside its own SQL front end on
-  # a clause it does not know, so gate on the version, not mere presence.
+  # world_query() emits the grammar of ggsql 0.5 (GGSQL_VERSION), the first
+  # release on CRAN with the DRAW spatial layer. An older ggsql accepts the
+  # call and then fails inside its own SQL front end on a clause it does not
+  # know, so gate on the version, not mere presence.
   need_pkg(engine, sprintf("for interactive_map(engine = \"%s\")", engine),
-           version = if (identical(engine, "ggsql")) "0.4.1" else NULL)
+           version = if (identical(engine, "ggsql")) GGSQL_VERSION else NULL)
 
   # The three engines below that build their own colour scale meet an
   # infinity without world_map()'s handling: leaflet's colorNumeric() died on
@@ -80,18 +83,13 @@ interactive_map <- function(data, fill, tooltip = NULL,
   }
 
   if (engine == "ggsql") {
-    need_pkg(c("sf", "DBI", "duckdb"),
-             "for interactive_map(engine = \"ggsql\")")
+    need_pkg("sf", "for interactive_map(engine = \"ggsql\")")
     q <- world_query(!!fill_q, source = "countryatlas_world", ...)
-    # The binding gate above is for DRAW spatial; the projection may need a
-    # later engine (Equal Earth arrived in 0.5.0). Checked before anything is
-    # registered, so an old ggsql refuses by name instead of failing inside its
-    # own SQL front end on a projection it does not know.
-    need_pkg("ggsql", 'for the projection in interactive_map(engine = "ggsql")',
-             version = attr(q, "countryatlas_ggsql_version"))
-    reader <- ggsql::duckdb_reader()
-    ggsql::ggsql_register(reader, ggsql_wkb_frame(data), "countryatlas_world")
-    return(ggsql::ggsql_execute(reader, unclass(q)))
+    reader <- as_ggsql_source(data, name = "countryatlas_world",
+                              format = "reader")
+    # ggsql_execute() returns a plot specification; the widget is what the
+    # other engines return, and what @return promises.
+    return(ggsql::ggsql_widget(ggsql::ggsql_execute(reader, unclass(q))))
   }
 
   if (engine == "mapgl") {

@@ -21,7 +21,7 @@ suppressPackageStartupMessages({
 pkgload::load_all(".", quiet = TRUE)
 
 dir.create("data", showWarnings = FALSE)
-MEMBERSHIP_AS_OF <- "2026-06-01"  # documented point-in-time for memberships
+MEMBERSHIP_AS_OF <- "2026-11-01"  # documented point-in-time for memberships
 
 # The snapshot year (decision Q10 of the 4.0.0 plan): move to the newer year
 # only if every curated indicator's coverage there is within 5 percentage
@@ -67,8 +67,9 @@ groups <- list(
          "Estonia","Finland","France","Germany","Greece","Hungary","Ireland",
          "Italy","Latvia","Lithuania","Luxembourg","Malta","Netherlands",
          "Poland","Portugal","Romania","Slovakia","Slovenia","Spain","Sweden"),
-  EuroZone = c("Austria","Belgium","Croatia","Cyprus","Estonia","Finland",
-               "France","Germany","Greece","Ireland","Italy","Latvia",
+  # Bulgaria adopted the euro on 1 January 2026.
+  EuroZone = c("Austria","Belgium","Bulgaria","Croatia","Cyprus","Estonia",
+               "Finland","France","Germany","Greece","Ireland","Italy","Latvia",
                "Lithuania","Luxembourg","Malta","Netherlands","Portugal",
                "Slovakia","Slovenia","Spain"),
   G7 = c("United States","Canada","United Kingdom","France","Germany","Italy",
@@ -81,13 +82,15 @@ groups <- list(
   # never confirmed accession, so it is deliberately not listed here.
   BRICS = c("Brazil","Russia","India","China","South Africa",
             "Egypt","Ethiopia","Iran","United Arab Emirates","Indonesia"),
+  # Timor-Leste was admitted on 26 October 2025, the eleventh member.
   ASEAN = c("Brunei","Cambodia","Indonesia","Laos","Malaysia","Myanmar",
-            "Philippines","Singapore","Thailand","Vietnam"),
+            "Philippines","Singapore","Thailand","Timor-Leste","Vietnam"),
   EFTA = c("Iceland","Liechtenstein","Norway","Switzerland"),
-  # Angola left with effect from 1 January 2024.
+  # Angola left with effect from 1 January 2024, and the United Arab Emirates
+  # from 1 May 2026.
   OPEC = c("Algeria","Congo - Brazzaville","Equatorial Guinea","Gabon",
            "Iran","Iraq","Kuwait","Libya","Nigeria","Saudi Arabia",
-           "United Arab Emirates","Venezuela"),
+           "Venezuela"),
   NATO = c("Albania","Belgium","Bulgaria","Canada","Croatia","Czechia",
            "Denmark","Estonia","Finland","France","Germany","Greece","Hungary",
            "Iceland","Italy","Latvia","Lithuania","Luxembourg","Montenegro",
@@ -138,7 +141,44 @@ groups <- list(
                  "Jordan","Kuwait","Lebanon","Libya","Mauritania","Morocco",
                  "Oman","Palestinian Territories","Qatar","Saudi Arabia",
                  "Somalia","Sudan","Syria","Tunisia","United Arab Emirates",
-                 "Yemen")
+                 "Yemen"),
+  # The 4.0.0 groups held as a current snapshot only; country_groups_history.R
+  # says why each is not dated. Suspended members are members.
+  # African Union: every African UN member state (Morocco rejoined on
+  # 31 January 2017). The Sahrawi Arab Democratic Republic, a member since
+  # 1982, has no ISO 3166-1 code of its own (ESH names the territory of
+  # Western Sahara), so it is not listed.
+  # Source: https://au.int/en/member_states/countryprofiles2
+  AU = c("Algeria","Angola","Benin","Botswana","Burkina Faso","Burundi",
+         "Cameroon","Cape Verde","Central African Republic","Chad","Comoros",
+         "Congo - Brazzaville","Congo - Kinshasa","Cote d'Ivoire","Djibouti",
+         "Egypt","Equatorial Guinea","Eritrea","Eswatini","Ethiopia","Gabon",
+         "Gambia","Ghana","Guinea","Guinea-Bissau","Kenya","Lesotho",
+         "Liberia","Libya","Madagascar","Malawi","Mali","Mauritania",
+         "Mauritius","Morocco","Mozambique","Namibia","Niger","Nigeria",
+         "Rwanda","Sao Tome and Principe","Senegal","Seychelles",
+         "Sierra Leone","Somalia","South Africa","South Sudan","Sudan",
+         "Tanzania","Togo","Tunisia","Uganda","Zambia","Zimbabwe"),
+  # ECOWAS after Burkina Faso, Mali and Niger left, with effect from
+  # 29 January 2025. Source: https://ecowas.int/member-states/
+  ECOWAS = c("Benin","Cape Verde","Cote d'Ivoire","Gambia","Ghana","Guinea",
+             "Guinea-Bissau","Liberia","Nigeria","Senegal","Sierra Leone",
+             "Togo"),
+  # The fifteen full members of the Caribbean Community, Montserrat (a
+  # British overseas territory) among them; associate members are not.
+  # Source: https://caricom.org/member-states-and-associate-members/
+  CARICOM = c("Antigua and Barbuda","Bahamas","Barbados","Belize","Dominica",
+              "Grenada","Guyana","Haiti","Jamaica","Montserrat",
+              "Saint Kitts and Nevis","Saint Lucia",
+              "Saint Vincent and the Grenadines","Suriname",
+              "Trinidad and Tobago"),
+  # Pacific Islands Forum: eighteen members, including the Cook Islands and
+  # Niue, and French Polynesia and New Caledonia, full members since 2016.
+  # Source: https://forumsec.org/who-we-arepacific-islands-forum
+  PIF = c("Australia","Cook Islands","Fiji","French Polynesia","Kiribati",
+          "Marshall Islands","Micronesia (Federated States of)","Nauru",
+          "New Caledonia","New Zealand","Niue","Palau","Papua New Guinea",
+          "Samoa","Solomon Islands","Tonga","Tuvalu","Vanuatu")
 )
 
 country_groups_tbl <- do.call(rbind, lapply(names(groups), function(g) {

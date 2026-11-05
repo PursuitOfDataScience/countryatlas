@@ -42,7 +42,8 @@ of unit warns (class \code{countryatlas_unit_mismatch}).
 }
 
 \examples{
-\donttest{
+\dontrun{
+# Needs the World Bank API: two releases of one series, fetched live.
 compare_vintages("SP.POP.TOTL", c("2019-07", "current"), year = 2015)
 }
 }

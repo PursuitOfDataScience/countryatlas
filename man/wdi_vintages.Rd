@@ -18,7 +18,8 @@ oldest first, so a figure can be pinned to the release it came from with
 The list is fetched once a day per session.
 }
 \examples{
-\donttest{
+\dontrun{
+# Needs the World Bank API.
 tail(wdi_vintages())
 }
 }

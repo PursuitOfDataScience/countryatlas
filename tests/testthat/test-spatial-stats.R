@@ -803,3 +803,15 @@ test_that("morans_i(scale) is deprecated but keeps its old meaning", {
   expect_equal(old$i, morans_i(snap, gdp_per_capita, n_perm = 0,
                                weights = country_weights("contiguity"))$i)
 })
+
+test_that("lisa_map lists all four cluster types, and calls missing 'No data'", {
+  skip_slow_on_cran()
+  skip_if_no_sf_geometry()
+  sfd <- attach_geometry(world_snapshot$countries, geometry = "sf")
+  set.seed(1)
+  p <- lisa_map(sfd, gdp_per_capita, n_perm = 999)
+  key <- ggplot2::get_guide_data(p, "fill")
+  expect_true(all(c("High-High", "Low-Low", "High-Low", "Low-High",
+                    "Not significant", "No data") %in% key$.label))
+  expect_true(isTRUE(p$layers[[1]]$show.legend))
+})

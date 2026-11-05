@@ -427,6 +427,26 @@ gg_caption <- function(p) {
   cap
 }
 
+# Captions are written as sentences, and ggplot2 never wraps text: a
+# right-aligned caption longer than the plot is cut off at its left edge. The
+# automatic ones run to 170 characters (coverage, the verb's notes, the
+# source, and lisa_map()'s multiple-testing method), so at the default 7-inch
+# width the start of the coverage statement was lost. Wrap at a width a
+# 7-inch figure holds (theme_world_map() aligns the caption to the whole plot),
+# keeping any line break a verb wrote itself; flat_caption() undoes it, for
+# comparing captions and for appending to one.
+wrap_caption <- function(x, width = 80L) {
+  if (is.null(x) || !length(x) || is.na(x[1]) || !nzchar(x[1])) return(x)
+  paras <- strsplit(x[1], "\n", fixed = TRUE)[[1]]
+  paste(vapply(paras, function(s) paste(strwrap(s, width = width), collapse = "\n"),
+               character(1), USE.NAMES = FALSE), collapse = "\n")
+}
+
+flat_caption <- function(x) {
+  if (is.null(x)) return(x)
+  gsub("[ \t]*\n[ \t]*", " ", x)
+}
+
 # The plot's own data slot. layer_data() is NOT the same thing -- that is the
 # *computed* layer data, with the aesthetics resolved -- and the callers here
 # want the frame that was handed in.

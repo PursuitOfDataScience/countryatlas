@@ -421,8 +421,8 @@ apply_min_coverage <- function(out, val_name, by, min_coverage, test,
 #' difference from [aggregate_regions()], which can only count what it is
 #' given. For `fun = "weighted_mean"` the weighted share is computed over the
 #' members present, since an absent member's weight is unknown. A group with no
-#' dated history (Commonwealth, G20, OPEC) warns and uses the current
-#' membership for every year.
+#' dated history (the Commonwealth, OPEC, AU, ECOWAS, CARICOM and PIF) warns
+#' and uses the current membership for every year.
 #'
 #' @return A tibble of `group` (and `year` for a panel), the aggregated value,
 #'   `n_countries` (members on that date), `n_reporting`, `coverage`, and for a

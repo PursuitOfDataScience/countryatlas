@@ -518,4 +518,18 @@ test_that("dated groups carry spells and suspensions", {
   expect_false(in_group("GBR", "CPTPP", "iso3c", as_of = "2024-12-14"))
   # Still undated, and said so.
   expect_warning(country_groups("Commonwealth", as_of = 2000), "No dated membership")
+  for (g in c("OPEC", "AU", "ECOWAS", "CARICOM", "PIF")) {
+    expect_warning(country_groups(g, as_of = 2000), "No dated membership")
+  }
+  # The G20 is dated for its nineteen countries, from the Berlin meeting.
+  expect_identical(nrow(country_groups("G20", as_of = "1999-12-15")), 19L)
+  expect_identical(nrow(country_groups("G20", as_of = "1999-12-14")), 0L)
+  # Bulgaria adopted the euro on 1 January 2026; Timor-Leste joined ASEAN on
+  # 26 October 2025.
+  expect_identical(in_group(c("BGR", "BGR"), "EuroZone", "iso3c",
+                            as_of = c("2025-12-31", "2026-01-01")),
+                   c(FALSE, TRUE))
+  expect_identical(in_group(c("TLS", "TLS"), "ASEAN", "iso3c",
+                            as_of = c("2025-10-25", "2025-10-26")),
+                   c(FALSE, TRUE))
 })

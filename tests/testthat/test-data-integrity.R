@@ -120,7 +120,8 @@ test_that("country_groups_tbl memberships are well formed", {
     unique(g$group),
     c("EU", "OECD", "G7", "G20", "BRICS", "ASEAN", "EFTA", "Commonwealth",
       "OPEC", "EuroZone", "NATO", "Nordic", "Visegrad", "Mercosur", "GCC",
-      "SCO", "CPTPP", "RCEP", "EAC", "SADC", "APEC", "ArabLeague")
+      "SCO", "CPTPP", "RCEP", "EAC", "SADC", "APEC", "ArabLeague",
+      "AU", "ECOWAS", "CARICOM", "PIF")
   )
   # Groups whose size is fixed by name or treaty.
   expect_equal(sum(g$group == "G7"), 7L)
@@ -507,15 +508,32 @@ test_that("every bundled table refers only to known codes", {
 # the documentation would start lying to readers.
 
 test_that("the README stays short, and runs what it shows", {
-  # The owner's standard: a hook, three real examples, setup in four steps, a
-  # gotchas table, under about 70 lines. The 3.0.0 README had grown to 470.
+  # The owner's standard: the title with the logo floated right on the same
+  # line, then the badges and one bold line; three real examples; setup in four
+  # steps with the tips beside them; under about 70 lines. The 3.0.0 README had
+  # grown to 470. The tone is the owner's too: an inviting first page, so no
+  # warning-style emoji, nothing centred, and no wording that reads as a list
+  # of hazards.
   skip_if_no_source_tree()
   skip_if_not(file.exists("../../README.Rmd"), "README.Rmd not present")
-  rd <- readLines("../../README.Rmd", warn = FALSE)
+  rd <- readLines("../../README.Rmd", warn = FALSE, encoding = "UTF-8")
   expect_lt(length(rd), 75L)
   txt <- paste(rd, collapse = "\n")
+  expect_true(any(grepl('^# countryatlas <img src="man/figures/logo.png" align="right"',
+                        rd)))
+  expect_false(grepl('align="center"', txt, fixed = TRUE))
   expect_match(txt, "## .*Setup")
-  expect_match(txt, "## .*Gotchas")
+  # U+26A0 warning sign, U+2757 / U+2755 exclamation marks, U+203C and U+2049
+  # double exclamation, U+1F6A8 rotating light, U+26D4 no entry, U+1F6D1 stop
+  # sign, U+2620 skull and crossbones, U+1F6AB prohibited.
+  alarm <- c("\u26a0", "\u2757", "\u2755", "\u203c", "\u2049",
+             "\U0001f6a8", "\u26d4", "\U0001f6d1", "\u2620", "\U0001f6ab")
+  expect_false(any(vapply(alarm, grepl, logical(1), x = txt, fixed = TRUE)))
+  expect_false(grepl(paste0(
+    "gotcha|warning|beware|caveat|pitfall|footgun|watch out|limitation|",
+    "known issue|danger|\\bbites?\\b|\\btraps?\\b|\\bnever\\b"),
+    txt, ignore.case = TRUE
+  ))
   # Every function it names is exported, so nothing it shows is stale.
   named <- unique(gsub("[`(]", "", regmatches(
     txt, gregexpr("`?[a-z][a-z0-9_]*\\(", txt))[[1]]))
@@ -668,12 +686,11 @@ test_that("the vignettes' version and projection lists match the code", {
   skip_if_no_source_tree()
   gg <- paste(readLines("../../vignettes/countryatlas-and-ggsql.Rmd",
                         warn = FALSE), collapse = " ")
-  src <- paste(readLines("../../R/map-interactive.R", warn = FALSE),
-               collapse = " ")
-  # The version interactive_map() actually enforces, and the version the
-  # vignette quotes, have to be the same string.
-  guard <- "0.4.1"
-  expect_true(grepl(paste0('"', guard, '"'), src, fixed = TRUE))
+  src <- paste(readLines("../../R/ggsql.R", warn = FALSE), collapse = " ")
+  # The version interactive_map() and as_ggsql_source() actually enforce, and
+  # the version the vignette quotes, have to be the same string.
+  guard <- countryatlas:::GGSQL_VERSION
+  expect_true(grepl(paste0('GGSQL_VERSION <- "', guard, '"'), src, fixed = TRUE))
   expect_true(grepl(guard, gg, fixed = TRUE))
 
   # sf-and-projections.Rmd enumerates every projection by name. [a-z0-9_], not
@@ -940,7 +957,8 @@ test_that("group memberships reflect the accessions the table is dated for", {
   expect_length(members("NATO"), 32L)
 
   expect_false("AGO" %in% members("OPEC"))       # left 1 January 2024
-  expect_length(members("OPEC"), 12L)
+  expect_false("ARE" %in% members("OPEC"))       # left 1 May 2026
+  expect_length(members("OPEC"), 11L)
 
   # BRICS: the original five plus the 2024 intake and Indonesia (January 2025).
   expect_true(all(c("BRA", "RUS", "IND", "CHN", "ZAF") %in% members("BRICS")))
@@ -951,12 +969,32 @@ test_that("group memberships reflect the accessions the table is dated for", {
   expect_true("GMB" %in% members("Commonwealth"))  # rejoined 2018
   expect_length(members("Commonwealth"), 56L)
 
+  # The 4.0.0 stamp said 2026-06-01 and still had the UAE in OPEC (it left on
+  # 1 May 2026), Bulgaria outside the euro area (it adopted the euro on
+  # 1 January 2026) and ASEAN at ten (Timor-Leste joined 26 October 2025).
+  expect_true("BGR" %in% members("EuroZone"))
+  expect_length(members("EuroZone"), 21L)
+  expect_true("TLS" %in% members("ASEAN"))
+  expect_length(members("ASEAN"), 11L)
+
+  # The four groups added in 4.0.0, at their current sizes: the African Union
+  # without the Sahrawi Republic, which has no ISO code; ECOWAS after Burkina
+  # Faso, Mali and Niger left (29 January 2025); CARICOM's full members; the
+  # Pacific Islands Forum's eighteen.
+  expect_length(members("AU"), 54L)
+  expect_true("MAR" %in% members("AU"))          # rejoined 2017
+  expect_length(members("ECOWAS"), 12L)
+  expect_false(any(c("BFA", "MLI", "NER") %in% members("ECOWAS")))
+  expect_length(members("CARICOM"), 15L)
+  expect_length(members("PIF"), 18L)
+
   # Unchanged reference points, so a bad rebuild shows up as more than a shift.
   expect_length(members("EU"), 27L)               # post-Brexit
-  expect_length(members("EuroZone"), 20L)         # Croatia joined 2023
   expect_length(members("OECD"), 38L)             # Costa Rica joined 2021
   expect_length(members("G7"), 7L)
+  expect_length(members("G20"), 19L)              # plus the EU and the AU
   expect_false("GBR" %in% members("EU"))
+  expect_identical(attr(g, "as_of"), "2026-11-01")
 })
 
 test_that("historical_codes distinguishes succession from continuation", {

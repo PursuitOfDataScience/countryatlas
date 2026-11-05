@@ -1153,3 +1153,39 @@ test_that("jenks degrades to quantile breaks when classInt is absent", {
   # Only jenks needs classInt; quantile computes its own breaks either way.
   expect_no_warning(world_map(mapdf, gdp_per_capita, style = "quantile"))
 })
+
+test_that("long captions wrap rather than run off the plot", {
+  # ggplot2 never wraps text, so a right-aligned caption longer than the plot
+  # was cut off at its left edge: lisa_map()'s ran to 170 characters, and at
+  # the default 7-inch width the coverage statement it starts with was lost.
+  long <- paste(rep("Twelve words in a sentence that keeps on going and going.", 4),
+                collapse = " ")
+  w <- countryatlas:::wrap_caption(long)
+  expect_true(all(nchar(strsplit(w, "\n", fixed = TRUE)[[1]]) <= 80))
+  expect_identical(countryatlas:::flat_caption(w), long)
+  # A break the verb wrote is kept; short captions are untouched.
+  expect_identical(countryatlas:::wrap_caption("a.\nb."), "a.\nb.")
+  expect_identical(countryatlas:::wrap_caption("Short."), "Short.")
+  expect_null(countryatlas:::wrap_caption(NULL))
+  skip_slow_on_cran()
+  p <- world_map(attach_geometry(world_snapshot$countries), gdp_per_capita,
+                 footnote = "A footnote that the caller wrote, long enough on its own to need two lines of a caption.")
+  cap <- ggplot2::get_labs(p)$caption
+  expect_true(all(nchar(strsplit(cap, "\n", fixed = TRUE)[[1]]) <= 80))
+})
+
+test_that("legend keys for empty classes keep their colour", {
+  # Since ggplot2 3.5 a key for a level no country falls in is drawn empty
+  # unless the layer sets show.legend = TRUE, so fixed breaks with an empty
+  # class showed a label with no swatch.
+  skip_slow_on_cran()
+  poly <- attach_geometry(world_snapshot$countries)
+  p <- world_map(poly, gdp_per_capita,
+                 breaks = c(-Inf, 1000, 2000, 300000, 400000, Inf))
+  fill_layers <- Filter(function(l) "fill" %in% names(l$mapping) ||
+                          "fill" %in% names(p$mapping), p$layers)
+  expect_true(isTRUE(fill_layers[[1]]$show.legend))
+  key <- ggplot2::get_guide_data(p, "fill")
+  expect_true("300K to 400K" %in% key$.label)       # empty, and still listed
+  expect_false(anyNA(key$fill))
+})
