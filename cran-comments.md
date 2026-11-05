@@ -53,12 +53,13 @@ behaviour. The ones that change output for existing code:
 * New in `Suggests`: `colorspace` (colour-vision simulation in
   `check_palette()`) and `shiny (>= 1.6.0)` (a map module,
   `world_map_ui()` / `world_map_server()`).
-* `ggsql` gains a version floor, `ggsql (>= 0.5.0)`: the database-side map
-  queries are written for, and were checked against, ggsql 0.5.2, the first
-  release on CRAN with its spatial layer. The tests and the vignette chunks
-  that execute them need a network connection (DuckDB downloads its spatial
-  extension into the session's temporary directory), so they are skipped on
-  CRAN.
+* The database-side map queries for `ggsql` (a Suggest) are written for,
+  and were checked against, ggsql 0.5.2, the first release on CRAN with its
+  spatial layer; the package checks for ggsql >= 0.5.0 when a query runs,
+  rather than in DESCRIPTION, since some CRAN macOS flavours still carry
+  0.3.3. The tests and the vignette chunks that execute queries need a
+  network connection (DuckDB downloads its spatial extension into the
+  session's temporary directory), so they are skipped on CRAN.
 * Removed from `Suggests`: `owidR` and `OECD`. Neither could return data:
   Our World in Data changed its API, and OECD.Stat, which the `OECD` package
   targets, has been offline since 2024-07-01. Both sources are rebuilt on the

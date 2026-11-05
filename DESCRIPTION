@@ -76,7 +76,7 @@ Suggests:
     ggiraph,
     ggpattern,
     ggrepel,
-    ggsql (>= 0.5.0),
+    ggsql,
     gifski,
     giscoR,
     gt,
